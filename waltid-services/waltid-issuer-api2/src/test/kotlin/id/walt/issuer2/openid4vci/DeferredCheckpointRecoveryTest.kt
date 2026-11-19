@@ -55,6 +55,7 @@ class DeferredCheckpointRecoveryTest {
     @Test fun failureAfterFinalizationRecoversWithoutRepeatedIssuance() = runTest { verifyRecovery("consume") }
     @Test fun deferredBatchRetainsStatusReservationsAfterGenerationFailure() = runTest { verifyRecovery("signing", preallocated = true) }
     @Test fun deferredBatchRetainsPreparedCredentialsAfterResponseFailure() = runTest { verifyRecovery("response", preallocated = true) }
+    @Test fun deferredBatchRetainsStatusReservationsWhenCheckpointStorageFails() = runTest { verifyRecovery("checkpoint", preallocated = true) }
     @Test fun deferredBatchRetainsStatusesAfterFinalizationFailure() = runTest { verifyRecovery("consume", preallocated = true) }
     @Test fun immediateBatchRetainsStatusReservationsAfterGenerationFailure() = runTest { verifyRecovery("signing", preallocated = true, deferred = false) }
     @Test fun immediateBatchRetainsPreparedCredentialsAfterResponseFailure() = runTest { verifyRecovery("response", preallocated = true, deferred = false) }
@@ -84,6 +85,11 @@ class DeferredCheckpointRecoveryTest {
                     expected.credentialStatusIssuance?.operations?.isNotEmpty() == true &&
                     replacement.credentialStatusIssuance?.operations?.isEmpty() == true &&
                     replacement.issuanceResults.isNotEmpty()
+                if (failure == "checkpoint" && fail &&
+                    replacement.deferredState?.transactions?.values?.any { it.response != null } == true) {
+                    fail = false
+                    error("Private checkpoint backend diagnostics")
+                }
                 if (failure == "consume" && fail &&
                     (replacement.deferredState?.transactions?.values?.any { it.consumed } == true || completesImmediate)) {
                     fail = false
@@ -171,13 +177,17 @@ class DeferredCheckpointRecoveryTest {
         }
         suspend fun submit(body: JsonObject, verifier: CredentialProofVerifier? = null) =
             protocol(verifier).processCredentialRequest(listOf("Bearer $token"), emptyList(), body, "credential")
-        if (failure == "consume" && deferred) assertFailsWith<IllegalStateException> { submit(request()) }
-        else assertEquals(500, submit(request()).status)
+        val failed = submit(request())
+        assertEquals(500, failed.status)
+        if (failure == "checkpoint" || (failure == "consume" && deferred)) {
+            assertEquals("server_error", failed.payload.getValue("error").jsonPrimitive.content)
+            assertEquals("Credential request processing failed", failed.payload.getValue("error_description").jsonPrimitive.content)
+        }
         assertEquals(1, proofVerifications, "The first request verifies its batch once")
         val transaction = if (deferred) assertNotNull(sessions.getSession(receipt.offerId).deferredState).transactions.values.single() else null
         if (transaction != null) {
             assertFalse(transaction.consumed)
-            if (failure != "signing") assertNotNull(transaction.response)
+            if (failure != "signing" && failure != "checkpoint") assertNotNull(transaction.response)
         } else {
             val operation = sessions.getSession(receipt.offerId).credentialStatusIssuance!!.operations.values.single()
             if (failure != "signing") assertNotNull(operation.response)
@@ -201,7 +211,7 @@ class DeferredCheckpointRecoveryTest {
         val recovered = submit(request())
         assertEquals(200, recovered.status, recovered.payload.toString())
         assertEquals(beforeRetry + 1, proofVerifications, "A retry verifies fresh proofs once, even for a saved response")
-        assertEquals(if (failure == "signing") 2 else 1, issuanceInputRequests)
+        assertEquals(if (failure == "signing" || failure == "checkpoint") 2 else 1, issuanceInputRequests)
         if (preallocated) {
             val statuses = recovered.payload.getValue("credentials").jsonArray.map {
                 SDJwt.parse(it.jsonObject.getValue("credential").jsonPrimitive.content).fullPayload.getValue("status")

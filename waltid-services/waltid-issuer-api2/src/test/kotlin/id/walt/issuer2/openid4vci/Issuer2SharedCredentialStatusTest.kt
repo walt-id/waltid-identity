@@ -19,6 +19,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCredential
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
+import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.repository.ConfiguredIssuanceSessionRepository
 import id.walt.issuer2.repository.IssuanceSessionStorageCodec
@@ -28,6 +29,7 @@ import id.walt.issuer2.repository.CredentialStatusConsumption
 import id.walt.issuer2.repository.CredentialStatusConsumptionRepository
 import id.walt.issuer2.service.openid4vci.decodeExternalLoginAuthorizationParameters
 import id.walt.issuer2.testsupport.*
+import id.walt.ktornotifications.SseNotifier
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
@@ -418,6 +420,84 @@ class Issuer2SharedCredentialStatusTest {
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject { put("transaction_id", transaction) })
         }
+        assertEquals(HttpStatusCode.OK, issued.status, issued.bodyAsText())
+        assertPreallocatedStatuses(issued.body(), "dc+sd-jwt", example.runtimeOverrides!!.credentialStatus!!.jsonArray.take(2))
+    }
+
+    @Test
+    fun deferredCapacityRejectionLetsTheWalletRetryWithFewerProofs() = testApplication {
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
+        val overrides = requireNotNull(example.runtimeOverrides)
+        val groups = overrides.credentialStatus!!.jsonArray.take(1)
+        val fixture = installStatusIssuer()
+        val offer = fixture.client.createCredentialOffer(example.copy(
+            deferred = true,
+            runtimeOverrides = overrides.copy(credentialStatus = JsonArray(groups)),
+        ))
+        val resolved = fixture.wallet.resolve(offer)
+        val configurationId = resolved.offer.credentialConfigurationIds.single()
+        val token = fixture.wallet.exchangePreAuthorizedCode(resolved, null)
+        suspend fun issue(proofs: Proofs) =
+            fixture.issue(resolved, token.access_token, credentialRequest(configurationId, proofs))
+
+        val pending = issue(fixture.twoProofs(resolved, configurationId))
+        assertEquals(HttpStatusCode.Accepted, pending.status)
+        val transaction = pending.body<JsonObject>().getValue("transaction_id")
+        val approved = fixture.client.post("/issuer2/credential-offers/${offer.offerId}/deferred/complete")
+        assertEquals(HttpStatusCode.NoContent, approved.status)
+        suspend fun poll() = fixture.client.post(assertNotNull(resolved.issuerMetadata.deferredCredentialEndpoint)) {
+            bearerAuth(token.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(buildJsonObject { put("transaction_id", transaction) })
+        }
+
+        val exhausted = poll()
+        assertEquals(HttpStatusCode.BadRequest, exhausted.status)
+        assertEquals("invalid_credential_request", exhausted.body<JsonObject>().getValue("error").jsonPrimitive.content)
+        assertEquals("invalid_transaction_id", poll().body<JsonObject>().getValue("error").jsonPrimitive.content)
+        val issued = issue(fixture.wallet.buildJwtProofs(resolved.issuerMetadata, configurationId))
+        assertEquals(HttpStatusCode.OK, issued.status, issued.bodyAsText())
+        assertPreallocatedStatuses(issued.body(), "dc+sd-jwt", groups)
+    }
+
+    @Test
+    fun reservationFailureReturnsASafeErrorAndAllowsRetry() = testApplication {
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
+        val ledger = ConfiguredCredentialStatusConsumptionRepository(
+            InMemoryPersistence<CredentialStatusConsumption>("status-storage-failure", Duration.INFINITE),
+            durable = true,
+        )
+        var failReservation = true
+        val repository = object : CredentialStatusConsumptionRepository by ledger {
+            override suspend fun reserve(
+                profileId: String,
+                operationId: String,
+                holderKeys: List<String>,
+                groups: List<CredentialStatusConfiguration.Group>,
+                expiresAt: Instant,
+            ): List<JsonArray> {
+                if (failReservation) error("Private status backend diagnostics")
+                return ledger.reserve(profileId, operationId, holderKeys, groups, expiresAt)
+            }
+        }
+        val fixture = installStatusIssuer(statusRepository = repository)
+        val offer = fixture.client.createCredentialOffer(example)
+        val resolved = fixture.wallet.resolve(offer)
+        val configurationId = resolved.offer.credentialConfigurationIds.single()
+        val token = fixture.wallet.exchangePreAuthorizedCode(resolved, null)
+        val request = credentialRequest(configurationId, fixture.twoProofs(resolved, configurationId))
+        val events = SseNotifier.getSseFlow(IssuanceNotificationService.ISSUER_EVENT_STREAM_TARGET)
+
+        val failed = fixture.issue(resolved, token.access_token, request)
+        assertEquals(HttpStatusCode.InternalServerError, failed.status)
+        val publicError = failed.body<JsonObject>()
+        assertEquals("server_error", publicError.getValue("error").jsonPrimitive.content)
+        assertEquals("Credential request processing failed", publicError.getValue("error_description").jsonPrimitive.content)
+        val event = events.replayCache.single { it.target == offer.offerId && it.error == "server_error" }
+        assertEquals("Credential request processing failed", event.errorDescription)
+
+        failReservation = false
+        val issued = fixture.issue(resolved, token.access_token, request)
         assertEquals(HttpStatusCode.OK, issued.status, issued.bodyAsText())
         assertPreallocatedStatuses(issued.body(), "dc+sd-jwt", example.runtimeOverrides!!.credentialStatus!!.jsonArray.take(2))
     }

@@ -894,12 +894,16 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             is DeferredCredentialRequestResult.OAuthFailure -> return oauth2Provider.writeDeferredCredentialError(result.error)
         }
         val claims = authorization.token.decodeJws().payload
-        val session = claims.stringClaim("sub")?.let { sessionService.getSessionOrNull(it) }
-            ?: return oauth2Provider.writeDeferredCredentialError(CredentialError(CredentialErrorCodes.INVALID_TRANSACTION_ID))
         return try {
+            val session = claims.stringClaim("sub")?.let { sessionService.getSessionOrNull(it) }
+                ?: return oauth2Provider.writeDeferredCredentialError(CredentialError(CredentialErrorCodes.INVALID_TRANSACTION_ID))
             collectDeferredCredential(authorization.token, session, request, claims, requestId)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: CredentialProtocolException) {
             oauth2Provider.writeDeferredCredentialError(e.error)
+        } catch (e: Exception) {
+            credentialIssuanceFailed(null, null, requestId, e)
         }
     }
 
@@ -924,15 +928,23 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     val prepared = claim.accepted.restore(
                         request.credentialResponseEncryption, DeferredCredentialResponseContext(session.sessionId, claim, deferredIssuance),
                     )
-                    val response = deferredIssuance.withClaim(session.sessionId, claim) {
-                        if (claim.response != null && claim.accepted.credentialIdentifier in sessionService.getSession(session.sessionId).issuanceResults) {
-                            when (val result = oauth2Provider.createDeferredCredentialResponse(
-                                request, requireNotNull(claim.response), DeferredCredentialResponseContext(session.sessionId, claim, deferredIssuance),
-                            )) {
-                                is CredentialResponseResult.Success -> oauth2Provider.writeCredentialResponse(prepared, result.response)
-                                is CredentialResponseResult.Failure -> oauth2Provider.writeDeferredCredentialError(result.error)
-                            }
-                        } else processCredentialRequest(accessToken, requestId, claim) { CredentialRequestResult.Success(prepared) }
+                    val response = try {
+                        deferredIssuance.withClaim(session.sessionId, claim) {
+                            if (claim.response != null && claim.accepted.credentialIdentifier in sessionService.getSession(session.sessionId).issuanceResults) {
+                                when (val result = oauth2Provider.createDeferredCredentialResponse(
+                                    request, requireNotNull(claim.response), DeferredCredentialResponseContext(session.sessionId, claim, deferredIssuance),
+                                )) {
+                                    is CredentialResponseResult.Success -> oauth2Provider.writeCredentialResponse(prepared, result.response)
+                                    is CredentialResponseResult.Failure -> oauth2Provider.writeDeferredCredentialError(result.error)
+                                }
+                            } else processCredentialRequest(accessToken, requestId, claim) { CredentialRequestResult.Success(prepared) }
+                        }
+                    } catch (e: CredentialStatusCapacityException) {
+                        withContext(NonCancellable) { deferredIssuance.discardUnissued(session.sessionId, claim) }
+                        return rejectCredentialRequest(
+                            prepared, session, claim.accepted.configuration.format, requestId,
+                            CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message),
+                        )
                     }
                     // Later polls of a denied transaction are rejected before acquiring a claim.
                     if (response.payload["error"]?.jsonPrimitive?.contentOrNull == CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED) {
@@ -951,7 +963,11 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     response
                 } catch (e: Throwable) {
                     withContext(NonCancellable) { runCatching { deferredIssuance.release(session.sessionId, claim) } }
-                    throw e
+                    when (e) {
+                        is CancellationException, is CredentialProtocolException -> throw e
+                        is Exception -> credentialIssuanceFailed(session, claim.accepted.configuration.format, requestId, e)
+                        else -> throw e
+                    }
                 }
             }
         }
@@ -1057,8 +1073,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             sessionService.getSession(sessionId)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
-            val error = OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message)
+        } catch (_: NotFoundException) {
+            val error = OAuthError(OAuthErrorCodes.INVALID_TOKEN, "Issuance session not found")
             val response = oauth2Provider.writeCredentialError(
                 credentialRequest.withSession(DefaultSession(subject = sessionId)),
                 error,
@@ -1071,6 +1087,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 errorDescription = error.description,
             )
             return response
+        } catch (e: Exception) {
+            return credentialIssuanceFailed(null, null, requestId, e)
         }
         val authorization = when (
             val resolution = credentialRequest.resolveCredentialAuthorization(
@@ -1189,13 +1207,25 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 return oauth2Provider.writeCredentialError(error)
             } catch (e: CredentialProtocolException) {
                 return oauth2Provider.writeDeferredCredentialError(e.error)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return credentialIssuanceFailed(observedSession, configuration.format, requestId, e)
             }
         }
 
         // Preallocated status requires a durable lease so a crashed process cannot lose the session.
-        val session = (if (deferredClaim != null) observedSession
-            else if (observedSession.requiresCredentialStatusLease) sessionService.claimCredentialStatusSession(sessionId)
-            else sessionService.claimSession(sessionId))
+        val session = try {
+            when {
+                deferredClaim != null -> observedSession
+                observedSession.requiresCredentialStatusLease -> sessionService.claimCredentialStatusSession(sessionId)
+                else -> sessionService.claimSession(sessionId)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return credentialIssuanceFailed(observedSession, configuration.format, requestId, e)
+        }
             ?: return rejectCredentialRequest(
                 requestWithSession,
                 observedSession,
@@ -1542,6 +1572,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
             throw e
         } catch (e: CredentialStatusCapacityException) {
+            if (deferredClaim != null) throw e
             if (session.credentialStatusIssuance?.leaseId != null) {
                 sessionService.discardUnreservedCredentialStatusOperation(session, issuanceRequest.credentialIdentifier)
             }
@@ -1566,16 +1597,15 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         } catch (e: CredentialProtocolException) {
             throw e
         } catch (e: Exception) {
-            if (claimFinalized) {
-                throw e
+            if (claimFinalized || deferredClaim != null) throw e
+            try {
+                restoreClaimedSession(session)
+            } catch (cleanup: CancellationException) {
+                throw cleanup
+            } catch (cleanup: Exception) {
+                logger.warn { "Could not release issuance claim (requestId=$requestId, exception=${cleanup.javaClass.simpleName})" }
             }
-            return failClaimedCredentialRequest(
-                requestWithSession,
-                session,
-                configuration.format,
-                requestId,
-                e.toCredentialServerError(),
-            )
+            return credentialIssuanceFailed(session, configuration.format, requestId, e)
         }
     }
 
@@ -2138,11 +2168,20 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             )
         }
 
-    private fun Exception.toCredentialServerError(): OAuthError =
-        OAuthError(
-            OAuthErrorCodes.SERVER_ERROR,
-            message ?: "Credential request processing failed",
+    private suspend fun credentialIssuanceFailed(
+        session: IssuanceSession?,
+        format: CredentialFormat?,
+        requestId: String,
+        cause: Exception,
+    ): CredentialResponseHttp {
+        logger.error { "Credential issuance failed (requestId=$requestId, exception=${cause.javaClass.simpleName})" }
+        val error = OAuthError(OAuthErrorCodes.SERVER_ERROR, "Credential request processing failed")
+        notificationService.notify(
+            requestId = requestId, session = session, event = credentialRequestEvent(format, succeeded = false),
+            error = error.error, errorDescription = error.description,
         )
+        return oauth2Provider.writeCredentialError(error)
+    }
 
     private fun parseSharedMdocStatus(status: JsonElement): MdocStatus? {
         return try {
