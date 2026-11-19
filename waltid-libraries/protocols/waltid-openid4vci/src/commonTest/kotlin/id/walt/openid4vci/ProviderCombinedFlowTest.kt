@@ -70,7 +70,7 @@ class ProviderCombinedFlowTest {
         assertTrue(tokenResponse.accessToken.isNotBlank())
 
         // Pre-authorized code flow
-        val issuedCode = config.preAuthorizedCodeIssuer.issue(
+        val issuedCode = provider.preAuthorizedCodeIssuer.issue(
             PreAuthorizedCodeIssueRequest(
                 scopes = setOf("openid"),
                 audience = setOf("aud:issuer"),

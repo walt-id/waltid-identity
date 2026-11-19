@@ -3,6 +3,7 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.deferred.DeferredCredentialResponseContext
 import id.walt.certificate.x509.X509Certificate
 import id.walt.openid4vci.Session
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -50,6 +51,8 @@ import kotlin.time.Instant
  * Parameters will be changed. However, we have to keep the implementation framework-agnostic (Ktor, Spring).
  */
 interface OAuth2Provider {
+    val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer
+
     // OAuth2.0 - Authorization Endpoint
     suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
 

@@ -11,6 +11,7 @@ import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeC
 import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeConfig
 import kotlinx.coroutines.runBlocking
 
 data class Issuer2ServiceConfig(
@@ -30,6 +31,7 @@ data class Issuer2ServiceConfig(
     val deferredIssuance: id.walt.openid4vci.deferred.DeferredIssuanceConfig = id.walt.openid4vci.deferred.DeferredIssuanceConfig(),
     /** Requires PKCE for authorization-code requests; supplied PKCE is always verified. */
     val requirePkce: Boolean = false,
+    val preAuthorizedCode: PreAuthorizedCodeConfig = PreAuthorizedCodeConfig(),
 ) : WaltConfig() {
     /** Preserves the full JVM constructor from before metadata signing configuration. */
     constructor(

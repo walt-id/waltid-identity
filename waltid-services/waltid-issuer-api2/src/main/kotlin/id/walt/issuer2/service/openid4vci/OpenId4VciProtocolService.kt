@@ -40,6 +40,7 @@ import id.walt.openid4vci.mdoc.MsoValidityResolver
 import id.walt.credentials.issuance.InstantClock
 import id.walt.credentials.issuance.IssuanceClock
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeFailure
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.toDefaultAuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -666,18 +667,25 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
         return when (result) {
             is AccessTokenResponseResult.Failure -> {
-                val correlatedSession = result.request.session?.subject
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { sessionId ->
-                        try {
-                            sessionService.getSessionOrNull(sessionId)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            logger.warn(e) { "Could not load issuance session $sessionId for token failure" }
-                            null
-                        }
+                val lockout = result.preAuthorizedCodeFailure as? PreAuthorizedCodeFailure.Locked
+                val sessionId = lockout?.issuanceSessionId ?: result.request.session?.subject?.takeIf(String::isNotBlank)
+                val closedSession = if (lockout != null && sessionId != null) {
+                    result.request.requestForm["pre-authorized_code"]?.firstOrNull()?.let { code ->
+                        sessionService.closeForPreAuthorizedCodeLockout(
+                            sessionId, code, IssuanceSessionFailure(result.error.error, result.error.description),
+                        )
                     }
+                } else null
+                val correlatedSession = closedSession ?: sessionId?.let {
+                    try {
+                        sessionService.getSessionOrNull(it)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logger.warn(e) { "Could not load issuance session $it for token failure" }
+                        null
+                    }
+                }
                 val response = oauth2Provider.writeAccessTokenError(result.request, result.error)
                 notificationService.notify(
                     requestId = requestId,
@@ -686,6 +694,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     error = result.error.error,
                     errorDescription = result.error.description,
                 )
+                closedSession?.let { notificationService.emitIssuanceStatus(requestId, it) }
                 response
             }
 
@@ -767,6 +776,14 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             "Token request has no issuance session"
         }
         val session = sessionService.getSession(sessionId)
+        if (GrantType.PreAuthorizedCode.value in accessTokenRequest.grantTypes) {
+            val currentCode = session.credentialOffer?.grants?.preAuthorizedCode?.preAuthorizedCode
+            if (currentCode == null || currentCode != accessTokenRequest.requestForm["pre-authorized_code"]?.singleOrNull()) {
+                throw InvalidTokenCredentialAuthorization(
+                    accessTokenRequest, "Pre-authorized code is invalid", OAuthErrorCodes.INVALID_GRANT,
+                )
+            }
+        }
         if (session.isClosed && !(session.deferredStatus == DeferredStatus.DENIED && refreshGrant != null)) {
             throw InvalidTokenCredentialAuthorization(
                 accessTokenRequest,
@@ -795,9 +812,14 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             establishedSelection = session.authorizedCredentialIdentifiers,
             refreshGrant = refreshGrant,
             includeInResponse = includeDetails,
-        ).copy(issuanceDeadline = session.deferredState?.let {
-            it.deadline ?: (Clock.System.now() + deferredConfig.lifetimeSeconds.seconds)
-        })
+        ).copy(
+            issuanceDeadline = session.deferredState?.let {
+                it.deadline ?: (Clock.System.now() + deferredConfig.lifetimeSeconds.seconds)
+            },
+            accessTokenDeadline = session.expiresAt.takeIf {
+                session.authenticationMethod == AuthenticationMethod.PRE_AUTHORIZED && session.deferredState == null
+            },
+        )
     }
 
     private suspend fun establishIssuanceSelection(

@@ -9,6 +9,7 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenCredentialAuthorization
 import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.responses.token.resolveTokenCredentialAuthorization
 import id.walt.openid4vci.requests.credential.CredentialAuthorization
@@ -286,7 +287,7 @@ class ProviderRefreshTokenFlowTest {
             accessTokenIssuer = CountingTokenIssuer(),
         )
         val provider = buildOAuth2Provider(config)
-        val issued = config.preAuthorizedCodeIssuer.issue(
+        val issued = provider.preAuthorizedCodeIssuer.issue(
             PreAuthorizedCodeIssueRequest(
                 clientId = null,
                 scopes = setOf("openid"),
@@ -322,6 +323,57 @@ class ProviderRefreshTokenFlowTest {
 
         assertTrue(refreshResponse is AccessTokenResponseResult.Success)
         assertNotNull(refreshResponse.response.refreshToken)
+    }
+
+    @Test
+    fun `refresh past the access token deadline is rejected without rotating the refresh token`() = runTest {
+        val refreshTokenRepository = InMemoryRefreshTokenRepository()
+        val refreshTokenIssuer = TestRefreshTokenIssuer()
+        val signer = CountingTokenIssuer()
+        val provider = buildOAuth2Provider(createTestConfig(
+            refreshTokenRepository = refreshTokenRepository,
+            refreshTokenIssuer = refreshTokenIssuer,
+            accessTokenIssuer = signer,
+        ))
+        var accessTokenDeadline = Clock.System.now() + 60.seconds
+        val options = TokenResponseOptions(credentialAuthorizationResolver = { _, _ ->
+            TokenCredentialAuthorization(emptyList(), false, accessTokenDeadline = accessTokenDeadline)
+        })
+        val issued = provider.preAuthorizedCodeIssuer.issue(
+            PreAuthorizedCodeIssueRequest(scopes = setOf("openid"), session = DefaultSession(subject = "holder")),
+        )
+        val accessRequest = provider.createAccessTokenRequest(mapOf(
+            "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+            "pre-authorized_code" to listOf(issued.code),
+        ))
+        require(accessRequest is AccessTokenRequestResult.Success)
+        val initial = provider.createAccessTokenResponse(accessRequest.request.withIssuer("test-issuer"), options)
+        require(initial is AccessTokenResponseResult.Success)
+        val refreshToken = assertNotNull(initial.response.refreshToken)
+
+        suspend fun refreshOnce(token: String): AccessTokenResponseResult {
+            val request = provider.createAccessTokenRequest(mapOf(
+                "grant_type" to listOf(GrantType.RefreshToken.value),
+                "refresh_token" to listOf(token),
+            ))
+            require(request is AccessTokenRequestResult.Success)
+            return provider.createAccessTokenResponse(request.request.withIssuer("test-issuer"), options)
+        }
+
+        accessTokenDeadline = Clock.System.now() - 1.seconds
+        val rejected = refreshOnce(refreshToken)
+        assertTrue(rejected is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_grant", rejected.error.error)
+        assertEquals(1, signer.claims.size, "An expired deadline must not sign another access token")
+        assertTrue(
+            assertNotNull(refreshTokenRepository.get(refreshTokenIssuer.signature(refreshToken))).active,
+            "An expired deadline must not rotate the refresh token",
+        )
+
+        accessTokenDeadline = Clock.System.now() + 60.seconds
+        val refreshed = refreshOnce(refreshToken)
+        assertTrue(refreshed is AccessTokenResponseResult.Success)
+        assertTrue(assertNotNull(refreshed.response.expiresIn) in 1..60)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

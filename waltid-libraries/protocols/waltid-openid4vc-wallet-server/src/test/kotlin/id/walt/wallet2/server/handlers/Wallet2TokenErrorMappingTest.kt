@@ -13,6 +13,7 @@ class Wallet2TokenErrorMappingTest {
         val upstream = TokenRequestException(
             statusCode = HttpStatusCode.BadRequest.value,
             oauthError = "invalid_grant",
+            oauthErrorDescription = "Too many incorrect tx_code attempts",
             cause = IllegalStateException("upstream body must not escape"),
         )
 

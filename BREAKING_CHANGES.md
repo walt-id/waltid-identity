@@ -1,5 +1,20 @@
 # Breaking changes since 0.3.1
 
+## OpenID4VCI pre-authorized code redemption
+
+- `OAuth2ProviderConfig` takes the repository and `PreAuthorizedCodeConfig` (or a configuration resolver).
+  Issue grants through `provider.preAuthorizedCodeIssuer`. Migrate custom issuer instances to
+  `preAuthorizedCodeIssuerFactory`, which receives the repository and resolved-settings callback.
+  Set `PreAuthorizedCodeIssueRequest.lifetimeSeconds` for explicit code validity. Set any
+  issuance-session access-token ceiling when resolving credential authorization at token exchange.
+- Custom `PreAuthorizedCodeRepository` implementations must provide atomic `compareAndSetRedemptionState`
+  and retain the updated state through the original expiry. The update matches the same unexpired,
+  active grant and its current redemption state. Use the default `consume` implementation or
+  ensure any override performs the same conditional active-to-redeemed transition for already authenticated grants.
+  In-memory snapshots expose the application-defined grant through `originalRecord`.
+- New issuer2 pre-authorized offers require a positive lifetime within the configured maximum (300 seconds by default).
+  Existing grants retain their stored expiry. Upgrade all token handlers sharing a repository to enforce the new attempt limit.
+
 ## OpenID4VCI claim metadata paths
 
 - `ClaimDescription.path` now uses `List<JsonElement>` to preserve string keys, integer indexes/map keys, and JSON null wildcards (OpenID4VCI Appendix C). Consumers reading or copying paths must handle these segment types instead of assuming every segment is a string; rebuild callers against the updated model. The Wallet2 detailed-offer claim path response uses the same typed segments.

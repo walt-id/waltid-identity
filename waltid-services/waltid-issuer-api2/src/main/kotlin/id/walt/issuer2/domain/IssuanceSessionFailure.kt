@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * The OAuth or OpenID4VCI error returned for a failed protocol request. It is published with failure
- * events and persisted for terminal credential failures.
+ * events and persisted when the failure closes the session.
  */
 @Serializable
 data class IssuanceSessionFailure(

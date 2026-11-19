@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class TypeMetadataOfferPreflightTest {
     @Test
@@ -53,7 +54,7 @@ class TypeMetadataOfferPreflightTest {
         val codeIssuer = object : PreAuthorizedCodeIssuer {
             override suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult {
                 codes++
-                return PreAuthorizedCodeIssueResult("code-$codes", Clock.System.now())
+                return PreAuthorizedCodeIssueResult("code-$codes", Clock.System.now() + 300.seconds)
             }
         }
         val config = Issuer2ServiceConfig(baseUrl = "https://issuer.example")

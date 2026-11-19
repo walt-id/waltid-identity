@@ -90,7 +90,7 @@ class DPoPProviderTest {
             dpopProofVerifier = dpopVerifier,
         )
         val provider = buildOAuth2Provider(config)
-        val code = config.preAuthorizedCodeIssuer.issue(
+        val code = provider.preAuthorizedCodeIssuer.issue(
             PreAuthorizedCodeIssueRequest(
                 scopes = setOf("credential"),
                 audience = setOf(ISSUER),

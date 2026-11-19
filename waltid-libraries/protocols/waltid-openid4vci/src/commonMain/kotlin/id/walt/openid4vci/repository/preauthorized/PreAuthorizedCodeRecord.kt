@@ -17,6 +17,15 @@ interface PreAuthorizedCodeRecord {
     val grantedAudience: Set<String>
     val session: Session
     val expiresAt: Instant
+    val redemptionState: PreAuthorizedCodeRedemptionState?
+        get() = null
+
+    /**
+     * The immutable grant payload, including any application-defined interfaces. Read [redemptionState]
+     * from the repository snapshot itself. Adapters that wrap records must expose the original payload here.
+     */
+    val originalRecord: PreAuthorizedCodeRecord
+        get() = this
 
     /** Optional issuance session ID for O(1) lookup on credential endpoint */
     val issuanceSessionId: String?
@@ -34,4 +43,21 @@ data class DefaultPreAuthorizedCodeRecord(
     override val session: Session,
     override val expiresAt: Instant,
     override val issuanceSessionId: String? = null,
+    override val redemptionState: PreAuthorizedCodeRedemptionState? = null,
 ) : PreAuthorizedCodeRecord
+
+@Serializable
+data class PreAuthorizedCodeRedemptionState(
+    val failedAttempts: Int,
+    val status: PreAuthorizedCodeStatus,
+)
+
+@Serializable
+enum class PreAuthorizedCodeStatus {
+    ACTIVE,
+    LOCKED,
+    REDEEMED,
+}
+
+fun PreAuthorizedCodeRecord.isRedeemableAt(now: Instant): Boolean =
+    now < expiresAt && (redemptionState?.status ?: PreAuthorizedCodeStatus.ACTIVE) == PreAuthorizedCodeStatus.ACTIVE

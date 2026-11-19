@@ -377,7 +377,7 @@ Failure events carry the protocol error directly on the event envelope:
   "session": { "sessionId": "..." } }
 ```
 
-`error` and `error_description` are the OAuth or OpenID4VCI error returned to the wallet. The event catalogue does not define a second error taxonomy such as `tx_code_validation_failed`; consumers use the specification error and description for diagnosis. For terminal credential failures the object is stored on the session and can be read from `GET /issuer2/sessions/{sessionId}`. Retryable credential proof and nonce failures publish it only on the event because the session remains usable.
+`error` and `error_description` are the OAuth or OpenID4VCI error returned to the wallet. The event catalogue does not define a second error taxonomy such as `tx_code_validation_failed`; consumers use the specification error and description for diagnosis. For terminal credential failures and permanent pre-authorized grant lockout, the object is stored on the session and can be read from `GET /issuer2/sessions/{sessionId}`. Retryable credential proof and nonce failures publish it only on the event because the session remains usable.
 
 ### Ordering and delivery
 
@@ -385,7 +385,7 @@ Events raised while handling a single request are delivered in order, on both tr
 
 On successful credential issuance the session is persisted as `SUCCESSFUL` before the credential success event and `issuance_status_changed` are published. A terminal credential failure is persisted as `UNSUCCESSFUL` before the credential failure event and `issuance_status_changed` are published. The status event carries `status`, `statusReason`, and `isClosed`.
 
-Only terminal credential endpoint failures conclude a session. Earlier stages and retryable credential proof or nonce failures leave it usable. An incorrect `tx_code`, for example, does not consume the pre-authorized code, so the wallet can retry and complete the same session.
+A wrong `tx_code` leaves the session active while attempts remain. At the limit, issuer2 closes the session as `UNSUCCESSFUL` and stops serving the offer by reference. The token failure event precedes `issuance_status_changed` for that request. The holder needs a new offer.
 
 Published session payloads redact issuer signing key material (`issuerKey.type = "redacted"`). Credential data may still be present; use trusted webhook receivers and avoid exposing event payloads in public logs or screenshots.
 
@@ -440,6 +440,29 @@ recovering the original offer session. Pre-authorized offers are unchanged.
 **Migration:** Send `"issuerStateMode": "INCLUDE"` to preserve the previous OSS behavior,
 including recovery of the original offer session and support for runtime overrides.
 Defaults for reference/value mode, expiry, and transaction codes are shared by both request forms.
+
+Issuer2 uses the OpenID4VCI library defaults of 300 seconds for both the default and maximum
+pre-authorized code lifetime and five incorrect transaction code attempts per grant. These values
+are issuer settings. Override them in `issuer-service.conf`:
+
+```hocon
+preAuthorizedCode {
+  defaultLifetimeSeconds = 120
+  maxLifetimeSeconds = 300
+  maxFailedTxCodeAttempts = 3
+}
+```
+
+If the request omits `expiresInSeconds`, the issuer uses `defaultLifetimeSeconds`. A request can choose a
+positive lifetime up to `maxLifetimeSeconds`. The default cannot exceed the maximum.
+A pre-authorized code can be redeemed once before its deadline. Issuer2 gives the offer and initial
+issuance session that same deadline. At token exchange, issuer2 bounds access tokens for
+immediate pre-authorized issuance by the session deadline, including when refreshing a token.
+For deferred issuance the separately configured deferred deadline starts at token issuance.
+
+The failed attempt budget is per grant and persists until the original expiry. Deployment rate limits
+can also restrict request volume across grants. Authorized offers have their own lifetime and accept
+`-1` for no expiry. The authorization code issued later still has its own expiry and can be used once.
 
 ### Sessions, authorization and proof copies
 

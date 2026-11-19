@@ -12,6 +12,7 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.pkce.PkceAuthorizationResult
 import id.walt.openid4vci.pkce.PkceService
+import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
@@ -108,6 +109,13 @@ class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
     private val pkceService: PkceService = PkceService(config.pkceServiceConfig),
 ) : OAuth2Provider {
+    override val preAuthorizedCodeIssuer = config.preAuthorizedCodeIssuerFactory
+        ?.invoke(config.preAuthorizedCodeRepository, config::resolvePreAuthorizedCodeConfig)
+        ?: DefaultPreAuthorizedCodeIssuer(
+            repository = config.preAuthorizedCodeRepository,
+            anonymousAccessSupported = config.preAuthorizedCodeAnonymousAccessSupported,
+            resolveConfig = config::resolvePreAuthorizedCodeConfig,
+        )
     private val deferredAttestationLifetimeValidator = DeferredAttestationLifetimeValidator()
     private val attestationStatusValidator = AttestationStatusValidator(config.attestationStatusResolver)
 
@@ -340,7 +348,7 @@ class DefaultOAuth2Provider(
     ): AccessTokenRequestResult {
         if (config.clientAuthenticationServiceResolver == null &&
             isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers) &&
-            !config.preAuthorizedCodeIssuer.anonymousAccessSupported
+            !preAuthorizedCodeIssuer.anonymousAccessSupported
         ) {
             return AccessTokenRequestResult.Failure(
                 OAuthError(OAuthErrorCodes.INVALID_CLIENT, "Anonymous pre-authorized code access is not supported"),
@@ -437,7 +445,7 @@ class DefaultOAuth2Provider(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
     ): Boolean =
-        config.preAuthorizedCodeIssuer.anonymousAccessSupported &&
+        preAuthorizedCodeIssuer.anonymousAccessSupported &&
                 isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers)
 
     private fun validateAccessTokenRequest(
@@ -509,7 +517,7 @@ class DefaultOAuth2Provider(
             } catch (error: InvalidTokenCredentialAuthorization) {
                 return AccessTokenResponseResult.Failure(
                     error.request,
-                    OAuthError(OAuthErrorCodes.INVALID_REQUEST, error.message)
+                    OAuthError(error.errorCode, error.message)
                 )
             }
             return when (result) {
