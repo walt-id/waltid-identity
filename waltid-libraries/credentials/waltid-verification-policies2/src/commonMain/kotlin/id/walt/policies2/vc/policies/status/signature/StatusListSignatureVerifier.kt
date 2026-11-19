@@ -11,6 +11,7 @@ import id.walt.credentials.keyresolver.ResolvedJwtVerificationKey
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.DidUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
@@ -60,6 +61,8 @@ class StatusListSignatureVerifier(
     allowUntrustedInlineJwk: Boolean = false,
     private val keyResolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(
         allowInlineJwk = allowUntrustedInlineJwk,
+        // A status list asserts issuer claims; authentication alone does not authorize its signature.
+        verificationRelationship = VerificationRelationshipType.AssertionMethod,
     ),
     private val allowedJwtAlgorithms: Set<JwsAlgorithm> = JwsAlgorithm.entries.toSet(),
     private val allowedCoseAlgorithms: Set<Int> = DEFAULT_COSE_ALGORITHMS,
