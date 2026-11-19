@@ -115,9 +115,11 @@ row. The portal exposes Copy instead of Download for short inline values; the
 bridge never accesses the clipboard. It reads declarative
 DC API inputs without executing supplied JavaScript. Downloads are removed immediately after reading. For DC API cases, the app
 driver uses Chrome at the counterpart's origin and the Android credential picker.
-For CS-07 issuance, the driver requires the app's new PID and an `issued` result
-from the same offer's authenticated status endpoint. The SDK diagnostics instead
-use their own in-memory wallet and interpret authorization redirects locally.
+For CS-07 issuance, the wallet uses a Custom Tab for issuer authorization so the
+original provider request can finish in Chrome. The driver requires the app's new
+PID, the browser's create response and an `issued` result from the same offer's
+authenticated status endpoint. The SDK diagnostics use their own in-memory
+wallet and interpret authorization redirects locally.
 
 The demo app uses its configured verifier trust anchors, which already include
 the EUDI PID Issuer CA 02 recorded in [the fixture provenance](../src/main/resources/itb/README.md).
@@ -236,7 +238,7 @@ execution report and of the normative specification version.
 | CS-02 | Seven presentation cases cover signed requests and the deployed invocation variants. The base-suite VP-004 transaction-data case is disabled. See the [profile assessment](ITB-CS02-COVERAGE.md) for registration and consent gaps. |
 | CS-04 | The runner supplies synthetic key attestation for issuance. Provider-backed WIA and KA, verification, and the unit lifecycle belong to [WAL-1060](https://linear.app/walt-new/issue/WAL-1060). |
 | CS-06 | [CS-06 v1.1](https://github.com/webuild-consortium/wp4-architecture/pull/287) assigns certificate issuance to the RP and certificate provider. Wallet-side access-certificate validation needs [WAL-1485](https://linear.app/walt-new/issue/WAL-1485) and ITB trust configuration. The 13 Trust Framework wallet cases need separate qualification, including VP-004 transaction-data binding. |
-| CS-07 | The app path drives `tc15` through Chrome presentation and `tc16` through Chrome issuance. Issuance requires a new stored PID and completion from the authorized issuer status capability for that offer. In a control, closing the instructions alone yielded ITB `SUCCESS`. |
+| CS-07 | The app path drives `tc15` through Chrome presentation and `tc16` through Chrome issuance. It verifies the browser response, the new stored PID and the issuer status for that offer. In a control, closing the instructions alone yielded ITB `SUCCESS`. |
 | CS-10 | RV-ISS-01 redeems both offers in one session and checks that the two stored SD-JWTs have one status-list URI, different indices and fresh clear status. RV-ISS-02 requires a fresh `INVALID` result, the SDK's projection of Token Status List value 1. The app run records each card's visible label before and after Check status and requires a new displayed check time before confirming the portal prompt. |
 | CS-12 | The local SCA matrix covers the updated SCA-User credential shape. The [native guide](ITB-NATIVE.md) records the earlier attended runs and the outstanding RP-permission and deployment checks. |
 | CS-13 | The inspected statements expose no dedicated [intermediary wallet suite](https://github.com/webuild-consortium/wp4-architecture/blob/d6603effe714411d5dd7e9542d4d7b7d9fe11426/conformance-specs/cs-13-intermediary-services-preflight.md). Coverage needs an intermediary counterpart and the registration material for the wallet to authenticate the intermediary and identify the represented relying party. |

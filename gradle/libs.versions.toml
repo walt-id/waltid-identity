@@ -135,6 +135,7 @@ androidx-lifecycle = "2.11.0"
 androidx-fragment = "1.9.1"
 androidx-biometric = "1.1.0"
 androidx-activity-compose = "1.13.0"
+androidx-browser = "1.9.0"
 androidx-test-runner = "1.7.0"
 androidx-test-ext-junit = "1.3.0"
 androidx-test-rules = "1.7.0"
@@ -321,6 +322,7 @@ androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-ru
 androidx-fragment = { module = "androidx.fragment:fragment", version.ref = "androidx-fragment" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "androidx-biometric" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
+androidx-browser = { module = "androidx.browser:browser", version.ref = "androidx-browser" }
 
 # Compose Multiplatform
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
