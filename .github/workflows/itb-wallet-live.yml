@@ -45,6 +45,7 @@ jobs:
             -Pplaywright.browser=chromium -Pplaywright.installWithDeps=true --max-workers=2 --console=plain
           sdkmanager 'emulator' 'platform-tools' 'build-tools;37.0.0' 'platforms;android-37.0' \
             'system-images;android-37.0;google_apis;x86_64'
+          test -x "$ANDROID_HOME/emulator/emulator"
           ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebug \
             :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebugAndroidTest \
             -PenableAndroidBuild=true -PwalletSigningProtectionMode=disabled --max-workers=2 --console=plain
@@ -54,14 +55,15 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          emulator -version
-          emulator -accel-check
+          emulator_bin="$ANDROID_HOME/emulator/emulator"
+          "$emulator_bin" -version
+          "$emulator_bin" -accel-check
           adb start-server
           avdmanager create avd -n itb-wallet -k 'system-images;android-37.0;google_apis;x86_64' -d pixel_7 <<< no
           emulator_log="$RUNNER_TEMP/itb-emulator.log"
           trap 'if (( $? != 0 )); then tail -n 160 "$emulator_log" || true; adb devices -l || true; fi' EXIT
           # Match the graphics and cold-boot settings of the Android DC API device-test lane.
-          nohup emulator -avd itb-wallet -port "${ANDROID_SERIAL#emulator-}" -cores 4 -memory 4096 -partition-size 6144 \
+          nohup "$emulator_bin" -avd itb-wallet -port "${ANDROID_SERIAL#emulator-}" -cores 4 -memory 4096 -partition-size 6144 \
             -no-snapshot -no-snapshot-save -no-window -gpu auto -noaudio -no-boot-anim -camera-back none \
             -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator > "$emulator_log" 2>&1 </dev/null &
           emulator_pid=$!
