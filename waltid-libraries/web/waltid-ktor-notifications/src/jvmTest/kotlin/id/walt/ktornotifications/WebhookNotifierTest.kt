@@ -52,11 +52,28 @@ class WebhookNotifierTest {
     }
 
     @Test
+    fun `injected store works when the default location cannot hold an outbox`() = runBlocking {
+        WebhookNotifier.stop()
+        WebhookNotifier.start(FileWebhookDeliveryStore(outboxDirectory))
+        val previous = System.getProperty(STORAGE_DIRECTORY_PROPERTY)
+        val file = Files.createFile(outboxDirectory.resolve("ordinary-file"))
+        try {
+            System.setProperty(STORAGE_DIRECTORY_PROPERTY, file.toString())
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1/hook"))
+            assertEquals(id, awaitDeadLetter(id).deliveryId)
+            assertTrue(WebhookNotifier.redrive(id))
+        } finally {
+            if (previous == null) System.clearProperty(STORAGE_DIRECTORY_PROPERTY)
+            else System.setProperty(STORAGE_DIRECTORY_PROPERTY, previous)
+        }
+    }
+
+    @Test
     fun `a loopback webhook is refused before the server is contacted`() = runBlocking {
         val hits = AtomicInteger()
         val server = localServer(hits)
         try {
-            val id = WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
             assertTrue(awaitDeadLetter(id).lastError.contains(BLOCKED))
             assertEquals(0, hits.get())
         } finally {
@@ -66,14 +83,14 @@ class WebhookNotifierTest {
 
     @Test
     fun `a private address is refused`() = runBlocking {
-        val id = WebhookNotifier.notify(update, webhook("http://10.0.0.5/hook"))
+        val id = WebhookNotifier.enqueue(update, webhook("http://10.0.0.5/hook"))
         assertTrue(awaitDeadLetter(id).lastError.contains(BLOCKED))
     }
 
     @Test
     fun `cloud metadata stays refused when loopback and private networks are allowed`() = runBlocking {
         guard(allowLoopback = true, allowPrivateNetworks = true)
-        val id = WebhookNotifier.notify(update, webhook("http://169.254.169.254/latest/meta-data/"))
+        val id = WebhookNotifier.enqueue(update, webhook("http://169.254.169.254/latest/meta-data/"))
         assertTrue(awaitDeadLetter(id).lastError.contains(BLOCKED))
     }
 
@@ -87,7 +104,7 @@ class WebhookNotifierTest {
             exchange.close()
         }
         try {
-            val id = WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
             assertTrue(awaitDeadLetter(id).lastError.contains("HTTP 302"))
             assertEquals(1, hits.get())
         } finally {
@@ -101,7 +118,7 @@ class WebhookNotifierTest {
         val hits = AtomicInteger()
         val server = localServer(hits)
         try {
-            val id = WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
             awaitDelivered(id)
             assertEquals(1, hits.get())
         } finally {
@@ -116,7 +133,7 @@ class WebhookNotifierTest {
         val hits = AtomicInteger()
         val server = localServer(hits)
         try {
-            val id = WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
             assertTrue(awaitDeadLetter(id).lastError.contains(BLOCKED))
             assertEquals(0, hits.get())
         } finally {
@@ -126,11 +143,11 @@ class WebhookNotifierTest {
 
     @Test
     fun `an unresolvable host is a connection failure`() = runBlocking {
-        val id = WebhookNotifier.notify(
+        val id = WebhookNotifier.enqueue(
             update,
             webhook("http://no-such-host.invalid/hook", WebhookRetryPolicy(maxAttempts = 1)),
         )
-        assertTrue(awaitDeadLetter(id).lastError.contains("no-such-host.invalid"))
+        assertTrue(awaitDeadLetter(id).lastError.contains("UnknownHostException"))
     }
 
     @Test
@@ -146,7 +163,7 @@ class WebhookNotifierTest {
         }
         server.start()
         try {
-            val id = WebhookNotifier.notify(update, webhook("http://localhost:${server.address.port}/hook"))
+            val id = WebhookNotifier.enqueue(update, webhook("http://localhost:${server.address.port}/hook"))
             awaitDelivered(id)
             assertEquals(1, hits.get())
         } finally {

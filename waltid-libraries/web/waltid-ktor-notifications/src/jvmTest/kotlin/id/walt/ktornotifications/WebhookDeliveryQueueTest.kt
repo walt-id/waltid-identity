@@ -114,6 +114,37 @@ class WebhookDeliveryQueueTest {
     }
 
     @Test
+    fun `an interrupted file transition keeps the dead letter until redrive commits`() = runTest {
+        val root = temporaryDirectory()
+        val store = FileWebhookDeliveryStore(root)
+        val delivery = delivery("{}")
+        store.enqueue(delivery)
+        val now = delivery.createdAtEpochMilliseconds
+        val claim = store.claimDue(now, now + 1).single()
+        val pending = root.resolve("pending/${delivery.deliveryId}.json")
+        val leasedRecord = Files.readAllBytes(pending)
+        val failed = claim.delivery.copy(failedAtEpochMilliseconds = now, lastError = "HTTP 400")
+        assertTrue(store.moveToDeadLetter(claim, failed))
+        val dead = root.resolve("dead-letter/${delivery.deliveryId}.json")
+        val deadRecord = Files.readAllBytes(dead)
+
+        // Process exited after publishing failure but before removing the leased pending file.
+        Files.write(pending, leasedRecord)
+        val restarted = FileWebhookDeliveryStore(root)
+        assertTrue(restarted.claimDue(now + 2, now + 3).isEmpty())
+        assertFalse(restarted.markDelivered(claim))
+        assertEquals(delivery.deliveryId, restarted.deadLetters().single().deliveryId)
+
+        // Process exited after writing a redriven record but before removing the dead letter.
+        assertTrue(restarted.redrive(delivery.deliveryId, now + 2))
+        Files.write(dead, deadRecord)
+        assertNull(FileWebhookDeliveryStore(root).pending(delivery.deliveryId))
+        assertTrue(restarted.redrive(delivery.deliveryId, now + 2))
+        assertEquals(delivery.deliveryId, restarted.claimDue(now + 2, now + 3).single().delivery.deliveryId)
+        assertTrue(restarted.deadLetters().isEmpty())
+    }
+
+    @Test
     fun `crash after lease does not consume an attempt`() = runTest {
         val root = temporaryDirectory()
         val durableStore = FileWebhookDeliveryStore(root)
@@ -329,6 +360,34 @@ class WebhookDeliveryQueueTest {
     }
 
     @Test
+    fun `large retry delays never wrap into the past`() = runTest {
+        val store = FileWebhookDeliveryStore(temporaryDirectory())
+        val queue = queue(
+            store = store,
+            transport = RecordingTransport(WebhookAttemptResult(statusCode = 503)),
+            jitter = { it - 1 },
+            clock = { 3_000L },
+        )
+        val id = queue.enqueue(update(), webhook(initialBackoffSeconds = Long.MAX_VALUE))
+        queue.processDue()
+        assertEquals(Long.MAX_VALUE, assertNotNull(store.pending(id)).nextAttemptAtEpochMilliseconds)
+        assertEquals(0, queue.processDue())
+    }
+
+    @Test
+    fun `transport accepts HTTP dates and saturates large Retry-After values`() = runTest {
+        val values = ArrayDeque(listOf("Thu, 01 Jan 1970 00:02:10 GMT", Long.MAX_VALUE.toString()))
+        HttpClient(MockEngine {
+            respond("", HttpStatusCode.TooManyRequests, headersOf(HttpHeaders.RetryAfter, values.removeFirst()))
+        }).use { client ->
+            val transport = KtorWebhookTransport(client) { 123_000L }
+            val delivery = delivery("{}")
+            assertEquals(7_000L, transport.deliver(delivery, 1, 123).retryAfterMilliseconds)
+            assertEquals(Long.MAX_VALUE, transport.deliver(delivery, 2, 123).retryAfterMilliseconds)
+        }
+    }
+
+    @Test
     fun `transport sends integrity idempotency and attempt headers`() = runTest {
         val payload = """{"event":"completed"}"""
         val delivery = delivery(payload)
@@ -374,6 +433,7 @@ class WebhookDeliveryQueueTest {
         )
         val client = HttpClient(MockEngine { request ->
             val signature = assertNotNull(request.headers[WEBHOOK_SIGNATURE_HEADER])
+            assertEquals("v1=BxDWiSo/4VW6835pqxCMkbLoSmLa4VaJvDCKe54vXCA=", signature)
             assertEquals("Bearer receiver-token", request.headers[HttpHeaders.Authorization])
             assertTrue(WebhookSignature.verify(
                 signature, secret, delivery.url, delivery.deliveryId, 123, 2, expectedDigest((request.body as TextContent).text)

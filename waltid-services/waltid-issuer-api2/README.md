@@ -366,7 +366,7 @@ Kotlin enum constants are `SCREAMING_SNAKE_CASE`; webhook and SSE payloads use t
 
 Offer events report management and retrieval facts. Protocol endpoint events report one final outcome. A successful request is emitted only after its protocol response has been constructed.
 
-An event contains the issuance session only after the request has been correlated using trusted protocol state. An unknown code, malformed request, or failure before grant resolution is published only on the issuer-level stream with its request ID and an empty session. The request ID is the Ktor call ID shared by the response `X-Request-ID` header and logging MDC; issuer2 accepts a valid incoming value or generates one when absent. The service does not decode an unverified token merely to obtain a session ID. Notification delivery is best effort and never changes the protocol response.
+An event contains the issuance session only after the request has been correlated using trusted protocol state. An unknown code, malformed request, or failure before grant resolution is published only on the issuer-level stream with its request ID and an empty session. The request ID is the Ktor call ID shared by the response `X-Request-ID` header and logging MDC; issuer2 accepts a valid incoming value or generates one when absent. The service does not decode an unverified token merely to obtain a session ID. Publishing an event preserves the protocol response. Issuer2 logs an error if it cannot enqueue the webhook. Once the write succeeds, the outbox retries delivery according to the configured policy.
 
 Nonce request events are always issuer-level. The OpenID4VCI Nonce Endpoint is not protected by an access token and its request contains no issuance-session identifier.
 

@@ -62,7 +62,7 @@ val update = KtorSessionUpdate(
 
 val notifications = KtorSessionNotifications(
     webhook = KtorSessionNotifications.VerificationSessionWebhookNotification(
-        url = "https://example.com/webhook",
+        url = io.ktor.http.Url("https://example.com/webhook"),
         bearerToken = "secret-token"
     )
 )
@@ -107,7 +107,8 @@ Notes:
 Webhook events use at-least-once delivery. Calling `notifySessionUpdate` first writes the exact serialized JSON
 payload to a local durable outbox and then returns; a background worker performs the HTTP request. Pending records
 are resumed when the service starts again. Exhausted and permanently rejected deliveries are retained under the
-outbox's `dead-letter` directory. The library exposes `WebhookNotifier.deadLetters()` and
+outbox's `dead-letter` directory. Embedded callers can use `WebhookNotifier.enqueue(update, config)` to obtain the stable delivery ID.
+The library exposes `WebhookNotifier.deadLetters()` and
 `WebhookNotifier.redrive(deliveryId)` as programmatic hooks for integration into authenticated operator tooling;
 it does not expose an HTTP management endpoint.
 
@@ -130,7 +131,8 @@ are dead-lettered immediately. The policy can be overridden per webhook:
 The default file-backed outbox root defaults to the operating system's temporary directory and logs a warning when that fallback is
 used. Production deployments must set the JVM property `waltid.webhook.delivery.directory` or environment variable
 `WALTID_WEBHOOK_DELIVERY_DIRECTORY` to put it on a durable volume. Issuer2 and Verifier2 use separate
-subdirectories. The file store is intended for a single service process per directory; replicas must not share an
+subdirectories. An embedded notifier uses the `embedded` subdirectory of a configured root. Without a configured
+root, its temporary directory is process-specific. The file store is intended for a single service process per directory; replicas must not share an
 outbox directory. Unreadable records are moved to the outbox's `corrupt` directory so they cannot block healthy
 deliveries. Delivery requests run with bounded concurrency, preventing one slow receiver from serially blocking
 the entire outbox. When a poll claims a full batch, the worker polls again immediately, so a backlog drains at
@@ -153,16 +155,16 @@ Every attempt sends the following headers:
 | --- | --- |
 | `Webhook-Id` | Stable unique ID for the logical delivery |
 | `Idempotency-Key` | Same value as `Webhook-Id`, for deduplication |
-| `Webhook-Sequence` | Monotonic enqueue order for this process. Sort by it when delivery arrival order differs from event order |
+| `Webhook-Sequence` | Enqueue order within one producer process. Compare events from the same request. The signature does not cover this header |
 | `Webhook-Timestamp` | Attempt time as Unix epoch seconds |
 | `Webhook-Attempt` | One-based attempt number |
 | `Content-Digest` | RFC 9530-style SHA-256 digest of the exact JSON body |
 | `X-Webhook-Signature` | `v1=` followed by Base64 HMAC-SHA256 when `signing_secret` is configured |
 
-A receiver should atomically record `Webhook-Id` with its business update. For signed callbacks, verify the ID before recording it. If the key is already present, it
-must return success without applying the update again. The receiver should also recompute `Content-Digest` before
-processing. The digest detects body changes but does not authenticate the sender. Enable signed callbacks for
-authentication and use HTTPS.
+Check the configured authentication and the digest of the raw body on every attempt, including duplicates.
+For signed callbacks, verify the timestamp and HMAC before trusting `Webhook-Id`. Record the verified ID atomically
+with the business update. If the ID was already committed, return success without applying the update again.
+Use HTTPS for delivery.
 
 ### Signed callbacks
 
