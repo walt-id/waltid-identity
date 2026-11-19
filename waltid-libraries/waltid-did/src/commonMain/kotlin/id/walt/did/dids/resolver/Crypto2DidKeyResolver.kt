@@ -4,6 +4,7 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.document.MultibasePublicKeys
 import id.walt.did.utils.KeyMaterial
 import kotlinx.coroutines.CancellationException
@@ -22,13 +23,32 @@ fun interface Crypto2DidKeyResolver {
 class DidDocumentCrypto2KeyResolver(
     private val resolver: DidResolver,
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+    private val verificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2DidKeyResolver {
+    private fun normalizeId(id: String, did: String): String = if (id.startsWith("#")) "$did$id" else id
+
     override suspend fun resolveToKeys(did: String): Set<Key> {
         val document = resolver.resolve(did).getOrElse { cause ->
             throw IllegalArgumentException("Unable to resolve DID document: $did", cause)
         }
-        val methods = document["verificationMethod"] as? JsonArray
-            ?: throw IllegalArgumentException("DID document has no verification methods: $did")
+        val methods = if (verificationRelationship == null) {
+            document["verificationMethod"] as? JsonArray
+                ?: throw IllegalArgumentException("DID document has no verification methods: $did")
+        } else {
+            // DID Core permits both embedded methods and references in verification relationships.
+            val references = (document["verificationMethod"] as? JsonArray).orEmpty()
+                .filterIsInstance<JsonObject>()
+                .associateBy { normalizeId(it["id"]?.jsonPrimitive?.content.orEmpty(), did) }
+            val relationship = document[verificationRelationship.toString()] as? JsonArray
+                ?: throw IllegalArgumentException("DID document has no $verificationRelationship methods: $did")
+            JsonArray(relationship.mapNotNull { entry ->
+                when (entry) {
+                    is JsonObject -> entry
+                    is JsonPrimitive -> references[normalizeId(entry.content, did)]
+                    else -> null
+                }
+            })
+        }
         val keys = methods.mapNotNull { element ->
             val method = element as? JsonObject ?: return@mapNotNull null
             val jwk = (method["publicKeyJwk"] as? JsonObject)
@@ -57,7 +77,7 @@ class DidDocumentCrypto2KeyResolver(
             val stored = EncodedKey.Jwk(
                 BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
                 privateMaterial = false,
-            ).toStoredSoftwareKey(KeyId(verificationMethodId), setOf(KeyUsage.VERIFY))
+            ).toStoredSoftwareKey(KeyId(normalizeId(verificationMethodId, did)), setOf(KeyUsage.VERIFY))
             try {
                 runtime.restore(stored)
             } catch (cause: CancellationException) {

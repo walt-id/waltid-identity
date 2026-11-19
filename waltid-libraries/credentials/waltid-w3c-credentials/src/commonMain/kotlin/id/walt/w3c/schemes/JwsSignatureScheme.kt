@@ -1,6 +1,7 @@
 package id.walt.w3c.schemes
 
 import id.walt.credentials.keyresolver.JwtKeyResolver
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.credentials.keyresolver.ResolvedJwtVerificationKey
 import id.walt.crypto.exceptions.CryptoArgumentException
@@ -143,7 +144,9 @@ class JwsSignatureScheme : SignatureScheme {
     @JsExport.Ignore
     suspend fun getIssuerCrypto2KeyInfo(
         jws: String,
-        resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(),
+        resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(
+            verificationRelationship = VerificationRelationshipType.AssertionMethod,
+        ),
     ): Crypto2KeyInfo {
         val compact = jws.substringBefore('~')
         val decoded = CompactJws.decodeUnverified(compact)
@@ -161,7 +164,9 @@ class JwsSignatureScheme : SignatureScheme {
     suspend fun verifyCrypto2(
         data: String,
         allowedAlgorithms: Set<JwsAlgorithm> = JwsAlgorithm.entries.toSet(),
-        resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(),
+        resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(
+            verificationRelationship = VerificationRelationshipType.AssertionMethod,
+        ),
     ): Result<JsonElement> = resultOfSuspend {
         val compact = data.substringBefore('~')
         val info = getIssuerCrypto2KeyInfo(compact, resolver)
