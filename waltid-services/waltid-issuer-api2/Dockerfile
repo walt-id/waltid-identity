@@ -26,7 +26,7 @@ WORKDIR /home/gradle/src/waltid-services/waltid-issuer-api2
 RUN gradle buildFatJar --no-daemon
 
 # Stage 3: Create the Runtime Image
-FROM amazoncorretto:22 AS runtime
+FROM amazoncorretto:21-al2023 AS runtime
 WORKDIR /waltid-issuer-api2
 
 # Create an unprivileged user and group
