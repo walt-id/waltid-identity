@@ -41,11 +41,14 @@ jobs:
           packages: ''
       - name: Prepare runner browser and Android Preview app
         run: |
-          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers \
-            -Pplaywright.browser=chromium -Pplaywright.installWithDeps=true --max-workers=2 --console=plain
+          # QEMU links PulseAudio even when launched with -noaudio.
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libpulse0
           sdkmanager 'emulator' 'platform-tools' 'build-tools;37.0.0' 'platforms;android-37.0' \
             'system-images;android-37.0;google_apis;x86_64'
-          test -x "$ANDROID_HOME/emulator/emulator"
+          "$ANDROID_HOME/emulator/emulator" -version
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers \
+            -Pplaywright.browser=chromium -Pplaywright.installWithDeps=true --max-workers=2 --console=plain
           ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebug \
             :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebugAndroidTest \
             -PenableAndroidBuild=true -PwalletSigningProtectionMode=disabled --max-workers=2 --console=plain
@@ -56,7 +59,6 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           emulator_bin="$ANDROID_HOME/emulator/emulator"
-          "$emulator_bin" -version
           "$emulator_bin" -accel-check
           adb start-server
           avdmanager create avd -n itb-wallet -k 'system-images;android-37.0;google_apis;x86_64' -d pixel_7 <<< no
