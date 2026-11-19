@@ -183,4 +183,22 @@ class StoredCredentialMetadataParserTest {
             assertTrue(StoredCredentialMetadataParser.claims("""{"credentialClaims":[{"path":$path}]}""").isEmpty(), path)
         }
     }
+    @Test fun contradictoryClaimPathsAbortMetadataProcessing() {
+        val invalid = listOf(
+            """[["people",null,"name"],["people",0,"age"]]""",
+            """[["people",0,"name"],["people","0","age"]]""",
+            """[["people",null],["people",null]]""",
+            """[["people",-0],["people",0]]""",
+            """[["people",-1,"name"]]""",
+        )
+        for (paths in invalid) {
+            val entries = kotlinx.serialization.json.Json.parseToJsonElement(paths) as kotlinx.serialization.json.JsonArray
+            val source = "{\"credentialClaims\":[" + entries.joinToString { "{\"path\":$it}" } + "]}"
+            assertTrue(StoredCredentialMetadataParser.claims(source, format = "dc+sd-jwt").isEmpty(), paths)
+        }
+        val maps = """{"credentialClaims":[{"path":["namespace","element",0]},{"path":["namespace","element","0"]}]}"""
+        assertEquals(2, StoredCredentialMetadataParser.claims(maps, format = "mso_mdoc").size)
+        assertTrue(StoredCredentialMetadataParser.claims(maps, format = "dc+sd-jwt").isEmpty())
+    }
+
 }

@@ -372,7 +372,8 @@ class Wallet2ExtendedIntegrationTest {
 
         val issuerMetadata = CredentialIssuerMetadata.fromBaseUrl(
             baseUrl = issuerBase,
-            credentialConfigurationsSupported = mapOf(credentialConfigId to configuration)
+            credentialConfigurationsSupported = mapOf(credentialConfigId to configuration),
+            notificationEndpointPath = "/notification",
         )
         val offer = CredentialOffer.withPreAuthorizedCodeGrant(
             credentialIssuer = issuerBase,
@@ -381,6 +382,7 @@ class Wallet2ExtendedIntegrationTest {
         )
 
         val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
+        val recordedNotifications = java.util.concurrent.CopyOnWriteArrayList<String>()
         val issuerServer = embeddedServer(CIO, host = host, port = issuerPort) {
             install(ContentNegotiation) { json(json) }
             routing {
@@ -481,7 +483,8 @@ class Wallet2ExtendedIntegrationTest {
                             put("issuing_country", "DE")
                         }),
                         selectiveDisclosure = null,
-                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization])
+                        proofValidationContext = proofSupport.validationContext(request, call.request.headers[HttpHeaders.Authorization]),
+                        notificationId = Uuid.random().toString(),
                     )
                     if (credentialResponse !is CredentialResponseResult.Success) {
                         val failure = credentialResponse as CredentialResponseResult.Failure
@@ -492,6 +495,12 @@ class Wallet2ExtendedIntegrationTest {
                         request, credentialResponse.response
                     )
                     call.respond(HttpStatusCode.fromValue(httpResp.status), httpResp.payload)
+                }
+                post("/notification") {
+                    val event = json.parseToJsonElement(call.receiveText())
+                        .jsonObject["event"]?.jsonPrimitive?.content
+                    if (event != null) recordedNotifications += event
+                    call.respond(HttpStatusCode.NoContent)
                 }
             }
         }.start(wait = false)
@@ -656,11 +665,26 @@ class Wallet2ExtendedIntegrationTest {
                         .body<FetchCredentialResult>()
                 }
                 assertTrue(fetchResult.rawCredentials.isNotEmpty(), "No credentials returned by fetch")
+                assertNotNull(fetchResult.notificationId, "Isolated fetch must return notification_id when the issuer advertises a notification endpoint")
 
                 // -- Verify credential is NOT yet in wallet (isolated steps don't store) --
                 testAndReturn("Wallet has no credentials yet (isolated steps don't store)") {
                     val creds = http.get("/wallet/$walletId/credentials").body<List<StoredCredentialMetadata>>()
                     assertEquals(0, creds.size, "Isolated steps should not auto-store, got ${creds.size} creds")
+                }
+
+                testAndReturn("Isolated: reject fetched credential") {
+                    http.post("/wallet/$walletId/credentials/receive/reject") {
+                        contentType(ContentType.Application.Json)
+                        setBody(
+                            RejectIssuedCredentialRequest(
+                                notificationId = fetchResult.notificationId!!,
+                                accessToken = tokenResult.accessToken,
+                                credentialIssuerBaseUrl = issuerBase,
+                            )
+                        )
+                    }.also { assertEquals(HttpStatusCode.NoContent, it.status, it.bodyAsText()) }
+                    assertEquals(listOf("credential_deleted"), recordedNotifications.toList())
                 }
 
                 testAndReturn("Isolated fetch stores when requested") {
@@ -681,6 +705,10 @@ class Wallet2ExtendedIntegrationTest {
                     val credentials = http.get("/wallet/$walletId/credentials")
                         .body<List<StoredCredentialMetadata>>()
                     assertEquals(1, credentials.size)
+                    assertEquals(
+                        listOf("credential_deleted", "credential_accepted"),
+                        recordedNotifications.toList(),
+                    )
                 }
 
                 // -- Now do a full receive for comparison (uses the same offer - but code is consumed,

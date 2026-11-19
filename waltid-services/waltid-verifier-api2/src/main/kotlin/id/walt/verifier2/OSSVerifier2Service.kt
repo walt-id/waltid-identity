@@ -1,6 +1,13 @@
 
 package id.walt.verifier2
 
+import id.walt.commons.featureflag.CommonsFeatureCatalog
+import id.walt.commons.featureflag.FeatureManager
+import id.walt.verifier2.data.externalReaderOutcomeUpdate
+import id.walt.verifier2.data.ExternalReaderDeviceResponse
+import id.walt.verifier2.handlers.ExternalReaderVerification
+import io.ktor.server.plugins.BadRequestException
+import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.fetchBinaryFile
 import id.walt.commons.web.plugins.httpJson
@@ -19,6 +26,7 @@ import id.walt.verifier2.data.Verifier2SessionUpdate
 import id.walt.verifier2.handlers.authrequest.Verifier2AuthorizationRequestHandler.respondAuthorizationRequest
 import id.walt.verifier2.handlers.authrequest.Verifier2RequestUriPostHandler.respondRequestUriPost
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse
+import id.walt.verifier2.openapi.ExternalReaderDeviceResponseOpenApi
 import id.walt.verifier2.openapi.VerificationSessionCreateOpenApi
 import id.walt.vical.*
 import io.github.smiley4.ktoropenapi.delete
@@ -173,6 +181,13 @@ object Verifier2Service {
     fun Route.registerRoute(
         repository: VerificationSessionRepository = defaultSessionRepository,
         surfaces: Set<Verifier2RouteSurface> = Verifier2RouteSurface.all,
+    ) = registerRoute(repository, surfaces) { PolicyExecutionContext.Empty }
+
+    /** Host-owned policy services are created per response, including metadata transport snapshots. */
+    fun Route.registerRoute(
+        repository: VerificationSessionRepository = defaultSessionRepository,
+        surfaces: Set<Verifier2RouteSurface> = Verifier2RouteSurface.all,
+        policyContextFactory: () -> PolicyExecutionContext,
     ) {
         require(surfaces.isNotEmpty()) { "At least one verifier route surface must be registered" }
         val updateSessionCallback = updateSessionCallback(repository)
@@ -180,6 +195,22 @@ object Verifier2Service {
             if (Verifier2RouteSurface.SESSION_MANAGEMENT in surfaces) route("", {
                 tags("Verification Session Management")
             }) {
+                if (FeatureManager.isFeatureEnabled(CommonsFeatureCatalog.proximityVerifierFeature)) {
+                    post<ExternalReaderDeviceResponse>("proximity/device-response", ExternalReaderDeviceResponseOpenApi.docs) { request ->
+                        val submission = try {
+                            request.parse()
+                        } catch (cause: Exception) {
+                            throw BadRequestException("Invalid external-reader submission: ${cause.message}", cause)
+                        }
+                        val outcome = ExternalReaderVerification.verify(
+                            request, submission, ConfigManager.getConfig<OSSVerifier2ServiceConfig>().sessionRetention,
+                        )
+                        repository.create(outcome.session)
+                        updateSessionCallback(outcome.session, outcome.event) {}
+                        call.respond(outcome.session.publicView())
+                    }
+                }
+
                 post<VerificationSessionSetup>("create", VerificationSessionCreateOpenApi.createDocs) { sessionSetup ->
                     val newSession = OSSVerifier2Manager.createVerificationSession(sessionSetup)
                     repository.create(newSession)
@@ -254,6 +285,9 @@ object Verifier2Service {
 
                             // This will suspend until the client disconnects.
                             send(JsonObject(emptyMap()))
+                            if (sseFlow.replayCache.isEmpty()) {
+                                verifierSession.externalReaderOutcomeUpdate()?.let { send(it.toKtorSessionUpdate()) }
+                            }
                             sseFlow.collect { event -> send(event) }
                         }
                     }
@@ -316,6 +350,7 @@ object Verifier2Service {
                         try {
                             call.respondHandleDirectPostResponse(
                                 verificationSession = claim.original.session,
+                                policyContext = policyContextFactory(),
                                 updateSessionCallback = updateSessionCallback,
                                 failSessionCallback = failSessionCallback,
                                 beforeRespond = {

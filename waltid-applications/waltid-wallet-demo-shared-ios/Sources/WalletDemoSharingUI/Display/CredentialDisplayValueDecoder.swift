@@ -2,6 +2,16 @@ import Foundation
 import ImageIO
 
 enum CredentialDisplayValueDecoder {
+    static func binaryValue(_ encoded: String, roles: Set<ClaimRole>) -> DisplayValue {
+        let binary = DisplayValue.text(CredentialDisplayText.binaryData)
+        guard roles.contains(.image), isImageCandidate(encoded, policy: .schemaImage) else { return binary }
+        return .deferredImage(DeferredCredentialImage {
+            guard let bytes = Base64Payload(encoded)?.decode(),
+                  let mimeType = ImageBytes.mimeType(for: bytes) else { return binary }
+            return imageValue(for: bytes, mimeType: mimeType, encoded: encoded)
+        })
+    }
+
     static func decodedValue(
         for value: String,
         path: DisplayClaimPath,

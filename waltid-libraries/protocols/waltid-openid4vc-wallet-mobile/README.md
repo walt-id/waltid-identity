@@ -122,6 +122,12 @@ val credentialIds = (outcome as? WalletIssuanceOutcome.Stored)?.credentialIds
     ?: error("Issuance did not store credentials: $outcome")
 ```
 
+Continuing a session posts OpenID4VCI `credential_accepted` when the issuer
+advertised a notification endpoint. After an isolated fetch that left
+`storeInWallet` false, call `wallet.rejectIssuedCredential(...)` to post
+`credential_deleted` instead of storing the credential. Offer-level
+`cancelIssuance` has no `notification_id` yet.
+
 `MobileWalletCredentialOffer.Uri` is used for deep-link / QR offers.
 `MobileWalletCredentialOffer.InlineJson` is the Credential Offer object from an
 OpenID4VCI Digital Credentials create request (`openid4vci-v1`, plus historical
@@ -216,6 +222,13 @@ when (val encryption = preview.request.responseEncryption) {
 
 Response-encryption metadata describes protection of the authorization response. It
 does not establish verifier trust and does not expose verifier key material.
+
+In the effective review returned by `reviewPresentation` or `reviewDigitalCredentialPresentation`,
+a location with `isBinary` identifies an mdoc byte string. Its value in `claimsJson` is an
+unpadded base64url string and has one claim location. Use the flag to display it as binary data
+and use the source path for its label and selection information.
+Effective mdoc review paths follow the signed CBOR structure. Display serializers can still
+format the stored credential view.
 
 ### TS-12 payment consent
 

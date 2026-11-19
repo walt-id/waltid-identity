@@ -16,12 +16,25 @@ protocol WalletCoreBridge: Sendable {
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func credentials() async throws -> [Credential]
     func deleteCredential(id: String) async throws -> Bool
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PreparedPresentationReview
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -118,6 +131,16 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
+        throw unavailableError()
+    }
+
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {
         throw unavailableError()
     }
 
@@ -218,4 +241,17 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
 @available(macOS 10.15, *)
 extension WalletCoreBridge {
     var signingIdentityCore: any SigningIdentityCore { UnavailableSigningIdentityCore() }
+}
+
+// Unsupported bridges fail closed instead of silently submitting an unreviewed selection.
+@available(macOS 10.15, *)
+extension WalletCoreBridge {
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PreparedPresentationReview {
+        throw WalletError.invalidInput("Effective claim review is unavailable")
+    }
 }

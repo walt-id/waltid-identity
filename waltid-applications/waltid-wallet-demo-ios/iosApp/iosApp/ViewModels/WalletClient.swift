@@ -2,6 +2,13 @@ import Foundation
 import WalletSDK
 
 protocol WalletClient {
+    var supportsClaimReview: Bool { get }
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?
+    ) async throws -> PreparedPresentationReview
     func signingIdentityManager() async throws -> SigningIdentityManager?
     func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult
     func signingProtectionAvailability(
@@ -14,6 +21,13 @@ protocol WalletClient {
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
     func preparePaymentConsent(
@@ -36,10 +50,36 @@ protocol WalletClient {
 }
 
 extension WalletClient {
+    var supportsClaimReview: Bool { false }
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?
+    ) async throws -> PreparedPresentationReview {
+        throw WalletError.invalidInput("Effective review is unavailable")
+    }
     func signingIdentityManager() async throws -> SigningIdentityManager? { nil }
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {}
 }
 
 final class SDKWalletClient: WalletClient {
+    var supportsClaimReview: Bool { true }
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?
+    ) async throws -> PreparedPresentationReview {
+        try await wallet().reviewPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions, did: did)
+    }
     private let configuration: WalletConfiguration
     private var cachedWallet: Wallet?
 
@@ -80,6 +120,21 @@ final class SDKWalletClient: WalletClient {
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome { try await wallet().continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: transactionCode, credentials: credentials) }
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome { try await wallet().continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI) }
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { try await wallet().cancelIssuance(sessionID: sessionID) }
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {
+        try await wallet().rejectIssuedCredential(
+            notificationID: notificationID,
+            accessToken: accessToken,
+            credentialIssuerBaseURL: credentialIssuerBaseURL,
+            notificationEndpoint: notificationEndpoint,
+            eventDescription: eventDescription
+        )
+    }
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome { try await wallet().resumeDeferredIssuance(deferredCredentialID: deferredCredentialID) }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {

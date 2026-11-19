@@ -40,7 +40,7 @@ class RetainedPaymentConsentTest {
             RawDcqlCredential("card", "dc+sd-jwt", credential.credentialData, originalCredential = credential), null,
             CredentialQuery(id = "payment", format = CredentialFormat.DC_SD_JWT, meta = id.walt.dcql.models.meta.SdJwtVcMeta(vctValues = listOf("$ISSUER/vct"))),
         )))
-        suspend fun prepare() = assertNotNull(consent.prepare(request, selected, credentials, disclosures, key, policy))
+        suspend fun prepare() = assertNotNull(consent.prepare(request, selected, credentials, disclosures, key, policy, typeMetadataSnapshots = emptyMap()))
         suspend fun confirm(revision: String?, request: AuthorizationRequest = this.request,
             credentials: List<PresentationCredentialSelection> = this.credentials,
             disclosures: List<PresentationDisclosureSelection>? = this.disclosures,
@@ -99,10 +99,10 @@ class RetainedPaymentConsentTest {
         ) } }
         assertFailure(PaymentConsentFailure.STALE_CONSENT) { confirm(prepared.revision, selected = changed) }
         assertFailure(PaymentConsentFailure.UNSUPPORTED_PAYMENT) {
-            consent.prepare(request.copy(transactionData = listOf(transaction, transaction)), selected, credentials, disclosures, key, policy)
+            consent.prepare(request.copy(transactionData = listOf(transaction, transaction)), selected, credentials, disclosures, key, policy, typeMetadataSnapshots = emptyMap())
         }
         assertFailure(PaymentConsentFailure.UNSUPPORTED_PAYMENT) {
-            consent.prepare(request, selected.mapValues { it.value + it.value }, credentials, disclosures, key, policy)
+            consent.prepare(request, selected.mapValues { it.value + it.value }, credentials, disclosures, key, policy, typeMetadataSnapshots = emptyMap())
         }
     }
 

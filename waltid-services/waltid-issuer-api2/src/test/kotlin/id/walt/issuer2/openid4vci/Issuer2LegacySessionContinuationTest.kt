@@ -131,6 +131,12 @@ class Issuer2LegacySessionContinuationTest {
         override fun getAndRemove(id: String) = raw.getAndRemove(id)?.let(IssuanceSessionStorageCodec::decode)
         override fun set(id: String, value: IssuanceSession) = set(id, value, null)
         override fun set(id: String, value: IssuanceSession, ttl: Duration?) = raw.set(id, Json.encodeToString(value), ttl)
+        override fun compareAndSet(id: String, expected: IssuanceSession?, replacement: IssuanceSession, ttl: Duration?): Boolean {
+            val stored = raw[id]
+            val current = stored?.let(IssuanceSessionStorageCodec::decode)
+            if (Json.encodeToString(current) != Json.encodeToString(expected)) return false
+            return raw.compareAndSet(id, stored, Json.encodeToString(replacement), ttl)
+        }
         override fun remove(id: String) = raw.remove(id)
         override fun contains(id: String) = id in raw
         override fun listAllKeys() = raw.listAllKeys()

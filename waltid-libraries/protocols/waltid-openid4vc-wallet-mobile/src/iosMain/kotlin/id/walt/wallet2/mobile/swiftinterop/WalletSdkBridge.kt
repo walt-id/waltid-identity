@@ -17,6 +17,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.MobileWalletPreparedPresentationReview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.ProximityCapabilities
@@ -190,6 +191,26 @@ public class WalletSdkBridge private constructor(
     public suspend fun listDeferredIssuance(): WalletBridgeResult<List<WalletIssuanceContinuation>> =
         walletBridgeCall { operations.listDeferredIssuance() }
 
+    /**
+     * Reports OpenID4VCI `credential_deleted` for a credential the holder rejected instead of storing.
+     */
+    public suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String? = null,
+        notificationEndpoint: String? = null,
+        eventDescription: String? = null,
+    ): WalletBridgeResult<Unit> =
+        walletBridgeCall {
+            operations.rejectIssuedCredential(
+                notificationId = notificationId,
+                accessToken = accessToken,
+                credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+                notificationEndpoint = notificationEndpoint,
+                eventDescription = eventDescription,
+            )
+        }
+
     /** Resumes one deferred credential issuance result. */
     public suspend fun resumeDeferredIssuance(
         deferredCredentialId: String,
@@ -245,6 +266,16 @@ public class WalletSdkBridge private constructor(
         walletBridgeCall {
             operations.previewPresentation(requestUrl = requestUrl)
         }
+
+    /** Prepares exact selection data through the same typed error/cancellation bridge as submission. */
+    public suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): WalletBridgeResult<MobileWalletPreparedPresentationReview> = walletBridgeCall {
+        operations.reviewPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
+    }
 
     /** Resolves authenticated payment instructions without signing. */
     public suspend fun preparePaymentConsent(
@@ -389,6 +420,14 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation>
 
+    suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    )
+
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome
 
     suspend fun credentials(): List<MobileWalletCredential>
@@ -406,6 +445,13 @@ internal interface WalletSdkBridgeOperations {
     suspend fun previewPresentation(
         requestUrl: String,
     ): MobileWalletPresentationPreviewResult
+
+    suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+    ): MobileWalletPreparedPresentationReview = error("Claim review is not implemented by this test bridge")
 
     suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
@@ -495,6 +541,22 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation> = wallet.listDeferredIssuance()
 
+    override suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    ) {
+        wallet.rejectIssuedCredential(
+            notificationId = notificationId,
+            accessToken = accessToken,
+            credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+            notificationEndpoint = notificationEndpoint,
+            eventDescription = eventDescription,
+        )
+    }
+
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome =
         wallet.resumeDeferredIssuance(deferredCredentialId)
 
@@ -522,6 +584,14 @@ internal class MobileWalletSdkBridgeOperations(
         requestUrl: String,
     ): MobileWalletPresentationPreviewResult =
         wallet.previewPresentation(requestUrl = requestUrl)
+
+    override suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+    ): MobileWalletPreparedPresentationReview = wallet.reviewPresentation(
+        previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
 
     override suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,

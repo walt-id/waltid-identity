@@ -339,7 +339,21 @@ final class WalletVisualTests: XCTestCase {
 
     func testLocalizedCredentialDetails() throws {
         let details = try WalletVisualFixtures().localizedCredentialDetails()
-        XCTAssertEqual(details.groups.flatMap(\.items).prefix(4).map(\.label), ["Familienname", "Vorname", "Name im Namensraum", "Straße"])
+        let roots = details.groups.flatMap(\.items)
+        XCTAssertEqual(roots.map { $0.path.id }, ["family_name", "given_name", #"["ns.with.dots"]"#, "address", "extra"])
+        XCTAssertEqual(roots.prefix(2).map(\.label), ["Familienname", "Vorname"])
+        for (path, label, value) in [
+            (#"["ns.with.dots"]"#, "Name im Namensraum", "Independent"),
+            ("address", "Straße", "1 Example Way"),
+        ] {
+            let parent = try XCTUnwrap(roots.first { $0.path.id == path })
+            guard case .object(let children) = parent.value else {
+                return XCTFail("Expected retained parent group at \(path)")
+            }
+            XCTAssertEqual(children.map(\.label), [label])
+            XCTAssertEqual(children.map(\.value), [.text(value)])
+            XCTAssertTrue(children.allSatisfy { $0.labelSource == .issuerMetadata })
+        }
         try capture(ScrollView { CredentialDetailsView(details: details).padding(20) }, id: "credential.details.localized_metadata")
     }
 
@@ -405,7 +419,7 @@ final class WalletVisualTests: XCTestCase {
         if alternative { credentials = [review.credentialOptions[1].selection] }
         let selection = SharingSelection(credentials: credentials)
         XCTAssertTrue(review.hasCompleteCredentialSelection(credentials))
-        let details = review.credentialOptions.map { CredentialDisplayNormalizer.details(for: $0) }
+        let details = await CredentialDisplayNormalizer.sharingDetails(for: review.credentialOptions, includeDisclosures: true)
         let groups = review.informationToShare(selection: selection, details: details)
         XCTAssertEqual(groups.count, multiple ? 2 : 1)
         if alternative { XCTAssertTrue(groups[0].fields.contains { $0.alwaysIncluded }) }

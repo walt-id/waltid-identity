@@ -165,6 +165,23 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return try Self.issuanceOutcome(result, operation: "cancel issuance")
     }
 
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {
+        let result = try await bridge.rejectIssuedCredential(
+            notificationId: notificationID,
+            accessToken: accessToken,
+            credentialIssuerBaseUrl: credentialIssuerBaseURL?.absoluteString,
+            notificationEndpoint: notificationEndpoint?.absoluteString,
+            eventDescription: eventDescription
+        )
+        _ = try Self.successAnyValue(result, operation: "reject issued credential")
+    }
+
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
         let result = try await bridge.resumeDeferredIssuance(deferredCredentialId: deferredCredentialID)
         return try Self.issuanceOutcome(result, operation: "resume deferred issuance")
@@ -225,6 +242,27 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
 
         return try value.toSwiftPreviewResult()
+    }
+
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PreparedPresentationReview {
+        let result = try await bridge.reviewPresentation(
+            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
+            selectedCredentialOptions: selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(queryId: $0.queryID, credentialId: $0.credentialID) },
+            selectedDisclosureOptions: selectedDisclosureOptions?.map { MobileWalletPresentationDisclosureSelection(queryId: $0.queryID, credentialId: $0.credentialID, path: $0.path) },
+            did: did)
+        let value = try Self.successValue(result, as: MobileWalletPreparedPresentationReview.self, operation: "review presentation")
+        return PreparedPresentationReview(credentials: value.credentials.map { claim in
+            PresentationCredentialClaims(queryID: claim.queryId, credentialID: claim.credentialId, format: claim.format,
+                claimsJSON: claim.claimsJson, wholeCredential: claim.wholeCredential, locations: claim.locations.map {
+                    PresentationClaimLocation(sourcePathJSON: $0.sourcePathJson, receivedPathJSON: $0.receivedPathJson,
+                        sharedBy: $0.sharedBy, alwaysCarried: $0.alwaysCarried, isBinary: $0.isBinary)
+                })
+        })
     }
 
     func preparePaymentConsent(

@@ -14,6 +14,13 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
             wallet ?: createWallet().also { wallet = it }
         }
 
+    override val supportsClaimReview: Boolean get() = wallet?.supportsClaimReview == true
+    override suspend fun reviewPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ) = wallet().reviewPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
     override suspend fun identityDetails(): WalletDemoIdentityDetails? = wallet().identityDetails()
     override suspend fun identitySetup(): WalletDemoIdentitySetup? = wallet().identitySetup()
     override suspend fun chooseIdentity(choiceId: String) = wallet().chooseIdentity(choiceId)
@@ -49,6 +56,20 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
         wallet().continueAuthorizationIssuance(sessionId, callbackUri)
 
     override suspend fun cancelIssuance(sessionId: String) = wallet().cancelIssuance(sessionId)
+
+    override suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    ) = wallet().rejectIssuedCredential(
+        notificationId = notificationId,
+        accessToken = accessToken,
+        credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+        notificationEndpoint = notificationEndpoint,
+        eventDescription = eventDescription,
+    )
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
         wallet().resumeDeferredIssuance(deferredCredentialId)

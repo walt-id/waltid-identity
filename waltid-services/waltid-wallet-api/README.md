@@ -88,6 +88,11 @@ Currently, the following databases can be used:
 - postgres 
 - microsoft sql server 
 
+Wallet API upgrades no longer include MySQL Connector/J. MySQL deployments need
+to supply the driver on their runtime classpath or migrate their wallet data to
+a bundled database before upgrading. Keep the current database and back it up
+before testing an upgrade.
+
 The configuration file `db.conf` contain the datasource info required to connect to the respective database engine.
 For more details about database and datasource,
 refer to https://github.com/JetBrains/Exposed/wiki/DataBase-and-DataSource.
@@ -136,6 +141,27 @@ driverClassName = "com.microsoft.sqlserver.jdbc.SQLServerDriver"
 ```bash
 docker run --name mssql -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=p@ssw0rd" -p 1433:1433 --hostname mssql -d mcr.microsoft.com/mssql/server:2022-latest
 ```
+
+### MySQL with an external JDBC driver
+
+Set `dataSource.jdbcUrl` to your existing `jdbc:mysql://...` URL and
+`dataSource.driverClassName` to `com.mysql.cj.jdbc.Driver` in `config/db.conf`.
+Build the Wallet API install distribution from the Gradle root:
+
+```bash
+./gradlew :waltid-services:waltid-wallet-api:installDist
+```
+
+From the Wallet API module directory, launch with your Connector/J JAR on the
+classpath. Replace the example path with the driver artifact for your deployment.
+
+```bash
+java -cp 'build/install/waltid-wallet-api/lib/*:/path/to/mysql-connector-j.jar' id.walt.webwallet.MainKt
+```
+
+Before upgrading production, start this distribution against a restored copy
+of the database. Check that the service starts, an existing account can log in,
+and its saved credentials can be listed.
 
 ## Join the community
 

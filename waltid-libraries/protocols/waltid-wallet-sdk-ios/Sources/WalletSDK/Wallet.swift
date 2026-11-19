@@ -153,6 +153,35 @@ public actor Wallet {
         try await bridge.listDeferredIssuance()
     }
 
+    /// Reports OpenID4VCI `credential_deleted` for a credential the holder rejected instead of storing.
+    ///
+    /// Isolated fetch (`storeInWallet=false`) returns the notification identifier to pass here with
+    /// the same access token. Delivery is Bearer-only and best-effort.
+    ///
+    /// - Parameters:
+    ///   - notificationID: OpenID4VCI `notification_id` from the credential response.
+    ///   - accessToken: Access token used to obtain the credential.
+    ///   - credentialIssuerBaseURL: Issuer identifier used to resolve `notification_endpoint` when
+    ///     `notificationEndpoint` is omitted.
+    ///   - notificationEndpoint: Explicit OpenID4VCI notification endpoint, when already known.
+    ///   - eventDescription: Optional issuer-facing description.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot deliver the notification request.
+    public func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL? = nil,
+        notificationEndpoint: URL? = nil,
+        eventDescription: String? = nil
+    ) async throws {
+        try await bridge.rejectIssuedCredential(
+            notificationID: notificationID,
+            accessToken: accessToken,
+            credentialIssuerBaseURL: credentialIssuerBaseURL,
+            notificationEndpoint: notificationEndpoint,
+            eventDescription: eventDescription
+        )
+    }
+
     /// Polls a deferred credential operation without exposing its access material.
     ///
     /// - Parameter deferredCredentialID: Opaque identifier returned in a deferred outcome.
@@ -217,6 +246,25 @@ public actor Wallet {
     /// - Throws: ``WalletError`` when the request cannot be resolved safely or a local wallet operation fails.
     public func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await bridge.previewPresentation(request: request)
+    }
+
+    /// Prepares the effective claims for this selection without signing or sending credentials.
+    /// Recompute after selection changes and submit the same selection snapshot that was displayed.
+    /// - Parameters:
+    ///   - previewHandle: Handle identifying the retained, wallet-bound presentation request.
+    ///   - selectedCredentialOptions: Credentials selected for the requested queries.
+    ///   - selectedDisclosureOptions: Selected optional disclosures, or nil for request-matched defaults.
+    ///   - did: Optional holder DID to use consistently with the subsequent submission.
+    /// - Returns: Effective credential claims and source/received path mappings for this selection.
+    /// - Throws: A wallet error when the request, selection or credential format cannot be reviewed.
+    public func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
+        did: String? = nil
+    ) async throws -> PreparedPresentationReview {
+        try await bridge.reviewPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions, did: did)
     }
 
     /// Resolves authenticated payment instructions for this selection without signing.

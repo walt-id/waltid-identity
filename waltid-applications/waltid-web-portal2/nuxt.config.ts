@@ -32,9 +32,6 @@ export default defineNuxtConfig({
         process.env.NUXT_PUBLIC_VERIFIER_BASE ||
         (verifierProxyTarget ? "/verifier-api" : "http://localhost:7004"),
       walletUrl: process.env.NUXT_PUBLIC_WALLET_URL || "http://localhost:7101",
-      verifierKeyJwk: process.env.NUXT_PUBLIC_VERIFIER_KEY_JWK || "",
-      verifierX5c: process.env.NUXT_PUBLIC_VERIFIER_X5C || "",
-      verifierClientId: process.env.NUXT_PUBLIC_VERIFIER_CLIENT_ID || "",
     },
   },
 

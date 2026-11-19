@@ -12,10 +12,11 @@ jobs:
     runs-on: windows-2025
     steps:
       - name: Checkout all repositories
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure Gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
@@ -31,10 +32,11 @@ jobs:
     runs-on: macos-15-intel
     steps:
       - name: Checkout all repositories
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure Gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
@@ -49,10 +51,11 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repositories
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d689d1e773d6918cc42299b3cf9563a9ebce3ca0
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@cba255efcba637f429422c132ccaf46b13b9572b
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
           ref: ${{ github.event.pull_request.head.ref || github.head_ref || github.ref_name }}
+          identity-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Configure Gradle
         uses: ./waltid-identity/.github/actions/gradle-setup-action
