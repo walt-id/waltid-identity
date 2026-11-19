@@ -17,8 +17,15 @@ internal object ItbPortalLogin {
         try {
             page.navigate("$testBed/app#/login", Page.NavigateOptions().setWaitUntil(WaitUntilState.COMMIT))
             step = ItbPortalStepTimeout.Step.LOGIN_FORM
-            page.getByRole(AriaRole.TEXTBOX, Page.GetByRoleOptions().setName("Username:"))
-                .fill(username, Locator.FillOptions().setTimeout(startupTimeoutMillis))
+            val usernameField = page.getByRole(AriaRole.TEXTBOX, Page.GetByRoleOptions().setName("Username:"))
+            try {
+                usernameField.waitFor(Locator.WaitForOptions().setTimeout(startupTimeoutMillis / 2))
+            } catch (_: TimeoutError) {
+                // A cold portal document can stall before hydration. Refresh once before entering credentials.
+                page.reload(Page.ReloadOptions().setWaitUntil(WaitUntilState.COMMIT))
+                usernameField.waitFor(Locator.WaitForOptions().setTimeout(startupTimeoutMillis))
+            }
+            usernameField.fill(username)
             page.getByRole(AriaRole.TEXTBOX, Page.GetByRoleOptions().setName("Password:")).fill(password)
             step = ItbPortalStepTimeout.Step.LOGIN_SUBMIT
             page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName(Pattern.compile("Log in"))).click()
