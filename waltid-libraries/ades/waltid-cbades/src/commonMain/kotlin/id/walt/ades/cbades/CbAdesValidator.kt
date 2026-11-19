@@ -316,7 +316,9 @@ class CbAdesValidator(
             fail("signing-certificate-binding", "none of x5t, x5ts or a protected x5chain is present", "5.2.2")
         }
         protected[CbAdesLabels.X5TS]?.let { if ((it.asArray?.size ?: 0) < 2) fail("x5ts", "x5ts shall contain at least two COSE_CertHash", "5.2.2") }
-        if (protected[CbAdesLabels.SR_ATS]?.asMap?.entries?.isEmpty() == true) fail("srAts", "empty srAts shall not be generated", "5.2.5")
+        protected[CbAdesLabels.SR_ATS]?.let {
+            if (it.asMap?.entries.isNullOrEmpty()) fail("srAts", "srAts shall be a non-empty map", "5.2.5")
+        }
         protected[CbAdesLabels.SR_ATS]?.asMap?.let { srAts ->
             listOf(2, 3).forEach { k ->
                 srAts[k]?.let { arr ->

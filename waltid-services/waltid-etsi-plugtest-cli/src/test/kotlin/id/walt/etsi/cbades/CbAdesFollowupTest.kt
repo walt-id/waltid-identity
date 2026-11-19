@@ -13,6 +13,7 @@ import id.walt.ades.cbades.cbor.asArray
 import id.walt.ades.cbades.cbor.asBytes
 import id.walt.ades.cbades.cbor.asMap
 import id.walt.ades.cbades.cbor.asUri
+import id.walt.ades.cbades.cbor.CborItem
 import id.walt.ades.crypto.AdesDigestAlgorithm
 import id.walt.ades.validation.AdesLevel
 import id.walt.ades.validation.AdesValidationPolicy
@@ -85,6 +86,9 @@ class CbAdesFollowupTest {
             val malformed = CbAdesSigner().signSign1("payload".encodeToByteArray(), pki.credentials(pki.signer, "test"),
                 CbAdesSignatureParameters(attributeCertificates = listOf(byteArrayOf(0x30, 0))))
             assertEquals(SubIndication.SIG_CONSTRAINTS_FAILURE, validator.validate(malformed.encode()).subIndication)
+            val malformedAttributes = CbAdesSigner().signSign1("payload".encodeToByteArray(), pki.credentials(pki.signer, "test"),
+                CbAdesSignatureParameters(extraProtected = mapOf(CbAdesLabels.SR_ATS to CborItem.int(1))))
+            assertEquals(SubIndication.FORMAT_FAILURE, validator.validate(malformedAttributes.encode()).subIndication)
         } finally {
             dir.walkBottomUp().forEach { Files.delete(it.toPath()) }
         }
