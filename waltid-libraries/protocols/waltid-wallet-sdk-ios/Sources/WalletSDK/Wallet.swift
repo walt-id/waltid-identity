@@ -58,6 +58,7 @@ public actor Wallet {
     }
 
     /// Changes the opt-in after foreground authorization. Store the returned binding only in app-private state.
+    /// - Parameter preference: The new maintenance preference to commit to the managed wallet.
     public func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? {
         try await bridge.setCredentialStatusMaintenance(preference)
     }
@@ -69,6 +70,11 @@ public actor Wallet {
 
     /// Runs one due-only pass against an enrolled existing wallet without creating a Wallet instance.
     /// Supply the original storage namespace and cancel this async operation when the host's execution window expires.
+    /// - Parameters:
+    ///   - binding: The opaque grant returned when the managed wallet was enrolled.
+    ///   - crossProcessAccess: The App Group and Keychain access group used to create the wallet, if configured.
+    ///   - maxItems: The maximum number of credentials to process in this pass.
+    ///   - budget: The execution budget for the maintenance pass, in seconds.
     public static func refreshDueStatusesForExistingWallet(
         binding: String, crossProcessAccess: WalletCrossProcessAccess? = nil,
         maxItems: Int = 25, budget: TimeInterval = 20
