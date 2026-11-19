@@ -127,9 +127,9 @@ class DPoPRefreshFlowTest {
             }
             val pollEndpoint = "$issuer/deferred_credential"
             assertIs<DeferredCredentialRequestResult.Success>(provider.createDeferredCredentialRequest(
-                mapOf("transaction_id" to listOf("transaction")), CredentialAccessTokenContext(
+                mapOf("transaction_id" to listOf("transaction")), ProtectedResourceAccessTokenContext(
                     authorization = AccessTokenAuthorization(if (expectedAccessBinding == null) AccessTokenAuthorizationScheme.BEARER else AccessTokenAuthorizationScheme.DPOP, response.accessToken),
-                    expectedIssuer = issuer, credentialEndpointUri = pollEndpoint,
+                    expectedIssuer = issuer, targetUri = pollEndpoint,
                     dpopProofHeaderValues = if (expectedAccessBinding != null) listOf(proof(target = pollEndpoint, accessToken = response.accessToken)) else emptyList(),
                 ),
             ))

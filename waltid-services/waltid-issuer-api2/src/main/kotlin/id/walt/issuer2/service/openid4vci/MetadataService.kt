@@ -97,6 +97,7 @@ class MetadataService @JvmOverloads constructor(
                 credentialRequestEncryption = credentialRequestEncryption,
                 batchCredentialIssuance = batchCredentialIssuance,
                 display = issuerDisplay,
+                notificationEndpointPath = "/${Issuer2EndpointPaths.NOTIFICATION}",
             )
         }
 
