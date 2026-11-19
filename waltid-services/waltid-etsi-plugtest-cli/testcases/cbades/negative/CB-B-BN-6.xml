@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-BN-6.cbor"/>
+  <Documentation>This is a negative test case for checking the COSE crit protected header parameter in a CB-AdES signature. The crit array does not identify every protected extension header parameter that is required to be understood and processed by the validation application; in particular, a present CB-AdES critical extension is omitted from crit.</Documentation>
+</SignatureRequest>

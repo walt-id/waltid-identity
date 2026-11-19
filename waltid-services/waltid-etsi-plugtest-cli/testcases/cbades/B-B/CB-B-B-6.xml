@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="../../Data/toBeSigned.txt" Detached="false" />
+    <COSESign1 Tagged="false">
+        <ProtectedHeader>
+            <alg />
+            <CWTClaims>
+                <iat />
+            </CWTClaims>
+            <x5chain />
+            <kid />
+        </ProtectedHeader>
+        <UnprotectedHeader />
+        <payload />
+        <signature />
+    </COSESign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign1 structure with attached payload.
+        Apart from the protected header parameters alg, CWT Claims (enclosing iat) and x5chain, the implementation
+        shall add the protected kid header parameter (label 4), whose content shall be the DER-encoded IssuerSerial
+        (IETF RFC 5035) of the signing certificate (clause 5.1.4). No other optional component shall be present. The
+        x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be
+        included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned Detached="true">
+    </PayloadToBeSigned>
+    <COSE_Sign1 Tagged="false">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <x5chain/>
+            <crit>
+                <label>267</label>
+            </crit>
+            <sigD>
+                <mId>http://uri.etsi.org/19152/ObjectIdByURI</mId>
+                <pars>[https://signature-plugtests.etsi.org/api/public/sigD1.pdf, https://signature-plugtests.etsi.org/api/public/sigD2.pdf]</pars>
+                <ctys>[application/pdf, application/pdf]</ctys>
+            </sigD>
+        </ProtectedHeader>
+        <payload Detached="true"/>
+        <signature/>
+    </COSE_Sign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign1 structure with detached payload. Apart from the protected header parameters alg, CWT Claims (enclosing iat) and x5chain, the implementation shall add the protected sigD header parameter (label 267) using the mechanism ObjectIdByURI (mId "http://uri.etsi.org/19152/ObjectIdByURI", clause 5.2.8.2.2): hashM and hashV shall not be present and the COSE Payload contributing to the signature value shall be the concatenation of the dereferenced objects in the order of pars. The COSE Payload shall be detached (the payload field shall be nil) and shall be built from two detached data objects (sigD1.pdf and sigD2.pdf), each referenced by one HTTP URL in the pars member; the URLs where both objects are published will be provided by the Plugtests portal. The ctys member shall contain "application/pdf" for both objects. The content type header parameter shall not be present (clause 5.1.3). As required by clause 5.1.10, the protected crit header parameter shall be present and shall contain the label 267 (sigD). No other optional component shall be present. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

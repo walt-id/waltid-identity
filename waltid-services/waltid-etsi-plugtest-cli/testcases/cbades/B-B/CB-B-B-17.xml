@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign1 Tagged="false">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <x5chain/>
+            <sigPId>
+                <id/>
+                <digAlgVal>
+                    <hashAlgorithm>SHA-256</hashAlgorithm>
+                    <hashValue/>
+                </digAlgVal>
+                <sigPQuals>
+                    <spURI/>
+                </sigPQuals>
+            </sigPId>
+        </ProtectedHeader>
+        <payload/>
+        <signature/>
+    </COSE_Sign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign1 structure with attached payload. Apart from the protected header parameters alg, CWT Claims (enclosing iat) and x5chain, the implementation shall add the protected sigPId header parameter (label 266) containing the id member (key 1) identifying the signature policy, the digAlgVal member (key 2) with the COSE identifier of SHA-256 (-16) and the SHA-256 digest of the signature policy document, and the sigPQuals member (key 4) with one spURI qualifier (tag 1) containing the URL where the policy document can be obtained. The digPSp member shall be absent. The signature policy document, its identifier (to be encoded as an oId whose id member is a URI, or an URN if it is an OID) and the URL where it is published will be provided by the Plugtests portal. No other optional component shall be present. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

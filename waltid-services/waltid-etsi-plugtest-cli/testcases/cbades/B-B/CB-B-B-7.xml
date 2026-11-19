@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+  <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+  <COSE_Sign1 Tagged="true">
+    <ProtectedHeader>
+      <alg/>
+      <CWTClaims>
+        <iat/>
+      </CWTClaims>
+      <x5ts>
+         <x5t>
+           <hashAlgorithm>SHA-256</hashAlgorithm>
+           <hashValue/>
+         </x5t>
+         <x5t>
+           <hashAlgorithm>SHA-256</hashAlgorithm>
+           <hashValue/>
+         </x5t>
+      </x5ts>
+    </ProtectedHeader>
+    <UnprotectedHeader>
+      <uHeaders>
+        <x5chain/>
+      </uHeaders>
+    </UnprotectedHeader>
+    <payload/>
+    <signature/>
+  </COSE_Sign1>
+  <Documentation>This case tests a CB-AdES-B-B signature using a tagged COSE_Sign1 structure with an attached payload. The implementation shall add at least the protected header parameter alg, x5ts and a protected CWT Claims header containing iat. x5ts contains at least two COSE_CertHash entries; first is signer certificate, followed by issuing certificate references. Unprotected header parameter x5chain shall be included within the uHeaders CBOR array. At least the signing certificate shall be included in x5chain; the certificates needed for certification-path building should also be included.</Documentation>
+</Signature>

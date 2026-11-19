@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign Tagged="false">
+        <payload/>
+        <signatures>
+            <COSE_Signature>
+                <ProtectedHeader>
+                    <alg/>
+                    <CWTClaims>
+                        <iat/>
+                    </CWTClaims>
+                    <x5chain/>
+                </ProtectedHeader>
+                <UnprotectedHeader>
+                    <uHeaders>
+                        <COSE_Countersignature Version="2" Abbreviated="false" Tagged="false">
+                            <ProtectedHeader>
+                                <alg/>
+                                <CWTClaims>
+                                    <iat/>
+                                </CWTClaims>
+                                <x5chain/>
+                            </ProtectedHeader>
+                            <signature/>
+                        </COSE_Countersignature>
+                    </uHeaders>
+                </UnprotectedHeader>
+                <signature/>
+            </COSE_Signature>
+            <COSE_Signature>
+                <ProtectedHeader>
+                    <alg/>
+                    <CWTClaims>
+                        <iat/>
+                    </CWTClaims>
+                    <x5chain/>
+                </ProtectedHeader>
+                <UnprotectedHeader>
+                    <uHeaders>
+                        <COSE_Countersignature Version="2" Abbreviated="false" Tagged="false">
+                            <ProtectedHeader>
+                                <alg/>
+                                <CWTClaims>
+                                    <iat/>
+                                </CWTClaims>
+                                <x5chain/>
+                            </ProtectedHeader>
+                            <signature/>
+                        </COSE_Countersignature>
+                    </uHeaders>
+                </UnprotectedHeader>
+                <signature/>
+            </COSE_Signature>
+        </signatures>
+    </COSE_Sign>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign structure with attached payload and two signers (two COSE_Signature elements), each of them counter-signed by one counter signature. Each COSE_Signature (signer layer) shall contain the minimum mandatory components: the protected header parameters alg, CWT Claims (enclosing iat) and x5chain. The uHeaders unprotected header parameter of each COSE_Signature shall contain exactly one element: the counter signature of that COSE_Signature. The counter signature shall be a full (non abbreviated) version 2 counter signature as specified in IETF RFC 9338 (COSE_Countersignature, label 11), untagged, incorporated as an element of the uHeaders unprotected header parameter of the counter-signed signature (clause 5.1.6). The counter signature shall itself contain at least the protected header parameters alg, CWT Claims (enclosing iat) and x5chain (identifying the counter-signer certificate) and shall not contain the content type header parameter, as its payload is a signature (clause 5.1.3). Its signature value shall be computed as specified in clause 3.3 of IETF RFC 9338, with context string "CounterSignature". The counter-signed structure in the Countersign_structure shall include the body-layer and signer-layer protected headers of the counter-signed COSE_Signature. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>
