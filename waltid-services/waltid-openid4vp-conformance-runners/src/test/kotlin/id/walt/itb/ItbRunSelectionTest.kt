@@ -35,8 +35,8 @@ class ItbRunSelectionTest {
 
     @Test
     fun filteredPresentationsIncludeTheirRealIssuancePrerequisitesFirst() {
-        val selected = ItbRunSelection.select(catalogue, "ts12/ts12_pay_dc_api_03,cs02v1/tc_vp_007,tc15")
-        assertEquals(listOf("tc_vci_006", "tc15", "tc_vci_008", "tc_vp_007", "ts12_issue_03", "ts12_pay_dc_api_03"),
+        val selected = ItbRunSelection.select(catalogue, "ts12/ts12_pay_dc_api_03,cs01v1/tc_vci_005,cs02v1/tc_vp_007,tc15")
+        assertEquals(listOf("tc_vci_006", "tc15", "tc_vci_008", "tc_vp_007", "tc_vci_005", "ts12_issue_03", "ts12_pay_dc_api_03"),
             selected.map { it.second.id })
     }
 
