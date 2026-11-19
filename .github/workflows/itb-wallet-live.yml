@@ -85,7 +85,7 @@ jobs:
           wait_for_android_dc_api_device
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
-          adb shell pm path com.android.chrome | rg '^package:'
+          adb shell pm path com.android.chrome | grep '^package:'
           adb shell dumpsys package com.android.chrome | awk -F= '/versionName=/ && !version {version=$2} END {print "Chrome version: " version}'
           # The clean emulator's browser should open directly on the credential flow without first-run UI.
           adb shell 'printf "%s\n" "chrome --disable-fre --no-first-run" > /data/local/tmp/chrome-command-line'

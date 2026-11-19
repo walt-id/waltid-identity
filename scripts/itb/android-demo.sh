@@ -18,12 +18,12 @@ outputs=waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/
 apk="$outputs/preview/debug/androidApp-preview-debug.apk"
 test_apk="$outputs/androidTest/preview/debug/androidApp-preview-debug-androidTest.apk"
 [[ -r "$apk" && -r "$test_apk" ]] || { echo 'Build the Preview Debug app and test APKs first.' >&2; exit 2; }
-ITB_WALLET_APP_APK_SHA256="$(shasum -a 256 "$apk" | cut -d' ' -f1)"
+ITB_WALLET_APP_APK_SHA256="$(openssl dgst -sha256 -r "$apk" | cut -d' ' -f1)"
 export ITB_WALLET_APP_APK_SHA256
-ITB_ANDROID_APK_SHA256="$(shasum -a 256 "$test_apk" | cut -d' ' -f1)"
+ITB_ANDROID_APK_SHA256="$(openssl dgst -sha256 -r "$test_apk" | cut -d' ' -f1)"
 export ITB_ANDROID_APK_SHA256
 
-if adb shell pm path "$app" | tr -d '\r' | rg -q '^package:'; then
+if adb shell pm path "$app" | tr -d '\r' | grep -q '^package:'; then
   echo 'Use a device with a fresh Preview installation. Uninstall the disposable ITB copy before another run.' >&2
   exit 2
 fi
@@ -64,7 +64,7 @@ adb shell am instrument -w -r \
   "$app.test/androidx.test.runner.AndroidJUnitRunner" >"$instrumentation_output" 2>&1 &
 instrumentation_pid=$!
 for attempt in {1..60}; do
-  if rg -q '^INSTRUMENTATION_STATUS: itb_state=listening' "$instrumentation_output"; then break; fi
+  if grep -q '^INSTRUMENTATION_STATUS: itb_state=listening' "$instrumentation_output"; then break; fi
   if ! kill -0 "$instrumentation_pid" 2>/dev/null; then
     echo 'Demo instrumentation exited before connecting.' >&2
     exit 2
@@ -77,7 +77,7 @@ status=0
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet --max-workers=2 --console=plain || status=$?
 if [[ "$status" == 0 ]]; then
   wait "$instrumentation_pid"
-  if ! rg -q '^OK \(1 test\)' "$instrumentation_output"; then
+  if ! grep -q '^OK (1 test)' "$instrumentation_output"; then
     echo 'Demo instrumentation did not complete its test.' >&2
     exit 1
   fi
