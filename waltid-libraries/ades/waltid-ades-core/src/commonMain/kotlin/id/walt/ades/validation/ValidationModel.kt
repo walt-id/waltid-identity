@@ -77,6 +77,8 @@ data class SignatureValidationResult(
     val level: AdesLevel?,
     val timestamps: List<TimestampValidationResult>,
     val checks: List<ValidationCheck>,
+    /** Profile indicated by the container. PAdES [level] additionally requires successful signature and time validation. */
+    val structuralLevel: AdesLevel? = level,
 ) {
     val isValid: Boolean get() = indication == Indication.TOTAL_PASSED
     val errors: List<ValidationCheck> get() = checks.filter { it.status == CheckStatus.FAILED }

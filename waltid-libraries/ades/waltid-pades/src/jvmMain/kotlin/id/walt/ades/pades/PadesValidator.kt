@@ -56,7 +56,31 @@ class PadesValidator(
         }
 
         for (ts in inspection.documentTimestamps) documentChecks += documentTimestampCheck(inspection, ts)
-        val results = inspection.signatures.map { validator.validate(evidence(inspection, it)) }
+        val results = inspection.signatures.map { field ->
+            val evidence = try {
+                evidence(inspection, field)
+            } catch (e: IllegalArgumentException) {
+                SignatureEvidence(field.name, listOf(ValidationCheck("format:cms", CheckStatus.FAILED,
+                    "malformed signature: ${e.message}")), null, null, false)
+            } catch (e: NoSuchElementException) {
+                SignatureEvidence(field.name, listOf(ValidationCheck("format:cms", CheckStatus.FAILED,
+                    "missing signature value: ${e.message}")), null, null, false)
+            } catch (e: IndexOutOfBoundsException) {
+                SignatureEvidence(field.name, listOf(ValidationCheck("format:cms", CheckStatus.FAILED,
+                    "truncated signature: ${e.message}")), null, null, false)
+            }
+            val result = validator.validate(evidence)
+            val timeEvidence = evidence.signatureTimestamps + evidence.archiveTimestamps
+            val passed = timeEvidence.zip(result.timestamps).filter { it.second.passed }.map { it.first }
+            val timeTokens = passed.mapNotNull { it.token?.let { token -> runCatching { TimeStampToken(token) }.getOrNull() } }
+            val archives = inspection.documentTimestamps.filter { ts ->
+                passed.any { it.type == TimestampType.ARCHIVE && it.description == "document-timestamp:${ts.name}" }
+            }
+            val certificate = result.signingCertificate
+            val level = if (!result.isValid || evidence.level == null || certificate == null) null else determineLevel(
+                inspection, field, certificate, validationPool(inspection, field), timeTokens, archives)
+            result.copy(level = level, structuralLevel = evidence.level)
+        }
         return DocumentValidationResult(FORMAT, results, documentChecks)
     }
 
@@ -119,6 +143,7 @@ class PadesValidator(
 
     private suspend fun evidence(inspection: PdfInspection, field: PdfSignatureField): SignatureEvidence {
         val checks = byteRangeChecks(inspection, field).toMutableList()
+        if (checks.any { it.status == CheckStatus.FAILED }) return SignatureEvidence(field.name, checks, null, null, false)
         var baseline = true
         val dictionary = field.dictionary.cosObject
         when (field.subFilter) {
@@ -228,10 +253,16 @@ class PadesValidator(
                     if (allowOtherModifications) CheckStatus.WARNING else CheckStatus.FAILED,
                     "document modified after signing: ${disallowed.joinToString("; ")}", "ISO 32000-1 12.8.2.2")
             }
-            if (inspection.docMdpPermission == 1 && ChangeKind.SIGNATURE in kinds) {
+            val signedPermissions = PdfInspection.open(inspection.pdf.copyOf(field.revisionEnd)).use { it.docMdpPermission }
+            if (signedPermissions != null && (ChangeKind.OTHER in kinds ||
+                    signedPermissions == 1 && ChangeKind.SIGNATURE in kinds)) {
                 checks += ValidationCheck("format:docmdp", CheckStatus.FAILED,
-                    "signatures were added to a document certified with DocMDP P=1 (no changes allowed)", "ISO 32000-1 12.8.2.2; EN 319 142-1 5.4.3")
+                    "changes violate the signed DocMDP P=$signedPermissions permissions", "ISO 32000-1 12.8.2.2; EN 319 142-1 5.4.3")
             }
+        }
+
+        inspection.fieldPermissionProblemsAfter(field.revisionEnd).forEach {
+            checks += ValidationCheck("format:fieldmdp", CheckStatus.FAILED, it, "ISO 32000-1 12.8.2.4")
         }
 
         val tokens = (signatureTimestamps + archiveTimestamps).mapNotNull { it.token?.let { t -> runCatching { TimeStampToken(t) }.getOrNull() } }
@@ -243,7 +274,7 @@ class PadesValidator(
                 listOfNotNull(timeProvidingDocumentTimestamp?.timestampToken),
             archiveCandidates = laterDocumentTimestamps.filter { it !== timeProvidingDocumentTimestamp },
         )
-        level?.let { checks += ValidationCheck("pades:level", CheckStatus.INFO, "PAdES-BASELINE-${it.code}", "EN 319 142-1 6.3") }
+        level?.let { checks += ValidationCheck("pades:level", CheckStatus.INFO, "structural profile PAdES-BASELINE-${it.code}; validated level is reported separately", "EN 319 142-1 6.3") }
 
         return SignatureEvidence(
             signatureId = field.name,

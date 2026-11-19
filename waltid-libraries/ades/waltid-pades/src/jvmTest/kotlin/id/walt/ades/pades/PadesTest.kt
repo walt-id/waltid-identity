@@ -51,19 +51,6 @@ class PadesTest {
     private val online = AdesValidationPolicy(trustAnchors = listOf(pki.root.certificate), transport = pki.transport)
     private val offline = AdesValidationPolicy(trustAnchors = listOf(pki.root.certificate))
 
-    private fun samplePdf(text: String = "Hello PAdES"): ByteArray = PDDocument().use { doc ->
-        val page = PDPage()
-        doc.addPage(page)
-        PDPageContentStream(doc, page, PDPageContentStream.AppendMode.OVERWRITE, false).use { cs ->
-            cs.beginText()
-            cs.setFont(PDType1Font(Standard14Fonts.FontName.HELVETICA), 14f)
-            cs.newLineAtOffset(72f, 700f)
-            cs.showText(text)
-            cs.endText()
-        }
-        ByteArrayOutputStream().also { doc.save(it) }.toByteArray()
-    }
-
     private suspend fun validate(pdf: ByteArray, policy: AdesValidationPolicy = online, allowOther: Boolean = false): DocumentValidationResult =
         PadesValidator(policy, allowOther).validate(pdf)
 
@@ -427,4 +414,17 @@ class PadesTest {
         }
         return -1
     }
+}
+
+internal fun samplePdf(text: String = "Hello PAdES"): ByteArray = PDDocument().use { doc ->
+    val page = PDPage()
+    doc.addPage(page)
+    PDPageContentStream(doc, page, PDPageContentStream.AppendMode.OVERWRITE, false).use { cs ->
+        cs.beginText()
+        cs.setFont(PDType1Font(Standard14Fonts.FontName.HELVETICA), 14f)
+        cs.newLineAtOffset(72f, 700f)
+        cs.showText(text)
+        cs.endText()
+    }
+    ByteArrayOutputStream().also { doc.save(it) }.toByteArray()
 }

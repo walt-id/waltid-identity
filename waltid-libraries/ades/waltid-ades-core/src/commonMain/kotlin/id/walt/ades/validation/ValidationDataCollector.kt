@@ -14,8 +14,8 @@ import kotlin.time.Duration.Companion.minutes
  * responders and CRL issuers. Used for augmentation to B-LT / before each new archive time-stamp.
  */
 class ValidationDataCollector(
-    private val transport: AdesTransport?,
-    private val trustAnchors: List<X509Certificate> = emptyList(),
+    val transport: AdesTransport?,
+    val trustAnchors: List<X509Certificate> = emptyList(),
     /** Embedded revocation data issued within this window is reused instead of being fetched again. */
     private val reuseWindow: Duration = 15.minutes,
     /** Include the self-signed root / trust anchor certificate in the collected certificates. */

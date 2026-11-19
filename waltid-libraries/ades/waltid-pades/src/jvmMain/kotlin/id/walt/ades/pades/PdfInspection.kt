@@ -14,20 +14,23 @@ import java.util.GregorianCalendar
 import java.util.TimeZone
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
-import org.apache.pdfbox.Loader
 import org.apache.pdfbox.cos.COSArray
 import org.apache.pdfbox.cos.COSBase
 import org.apache.pdfbox.cos.COSDictionary
 import org.apache.pdfbox.cos.COSName
 import org.apache.pdfbox.cos.COSNull
+import org.apache.pdfbox.cos.COSNumber
 import org.apache.pdfbox.cos.COSObject
 import org.apache.pdfbox.cos.COSObjectKey
 import org.apache.pdfbox.cos.COSStream
 import org.apache.pdfbox.cos.COSString
+import org.apache.pdfbox.io.RandomAccessReadBuffer
+import org.apache.pdfbox.pdfparser.PDFParser
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.interactive.digitalsignature.PDSignature
 
 internal object PdfNames {
+    val DATA: COSName = COSName.getPDFName("Data")
     val ETSI_CADES_DETACHED: COSName = COSName.getPDFName("ETSI.CAdES.detached")
     val ETSI_RFC3161: COSName = COSName.getPDFName("ETSI.RFC3161")
     val ADBE_PKCS7_DETACHED: COSName = COSName.getPDFName("adbe.pkcs7.detached")
@@ -65,13 +68,13 @@ internal class PdfSignatureField(
     val der: ByteArray? = runCatching { Der.parseFirst(contents).encoded }.getOrNull()
 
     /** End offset (exclusive) of the revision signed by this signature. */
-    val revisionEnd: Int = byteRange?.let { it[2] + it[3] } ?: Int.MAX_VALUE
+    val revisionEnd: Int = byteRange?.let { (it[2].toLong() + it[3]).takeIf { end -> end in 0..pdf.size.toLong() }?.toInt() ?: Int.MAX_VALUE } ?: Int.MAX_VALUE
 
     val gapStart: Int get() = byteRange?.get(1) ?: -1
     val gapEnd: Int get() = byteRange?.get(2) ?: -1
 
     val signedContent: ByteArray? = byteRange?.let { br ->
-        if (br[0] < 0 || br[1] < 0 || br[2] < 0 || br[3] < 0 || br[0] + br[1] > br[2] || br[2] + br[3] > pdf.size) null
+        if (br[0] < 0 || br[1] < 0 || br[2] < 0 || br[3] < 0 || br[0].toLong() + br[1] > br[2] || br[2].toLong() + br[3] > pdf.size) null
         else pdf.copyOfRange(br[0], br[0] + br[1]) + pdf.copyOfRange(br[2], br[2] + br[3])
     }
 
@@ -114,13 +117,15 @@ internal class DssContent(
             val crls = LinkedHashSet<X509Crl>()
             val ocsps = LinkedHashSet<OcspResponse>()
             fun collect(dict: COSDictionary, certKey: COSName, crlKey: COSName, ocspKey: COSName, where: String) {
-                streamBytes(dict.getDictionaryObject(certKey) as? COSArray).forEach { b ->
+                fun bytes(key: COSName): List<ByteArray> = runCatching { streamBytes(dict.getDictionaryObject(key) as? COSArray) }
+                    .getOrElse { problems += "$where: unreadable ${key.name}: ${it.message}"; emptyList() }
+                bytes(certKey).forEach { b ->
                     runCatching { X509Certificate(b) }.onSuccess(certs::add).onFailure { problems += "$where: invalid certificate: ${it.message}" }
                 }
-                streamBytes(dict.getDictionaryObject(crlKey) as? COSArray).forEach { b ->
+                bytes(crlKey).forEach { b ->
                     runCatching { X509Crl(b) }.onSuccess(crls::add).onFailure { problems += "$where: invalid CRL: ${it.message}" }
                 }
-                streamBytes(dict.getDictionaryObject(ocspKey) as? COSArray).forEach { b ->
+                bytes(ocspKey).forEach { b ->
                     runCatching { OcspResponse(b) }.onSuccess(ocsps::add).onFailure { problems += "$where: invalid OCSP response: ${it.message}" }
                 }
             }
@@ -148,29 +153,65 @@ internal class PdfInspection private constructor(val pdf: ByteArray, val documen
     val dss: DssContent by lazy { DssContent.read(document) }
 
     /** DocMDP permission P (1..3) of a certification signature, null when the document is not certified (ISO 32000-1 12.8.2.2). */
-    val docMdpPermission: Int? by lazy {
-        val perms = document.documentCatalog.cosObject.getDictionaryObject(COSName.PERMS) as? COSDictionary
-        val certification = perms?.getDictionaryObject(COSName.getPDFName("DocMDP")) as? COSDictionary ?: return@lazy null
-        val references = certification.getDictionaryObject(COSName.getPDFName("Reference")) as? COSArray
-        (0 until (references?.size() ?: 0)).firstNotNullOfOrNull { i ->
-            (references!!.getObject(i) as? COSDictionary)
-                ?.takeIf { it.getCOSName(COSName.getPDFName("TransformMethod"))?.name == "DocMDP" }
-                ?.let { (it.getDictionaryObject(COSName.getPDFName("TransformParams")) as? COSDictionary)?.getInt(COSName.P, 2) ?: 2 }
-        } ?: 2
-    }
-
-    /** Revisions as [start of "%%EOF", end of the line following it). */
-    val revisions: List<IntRange> = findEofMarkers(pdf)
+    val docMdpPermission: Int? by lazy { PdfPermissions.docMdpPermission(document) }
 
     private val revisionDocuments = HashMap<Int, PDDocument>()
+
+    /** Revisions as [start of "%%EOF", end of the line following it), linked by the trailer /Prev chain. */
+    val revisions: List<IntRange> = try {
+        linkedRevisions()
+    } catch (e: Exception) {
+        revisionDocuments.values.forEach { it.close() }
+        throw e
+    }
 
     /** Index of the revision that ends at [offset] (end of a ByteRange), or -1. */
     fun revisionIndexEndingAt(offset: Int): Int = revisions.indexOfFirst { offset >= it.first + EOF.size && offset <= it.last + 1 }
 
     fun revisionDocument(end: Int): PDDocument =
-        if (end >= pdf.size) document else revisionDocuments.getOrPut(end) { Loader.loadPDF(pdf.copyOf(end)) }
+        if (end >= pdf.size) document else revisionDocuments.getOrPut(end) { loadStrict(pdf.copyOf(end)) }
 
     fun dssAt(end: Int): DssContent = if (end >= pdf.size) dss else DssContent.read(revisionDocument(end))
+
+    private fun linkedRevisions(): List<IntRange> {
+        val text = pdf.toString(Charsets.ISO_8859_1)
+        val markers = Regex("startxref[\\t\\r\\n ]+([0-9]+)[\\t\\r\\n ]+%%EOF(?:\\r\\n|\\r|\\n)?")
+            .findAll(text).map { match ->
+                match.groupValues[1].toLong() to (text.indexOf("%%EOF", match.range.first) until match.range.last + 1)
+            }.toList()
+        val result = mutableListOf<IntRange>()
+        val visited = HashSet<Long>()
+        var xref = document.document.startXref
+        while (true) {
+            require(xref >= 0 && visited.add(xref)) { "Invalid or cyclic revision xref chain" }
+            val marker = requireNotNull(markers.firstOrNull { it.first == xref && it.second.first > xref }?.second) {
+                "No revision boundary for xref $xref"
+            }
+            val revision = revisionDocument(marker.last + 1)
+            require(revision.document.startXref == xref) { "Revision startxref mismatch" }
+            result += marker
+            val previous = revision.document.trailer.getLong(COSName.PREV, -1)
+            if (previous < 0) break
+            // A linearized base file has two xref sections in one revision; the first points forward to the main section.
+            if (previous > xref && previous < marker.first &&
+                revision.document.linearizedDictionary?.getLong(COSName.L) == (marker.last + 1).toLong()) break
+            require(previous < xref) { "Non-monotonic revision xref chain" }
+            xref = previous
+        }
+        return result.reversed()
+    }
+
+    /** Check the original signed rules against every later revision, including changes subsequently reverted. */
+    fun fieldPermissionProblemsAfter(end: Int): List<String> {
+        val original = revisionDocument(end)
+        val index = revisionIndexEndingAt(end)
+        return revisions.drop(index + 1).flatMap { boundary -> PdfPermissions.changes(original, revisionDocument(boundary.last + 1)) }.distinct()
+    }
+
+    fun requireSignable(name: String) {
+        PdfPermissions.requireSignable(document, name)
+        signatures.forEach { PdfPermissions.requireSignable(revisionDocument(it.revisionEnd), name) }
+    }
 
     private val changeCache = HashMap<Int, RevisionChanges>()
 
@@ -183,7 +224,7 @@ internal class PdfInspection private constructor(val pdf: ByteArray, val documen
             val oldEnd = revisions[i - 1].last + 1
             val newEnd = revisions[i].last + 1
             result += changeCache.getOrPut(newEnd) {
-                runCatching { PdfRevisionDiff.diff(revisionDocument(oldEnd), revisionDocument(newEnd), i) }
+                runCatching { PdfRevisionDiff.diff(revisionDocument(oldEnd), revisionDocument(newEnd), i, newEnd) }
                     .getOrElse { RevisionChanges(i, setOf(ChangeKind.OTHER), listOf("revision $i could not be compared: ${it.message}")) }
             }
         }
@@ -202,41 +243,37 @@ internal class PdfInspection private constructor(val pdf: ByteArray, val documen
     companion object {
         private val EOF = "%%EOF".encodeToByteArray()
 
-        fun open(pdf: ByteArray) = PdfInspection(pdf, Loader.loadPDF(pdf))
+        fun open(pdf: ByteArray): PdfInspection {
+            val document = loadStrict(pdf)
+            return try { PdfInspection(pdf, document) } catch (e: Exception) { document.close(); throw e }
+        }
+
+        private fun loadStrict(pdf: ByteArray): PDDocument {
+            val source = RandomAccessReadBuffer(pdf)
+            return try { PDFParser(source).parse(false) } catch (e: Exception) { source.close(); throw e }
+        }
 
         private fun Byte.isWhitespace() = this == 0x20.toByte() || this == 0x0a.toByte() || this == 0x0d.toByte() || this == 0x09.toByte() || this == 0x00.toByte() || this == 0x0c.toByte()
 
-        fun findEofMarkers(pdf: ByteArray): List<IntRange> {
-            val out = mutableListOf<IntRange>()
-            var i = 0
-            while (i <= pdf.size - EOF.size) {
-                if (pdf[i] == '%'.code.toByte() && (0 until EOF.size).all { pdf[i + it] == EOF[it] }) {
-                    var end = i + EOF.size
-                    if (end < pdf.size && pdf[end] == '\r'.code.toByte()) end++
-                    if (end < pdf.size && pdf[end] == '\n'.code.toByte()) end++
-                    out += i until end
-                    i = end
-                } else i++
-            }
-            return out
-        }
+
     }
 }
 
-internal enum class ChangeKind { DSS, DOC_TIMESTAMP, SIGNATURE, OTHER }
+internal enum class ChangeKind { DSS, DOC_TIMESTAMP, SIGNATURE, FORM_FILL, ANNOTATION, OTHER }
 
 internal class RevisionChanges(val revision: Int, val kinds: Set<ChangeKind>, val details: List<String>)
 
 /** Object-level comparison of two consecutive revisions, classifying what an incremental update changed. */
 internal object PdfRevisionDiff {
 
-    fun diff(old: PDDocument, new: PDDocument, revision: Int): RevisionChanges {
+    fun diff(old: PDDocument, new: PDDocument, revision: Int, revisionEnd: Int): RevisionChanges {
         val kinds = mutableSetOf<ChangeKind>()
         val details = mutableListOf<String>()
         fun other(message: String) {
             kinds += ChangeKind.OTHER; details += message
         }
 
+        val update = SignatureUpdate(revisionEnd, new, PdfPermissions.docMdpPermission(old))
         val oldXref = old.document.xrefTable
         val newXref = new.document.xrefTable
         val oldRoot = old.document.trailer.getItem(COSName.ROOT) as? COSObject
@@ -244,18 +281,19 @@ internal object PdfRevisionDiff {
         if (oldRoot == null || newRoot == null || !same(oldRoot, newRoot)) other("document catalog replaced")
         if (!same(old.document.trailer.getItem(COSName.INFO), new.document.trailer.getItem(COSName.INFO))) other("document information dictionary replaced")
 
-        val oldDss = reachable(old.documentCatalog.cosObject.getItem(COSName.DSS))
-        val newDss = reachable(new.documentCatalog.cosObject.getItem(COSName.DSS))
+        val protected = documentObjects(old) + documentObjects(new)
+        val oldDss = dssObjects(old.documentCatalog.cosObject.getItem(COSName.DSS))
+        val newDss = dssObjects(new.documentCatalog.cosObject.getItem(COSName.DSS))
 
         for (key in oldXref.keys) if (key !in newXref) other("object ${key.number} ${key.generation} removed")
         for ((key, offset) in newXref) {
             val previous = oldXref[key]
-            if (previous == offset) continue
+            if (previous == offset && offset >= 0) continue
             val newObject = new.document.getObjectFromPool(key).`object`
-            if (newObject is COSStream && newObject.getCOSName(COSName.TYPE).let { it == COSName.XREF || it == COSName.OBJ_STM }) continue
             if (previous == null) {
                 when {
                     key in newDss -> kinds += ChangeKind.DSS
+                    update.isAnnotation(newObject) -> kinds += ChangeKind.ANNOTATION
                     newObject is COSDictionary && newObject.getCOSName(COSName.TYPE) == COSName.DOC_TIME_STAMP -> kinds += ChangeKind.DOC_TIMESTAMP
                     newObject is COSDictionary && newObject.getCOSName(COSName.TYPE) == COSName.SIG -> kinds += ChangeKind.SIGNATURE
                 }
@@ -263,16 +301,29 @@ internal object PdfRevisionDiff {
             }
             val oldObject = old.document.getObjectFromPool(key).`object`
             if (same(oldObject, newObject)) continue
-            if (key in newDss && key in oldDss && newObject !is COSStream) {
+            if (key in newDss && key in oldDss && key !in protected && newObject !is COSStream) {
                 kinds += ChangeKind.DSS; continue
             }
-            val problem = changeProblem(oldObject, newObject)
+            val annotationArray = key in update.annotationArrays
+            val problem = changeProblem(oldObject, newObject, update, annotationArray)
+            if (problem == null && update.isFormField(newObject)) kinds += ChangeKind.FORM_FILL
+            if (problem == null && update.isAnnotation(newObject)) kinds += ChangeKind.ANNOTATION
             if (problem != null) other("object ${key.number} ${key.generation}: $problem")
             else if (newObject is COSDictionary && newObject.getCOSName(COSName.TYPE) == COSName.CATALOG &&
                 !same(oldObject.asDict()?.getItem(COSName.DSS), newObject.getItem(COSName.DSS))
             ) kinds += ChangeKind.DSS
         }
         return RevisionChanges(revision, kinds, details)
+    }
+
+    private class SignatureUpdate(val end: Int, document: PDDocument, val permission: Int?) {
+        val fields = document.signatureFields.map { it.cosObject }.toSet()
+        val formFields = PdfPermissions.formFields(document).values.map { it.cosObject }.toSet() - fields
+        val annotations = document.pages.flatMap { it.annotations }.map { it.cosObject }.toSet()
+        val annotationArrays = document.pages.mapNotNull { (it.cosObject.getItem(COSName.ANNOTS) as? COSObject)?.reference() }.toSet()
+        fun isFormField(item: COSBase?) = permission in 2..3 && item in formFields
+        fun isAnnotation(item: COSBase?) = permission == 3 && item in annotations &&
+            item.asDict()?.getCOSName(COSName.SUBTYPE) in setOf(COSName.getPDFName("Text"), COSName.getPDFName("Highlight"), COSName.getPDFName("Underline"), COSName.getPDFName("StrikeOut"), COSName.getPDFName("Squiggly"), COSName.getPDFName("Ink"), COSName.getPDFName("Square"), COSName.getPDFName("Circle"), COSName.getPDFName("FreeText"), COSName.getPDFName("Stamp"))
     }
 
     @Suppress("DEPRECATION")
@@ -285,86 +336,153 @@ internal object PdfRevisionDiff {
         (a.keySet() + b.keySet()).filter { !same(a.getItem(it), b.getItem(it)) }.toSet()
 
     /** Null when the modification of an existing object is one of those allowed after signing. */
-    private fun changeProblem(old: COSBase?, new: COSBase?): String? {
-        if (old is COSArray && new is COSArray) return arrayGrowthProblem(old, new)
+    private fun changeProblem(old: COSBase?, new: COSBase?, update: SignatureUpdate, annotations: Boolean = false): String? {
+        if (old is COSArray && new is COSArray) return arrayGrowthProblem(old, new, update, annotations)
         if (old !is COSDictionary || new !is COSDictionary || old is COSStream || new is COSStream) return "content modified"
         val diff = differingKeys(old, new)
         val type = new.getCOSName(COSName.TYPE)
         return when {
+            update.isFormField(new) -> if ((diff - setOf(COSName.V, COSName.AP, COSName.AS)).isEmpty()) null else "non-value form field entries modified"
+            update.isAnnotation(new) -> if ((diff - setOf(COSName.CONTENTS, COSName.RECT, COSName.AP, COSName.C, COSName.CA, COSName.M, COSName.F,
+                COSName.getPDFName("QuadPoints"), COSName.getPDFName("InkList"))).isEmpty()) null else "unsupported annotation entries modified"
             type == COSName.CATALOG -> {
                 val extra = diff - setOf(COSName.DSS, COSName.EXTENSIONS, COSName.ACRO_FORM)
                 if (extra.isNotEmpty()) "catalog entries ${extra.joinToString { it.name }} modified"
-                else if (COSName.ACRO_FORM in diff) acroFormProblem(old.getItem(COSName.ACRO_FORM), new.getItem(COSName.ACRO_FORM))
-                else null
+                else {
+                    val formProblem = if (COSName.ACRO_FORM in diff) acroFormProblem(old.getItem(COSName.ACRO_FORM), new.getItem(COSName.ACRO_FORM), update) else null
+                    formProblem ?: if (COSName.EXTENSIONS in diff) extensionProblem(old.getDictionaryObject(COSName.EXTENSIONS).asDict(), new.getDictionaryObject(COSName.EXTENSIONS).asDict()) else null
+                }
             }
 
             type == COSName.PAGE -> {
                 val extra = diff - COSName.ANNOTS
                 if (extra.isNotEmpty()) "page entries ${extra.joinToString { it.name }} modified"
-                else arrayItemProblem(old.getItem(COSName.ANNOTS), new.getItem(COSName.ANNOTS))
+                else arrayItemProblem(old.getItem(COSName.ANNOTS), new.getItem(COSName.ANNOTS), update, true)
             }
 
-            new.getCOSName(COSName.FT) == COSName.SIG || old.getCOSName(COSName.FT) == COSName.SIG -> {
-                val extra = diff - setOf(COSName.V, COSName.AP, COSName.AS)
+            new.getCOSName(COSName.FT) == COSName.SIG || old.getCOSName(COSName.FT) == COSName.SIG ||
+                new.getCOSName(COSName.SUBTYPE) == COSName.WIDGET && new.getDictionaryObject(COSName.PARENT).asDict()?.getCOSName(COSName.FT) == COSName.SIG -> {
+                val extra = diff - setOf(COSName.V, COSName.AP, COSName.AS, COSName.F)
+                val oldField = if (old.getCOSName(COSName.FT) == COSName.SIG) old else old.getDictionaryObject(COSName.PARENT).asDict()
                 when {
                     extra.isNotEmpty() -> "signature field entries ${extra.joinToString { it.name }} modified"
-                    COSName.V in diff && old.getItem(COSName.V) != null -> "existing signature value replaced"
+                    oldField?.getDictionaryObject(COSName.V) != null -> "existing signature value or appearance modified"
+                    COSName.F in diff && (old.getInt(COSName.F) xor new.getInt(COSName.F)) and 4.inv() != 0 -> "signature widget flags modified"
+                    !isSignatureFieldOrWidget(new, update) -> "signature field is not signed in this revision"
                     else -> null
                 }
             }
 
-            new.containsKey(COSName.FIELDS) || old.containsKey(COSName.FIELDS) -> acroFormProblem(old, new)
+            new.containsKey(COSName.FIELDS) || old.containsKey(COSName.FIELDS) -> acroFormProblem(old, new, update)
             else -> "entries ${diff.joinToString { it.name }} modified"
         }
     }
 
-    private fun acroFormProblem(oldItem: COSBase?, newItem: COSBase?): String? {
+    private fun extensionProblem(old: COSDictionary?, new: COSDictionary?): String? {
+        new ?: return "extensions removed"
+        val changed = (old?.keySet().orEmpty() + new.keySet()).filter { !same(old?.getItem(it), new.getItem(it)) }
+        if (changed.any { it != PdfNames.ESIC }) return "non-DSS extensions modified"
+        val esic = new.getDictionaryObject(PdfNames.ESIC) as? COSDictionary ?: return "DSS extension removed"
+        return if (esic.keySet() == setOf(PdfNames.BASE_VERSION, PdfNames.EXTENSION_LEVEL) &&
+            esic.getCOSName(PdfNames.BASE_VERSION)?.name == "1.7" && esic.getInt(PdfNames.EXTENSION_LEVEL) == 1) null
+        else "unsupported DSS extension"
+    }
+
+    private fun acroFormProblem(oldItem: COSBase?, newItem: COSBase?, update: SignatureUpdate): String? {
         if (oldItem is COSObject && newItem is COSObject && same(oldItem, newItem)) return null // compared as its own object
         val old = oldItem.asDict()
         val new = newItem.asDict() ?: return "AcroForm removed"
         if (old == null) {
+            if ((new.keySet() - setOf(COSName.FIELDS, COSName.SIG_FLAGS)).isNotEmpty()) return "unsupported new AcroForm entries"
             val fields = new.getDictionaryObject(COSName.FIELDS) as? COSArray ?: return null
-            return if ((0 until fields.size()).all { isSignatureFieldOrWidget(fields.getObject(it)) }) null else "new non-signature form fields"
+            return if ((0 until fields.size()).all { isSignatureFieldOrWidget(fields.getObject(it), update) }) null else "new non-signature form fields"
         }
         val extra = differingKeys(old, new) - setOf(COSName.FIELDS, COSName.SIG_FLAGS)
         if (extra.isNotEmpty()) return "AcroForm entries ${extra.joinToString { it.name }} modified"
-        return arrayItemProblem(old.getItem(COSName.FIELDS), new.getItem(COSName.FIELDS))
+        return arrayItemProblem(old.getItem(COSName.FIELDS), new.getItem(COSName.FIELDS), update)
     }
 
-    private fun arrayItemProblem(oldItem: COSBase?, newItem: COSBase?): String? {
+    private fun arrayItemProblem(oldItem: COSBase?, newItem: COSBase?, update: SignatureUpdate, annotations: Boolean = false): String? {
         if (oldItem is COSObject && newItem is COSObject && same(oldItem, newItem)) return null
         val new = newItem.deref() as? COSArray ?: return if (oldItem == null) null else "array removed"
-        return arrayGrowthProblem(oldItem.deref() as? COSArray ?: COSArray(), new)
+        return arrayGrowthProblem(oldItem.deref() as? COSArray ?: COSArray(), new, update, annotations)
     }
 
-    private fun arrayGrowthProblem(old: COSArray, new: COSArray): String? {
-        val remaining = (0 until new.size()).map { new.get(it) }.toMutableList()
-        for (i in 0 until old.size()) {
-            val idx = remaining.indexOfFirst { same(old.get(i), it) }
-            if (idx < 0) return "existing array entry removed or replaced"
-            remaining.removeAt(idx)
+    private fun arrayGrowthProblem(old: COSArray, new: COSArray, update: SignatureUpdate, annotations: Boolean = false): String? {
+        if (new.size() < old.size() || (0 until old.size()).any { !same(old.get(it), new.get(it)) }) {
+            return "existing array entry removed, reordered or replaced"
         }
-        return if (remaining.all { isSignatureFieldOrWidget(it.deref()) }) null else "non-signature entries added"
+        return if ((old.size() until new.size()).all { isSignatureFieldOrWidget(new.get(it), update) || annotations && update.isAnnotation(new.getObject(it)) }) null
+        else "unsigned or non-signature entries added"
     }
 
-    private fun isSignatureFieldOrWidget(item: COSBase?): Boolean {
-        val dict = item.deref() as? COSDictionary ?: return false
-        if (dict.getCOSName(COSName.FT) == COSName.SIG) return true
-        val parent = dict.getDictionaryObject(COSName.PARENT) as? COSDictionary
-        return dict.getCOSName(COSName.SUBTYPE) == COSName.WIDGET && parent?.getCOSName(COSName.FT) == COSName.SIG
+    private fun isSignatureFieldOrWidget(item: COSBase?, update: SignatureUpdate): Boolean {
+        val dict = item.asDict() ?: return false
+        val field = if (dict.getCOSName(COSName.FT) == COSName.SIG) dict
+        else if (dict.getCOSName(COSName.SUBTYPE) == COSName.WIDGET) dict.getDictionaryObject(COSName.PARENT) as? COSDictionary
+        else null
+        if (field?.getCOSName(COSName.FT) != COSName.SIG || field !in update.fields) return false
+        val signature = field.getDictionaryObject(COSName.V) as? COSDictionary ?: return false
+        // A leniently ignored, invalid document time-stamp must not authorize a visible overlay.
+        if (signature.getCOSName(COSName.TYPE) == COSName.DOC_TIME_STAMP || signature.getNameAsString(COSName.SUB_FILTER) == PdfNames.ETSI_RFC3161.name) {
+            val rectangle = dict.getDictionaryObject(COSName.RECT) as? COSArray
+            if (rectangle != null) {
+                val values = runCatching { rectangle.toFloatArray() }.getOrNull() ?: return false
+                if (values.size != 4 || values[0] != values[2] && values[1] != values[3]) return false
+            } else if (dict.containsKey(COSName.AP)) return false
+        }
+        val range = signature.getDictionaryObject(COSName.BYTERANGE) as? COSArray ?: return false
+        val values = runCatching { IntArray(range.size()) { (range.getObject(it) as COSNumber).intValue() } }.getOrNull() ?: return false
+        return values.size == 4 && values[0] == 0 && values.all { it >= 0 } &&
+            values[2].toLong() + values[3] == update.end.toLong()
     }
 
-    private fun reachable(start: COSBase?): Set<COSObjectKey> {
+    /** DSS references cannot grant an exemption to an object also used by the document or its appearances. */
+    private fun documentObjects(document: PDDocument): Set<COSObjectKey> {
+        val catalog = document.documentCatalog.cosObject
         val keys = HashSet<COSObjectKey>()
-        fun walk(b: COSBase?) {
-            when (b) {
-                is COSObject -> if (keys.add(b.reference())) walk(b.`object`)
-                is COSDictionary -> b.values.forEach(::walk)
-                is COSArray -> (0 until b.size()).forEach { walk(b.get(it)) }
-                else -> {}
+        fun walk(value: COSBase?) {
+            when (value) {
+                is COSObject -> if (keys.add(value.reference())) walk(value.`object`)
+                is COSDictionary -> (value.keySet() - if (value === catalog) setOf(COSName.DSS) else emptySet())
+                    .forEach { walk(value.getItem(it)) }
+                is COSArray -> (0 until value.size()).forEach { walk(value.get(it)) }
+                else -> Unit
             }
         }
-        walk(start)
+        (catalog.keySet() - COSName.DSS).forEach { walk(catalog.getItem(it)) }
+        walk(document.document.trailer.getItem(COSName.INFO))
+        return keys
+    }
+
+    /** Only the DSS schema grants an exemption, never arbitrary objects reachable from an unknown entry. */
+    private fun dssObjects(start: COSBase?): Set<COSObjectKey> {
+        val keys = HashSet<COSObjectKey>()
+        fun record(value: COSBase?) { if (value is COSObject) keys += value.reference() }
+        fun streams(value: COSBase?) {
+            val array = value.deref() as? COSArray ?: return
+            if ((0 until array.size()).any { array.getObject(it) !is COSStream }) return
+            record(value)
+            for (i in 0 until array.size()) {
+                if (array.getObject(i) is COSStream) record(array.get(i))
+            }
+        }
+        fun entry(value: COSBase?, root: Boolean) {
+            val dict = value.asDict()?.takeUnless { it is COSStream } ?: return
+            val arrays = if (root) listOf(COSName.CERTS, COSName.CRLS, COSName.OCSPS)
+                else listOf(PdfNames.CERT, PdfNames.CRL, PdfNames.OCSP)
+            val allowed = arrays.toSet() + if (root) setOf(COSName.TYPE, COSName.VRI) else emptySet()
+            if ((dict.keySet() - allowed).isNotEmpty()) return
+            record(value)
+            arrays.forEach { streams(dict.getItem(it)) }
+            if (root) {
+                val vriItem = dict.getItem(COSName.VRI)
+                val vri = vriItem.asDict() ?: return
+                record(vriItem)
+                vri.keySet().forEach { entry(vri.getItem(it), false) }
+            }
+        }
+        entry(start, true)
         return keys
     }
 

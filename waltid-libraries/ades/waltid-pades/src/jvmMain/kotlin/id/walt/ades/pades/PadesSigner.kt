@@ -7,10 +7,18 @@ import id.walt.ades.tsp.TimeStampToken
 import id.walt.ades.tsp.TimestampException
 import id.walt.ades.tsp.TimestampSource
 import id.walt.ades.validation.AdesLevel
+import id.walt.ades.validation.AdesValidationPolicy
+import id.walt.ades.validation.CertificateChainValidator
+import id.walt.ades.validation.TimestampEvidence
+import id.walt.ades.validation.TimestampType
+import id.walt.ades.validation.TimestampValidator
 import id.walt.ades.validation.ValidationData
 import id.walt.ades.validation.ValidationDataCollector
+import id.walt.ades.validation.ValidationDataResolver
 import id.walt.ades.x509.X509Certificate
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.io.ByteArrayOutputStream
+import kotlin.time.Clock
 import org.apache.pdfbox.Loader
 import org.apache.pdfbox.cos.COSArray
 import org.apache.pdfbox.cos.COSDictionary
@@ -18,13 +26,13 @@ import org.apache.pdfbox.cos.COSInteger
 import org.apache.pdfbox.cos.COSName
 import org.apache.pdfbox.cos.COSStream
 import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.pdmodel.common.PDRectangle
 import org.apache.pdfbox.pdmodel.interactive.digitalsignature.PDSignature
 import org.apache.pdfbox.pdmodel.interactive.digitalsignature.SignatureOptions
+import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm
 import org.apache.pdfbox.pdmodel.interactive.form.PDSignatureField
 import org.bouncycastle.asn1.ASN1Encoding
 import org.bouncycastle.cms.CMSSignedData
-import java.io.ByteArrayOutputStream
-import kotlin.time.Clock
 
 private val log = KotlinLogging.logger {}
 
@@ -37,9 +45,14 @@ private val log = KotlinLogging.logger {}
 class PadesSigner(
     private val timestampSource: TimestampSource? = null,
     private val validationDataCollector: ValidationDataCollector? = null,
+    /** Trust policy for reusing existing time-stamps; defaults to the collector's anchors and transport. */
+    timestampValidationPolicy: AdesValidationPolicy? = null,
 ) {
+    private val timestampPolicy = timestampValidationPolicy ?: validationDataCollector?.let {
+        AdesValidationPolicy(it.trustAnchors, transport = it.transport)
+    }
 
-    /** Signs [pdf] with a new invisible signature field and returns the signed document (at [PadesSignatureParameters.level]). */
+    /** Signs [pdf] with a new or existing signature field and returns the signed document (at [PadesSignatureParameters.level]). */
     suspend fun sign(
         pdf: ByteArray,
         credentials: AdesSigningCredentials,
@@ -56,7 +69,11 @@ class PadesSigner(
         if (level >= AdesLevel.B_T) requireNotNull(timestampSource) { "A TimestampSource is required for ${level.code}" }
         if (level >= AdesLevel.B_LT) requireNotNull(validationDataCollector) { "A ValidationDataCollector is required for ${level.code}" }
         val signatureTimestamp = level >= AdesLevel.B_T && parameters.timestampMode == PadesTimestampMode.SIGNATURE_TIMESTAMP
-        PdfInspection.open(pdf).use { check(it.docMdpPermission != 1) { "Document is certified with DocMDP P=1: no further signatures allowed" } }
+        PdfInspection.open(pdf).use { inspection ->
+            check(inspection.docMdpPermission != 1 && inspection.signatures.none {
+                PdfPermissions.docMdpPermission(inspection.revisionDocument(it.revisionEnd)) == 1
+            }) { "Document is certified with DocMDP P=1: no further signatures allowed" }
+        }
 
         var size = parameters.contentsSize ?: estimateContentsSize(credentials, signatureTimestamp)
         var signed: ByteArray? = null
@@ -95,8 +112,34 @@ class PadesSigner(
         }
         SignatureOptions().use { options ->
             options.preferredSignatureSize = size
+            options.page = parameters.pageIndex
+            require(parameters.pageIndex < doc.numberOfPages) { "Signature page does not exist" }
+            val form = (doc.documentCatalog.cosObject.getDictionaryObject(COSName.ACRO_FORM) as? COSDictionary)?.let { PDAcroForm(doc, it) }
+            val existing = parameters.existingFieldName?.let { name ->
+                val field = requireNotNull(form?.getField(name)) { "Signature field $name does not exist" }
+                require(field is PDSignatureField) { "Field $name is not a signature field" }
+                require(!field.isReadOnly) { "Signature field $name is read-only" }
+                require(field.signature == null) { "Signature field $name is already signed" }
+                require(field.widgets.size == 1) { "Signing fields with multiple widgets is unsupported" }
+                field
+            }
+            val existingAppearance = existing?.widgets?.single()?.appearance
+            val existingRectangle = existing?.widgets?.single()?.rectangle
+            existing?.setValue(signature)
             doc.addSignature(signature, options)
             parameters.fieldName?.let { renameField(doc, signature, it) }
+            val field = existing ?: doc.signatureFields.single { it.signature?.cosObject === signature.cosObject }
+            PdfInspection.open(pdf).use { it.requireSignable(field.fullyQualifiedName) }
+            PdfPermissions.configure(doc, field, signature, parameters)
+            val widget = field.widgets.single()
+            existingRectangle?.let { widget.rectangle = it }
+            if (parameters.appearance == null) existingAppearance?.let { widget.appearance = it }
+            parameters.rectangle?.let { rectangle ->
+                widget.rectangle = PDRectangle(rectangle.x, rectangle.y, rectangle.width, rectangle.height)
+                widget.setPage(doc.getPage(parameters.pageIndex))
+            }
+            parameters.appearance?.let { PdfSignatureAppearance.apply(doc, widget, it) }
+            field.cosObject.isNeedToBeUpdated = true
             val out = ByteArrayOutputStream()
             val external = doc.saveIncrementalForExternalSigning(out)
             val content = external.content.use { it.readAllBytes() }
@@ -138,9 +181,11 @@ class PadesSigner(
                     doc.addSignature(signature, options)
                     val out = ByteArrayOutputStream()
                     val external = doc.saveIncrementalForExternalSigning(out)
-                    val imprint = digest.digest(external.content.use { it.readAllBytes() })
+                    val content = external.content.use { it.readAllBytes() }
+                    val imprint = digest.digest(content)
                     val token = source.timestamp(digest, imprint)
-                    if (!TimeStampToken(token).tstInfo.messageImprint.contentEquals(imprint)) throw TimestampException("Document time-stamp does not cover the document")
+                    val timestamp = TimeStampToken(token)
+                    if (timestamp.tstInfo.messageImprintAlgorithm != digest || !timestamp.verify(data = content).isValid) throw TimestampException("Document time-stamp is invalid or does not cover the document")
                     if (token.size > size) return@use null to token.size
                     external.setSignature(token)
                     out.toByteArray() to token.size
@@ -194,16 +239,16 @@ class PadesSigner(
         dss.setItem(COSName.TYPE, PdfNames.DSS_TYPE)
 
         // existing streams by content, so VRI entries can reference them instead of duplicating values
-        val streams = HashMap<String, COSStream>()
+        val streams = HashMap<Pair<COSName, String>, COSStream>()
         fun index(name: COSName) {
             val array = dss.getDictionaryObject(name) as? COSArray ?: return
             for (i in 0 until array.size()) (array.getObject(i) as? COSStream)?.let { s ->
-                streams[s.createInputStream().use { it.readAllBytes() }.contentHashCode().toString() + name.name] = s
+                streams[name to s.createInputStream().use { it.readAllBytes() }.toHexString()] = s
             }
         }
         listOf(COSName.CERTS, COSName.CRLS, COSName.OCSPS).forEach(::index)
 
-        fun streamFor(name: COSName, bytes: ByteArray): COSStream = streams.getOrPut(bytes.contentHashCode().toString() + name.name) {
+        fun streamFor(name: COSName, bytes: ByteArray): COSStream = streams.getOrPut(name to bytes.toHexString()) {
             val stream = doc.document.createCOSStream()
             stream.createOutputStream(COSName.FLATE_DECODE).use { it.write(bytes) }
             val array = dss.getDictionaryObject(name) as? COSArray ?: COSArray().also { dss.setItem(name, it) }
@@ -272,7 +317,14 @@ class PadesSigner(
         val source = requireNotNull(timestampSource) { "A TimestampSource is required for B-T" }
         val untimed = PdfInspection.open(pdf).use { inspection ->
             inspection.signatures.filter { sig ->
-                sig.signatureTimestampTokens.isEmpty() && inspection.documentTimestamps.none { it.revisionEnd > sig.revisionEnd }
+                val signatureValue = sig.cms?.signerInfos?.singleOrNull()?.signature
+                val validSignatureTime = sig.signatureTimestampTokens.any { token ->
+                    usableTimestamp(token, signatureValue, inspection.dss.toValidationData())
+                }
+                val validDocumentTime = inspection.documentTimestamps.any { ts ->
+                    ts.revisionEnd > sig.revisionEnd && usableTimestamp(ts.der, ts.signedContent, inspection.dss.toValidationData())
+                }
+                !validSignatureTime && !validDocumentTime
             }.map { Triple(it.gapStart, it.gapEnd, it.der) }
         }
         if (untimed.isEmpty()) return pdf
@@ -282,6 +334,13 @@ class PadesSigner(
             timestampInPlace(pdf, single.first, single.second, single.third!!, source, parameters.timestampDigest)?.let { return it }
         }
         return addDocumentTimestamp(pdf, parameters.timestampDigest, parameters.timestampContentsSize)
+    }
+
+    private suspend fun usableTimestamp(token: ByteArray?, content: ByteArray?, data: ValidationData): Boolean {
+        val policy = timestampPolicy ?: return false // Presence or self-contained crypto alone does not establish trust.
+        val resolver = ValidationDataResolver(data, policy.transport, policy.trustAnchors, policy.fetchMissingValidationData)
+        return TimestampValidator(CertificateChainValidator(resolver, policy))
+            .validate(TimestampEvidence(TimestampType.SIGNATURE, token, content)).passed
     }
 
     /** Rewrites /Contents with an added signature-time-stamp; null when it is covered by later revisions or too small. */

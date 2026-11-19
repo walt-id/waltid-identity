@@ -178,7 +178,13 @@ class TimestampValidator(
             return TimestampValidationResult(evidence.type, Indication.FAILED, SubIndication.FORMAT_FAILURE, null, null, listOf("invalid time-stamp token: ${it.message}"))
         }
         token.certificates.forEach(chainValidator.resolver.pool::add)
-        val v = token.verify(data = evidence.coveredData, additionalCertificates = chainValidator.resolver.pool.certificates)
+        val v = try {
+            token.verify(data = evidence.coveredData, additionalCertificates = chainValidator.resolver.pool.certificates)
+        } catch (e: RuntimeException) {
+            if (e !is IllegalArgumentException && e !is NoSuchElementException && e !is IndexOutOfBoundsException) throw e
+            return TimestampValidationResult(evidence.type, Indication.FAILED, SubIndication.FORMAT_FAILURE, null, null,
+                listOf("malformed time-stamp token: ${e.message}"))
+        }
         val genTime = token.genTime
         if (evidence.coveredData == null || !v.messageImprintMatches) {
             return TimestampValidationResult(evidence.type, Indication.FAILED, SubIndication.HASH_FAILURE, genTime, v.signerCertificate, v.problems)

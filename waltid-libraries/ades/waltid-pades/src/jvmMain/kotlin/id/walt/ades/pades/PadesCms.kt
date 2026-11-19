@@ -9,6 +9,8 @@ import id.walt.ades.tsp.TimeStampToken
 import id.walt.ades.tsp.TimestampException
 import id.walt.ades.tsp.TimestampSource
 import id.walt.ades.x509.X509Certificate
+import java.io.ByteArrayOutputStream
+import java.io.OutputStream
 import org.bouncycastle.asn1.ASN1Encodable
 import org.bouncycastle.asn1.ASN1EncodableVector
 import org.bouncycastle.asn1.ASN1Encoding
@@ -45,8 +47,6 @@ import org.bouncycastle.cms.SignerInformationStore
 import org.bouncycastle.operator.ContentSigner
 import org.bouncycastle.operator.bc.BcDigestCalculatorProvider
 import org.bouncycastle.util.CollectionStore
-import java.io.ByteArrayOutputStream
-import java.io.OutputStream
 
 /** Builds the CAdES (ETSI.CAdES.detached) SignedData of a PAdES signature with BouncyCastle. */
 internal object PadesCms {
@@ -121,10 +121,20 @@ internal object PadesCms {
         val signer = cms.signerInfos.signers.single()
         val imprint = digest.digest(signer.signature)
         val token = source.timestamp(digest, imprint)
-        if (!TimeStampToken(token).tstInfo.messageImprint.contentEquals(imprint)) throw TimestampException("Time-stamp token does not cover the signature value")
-        val attribute = Attribute(PKCSObjectIdentifiers.id_aa_signatureTimeStampToken, DERSet(ASN1Primitive.fromByteArray(token)))
-        val unsigned = signer.unsignedAttributes?.toASN1EncodableVector() ?: ASN1EncodableVector()
-        unsigned.add(attribute)
+        val timestamp = TimeStampToken(token)
+        if (timestamp.tstInfo.messageImprintAlgorithm != digest || !timestamp.verify(data = signer.signature).isValid) throw TimestampException("Time-stamp token is invalid or does not cover the signature value")
+        val oid = PKCSObjectIdentifiers.id_aa_signatureTimeStampToken
+        val unsigned = ASN1EncodableVector()
+        val tokens = ASN1EncodableVector()
+        signer.unsignedAttributes?.toASN1EncodableVector()?.let { attributes ->
+            for (i in 0 until attributes.size()) {
+                val attribute = Attribute.getInstance(attributes.get(i))
+                if (attribute.attrType == oid) attribute.attrValues.toArray().forEach(tokens::add)
+                else unsigned.add(attribute)
+            }
+        }
+        tokens.add(ASN1Primitive.fromByteArray(token))
+        unsigned.add(Attribute(oid, DERSet(tokens)))
         val updated = SignerInformation.replaceUnsignedAttributes(signer, AttributeTable(unsigned))
         return CMSSignedData.replaceSigners(cms, SignerInformationStore(updated))
     }

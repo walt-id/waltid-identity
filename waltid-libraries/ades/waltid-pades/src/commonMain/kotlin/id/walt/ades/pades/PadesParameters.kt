@@ -38,8 +38,22 @@ class PadesSignatureParameters(
     val timestampDigest: AdesDigestAlgorithm = AdesDigestAlgorithm.SHA256,
     /** Write per-signature VRI dictionaries when adding validation data (Table 1 v: optional). */
     val includeVri: Boolean = false,
+    /** Fully qualified name of an existing empty signature field. Mutually exclusive with [fieldName]. */
+    val existingFieldName: String? = null,
+    /** Zero-based page for a new visible signature; existing fields retain their page and rectangle. */
+    val pageIndex: Int = 0,
+    val rectangle: PadesSignatureRectangle? = null,
+    val appearance: PadesSignatureAppearance? = null,
+    val certificationPermission: PadesCertificationPermission? = null,
+    val fieldLock: PadesFieldLock? = null,
 ) {
     init {
+        require(listOfNotNull(fieldName, existingFieldName).all { it.isNotBlank() }) { "Signature field names must not be blank" }
+        require(fieldName == null || existingFieldName == null) { "Choose a new field name or an existing field" }
+        require(pageIndex >= 0) { "Page index must be non-negative" }
+        require(rectangle == null || existingFieldName == null) { "Existing fields retain their rectangle" }
+        require(rectangle == null || appearance != null) { "A rectangle requires an appearance" }
+        require(appearance == null || rectangle != null || existingFieldName != null) { "A new visible signature requires a rectangle" }
         require(reason == null || (commitment == null && signaturePolicy == null)) {
             "/Reason shall not be used together with commitment-type-indication or signature-policy-identifier (EN 319 142-1 6.3 d, m)"
         }
@@ -59,3 +73,39 @@ class PadesAugmentationParameters(
     /** Bytes reserved for each document time-stamp token. */
     val timestampContentsSize: Int? = null,
 )
+
+/** Rectangle in unrotated PDF user-space coordinates, measured from the lower-left corner of the page. */
+data class PadesSignatureRectangle(val x: Float, val y: Float, val width: Float, val height: Float) {
+    init {
+        require(listOf(x, y, width, height).all { it.isFinite() } && width > 0 && height > 0) { "A finite, positive signature rectangle is required" }
+    }
+}
+
+/** A signed appearance. The image is fitted above the text; font bytes allow characters outside Helvetica. */
+class PadesSignatureAppearance(
+    val text: String,
+    val image: ByteArray? = null,
+    val font: ByteArray? = null,
+    val fontSize: Float = 12f,
+) {
+    init {
+        require(text.isNotBlank() || image != null) { "A visible signature needs text or an image" }
+        require(fontSize.isFinite() && fontSize in 4f..72f) { "Font size must be between 4 and 72 points" }
+    }
+}
+
+/** DocMDP permissions of a certification signature (ISO 32000-1 12.8.2.2). */
+enum class PadesCertificationPermission(val value: Int) {
+    NO_CHANGES(1), FORM_FILLING_AND_SIGNING(2), FORM_FILLING_SIGNING_AND_ANNOTATIONS(3),
+}
+
+enum class PadesFieldLockAction { ALL, INCLUDE, EXCLUDE }
+
+/** Field names are fully qualified; a parent name also selects its descendants. */
+class PadesFieldLock(val action: PadesFieldLockAction = PadesFieldLockAction.ALL, val fields: List<String> = emptyList()) {
+    init {
+        require(fields.all { it.isNotBlank() }) { "Locked field names must not be blank" }
+        require(action == PadesFieldLockAction.ALL || fields.isNotEmpty()) { "Include/exclude locks require field names" }
+        require(action != PadesFieldLockAction.ALL || fields.isEmpty()) { "An all-fields lock does not take field names" }
+    }
+}
