@@ -841,16 +841,18 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val authorization = parseCredentialAuthorization(authorizationHeaders)
             ?: return invalidCredentialAuthorization(requestId)
         val parameterMap = parameters.toParametersMap()
-        return processCredentialRequest(authorization.token, requestId) {
-            oauth2Provider.createCredentialRequest(
-                parameters = parameterMap,
-                accessTokenContext = CredentialAccessTokenContext(
-                    authorization = authorization,
-                    expectedIssuer = metadataService.issuerBaseUrl(),
-                    dpopProofHeaderValues = dpopProofHeaderValues,
-                    credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
-                ),
-            )
+        return withCredentialErrorHandling(requestId) {
+            processCredentialRequest(authorization.token, requestId) {
+                oauth2Provider.createCredentialRequest(
+                    parameters = parameterMap,
+                    accessTokenContext = CredentialAccessTokenContext(
+                        authorization = authorization,
+                        expectedIssuer = metadataService.issuerBaseUrl(),
+                        dpopProofHeaderValues = dpopProofHeaderValues,
+                        credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
+                    ),
+                )
+            }
         }
     }
 
@@ -862,16 +864,18 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     ): CredentialResponseHttp {
         val authorization = parseCredentialAuthorization(authorizationHeaders)
             ?: return invalidCredentialAuthorization(requestId)
-        return processCredentialRequest(authorization.token, requestId) {
-            oauth2Provider.createCredentialRequest(
-                encryptedCredentialRequest = encryptedCredentialRequest,
-                accessTokenContext = CredentialAccessTokenContext(
-                    authorization = authorization,
-                    expectedIssuer = metadataService.issuerBaseUrl(),
-                    dpopProofHeaderValues = dpopProofHeaderValues,
-                    credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
-                ),
-            )
+        return withCredentialErrorHandling(requestId) {
+            processCredentialRequest(authorization.token, requestId) {
+                oauth2Provider.createCredentialRequest(
+                    encryptedCredentialRequest = encryptedCredentialRequest,
+                    accessTokenContext = CredentialAccessTokenContext(
+                        authorization = authorization,
+                        expectedIssuer = metadataService.issuerBaseUrl(),
+                        dpopProofHeaderValues = dpopProofHeaderValues,
+                        credentialEndpointUri = endpointUri(CREDENTIAL_ENDPOINT_PATH),
+                    ),
+                )
+            }
         }
     }
 
@@ -1573,13 +1577,15 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             throw e
         } catch (e: CredentialStatusCapacityException) {
             if (deferredClaim != null) throw e
-            if (session.credentialStatusIssuance?.leaseId != null) {
-                sessionService.discardUnreservedCredentialStatusOperation(session, issuanceRequest.credentialIdentifier)
+            return withCredentialErrorHandling(requestId, session, configuration.format) {
+                if (session.credentialStatusIssuance?.leaseId != null) {
+                    sessionService.discardUnreservedCredentialStatusOperation(session, issuanceRequest.credentialIdentifier)
+                }
+                retryCredentialRequest(
+                    requestWithSession, session, configuration.format, requestId,
+                    CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message),
+                )
             }
-            val response = retryCredentialRequest(requestWithSession, session, configuration.format, requestId,
-                CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message))
-            claimFinalized = true
-            return response
         } catch (e: CredentialStatusOperationException) {
             // A stale worker must never overwrite a newer claim while attempting cleanup.
             try {
@@ -2167,6 +2173,21 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 message ?: "Authorization request processing failed",
             )
         }
+
+    private suspend fun withCredentialErrorHandling(
+        requestId: String,
+        session: IssuanceSession? = null,
+        format: CredentialFormat? = null,
+        process: suspend () -> CredentialResponseHttp,
+    ): CredentialResponseHttp = try {
+        process()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: CredentialProtocolException) {
+        oauth2Provider.writeCredentialError(e.error)
+    } catch (e: Exception) {
+        credentialIssuanceFailed(session, format, requestId, e)
+    }
 
     private suspend fun credentialIssuanceFailed(
         session: IssuanceSession?,

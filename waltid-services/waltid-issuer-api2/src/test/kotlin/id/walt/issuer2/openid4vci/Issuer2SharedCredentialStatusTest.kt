@@ -502,6 +502,48 @@ class Issuer2SharedCredentialStatusTest {
         assertPreallocatedStatuses(issued.body(), "dc+sd-jwt", example.runtimeOverrides!!.credentialStatus!!.jsonArray.take(2))
     }
 
+    @Test
+    fun immediateCapacityCleanupFailureReturnsASafeErrorAndKeepsTheLastStatusAvailable() = testApplication {
+        val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
+        val overrides = requireNotNull(example.runtimeOverrides)
+        val lastGroup = overrides.credentialStatus!!.jsonArray.take(1)
+        val offerRequest = example.copy(runtimeOverrides = overrides.copy(credentialStatus = JsonArray(lastGroup)))
+        var cleanupFailed = false
+        val sessionStorage = JsonSessions { expected, replacement ->
+            if (!cleanupFailed && expected?.credentialStatusIssuance?.operations?.isNotEmpty() == true &&
+                replacement.credentialStatusIssuance?.operations?.isEmpty() == true &&
+                replacement.issuanceResults.isEmpty()
+            ) {
+                cleanupFailed = true
+                error("Private session-store diagnostics")
+            }
+        }
+        val fixture = installStatusIssuer(sessionStorage = sessionStorage)
+        val offer = fixture.client.createCredentialOffer(offerRequest)
+        val resolved = fixture.wallet.resolve(offer)
+        val configurationId = resolved.offer.credentialConfigurationIds.single()
+        val token = fixture.wallet.exchangePreAuthorizedCode(resolved, null)
+        val proofs = fixture.twoProofs(resolved, configurationId)
+        val events = SseNotifier.getSseFlow(IssuanceNotificationService.ISSUER_EVENT_STREAM_TARGET)
+
+        val failed = fixture.issue(resolved, token.access_token, credentialRequest(configurationId, proofs))
+        assertTrue(cleanupFailed, "Capacity rejection must reach the session cleanup")
+        assertEquals(HttpStatusCode.InternalServerError, failed.status)
+        assertEquals(buildJsonObject {
+            put("error", "server_error")
+            put("error_description", "Credential request processing failed")
+        }, failed.body<JsonObject>())
+        val event = events.replayCache.single { it.target == offer.offerId && it.error == "server_error" }
+        assertEquals("Credential request processing failed", event.errorDescription)
+
+        val nextOffer = fixture.wallet.resolve(fixture.client.createCredentialOffer(offerRequest))
+        val nextToken = fixture.wallet.exchangePreAuthorizedCode(nextOffer, null)
+        val singleProof = fixture.wallet.buildJwtProofs(nextOffer.issuerMetadata, configurationId)
+        val issued = fixture.issue(nextOffer, nextToken.access_token, credentialRequest(configurationId, singleProof))
+        assertEquals(HttpStatusCode.OK, issued.status, issued.bodyAsText())
+        assertPreallocatedStatuses(issued.body(), "dc+sd-jwt", lastGroup)
+    }
+
     private fun Proofs.repeatingFirstKey() = copy(jwt = List(2) { jwt!!.first() })
 
     private suspend fun assertInvalidProof(response: HttpResponse) {
@@ -693,6 +735,7 @@ class Issuer2SharedCredentialStatusTest {
             InMemoryPersistence<CredentialStatusConsumption>("preallocated-status-test", Duration.INFINITE),
             durable = true,
         ),
+        sessionStorage: JsonSessions = JsonSessions(),
     ): Fixture {
         loadIssuer2ConfigFiles()
         // A test backend alias exercises the legacy provider branch without weakening JWK migration.
@@ -706,7 +749,7 @@ class Issuer2SharedCredentialStatusTest {
         }.toMutableMap()
         additionalProfile?.let { (alias, source) -> profiles[alias] = profiles.getValue(source) }
         val repository = ConfiguredIssuanceSessionRepository(
-            sessions = JsonSessions(),
+            sessions = sessionStorage,
             crypto2Keys = InMemoryPersistence("status-test-keys", 5.minutes),
         )
         val attestation = createIssuer2ClientAttestationTestMaterial()
@@ -774,12 +817,16 @@ class Issuer2SharedCredentialStatusTest {
         }
     }
 
-    private class JsonSessions : Persistence<IssuanceSession>("status-test-sessions", 5.minutes) {
+    private class JsonSessions(
+        private val beforeCompareAndSet: (IssuanceSession?, IssuanceSession) -> Unit = { _, _ -> },
+    ) : Persistence<IssuanceSession>("status-test-sessions", 5.minutes) {
         private val raw = InMemoryPersistence<String>(discriminator, 5.minutes)
         override fun get(id: String) = raw[id]?.let(IssuanceSessionStorageCodec::decode)
         override fun getAndRemove(id: String) = raw.getAndRemove(id)?.let(IssuanceSessionStorageCodec::decode)
-        override fun compareAndSet(id: String, expected: IssuanceSession?, replacement: IssuanceSession, ttl: Duration?) =
-            raw.compareAndSet(id, expected?.let { Json.encodeToString(it) }, Json.encodeToString(replacement), ttl)
+        override fun compareAndSet(id: String, expected: IssuanceSession?, replacement: IssuanceSession, ttl: Duration?): Boolean {
+            beforeCompareAndSet(expected, replacement)
+            return raw.compareAndSet(id, expected?.let { Json.encodeToString(it) }, Json.encodeToString(replacement), ttl)
+        }
         override fun set(id: String, value: IssuanceSession) = set(id, value, null)
         override fun set(id: String, value: IssuanceSession, ttl: Duration?) = raw.set(id, Json.encodeToString(value), ttl)
         override fun remove(id: String) = raw.remove(id)
