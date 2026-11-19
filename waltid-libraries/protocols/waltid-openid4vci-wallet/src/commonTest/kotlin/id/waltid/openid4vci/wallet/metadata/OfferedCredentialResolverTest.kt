@@ -93,14 +93,14 @@ class OfferedCredentialResolverTest {
                 ),
                 claims = listOf(
                     ClaimDescription(
-                        path = listOf("given_name"),
+                        path = listOf(JsonPrimitive("given_name")),
                         display = listOf(
                             ClaimDisplay(name = "Given Name", locale = "en-US"),
                             ClaimDisplay(name = "Vorname", locale = "de-DE"),
                         ),
                     ),
                     ClaimDescription(
-                        path = listOf("family_name"),
+                        path = listOf(JsonPrimitive("family_name")),
                         display = listOf(
                             ClaimDisplay(name = "Family Name", locale = "en-US"),
                         ),
