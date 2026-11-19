@@ -1,8 +1,10 @@
 package id.walt.itb
 
 import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import java.awt.Color
 import java.awt.image.BufferedImage
 import kotlin.test.*
@@ -27,6 +29,19 @@ class ItbPresentationQrTest {
     fun preservesTheFullQrPayloadIncludingEscapedOpaqueParameters() {
         val invocation = "haip-vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest%3Fopaque%3Da%252Bb%252Fc%253D&request_uri_method=post"
         assertEquals(invocation, ItbPresentationQr.decode(ItbQrFixtures.qr(invocation)))
+    }
+
+    @Test
+    fun decodesACleanPortalStyleQrWhenFinderDetectionFails() {
+        val invocation = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest%2F" +
+            "synthetic-10".repeat(11) + "&request_uri_method=get"
+        // This generated 970px symbol reproduces the finder failure without a live verifier link.
+        val pixels = QRCodeWriter().encode(invocation, BarcodeFormat.QR_CODE, 970, 970, mapOf(
+            EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.H,
+            EncodeHintType.QR_VERSION to 18,
+            EncodeHintType.QR_MASK_PATTERN to 0,
+        ))
+        assertEquals(invocation, ItbPresentationQr.decode(ItbQrFixtures.png(pixels)))
     }
 
     @Test

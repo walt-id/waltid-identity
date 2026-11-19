@@ -73,7 +73,8 @@ class ItbPortalBridgeBrowserTest {
             presentationQr = byteArrayOf(1, 2, 3),
         ) { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
-            assertFailsWith<IllegalArgumentException> { bridge.read(bridge.prepare(suite, case)) }
+            val rejection = assertFailsWith<ItbPortalInputError> { bridge.read(bridge.prepare(suite, case)) }
+            assertEquals(ItbPortalInputError.Reason.PRESENTATION_QR_IMAGE_FORMAT, rejection.reason)
             assertEquals(1, page.evaluate("window.qrDownloadCount"))
             assertEquals(0, page.evaluate("window.textDownloadCount"))
             assertEquals(1, page.evaluate("window.startCount"))

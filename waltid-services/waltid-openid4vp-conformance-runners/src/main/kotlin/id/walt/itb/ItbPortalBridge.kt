@@ -6,6 +6,7 @@ import com.microsoft.playwright.TimeoutError
 import com.microsoft.playwright.options.AriaRole
 import com.microsoft.playwright.options.ElementState
 import com.microsoft.playwright.options.WaitUntilState
+import io.ktor.http.URLParserException
 import io.ktor.http.Url
 import java.nio.ByteBuffer
 import java.util.regex.Pattern
@@ -13,6 +14,18 @@ import java.nio.file.Files
 
 /** The owned session started, but the portal displayed its generic execution error. */
 internal class ItbPortalExecutionError : IllegalStateException("The ITB portal could not start the wallet interaction")
+
+/** A fixed reason suitable for reports that must never include the downloaded interaction. */
+internal class ItbPortalInputError(val reason: Reason) : IllegalArgumentException(reason.name) {
+    enum class Reason {
+        INTERACTION_DOWNLOAD_SIZE,
+        PRESENTATION_QR_IMAGE_FORMAT,
+        PRESENTATION_QR_IMAGE_DIMENSIONS,
+        PRESENTATION_QR_IMAGE_READ,
+        PRESENTATION_QR_UNREADABLE,
+        PRESENTATION_QR_INVALID_URL,
+    }
+}
 
 /** A bounded portal step timed out; the step name is safe to include in sanitized reports. */
 internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The ITB portal timed out at $step") {
@@ -128,9 +141,15 @@ class ItbPortalBridge(
                 ItbWalletInteraction.Offer(Url(preview("VCI request")), pin)
             }
             // Consume the wallet-facing QR directly; ITB's derived text can be a false EAN/UPC decode.
-            text.contains("VP request") -> ItbWalletInteraction.Presentation(
-                Url(ItbPresentationQr.decode(download(row("Credential QR code")))),
-            )
+            text.contains("VP request") -> {
+                val invocation = ItbPresentationQr.decode(download(row("Credential QR code")))
+                val url = try {
+                    Url(invocation)
+                } catch (_: URLParserException) {
+                    throw ItbPortalInputError(ItbPortalInputError.Reason.PRESENTATION_QR_INVALID_URL)
+                }
+                ItbWalletInteraction.Presentation(url)
+            }
             text.contains(ISSUANCE_LABEL) -> parseDigitalIssuance(preview(ISSUANCE_LABEL))
             text.contains("TS12 payment Digital Credentials API presentation request") -> parseDigitalCredentials(
                 preview("TS12 payment Digital Credentials API presentation request"),
@@ -177,7 +196,9 @@ class ItbPortalBridge(
         }
         return try {
             val path = download.path()
-            require(Files.size(path) <= 1024 * 1024) { "The ITB interaction exceeds the size limit" }
+            if (Files.size(path) !in 1..1024 * 1024) {
+                throw ItbPortalInputError(ItbPortalInputError.Reason.INTERACTION_DOWNLOAD_SIZE)
+            }
             Files.readAllBytes(path)
         } finally {
             download.delete()
