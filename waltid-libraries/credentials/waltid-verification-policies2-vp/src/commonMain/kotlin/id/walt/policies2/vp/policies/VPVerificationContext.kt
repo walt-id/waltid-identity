@@ -1,5 +1,6 @@
 package id.walt.policies2.vp.policies
 
+import id.walt.mdoc.objects.SessionTranscript
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -35,6 +36,8 @@ data class VerificationSessionContext(
      * and the verifier MUST validate them against these values.
      */
     val transactionData: List<String>? = null,
+    /** Exact proximity transcript, supplied by an external reader instead of reconstructed from OpenID4VP. */
+    val mdocSessionTranscript: SessionTranscript? = null,
 ) {
     val isDcApi
         get() = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES

@@ -53,9 +53,50 @@ These conventions enable their Android targets through `enableAndroidBuild`. And
 
 #### Dependency analysis
 
-- `waltid.licensereport.gradle.kts` - License report
+- `waltid.licensereport.gradle.kts` - Generates NOTICE / THIRD-PARTY-NOTICE attribution reports (opt-in for identity via `-PenableLicenseReport=true`; always on for enterprise-api). Does not fail the build on disallowed licenses.
+- `waltid.licensee.gradle.kts` - Licensee policy enforcement (`app.cash.licensee`). Attached to `check`. Run `./gradlew licensee` to execute every module's check. Product policy is selected by project path, or overridden with `-Pwaltid.licensee.policy=apache|binary|saas`:
+  - `apache` — identity libraries and OSS services (Apache-2.0 product). Permissive licenses plus weak copyleft (EPL, CDDL, MPL, GPL with classpath exception). Plain GPL and LGPL are not allowed.
+  - `binary` — shipped Enterprise binaries. Apache set plus LGPL. Does not allow GPL.
+  - `saas` — license server. Same set as `binary`. Plain GPL and AGPL are not allowed.
+
+The Android policy records exceptions for the exact Google Play Services, ML Kit and
+SQLCipher versions used by the existing Android dependency graphs. Review the relevant
+terms and update the allowlist when those dependencies change. Version-specific
+exceptions appear in the validation reports and keep the dependencies in the inventory.
 
 #### Misc
 
 - `waltid.base.gradle.kts` - Base for all types
-- `waltid.licensereport.gradle.kts` - Use mocking
+- `waltid.mokkery.gradle.kts` - Use mocking
+
+## Kotlin compiler warnings
+
+The Identity and Unified Build roots apply `waltid.kotlin-warnings` once for all projects.
+The convention makes missing experimental opt-ins errors in production and test
+compilations, including enabled JVM, JS, Android, and native targets. A module that
+applies Kotlin directly receives the same policy as a convention-based module,
+without declaring another plugin. Keep explicit plugin versions in the root's
+`plugins` block when those plugins are also dependencies of build logic.
+
+Use a local `@OptIn` when an implementation intentionally uses an experimental API.
+Applying the experimental marker itself makes the declaration experimental for its
+callers. Avoid module-wide opt-ins, which hide unintended experimental API use in
+both production and test code.
+
+Once a module's supported production and test compilations are warning-free,
+enable the stricter policy in its build script:
+
+```kotlin
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+```
+
+This also rejects new deprecated API usages. Migrate legacy APIs deliberately;
+compatibility tests and adapters may need to keep exercising deprecated entry
+points. Any necessary suppression should be local and explain the compatibility
+contract it preserves.
+
+Compiler options are described in the [Kotlin warning documentation](https://kotlinlang.org/docs/compiler-reference.html#warning-management).

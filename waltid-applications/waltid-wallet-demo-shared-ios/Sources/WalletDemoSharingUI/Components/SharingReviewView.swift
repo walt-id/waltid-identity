@@ -20,9 +20,19 @@ public struct SharingReviewView: View {
     private let compact: Bool
     private let showActions: Bool
     private let paymentReview: PaymentReviewState
+    private let claimReview: ClaimReviewState
+    private let onRetryClaimReview: () -> Void
     @State private var normalizedDetails: [CredentialDetails] = []
-    @State private var normalizedOptions: [PresentationCredentialOption]?
-    private var isNormalized: Bool { normalizedOptions == review.credentialOptions }
+    private struct NormalizationInput: Equatable {
+        let options: [PresentationCredentialOption]
+        let includeDisclosures: Bool
+    }
+    @State private var normalizedInput: NormalizationInput?
+    private var usesLegacyClaimReview: Bool { if case .legacy = claimReview { return true }; return false }
+    private var normalizationInput: NormalizationInput {
+        NormalizationInput(options: review.credentialOptions, includeDisclosures: usesLegacyClaimReview)
+    }
+    private var isNormalized: Bool { normalizedInput == normalizationInput }
     private var credentialDetails: [CredentialDetails] { isNormalized ? normalizedDetails : [] }
 
     /// Renders one sharing review.
@@ -50,7 +60,9 @@ public struct SharingReviewView: View {
         onCancel: @escaping () -> Void,
         compact: Bool = false,
         showActions: Bool = true,
-        paymentReview: PaymentReviewState = .notRequired
+        paymentReview: PaymentReviewState = .notRequired,
+        claimReview: ClaimReviewState = .legacy,
+        onRetryClaimReview: @escaping () -> Void = {}
     ) {
         self.review = review
         self.selection = selection
@@ -65,6 +77,8 @@ public struct SharingReviewView: View {
         self.compact = compact
         self.showActions = showActions
         self.paymentReview = paymentReview
+        self.claimReview = claimReview
+        self.onRetryClaimReview = onRetryClaimReview
     }
 
     public var body: some View {
@@ -87,11 +101,13 @@ public struct SharingReviewView: View {
                             SharingCredentialRow(option: option, details: details, selection: selection,
                                 isLoading: isLoading, isReadOnly: isReadOnly || !review.allowsCredentialSelection(option),
                                 onToggleCredential: onToggleCredential,
-                                hasAlternatives: review.credentialOptions.filter { $0.queryID == option.queryID }.count > 1)
+                                hasAlternatives: review.credentialOptions.filter { $0.queryID == option.queryID }.count > 1,
+                                showAdditionalInformationHint: usesLegacyClaimReview)
                         }
                     }
                 }
             }
+            if case .legacy = claimReview {
             let groups = review.informationToShare(selection: selection, details: credentialDetails)
             WalletSection(String(localized: "Information to share", bundle: .module)) {
                 VStack(spacing: 0) {
@@ -119,10 +135,14 @@ public struct SharingReviewView: View {
                 }
             }.accessibilityElement(children: .contain)
                 .accessibilityIdentifier("review-information-to-share")
+            } else {
+                EffectiveSharingInformationView(state: claimReview, enabled: !isLoading, readOnly: isReadOnly,
+                    onToggle: onToggleDisclosure, onRetry: onRetryClaimReview)
+            }
 
             if !isReadOnly && showActions {
                 ReviewActions(
-                    selectionComplete: selectionComplete && isNormalized,
+                    selectionComplete: selectionComplete && isNormalized && claimReview.canConfirm,
                     isLoading: isLoading,
                     onSubmit: onSubmit,
                     onReject: onReject,
@@ -133,13 +153,15 @@ public struct SharingReviewView: View {
             }
         }
         .preference(key: SharingReviewReadinessKey.self, value: isNormalized ? review.credentialOptions : [])
-        .task(id: review.credentialOptions) {
-            normalizedOptions = nil
+        .task(id: normalizationInput) { [input = normalizationInput] in
+            normalizedInput = nil
             normalizedDetails = []
-            let snapshot = await CredentialDisplayNormalizer.details(for: review.credentialOptions)
+            let snapshot = await CredentialDisplayNormalizer.sharingDetails(
+                for: input.options, includeDisclosures: input.includeDisclosures
+            )
             guard !Task.isCancelled else { return }
             normalizedDetails = snapshot
-            normalizedOptions = review.credentialOptions
+            normalizedInput = input
         }
     }
 

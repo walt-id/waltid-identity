@@ -146,18 +146,18 @@ class DocumentSignerCertificateBuilderTest {
             iacaPrincipalName.country,
             cert.issuerX500Principal.name.substringAfter("C=").take(2)
         )
-        assertTrue {
+        assertTrue(
             cert.issuerX500Principal.name.contains("CN=${iacaPrincipalName.commonName}")
-        }
+        )
         iacaPrincipalName.organizationName?.let { orgName ->
-            assertTrue {
+            assertTrue(
                 cert.issuerX500Principal.name.contains("O=$orgName")
-            }
+            )
         }
         iacaPrincipalName.stateOrProvinceName?.let { stateName ->
-            assertTrue {
+            assertTrue(
                 cert.issuerX500Principal.name.contains("ST=$stateName")
-            }
+            )
         }
 
         assertEquals(
@@ -175,23 +175,23 @@ class DocumentSignerCertificateBuilderTest {
             dsPrincipalName.country,
             cert.subjectX500Principal.name.substringAfter("C=").take(2)
         )
-        assertTrue {
+        assertTrue(
             cert.subjectX500Principal.name.contains("CN=${dsPrincipalName.commonName}")
-        }
+        )
         dsPrincipalName.organizationName?.let { orgName ->
-            assertTrue {
+            assertTrue(
                 cert.subjectX500Principal.name.contains("O=$orgName")
-            }
+            )
         }
         dsPrincipalName.stateOrProvinceName?.let { stateName ->
-            assertTrue {
+            assertTrue(
                 cert.subjectX500Principal.name.contains("ST=$stateName")
-            }
+            )
         }
         dsPrincipalName.localityName?.let { localityName ->
-            assertTrue {
+            assertTrue(
                 cert.subjectX500Principal.name.contains("L=$localityName")
-            }
+            )
         }
 
         assertNotNull(
@@ -221,18 +221,18 @@ class DocumentSignerCertificateBuilderTest {
             actual = cert.issuerAlternativeNames.size,
         )
         iacaSignerSpec.profileData.issuerAlternativeName.uri?.let { uri ->
-            assertTrue {
+            assertTrue(
                 cert.issuerAlternativeNames.any {
                     it[1] == uri
                 }
-            }
+            )
         }
         iacaSignerSpec.profileData.issuerAlternativeName.email?.let { email ->
-            assertTrue {
+            assertTrue(
                 cert.issuerAlternativeNames.any {
                     it[1] == email
                 }
-            }
+            )
         }
 
         val crlBytes = cert.getExtensionValue(Extension.cRLDistributionPoints.id)

@@ -21,6 +21,8 @@ enum class ClaimRole {
     ExpiryDate,
     Image,
     CredentialType,
+    /** Display category only; it never decides disclosure or inclusion policy. */
+    Technical,
 }
 
 private data class ClaimDescriptor(
@@ -49,7 +51,6 @@ private data class NormalizedClaimKey(val value: String) {
 
 internal object CredentialDisplayVocabulary {
     const val GenericVerifiableCredentialType = "VerifiableCredential"
-    const val RequestedDisclosuresTitle = "Requested disclosures"
     const val TransactionDataTitle = "Transaction data"
     const val TransactionDataTypeLabel = "Type"
     const val TransactionDataCredentialQueriesLabel = "Credential queries"
@@ -129,6 +130,7 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("attestation_legal_category", label = "Attestation legal category", displayOrder = 124),
         ClaimDescriptor("issuer", label = "Issuer", displayOrder = 130),
         ClaimDescriptor("vct", label = "Credential type", group = ClaimGroupKind.Technical, roles = setOf(ClaimRole.CredentialType), displayOrder = 200),
+        ClaimDescriptor("vct#integrity", label = "Type metadata integrity", group = ClaimGroupKind.Technical, displayOrder = 232),
         ClaimDescriptor("iss", label = "Issuer", group = ClaimGroupKind.Technical, displayOrder = 201),
         ClaimDescriptor("sub", label = "Subject", group = ClaimGroupKind.Technical, displayOrder = 202),
         ClaimDescriptor("iat", label = "Issued at", group = ClaimGroupKind.Technical, roles = setOf(ClaimRole.Temporal), displayOrder = 203),
@@ -149,7 +151,7 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("valid_to", aliases = setOf("Valid to"), roles = setOf(ClaimRole.Temporal, ClaimRole.ExpiryDate), displayOrder = 216),
         ClaimDescriptor("status", label = "Credential status", group = ClaimGroupKind.Technical, displayOrder = 220),
         ClaimDescriptor("credential_status", aliases = setOf("credentialStatus"), label = "Credential status", displayOrder = 221),
-        ClaimDescriptor("_sd", label = "Undisclosed claims", group = ClaimGroupKind.Technical, displayOrder = 230),
+        ClaimDescriptor("_sd", label = "Disclosure digests", group = ClaimGroupKind.Technical, displayOrder = 230),
         ClaimDescriptor("_sd_alg", label = "Selective disclosure algorithm", group = ClaimGroupKind.Technical, displayOrder = 231),
         ClaimDescriptor("cnf", label = "Confirmation key", group = ClaimGroupKind.Technical, displayOrder = 240),
         ClaimDescriptor("credential_type", aliases = setOf("Credential type", "credentialType"), roles = setOf(ClaimRole.CredentialType), displayOrder = 250),

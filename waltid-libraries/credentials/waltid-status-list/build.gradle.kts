@@ -7,6 +7,10 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     js {
         outputModuleName = "status-list"
     }

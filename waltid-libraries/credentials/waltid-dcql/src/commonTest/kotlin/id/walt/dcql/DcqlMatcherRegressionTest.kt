@@ -1,6 +1,9 @@
 package id.walt.dcql
 
+import id.walt.dcql.models.meta.SdJwtVcMeta
+import id.walt.dcql.jsonld.JsonLdContextDocumentSource
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -8,6 +11,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class DcqlMatcherRegressionTest {
@@ -15,6 +19,58 @@ class DcqlMatcherRegressionTest {
         DcqlParser.parse("""{"credentials":[{"id":"q","format":"jwt_vc_json","meta":{},"claims":$claims $sets}]}""").getOrThrow().credentials.single(),
         RawDcqlCredential("c", "jwt_vc_json", Json.parseToJsonElement(data).jsonObject),
     )
+
+    @Test
+    fun copiedCredentialRetainsAncestorMatchingWithTheSameContext() {
+        val query = DcqlParser.parse("""{"credentials":[{"id":"q","format":"dc+sd-jwt","meta":{"vct_values":["urn:example:parent"]}}]}""")
+            .getOrThrow().credentials.single()
+        val credential = RawDcqlCredential("c", "dc+sd-jwt", buildJsonObject { put("vct", JsonPrimitive("urn:example:leaf")) })
+        val context = DcqlMatchingContext(mapOf(credential to setOf("urn:example:parent")))
+        assertTrue(DcqlMatcher.matchCredential(query, credential, context).isSuccess)
+        assertTrue(DcqlMatcher.matchCredential(query, credential.copy(), context).isSuccess)
+        assertTrue(DcqlMatcher.matchCredential(query, credential.copy(), context, JsonLdContextDocumentSource.bundled).isSuccess)
+        assertTrue(DcqlMatcher.matchCredential(query, credential.copy()).isFailure)
+        val leafQuery = query.copy(meta = SdJwtVcMeta(listOf("urn:example:leaf")))
+        assertTrue(DcqlMatcher.matchCredential(leafQuery, credential.copy()).isSuccess)
+    }
+
+    @Test
+    fun verifiedTypesAreBoundToTheInputAndSharedByEveryMatchingEntryPoint() {
+        val query = DcqlParser.parse("""{"credentials":[{"id":"q","format":"dc+sd-jwt","multiple":true,"meta":{"vct_values":["urn:example:parent"]}}]}""")
+            .getOrThrow()
+        val data = mutableMapOf("vct" to JsonPrimitive("urn:example:leaf"))
+        val raw = RawDcqlCredential("c", "dc+sd-jwt", JsonObject(data))
+        val custom = object : DcqlCredential by raw {}
+        val types = mutableSetOf("urn:example:parent")
+        val inputs = mutableMapOf<DcqlCredential, Set<String>>(custom to types)
+        val context = DcqlMatchingContext(inputs)
+        types.clear()
+        inputs.clear()
+        // The context owns its inputs, including JSON backed by a mutable map.
+        data["vct"] = JsonPrimitive("urn:example:replacement")
+        val original = raw.copy(data = buildJsonObject { put("vct", JsonPrimitive("urn:example:leaf")) })
+        val other = original.copy(id = "other")
+        val candidates = listOf(raw, other, original)
+        assertFailsWith<IllegalArgumentException> {
+            DcqlMatchingContext(mapOf(
+                original to setOf("urn:example:parent"),
+                (object : DcqlCredential by original {}) to setOf("urn:example:other"),
+            ))
+        }
+        assertTrue(DcqlMatcher.matchCredential(query.credentials.single(), custom, context).isFailure)
+        assertTrue(DcqlMatcher.matchCredential(query.credentials.single(), original, context).isSuccess)
+        val customCopy = object : DcqlCredential by original {}
+        assertTrue(DcqlMatcher.matchCredential(query.credentials.single(), customCopy, context).isSuccess)
+        for (matches in listOf(
+            DcqlMatcher.findMatches(query, candidates, context),
+            DcqlMatcher.findMatches(query, candidates, context, JsonLdContextDocumentSource.bundled),
+            DcqlMatcher.match(query, candidates, context),
+            DcqlMatcher.match(query, candidates, context, JsonLdContextDocumentSource.bundled),
+        )) assertEquals(listOf(original), matches.getOrThrow().getValue("q").map { it.credential })
+        assertEquals(listOf(original), DcqlMatcher.matchWithoutClaims(query, candidates, context).getOrThrow().getValue("q"))
+        assertEquals(listOf(original), DcqlMatcher.matchWithoutClaims(query, candidates, context,
+            JsonLdContextDocumentSource.bundled).getOrThrow().getValue("q"))
+    }
 
     @Test
     fun wildcardValue() {

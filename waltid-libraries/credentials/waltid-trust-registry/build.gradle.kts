@@ -6,6 +6,10 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
 
     sourceSets {
         commonMain.dependencies {
@@ -31,6 +35,8 @@ kotlin {
         jvmMain.dependencies {
             // OkHttp engine for JVM (SSRF-safe DNS resolver requires OkHttp)
             implementation(identityLibs.ktor.client.okhttp)
+            // Deployment-level private-network opt-outs (network-fetch-guard.conf)
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
         }
 
         if (enableIosBuild) {

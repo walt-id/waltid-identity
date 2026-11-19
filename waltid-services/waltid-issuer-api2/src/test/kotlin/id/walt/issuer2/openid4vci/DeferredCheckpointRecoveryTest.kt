@@ -1,6 +1,7 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
@@ -27,9 +28,19 @@ import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
 import kotlin.test.*
 import kotlin.time.Clock
+import kotlin.time.Duration
 
 class DeferredCheckpointRecoveryTest {
-    @AfterEach fun clear() = clearIssuer2TestEnvironment()
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
+    @AfterEach
+    fun clear() {
+        try {
+            catalogues.forEach { it.close() }
+        } finally {
+            clearIssuer2TestEnvironment()
+        }
+    }
 
     @Test fun initialSigningFailureCanRetryWithFreshProof() = runTest { verifyRecovery("signing") }
     @Test fun responseFailureAfterCheckpointDoesNotSignAgain() = runTest { verifyRecovery("response") }
@@ -52,8 +63,17 @@ class DeferredCheckpointRecoveryTest {
             }
         }
         val sessions = IssuanceSessionService(repository)
-        val module = OpenId4VciModule.create(serviceConfig, InMemoryAuthorizationCodeRepository(), InMemoryPreAuthorizedCodeRepository(), InMemoryPARRepository(), InMemoryRefreshTokenRepository())
-        val metadata = MetadataService(serviceConfig, metadataConfig, profiles, sessions, module.preAuthorizedCodeIssuer.anonymousAccessSupported)
+        val typeMetadata = IssuerTypeMetadataCatalogue(
+            serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
+        val module = OpenId4VciModule.create(
+            serviceConfig, InMemoryAuthorizationCodeRepository(), InMemoryPreAuthorizedCodeRepository(),
+            InMemoryPARRepository(), InMemoryRefreshTokenRepository(), metadataResolver = typeMetadata,
+        )
+        val metadata = MetadataService(
+            serviceConfig, metadataConfig, profiles, sessions, typeMetadata,
+            preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,
+        )
         val notifications = IssuanceNotificationService()
         var signingCalls = 0
         // Intercept only the failure boundary; all parsing, proof validation, signing and persistence use real implementations.
@@ -72,7 +92,7 @@ class DeferredCheckpointRecoveryTest {
             oauth2Provider = provider, sessionService = IssuanceSessionService(repository), profileService = profiles,
             metadataService = metadata, notificationService = notifications, credentialNonceService = module.credentialNonceService,
         )
-        val offers = CredentialOfferService(profiles, sessions, module.preAuthorizedCodeIssuer, serviceConfig, notifications)
+        val offers = CredentialOfferService(profiles, sessions, module.preAuthorizedCodeIssuer, serviceConfig, notifications, typeMetadata)
         val receipt = offers.createCredentialOffer(Issuer2RequestExamples.PROFILE_DEFERRED_OFFER.copy(profileId = "identityCredentialSdJwt"), "create")
         val offer = assertNotNull(offers.getCredentialOffer(receipt.offerId, "resolve"))
         val token = protocol().processTokenRequest(mapOf(

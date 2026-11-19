@@ -13,12 +13,13 @@ data class CredentialCardDisplayData(
 )
 
 /** Card art does not require normalized claim groups or decoded claim images. */
-fun CredentialSummary.toCardDisplayData(): CredentialCardDisplayData {
-    val locales = platformPreferredLocales()
+fun CredentialSummary.toCardDisplayData(
+    preferredLocales: List<String> = platformPreferredLocales(),
+): CredentialCardDisplayData {
     return cardDisplayData(
         summary = this,
-        issuerDisplay = StoredCredentialMetadataParser.issuerDisplay(metadataJson, locales),
-        credentialDisplay = StoredCredentialMetadataParser.credentialDisplay(metadataJson, locales),
+        issuerDisplay = StoredCredentialMetadataParser.issuerDisplay(metadataJson, preferredLocales),
+        credentialDisplay = StoredCredentialMetadataParser.credentialDisplay(metadataJson, preferredLocales),
     )
 }
 

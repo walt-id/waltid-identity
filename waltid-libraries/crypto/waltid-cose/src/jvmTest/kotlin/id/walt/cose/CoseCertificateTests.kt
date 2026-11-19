@@ -33,7 +33,7 @@ class CoseCertificateTests {
         decodedHeaders.x5chain!!.forEach { cert ->
             val key = JWKKey.importFromDerCertificate(cert.rawBytes)
             println("Certificate chain key: $key")
-            assertTrue { key.isSuccess }
+            assertTrue(key.isSuccess)
         }
     }
 
@@ -56,7 +56,7 @@ class CoseCertificateTests {
         decodedHeaders.x5chain!!.forEachIndexed { idx, cert ->
             val key = JWKKey.importFromDerCertificate(cert.rawBytes)
             println("Certificate chain key ${idx + 1}: $key")
-            assertTrue { key.isSuccess }
+            assertTrue(key.isSuccess)
         }
     }
 
