@@ -36,7 +36,7 @@ class ItbRunSelectionTest {
     @Test
     fun filteredPresentationsIncludeTheirRealIssuancePrerequisitesFirst() {
         val selected = ItbRunSelection.select(catalogue, "ts12/ts12_pay_dc_api_03,cs02v1/tc_vp_007,tc15")
-        assertEquals(listOf("tc_vci_006", "tc_vci_008", "tc_vp_007", "tc15", "ts12_issue_03", "ts12_pay_dc_api_03"),
+        assertEquals(listOf("tc_vci_006", "tc15", "tc_vci_008", "tc_vp_007", "ts12_issue_03", "ts12_pay_dc_api_03"),
             selected.map { it.second.id })
     }
 
@@ -73,7 +73,8 @@ class ItbRunSelectionTest {
         assertFailsWith<IllegalArgumentException> { ItbRunSelection.select(catalogue, "rv_iss_02") }
         val unattended = ItbRunSelection.select(catalogue, null, unattendedOnly = true, demoApp = true)
         assertEquals(21, unattended.size)
-        assertEquals(listOf("tc15", "tc16"), unattended.filter { it.first.id == "cts07" }.map { it.second.id })
+        // The OS picker fixes the credential set before the app opens. Register only the expected PID for tc15.
+        assertEquals(listOf("tc_vci_006", "tc15", "tc16"), unattended.take(3).map { it.second.id })
     }
 
     @Test

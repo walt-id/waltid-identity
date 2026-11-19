@@ -4,6 +4,18 @@
   "testBedVersion": "1.29.5",
   "suites": [
     {
+      "profile": "CS-07",
+      "id": "cts07",
+      "name": "WE BUILD DC APIs Test Suite",
+      "publishedVersion": "1.0",
+      "cases": [
+        { "id": "tc15", "name": "DC API [Wallet SUT]- CS-07 VP Request", "prerequisite": "cs01v1/tc_vci_006" },
+        { "id": "tc16", "name": "DC API - [Wallet SUT] CS-07 PID Credential Issuance", "demoOnly": true }
+      ],
+      "statement": "Domain Specific and generic use cases",
+      "actor": "User"
+    },
+    {
       "profile": "CS-01",
       "id": "cs01v1",
       "name": "WE BUILD CTS - CS-01 Issuance",
@@ -34,18 +46,6 @@
         { "id": "tc_vp_013", "name": "VP-013: CS-02 hash presentation invoked with haip-vp [Wallet SUT]", "invocationScheme": "haip-vp", "prerequisite": "cs01v1/tc_vci_006" }
       ],
       "statement": "Base Protocols"
-    },
-    {
-      "profile": "CS-07",
-      "id": "cts07",
-      "name": "WE BUILD DC APIs Test Suite",
-      "publishedVersion": "1.0",
-      "cases": [
-        { "id": "tc15", "name": "DC API [Wallet SUT]- CS-07 VP Request", "prerequisite": "cs01v1/tc_vci_006" },
-        { "id": "tc16", "name": "DC API - [Wallet SUT] CS-07 PID Credential Issuance", "demoOnly": true }
-      ],
-      "statement": "Domain Specific and generic use cases",
-      "actor": "User"
     },
     {
       "profile": "CS-10",
