@@ -47,6 +47,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.util.regex.Pattern
 
 /** Opt-in instrumentation around the installed Preview app's real entry points, UI and store. */
 @RunWith(AndroidJUnit4::class)
@@ -165,13 +166,19 @@ private class DemoInteractions(
     }
 
     private suspend fun present(credentialId: String?, payment: Boolean, provider: Boolean): ItbWalletResult {
-        waitFor("wallet.presentationSubmitButton")
+        val submit = "wallet.presentationSubmitButton"
+        waitFor(submit, code = "demo_presentation_review_missing")
         if (credentialId != null) selectCredential(credentialId)
         if (payment) {
             check(attended) { "Payment requires operator consent" }
             waitFor("payment-consent")
             println("ITB_OPERATOR: review the payee and amount in the wallet, then confirm and approve the native signing prompt.")
-        } else clickByTag(device, "wallet.presentationSubmitButton")
+        } else {
+            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_submit_disabled") {
+                device.hasObject(By.pkg(context.packageName).res(submit).enabled(true))
+            }
+            click(submit, "demo_presentation_submit_not_clickable")
+        }
         val timeout = if (payment) 165_000L else WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
         if (provider) {
             waitUntil(timeout, "demo_provider_presentation_not_completed") {
@@ -184,8 +191,7 @@ private class DemoInteractions(
 
     private suspend fun selectCredential(credentialId: String) {
         val suffix = "${credentialId.length}:$credentialId"
-        val options = By.res(java.util.regex.Pattern.compile("wallet\\.presentationCredentialToggle\\..*" +
-            java.util.regex.Pattern.quote(suffix)))
+        val options = By.res(Pattern.compile("wallet\\.presentationCredentialToggle\\..*" + Pattern.quote(suffix)))
         var node = device.wait(Until.findObject(options), 5_000)
         if (node == null) {
             repeat(5) {
@@ -200,7 +206,7 @@ private class DemoInteractions(
         if (!option.isClickable && !option.isCheckable) return
         if (!option.isSelected && !option.isChecked) {
             val tag = option.resourceName
-            clickByTag(device, tag)
+            click(tag, "demo_prerequisite_credential_not_clickable")
             waitUntil(10_000, "demo_credential_not_selected") {
                 device.findObject(By.res(tag))?.let { it.isSelected || it.isChecked } == true
             }
@@ -239,6 +245,7 @@ private class DemoInteractions(
 
     private suspend fun enterProviderReview(reviewTag: String) {
         val picker = By.pkg("com.google.android.gms")
+        val shareWithHost = Pattern.compile("Share\\s+info\\s+with\\s+${Pattern.quote(itbHost)}\\?")
         var selected = false
         var browserConfirmed = false
         waitUntil(if (attended) 90_000 else 40_000, "demo_dc_picker_or_review_missing") {
@@ -250,11 +257,15 @@ private class DemoInteractions(
                     return@waitUntil false
                 }
             }
-            if (device.hasObject(By.res(reviewTag))) true else {
-                val shareSheet = device.hasObject(By.copy(picker).text("Share info"))
+            if (device.hasObject(By.pkg(context.packageName).res(reviewTag))) true else {
+                val combinedHeading = device.hasObject(By.copy(picker).textStartsWith("Share info with"))
+                val shareSheet = combinedHeading || device.hasObject(By.copy(picker).text("Share info"))
                 val candidate = device.findObject(By.copy(picker).textContains("walt.id Wallet"))
                 val confirm = if (shareSheet) {
-                    if (!attended && device.hasObject(By.copy(picker).text(itbHost))) {
+                    val approvedOrigin = if (combinedHeading) {
+                        device.hasObject(By.copy(picker).text(shareWithHost))
+                    } else device.hasObject(By.copy(picker).text(itbHost))
+                    if (!attended && approvedOrigin) {
                         device.findObject(By.copy(picker).text("Agree and continue"))
                     } else null
                 } else {
@@ -307,8 +318,10 @@ private class DemoInteractions(
 
     private suspend fun completeReceipt(tag: String, failure: String, timeout: Long) {
         val presentation = tag == "wallet.presentationDone"
+        val done = By.pkg(context.packageName).res(tag)
+        val confirmation = By.pkg(context.packageName).text("Presentation sent")
         var returnedFromBrowser = false
-        waitUntil(timeout, "demo_receipt_missing") {
+        waitUntil(timeout, if (presentation) "demo_presentation_receipt_missing" else "demo_issuance_receipt_missing") {
             if (presentation && !returnedFromBrowser && device.currentPackageName == CHROME_PACKAGE) {
                 // Some verifier responses switch to Chrome. Resume the existing wallet task
                 // to observe its receipt before acknowledging ITB.
@@ -320,14 +333,18 @@ private class DemoInteractions(
             if (WalletComposeE2EHelper.latestStatus(device).startsWith(failure)) {
                 throw ItbWalletRejection(if (presentation) "demo_presentation_rejected" else "demo_issuance_rejected")
             }
-            val receiptVisible = device.hasObject(By.res(tag))
-            if (presentation && receiptVisible && !device.hasObject(By.text("Presentation sent"))) {
-                throw ItbWalletRejection("demo_presentation_rejected")
-            }
-            receiptVisible
+            device.hasObject(done) && (!presentation || device.hasObject(confirmation))
         }
-        clickByTag(device, tag)
-        waitFor("wallet.scanButton")
+        if (presentation && !attended) {
+            // The demo dismisses a successful receipt automatically. Wait for that UI transition
+            // once its success text has been observed, so Done cannot disappear under a delayed tap.
+            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_home_not_restored") {
+                !device.hasObject(done) && device.hasObject(By.pkg(context.packageName).res("wallet.scanButton"))
+            }
+        } else {
+            clickByTag(device, tag)
+            waitFor("wallet.scanButton")
+        }
     }
 
     private fun open(url: String) {
@@ -359,8 +376,17 @@ private class DemoInteractions(
         added.singleOrNull() ?: throw ItbWalletRejection("demo_expected_one_new_credential")
     }
 
-    private fun waitFor(tag: String, timeout: Long = WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT): UiObject2 =
-        waitForResourceAfterScrolling(device, tag, timeout) ?: throw ItbWalletRejection("demo_expected_screen_missing")
+    private fun waitFor(tag: String, code: String = "demo_expected_screen_missing"): UiObject2 =
+        waitForResourceAfterScrolling(device, tag, WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT)
+            ?: throw ItbWalletRejection(code)
+
+    private fun click(tag: String, code: String) {
+        try {
+            clickByTag(device, tag)
+        } catch (_: AssertionError) {
+            throw ItbWalletRejection(code)
+        }
+    }
 
     private suspend fun waitUntil(timeout: Long, code: String, condition: suspend () -> Boolean) {
         val ready = withTimeoutOrNull(timeout) {

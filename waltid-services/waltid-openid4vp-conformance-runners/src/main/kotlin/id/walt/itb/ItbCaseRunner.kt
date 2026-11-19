@@ -188,6 +188,7 @@ class ItbCaseRunner(
                 is ItbWalletRejection -> error.code
                 is ItbVerifierRejection -> error.code
                 is ItbPortalStepTimeout -> error.step.name.lowercase()
+                is ItbPortalInputError -> error.reason.name.lowercase()
                 is CredentialEndpointException -> "credential_endpoint_http_${error.statusCode}" +
                     (error.credentialError?.error?.takeIf(credentialEndpointErrorCodes::contains)?.let { "_$it" } ?: "")
                 is TokenRequestException -> ItbTokenFailure.reportCode(error)
