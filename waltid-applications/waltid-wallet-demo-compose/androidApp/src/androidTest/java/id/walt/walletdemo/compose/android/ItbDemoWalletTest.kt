@@ -5,6 +5,7 @@ import android.content.Intent
 import android.hardware.biometrics.BiometricManager
 import android.net.Uri
 import android.os.Bundle
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -220,10 +221,17 @@ private class DemoInteractions(
             Json.parseToJsonElement(credential.credentialDataJson).jsonObject["status"]
         })
         val observed = input.credentialIds.map { id ->
-            waitFor("wallet.credentialCard.$id")
-            WalletComposeE2EHelper.tapStoredCard(device, "wallet.credentialCard.$id")
+            val card = "wallet.credentialCard.$id"
+            waitFor(card, code = "demo_status_card_missing")
+            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_card_not_clickable") {
+                // Invoke the intended card's accessibility action even when other cards overlap it.
+                val node = device.findObject(By.pkg(context.packageName).res(card))?.accessibilityNodeInfo
+                node?.isVisibleToUser == true && node.isEnabled && node.isClickable &&
+                    node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            }
             val headline = "credential-status-headline-$id"
-            val initial = waitFor(headline).text.takeIf { it in ItbStatusObservation.labels } ?: "Other"
+            val initial = waitFor(headline, code = "demo_status_detail_not_open").text
+                .takeIf { it in ItbStatusObservation.labels } ?: "Other"
             val latest = "credential-status-last-checked-$id"
             val previousCheck = device.findObject(By.res(latest))?.text
             clickByTag(device, "credential-status-check-$id")
@@ -237,7 +245,7 @@ private class DemoInteractions(
                 device.hasObject(By.res("wallet.detailsBack")) -> clickByTag(device, "wallet.detailsBack")
                 else -> device.pressBack()
             }
-            waitFor("wallet.scanButton")
+            waitFor("wallet.scanButton", code = "demo_status_home_not_restored")
             ItbStatusObservation(initial, input.expected.label)
         }
         return ItbWalletResult(statusObservations = observed)
@@ -322,11 +330,9 @@ private class DemoInteractions(
         val confirmation = By.pkg(context.packageName).text("Presentation sent")
         var returnedFromBrowser = false
         waitUntil(timeout, if (presentation) "demo_presentation_receipt_missing" else "demo_issuance_receipt_missing") {
-            if (presentation && !returnedFromBrowser && device.currentPackageName == CHROME_PACKAGE) {
+            if (presentation && !returnedFromBrowser && resumeWalletFromChrome()) {
                 // Some verifier responses switch to Chrome. Resume the existing wallet task
                 // to observe its receipt before acknowledging ITB.
-                val launch = checkNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
-                context.startActivity(launch)
                 returnedFromBrowser = true
                 return@waitUntil false
             }
@@ -336,15 +342,30 @@ private class DemoInteractions(
             device.hasObject(done) && (!presentation || device.hasObject(confirmation))
         }
         if (presentation && !attended) {
-            // The demo dismisses a successful receipt automatically. Wait for that UI transition
-            // once its success text has been observed, so Done cannot disappear under a delayed tap.
-            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_home_not_restored") {
-                !device.hasObject(done) && device.hasObject(By.pkg(context.packageName).res("wallet.scanButton"))
+            var clicked = false
+            var resumedDuringCleanup = false
+            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_receipt_not_closed") {
+                if (!resumedDuringCleanup && resumeWalletFromChrome()) {
+                    resumedDuringCleanup = true
+                    return@waitUntil false
+                }
+                if (device.currentPackageName != context.packageName) return@waitUntil false
+                if (!device.hasObject(done)) return@waitUntil true
+                // The app may dismiss a success receipt while the test is locating Done.
+                if (!clicked) clicked = WalletComposeE2EHelper.clickVisibleResource(device, tag)
+                false
             }
         } else {
             clickByTag(device, tag)
-            waitFor("wallet.scanButton")
         }
+        waitFor("wallet.scanButton", code = if (presentation) "demo_presentation_home_not_restored" else "demo_issuance_home_not_restored")
+    }
+
+    private fun resumeWalletFromChrome(): Boolean {
+        if (device.currentPackageName != CHROME_PACKAGE) return false
+        val launch = checkNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
+        context.startActivity(launch)
+        return true
     }
 
     private fun open(url: String) {

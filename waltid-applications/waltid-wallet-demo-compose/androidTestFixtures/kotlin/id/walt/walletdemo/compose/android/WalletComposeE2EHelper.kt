@@ -279,10 +279,7 @@ internal object WalletComposeE2EHelper {
             try {
                 // The sheet can replace its accessibility nodes after the first lookup.
                 // Reacquire the visible, enabled hit target instead of retaining a stale node.
-                val node = findVisibleResource(device, tag)
-                val target = node?.let { it.clickableAncestorOrSelf() ?: it }
-                if (node?.isEnabled == true && target?.isEnabled == true && target.isVisibleOn(device)) {
-                    target.click()
+                if (clickVisibleResource(device, tag)) {
                     device.waitForIdle()
                     return
                 }
@@ -292,6 +289,14 @@ internal object WalletComposeE2EHelper {
             Thread.sleep(200)
         }
         fail("$tag did not become visible and enabled.\n${visibleUiSnapshot(device)}")
+    }
+
+    fun clickVisibleResource(device: UiDevice, tag: String): Boolean {
+        val node = findVisibleResource(device, tag)?.takeIf { it.isEnabled } ?: return false
+        val target = node.clickableAncestorOrSelf() ?: node
+        if (!target.isEnabled || !target.isVisibleOn(device)) return false
+        target.click()
+        return true
     }
 
     fun setTextByTag(device: UiDevice, tag: String, value: String) {
