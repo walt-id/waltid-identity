@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 90
     env:
       CI: 'true'
+      ANDROID_SERIAL: emulator-5554
       KLOGGING_CONFIG_PATH: ${{ github.workspace }}/.github/ci/klogging.conf
     steps:
       - uses: actions/checkout@v4
@@ -48,29 +49,46 @@ jobs:
             :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebugAndroidTest \
             -PenableAndroidBuild=true -PwalletSigningProtectionMode=disabled --max-workers=2 --console=plain
       - name: Start a clean Android emulator with Chrome
+        shell: bash
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+          emulator -version
+          emulator -accel-check
+          adb start-server
           avdmanager create avd -n itb-wallet -k 'system-images;android-37.0;google_apis;x86_64' -d pixel_7 <<< no
-          nohup emulator -avd itb-wallet -port 5560 -cores 4 -memory 4096 -partition-size 6144 \
-            -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect \
-            > "$RUNNER_TEMP/itb-emulator.log" 2>&1 </dev/null &
-          export ANDROID_SERIAL=emulator-5560
-          timeout 90 adb wait-for-device
-          boot_deadline=$((SECONDS + 510))
-          until [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; do
-            if (( SECONDS >= boot_deadline )); then echo 'Android boot timed out.' >&2; exit 1; fi
+          emulator_log="$RUNNER_TEMP/itb-emulator.log"
+          trap 'if (( $? != 0 )); then tail -n 160 "$emulator_log" || true; adb devices -l || true; fi' EXIT
+          # Match the graphics and cold-boot settings of the Android DC API device-test lane.
+          nohup emulator -avd itb-wallet -port "${ANDROID_SERIAL#emulator-}" -cores 4 -memory 4096 -partition-size 6144 \
+            -no-snapshot -no-snapshot-save -no-window -gpu auto -noaudio -no-boot-anim -camera-back none \
+            -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator > "$emulator_log" 2>&1 </dev/null &
+          emulator_pid=$!
+          boot_deadline=$((SECONDS + 600))
+          until [[ "$(timeout 5 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; do
+            if ! kill -0 "$emulator_pid" 2>/dev/null; then
+              echo 'Android emulator exited before boot completed.' >&2
+              exit 1
+            fi
+            if (( SECONDS >= boot_deadline )); then
+              echo 'Android boot timed out.' >&2
+              exit 1
+            fi
             sleep 2
           done
+          source .github/scripts/mobile-ci/prepare-android-dc-api-device.sh
+          wait_for_android_dc_api_device
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
           adb shell pm path com.android.chrome | rg '^package:'
+          adb shell dumpsys package com.android.chrome | awk -F= '/versionName=/ && !version {version=$2} END {print "Chrome version: " version}'
           # The clean emulator's browser should open directly on the credential flow without first-run UI.
           adb shell 'printf "%s\n" "chrome --disable-fre --no-first-run" > /data/local/tmp/chrome-command-line'
           adb shell am set-debug-app --persistent com.android.chrome
           adb shell cmd role add-role-holder android.app.role.BROWSER com.android.chrome
       - name: Run selected deployed cases in the Android demo app
+        id: cases
         env:
           ITB_ORGANISATION_KEY: ${{ secrets.ITB_ORGANISATION_KEY }}
           ITB_USERNAME: ${{ secrets.ITB_USERNAME }}
@@ -79,18 +97,18 @@ jobs:
           ITB_BUILD_REVISION: ${{ github.sha }}
           ITB_CASES: ${{ inputs.cases }}
           ITB_REPORT_DIR: ${{ github.workspace }}/build/reports/itb-wallet
-        run: scripts/itb/android-demo.sh unattended emulator-5560
+        run: scripts/itb/android-demo.sh unattended "$ANDROID_SERIAL"
       - name: Summarize every selected case
         if: always()
         run: |
           if [ -f build/reports/itb-wallet/summary.md ]; then
             cat build/reports/itb-wallet/summary.md >> "$GITHUB_STEP_SUMMARY"
           else
-            echo 'ITB setup did not produce a case report; no passing result is implied.' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
+            echo 'No ITB case report was produced. See the setup and execution steps for the failure.' >> "$GITHUB_STEP_SUMMARY"
+            if [[ '${{ steps.cases.outcome }}' == success ]]; then exit 1; fi
           fi
       - name: Preserve sanitized case outcomes
-        if: always()
+        if: always() && hashFiles('build/reports/itb-wallet/summary.md') != ''
         uses: actions/upload-artifact@v7
         with:
           name: itb-wallet-live-${{ github.sha }}
