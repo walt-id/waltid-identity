@@ -271,11 +271,25 @@ private class DemoInteractions(
     }
 
     private suspend fun completeReceipt(tag: String, failure: String, timeout: Long) {
+        val presentation = tag == "wallet.presentationDone"
+        var returnedFromBrowser = false
         waitUntil(timeout, "demo_receipt_missing") {
-            if (WalletComposeE2EHelper.latestStatus(device).startsWith(failure)) {
-                throw ItbWalletRejection(if (tag == "issuance-done") "demo_issuance_rejected" else "demo_presentation_rejected")
+            if (presentation && !returnedFromBrowser && device.currentPackageName == "com.android.chrome") {
+                // Some verifier responses switch to Chrome. Resume the existing wallet task
+                // to observe its receipt before acknowledging ITB.
+                val launch = checkNotNull(context.packageManager.getLaunchIntentForPackage(context.packageName))
+                context.startActivity(launch)
+                returnedFromBrowser = true
+                return@waitUntil false
             }
-            device.hasObject(By.res(tag))
+            if (WalletComposeE2EHelper.latestStatus(device).startsWith(failure)) {
+                throw ItbWalletRejection(if (presentation) "demo_presentation_rejected" else "demo_issuance_rejected")
+            }
+            val receiptVisible = device.hasObject(By.res(tag))
+            if (presentation && receiptVisible && !device.hasObject(By.text("Presentation sent"))) {
+                throw ItbWalletRejection("demo_presentation_rejected")
+            }
+            receiptVisible
         }
         clickByTag(device, tag)
         waitFor("wallet.scanButton")
