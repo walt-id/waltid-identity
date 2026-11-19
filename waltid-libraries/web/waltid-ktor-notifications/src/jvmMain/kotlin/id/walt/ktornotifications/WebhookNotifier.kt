@@ -123,7 +123,9 @@ internal class KtorWebhookTransport(
 
     private fun parseRetryAfter(value: String?, now: Long): Long? {
         if (value == null) return null
-        value.toLongOrNull()?.let { seconds -> return TimeUnit.SECONDS.toMillis(seconds.coerceAtLeast(0)) }
+        if (value.isNotEmpty() && value.all { it in '0'..'9' }) {
+            return TimeUnit.SECONDS.toMillis(value.toLongOrNull() ?: Long.MAX_VALUE)
+        }
         return runCatching {
             val retryAt = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli()
             (retryAt - now).coerceAtLeast(0)

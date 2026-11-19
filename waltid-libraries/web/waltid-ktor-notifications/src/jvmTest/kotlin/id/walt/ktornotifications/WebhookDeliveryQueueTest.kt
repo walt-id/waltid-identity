@@ -101,6 +101,7 @@ class WebhookDeliveryQueueTest {
         val healthyDeliveryId = queue.enqueue(update(), webhook())
         val corruptPath = root.resolve("pending/corrupt.json")
         Files.writeString(corruptPath, "{truncated")
+        Files.write(root.resolve("pending/invalid-encoding.json"), byteArrayOf(0xff.toByte()))
 
         queue.processDue()
 
@@ -108,7 +109,7 @@ class WebhookDeliveryQueueTest {
         assertEquals(1, transport.deliveries.size)
         assertFalse(Files.exists(corruptPath))
         assertEquals(
-            1L,
+            2L,
             Files.list(root.resolve("corrupt")).use { files -> files.count() },
         )
     }
@@ -376,7 +377,7 @@ class WebhookDeliveryQueueTest {
 
     @Test
     fun `transport accepts HTTP dates and saturates large Retry-After values`() = runTest {
-        val values = ArrayDeque(listOf("Thu, 01 Jan 1970 00:02:10 GMT", Long.MAX_VALUE.toString()))
+        val values = ArrayDeque(listOf("Thu, 01 Jan 1970 00:02:10 GMT", Long.MAX_VALUE.toString(), "9".repeat(20)))
         HttpClient(MockEngine {
             respond("", HttpStatusCode.TooManyRequests, headersOf(HttpHeaders.RetryAfter, values.removeFirst()))
         }).use { client ->
@@ -384,6 +385,7 @@ class WebhookDeliveryQueueTest {
             val delivery = delivery("{}")
             assertEquals(7_000L, transport.deliver(delivery, 1, 123).retryAfterMilliseconds)
             assertEquals(Long.MAX_VALUE, transport.deliver(delivery, 2, 123).retryAfterMilliseconds)
+            assertEquals(Long.MAX_VALUE, transport.deliver(delivery, 3, 123).retryAfterMilliseconds)
         }
     }
 
