@@ -1,7 +1,7 @@
-FROM nginx:1.27-alpine
+FROM nginx:1.31.9-trixie
 
-RUN addgroup -g 10001 -S appgroup && \
-    adduser -u 10001 -S appuser -G appgroup
+RUN groupadd -g 10001 -r appgroup && \
+    useradd -u 10001 -r -g appgroup -M -s /usr/sbin/nologin appuser
 
 COPY nginx.conf /etc/nginx/nginx.conf
 # Kotlin (Dokka) docs, served on sdk.docs.walt.id.
