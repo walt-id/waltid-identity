@@ -265,6 +265,22 @@ internal class MobileDemoWallet(
     override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome =
         mobileWallet.cancelIssuance(sessionId).toDemoIssuanceOutcome()
 
+    override suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    ) {
+        mobileWallet.rejectIssuedCredential(
+            notificationId = notificationId,
+            accessToken = accessToken,
+            credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+            notificationEndpoint = notificationEndpoint,
+            eventDescription = eventDescription,
+        )
+    }
+
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
         mobileWallet.resumeDeferredIssuance(deferredCredentialId).toDemoIssuanceOutcome()
 
@@ -575,6 +591,7 @@ fun id.walt.wallet2.mobile.MobileWalletPreparedPresentationReview.toDemoClaimRev
     WalletDemoPreparedClaimReview(credentials.map { contribution ->
         WalletDemoCredentialClaims(contribution.queryId, contribution.credentialId, contribution.format,
             contribution.claimsJson, contribution.wholeCredential, contribution.locations.map { location ->
-                WalletDemoClaimLocation(location.sourcePathJson, location.receivedPathJson, location.sharedBy, location.alwaysCarried)
+                WalletDemoClaimLocation(location.sourcePathJson, location.receivedPathJson,
+                    location.sharedBy, location.alwaysCarried, location.isBinary)
             })
     })

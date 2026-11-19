@@ -187,6 +187,18 @@ class MobileWalletDigitalCredentialPresentationTest {
         val option = preview.credentialOptions.single()
         val disclosure = option.disclosures.single()
         assertTrue(disclosure.required)
+        val review = fixture.wallet.reviewDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selectedDisclosureOptions = emptyList(),
+        ).credentials.single()
+        val attachment = Json.parseToJsonElement(review.claimsJson).jsonObject.getValue(MDOC_NAMESPACE)
+            .jsonObject.getValue("arbitrary_attachment").jsonPrimitive
+        assertContentEquals(IMAGE_BYTES, attachment.content.decodeFromBase64Url())
+        val location = review.locations.single { it.isBinary }
+        assertEquals("""["$MDOC_NAMESPACE","arbitrary_attachment"]""", location.sourcePathJson)
+        assertEquals(location.sourcePathJson, location.receivedPathJson)
+        assertEquals(3, review.locations.size)
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
             selectedCredentialOptions = preview.credentialOptions.selections(),

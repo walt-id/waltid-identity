@@ -15,9 +15,12 @@ data class PresentationClaimLocation(
     val sharedBy: List<String> = emptyList(),
     /** True for clear values outside any selectively disclosed ancestor, or a whole credential. */
     val alwaysCarried: Boolean = true,
+    /** A CBOR byte string represented by one unpadded base64url value at [receivedPath]. */
+    val isBinary: Boolean = false,
 )
 
 class PresentationClaimsProjection(
+    /** The JSON review view. Locations marked binary identify base64url values. */
     val claims: JsonObject,
     val wholeCredential: Boolean,
     val locations: List<PresentationClaimLocation> = identityLocations(claims),
@@ -36,17 +39,7 @@ class PresentationClaimsProjection(
                         PresentationClaimsProjection(payload, true, identityLocations(payload, payload["vc"] is JsonObject))
                     }
                 }
-                WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC -> {
-                    val claims = MdocPresenter.previewClaims(credential, match)
-                    val selected = match.originalQuery.claims.orEmpty().filter {
-                        it.path.joinToString(".") in match.selectedDisclosures.orEmpty()
-                    }
-                    PresentationClaimsProjection(claims, false, identityLocations(claims).map { location ->
-                        location.copy(alwaysCarried = false, sharedBy = selected.filter { query ->
-                            location.sourcePath.take(query.path.size) == query.path
-                        }.map { it.path.joinToString(".") })
-                    })
-                }
+                WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC -> MdocPresenter.preview(credential, match)
                 else -> error("A reliable claim preview is unavailable for credential format ${credential.format}")
             }
     }

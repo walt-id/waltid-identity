@@ -2322,9 +2322,13 @@ object WalletPresentationHandler {
 
         val root = (credential.data["vc"] as? JsonObject) ?: credential.data
         val selectedValues = DcqlMatcher.processClaimsPath(root, claimPath).getOrElse { return fallback }
-            // A selected claim is withheld only when `values` filtered it out
-            .filterNot { (location, _) -> isWithheld(location) }
-            .map { (location, value) -> withoutWithheld(value, location) }
+            .mapNotNull { (location, value) ->
+                when {
+                    withheldLocations.isEmpty() -> value
+                    isWithheld(location) -> null
+                    else -> withoutWithheld(value, location)
+                }
+            }
         return selectedValues.singleOrNull()?.takeIf { claimPath.lastOrNull() !is JsonNull } ?: JsonArray(selectedValues)
     }
 

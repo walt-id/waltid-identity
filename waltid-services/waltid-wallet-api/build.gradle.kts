@@ -61,10 +61,6 @@ dependencies {
     implementation(identityLibs.bouncycastle.prov)
     implementation(identityLibs.bouncycastle.pkix)
 
-    // Argon2
-    implementation(identityLibs.argon2.jvm)
-
-
     // walt.id
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
     implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
@@ -118,7 +114,6 @@ dependencies {
     // drivers
     implementation(identityLibs.sqlite.wallet)
     implementation(identityLibs.postgresql)
-    implementation(identityLibs.mysql.connector)
     implementation(identityLibs.mssql.jdbc)
 
     // Web push

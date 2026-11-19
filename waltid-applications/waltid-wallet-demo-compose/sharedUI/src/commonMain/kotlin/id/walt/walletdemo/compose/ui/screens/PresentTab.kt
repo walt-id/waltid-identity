@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import id.walt.walletdemo.compose.logic.WalletDemoClaimReview
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
@@ -67,7 +68,7 @@ internal fun PresentTab(
     }
 
     if (preview != null) {
-        val information by rememberSharingInformation(preview.credentialOptions)
+        val information by rememberSharingInformation(preview.credentialOptions, state.claimReview is WalletDemoClaimReview.Legacy)
         ReviewScaffold(
             fillViewport = fillViewport,
             modifier = modifier.testTag(WalletUiTestTags.PresentTabContent),

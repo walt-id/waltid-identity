@@ -4,6 +4,7 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
+import id.walt.openid4vci.requests.notification.NotificationRequestValidationResult
 
 /**
  * Parses authorization parameters and rejects requests disallowed by current policy.
@@ -22,4 +23,8 @@ fun interface AccessTokenRequestValidator {
 
 interface CredentialRequestValidator {
     fun validate(parameters: Map<String, List<String>>, session: Session?): CredentialRequestResult
+}
+
+fun interface NotificationRequestValidator {
+    fun validate(parameters: Map<String, List<String>>): NotificationRequestValidationResult
 }

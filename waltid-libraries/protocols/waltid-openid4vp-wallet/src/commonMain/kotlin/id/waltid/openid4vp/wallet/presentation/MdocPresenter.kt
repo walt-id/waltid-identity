@@ -421,8 +421,8 @@ object MdocPresenter {
     }
 
     /** The selected signed elements, prepared without device authentication or holder-key access. */
-    fun previewClaims(digitalCredential: DigitalCredential, matchResult: DcqlMatcher.DcqlMatchResult) =
-        prepareIssuerSigned(digitalCredential as MdocsCredential, matchResult).namespacesToJson()
+    internal fun preview(digitalCredential: DigitalCredential, matchResult: DcqlMatcher.DcqlMatchResult) =
+        prepareIssuerSigned(digitalCredential as MdocsCredential, matchResult).toMdocReviewProjection()
 
     private fun prepareIssuerSigned(
         mdocsCredential: MdocsCredential,

@@ -1,6 +1,5 @@
 package id.walt.webwallet.service.account
 
-import de.mkammerer.argon2.Argon2Factory
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.UnauthorizedException
 import id.walt.webwallet.db.models.Accounts
@@ -63,11 +62,7 @@ object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
                 Pair(matchedAccount, pwHash)
             }
 
-            val passwordMatches = Argon2Factory.create().run {
-                verify(pwHash, req.password).also {
-                    wipeArray(req.password)
-                }
-            }
+            val passwordMatches = Argon2Passwords.verify(pwHash, req.password)
 
             if (passwordMatches) {
                 val id = matchedAccount[Accounts.id]

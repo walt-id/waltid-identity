@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
+import id.walt.walletdemo.compose.logic.WalletDemoClaimReview
 import id.walt.walletdemo.compose.logic.WalletDemoPaymentConsent
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
@@ -52,7 +53,7 @@ fun WalletDemoSharingReviewScreen(
     val selection = state.selection
     val paymentReview = state.payment
     val submit = { owner.selectionForSubmission(state)?.let(onSubmit); Unit }
-    val information by rememberSharingInformation(review.credentialOptions)
+    val information by rememberSharingInformation(review.credentialOptions, state.information is WalletDemoClaimReview.Legacy)
     val selectionComplete = information != null && state.information.canConfirm && review.hasCompleteCredentialSelection(selection.credentials)
 
     WalletReviewHost(dismissEnabled = enabled, onDismiss = onBackAtRoot) {

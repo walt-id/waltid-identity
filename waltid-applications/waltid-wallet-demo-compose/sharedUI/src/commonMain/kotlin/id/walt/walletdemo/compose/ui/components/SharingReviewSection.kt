@@ -74,9 +74,12 @@ internal fun SharingReviewSection(
 
 /** The host uses this same snapshot to gate confirmation until the reviewed values are rendered. */
 @Composable
-internal fun rememberSharingInformation(options: List<WalletDemoPresentationCredentialOption>): State<List<SharingCredentialInformation>?> =
-    key(options) {
+internal fun rememberSharingInformation(
+    options: List<WalletDemoPresentationCredentialOption>,
+    includeDisclosures: Boolean,
+): State<List<SharingCredentialInformation>?> =
+    key(options, includeDisclosures) {
         produceState<List<SharingCredentialInformation>?>(null) {
-            value = withContext(Dispatchers.Default) { options.map { it.toSharingInformation() } }
+            value = withContext(Dispatchers.Default) { options.map { it.toSharingInformation(includeDisclosures = includeDisclosures) } }
         }
     }

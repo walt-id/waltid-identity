@@ -109,6 +109,11 @@ object CredentialDisplayNormalizer {
             ?: DisplayValue.Raw(valueJson)
     }
 
+    internal fun toBinaryReviewValue(value: JsonElement, path: ClaimPath): DisplayValue {
+        require(value is JsonPrimitive && value.isString) { "A binary review claim must be a base64url string" }
+        return valueDecoder.binaryValue(value.content, CredentialDisplayVocabulary.roles(path))
+    }
+
     fun transactionDataGroups(items: List<WalletDemoTransactionDataItem>): List<ClaimGroup> {
         val baseTitles = items.map { item ->
             item.transactionDataTitle()

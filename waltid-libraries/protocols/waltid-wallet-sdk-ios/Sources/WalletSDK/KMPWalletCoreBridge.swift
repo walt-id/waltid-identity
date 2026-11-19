@@ -165,6 +165,23 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return try Self.issuanceOutcome(result, operation: "cancel issuance")
     }
 
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {
+        let result = try await bridge.rejectIssuedCredential(
+            notificationId: notificationID,
+            accessToken: accessToken,
+            credentialIssuerBaseUrl: credentialIssuerBaseURL?.absoluteString,
+            notificationEndpoint: notificationEndpoint?.absoluteString,
+            eventDescription: eventDescription
+        )
+        _ = try Self.successAnyValue(result, operation: "reject issued credential")
+    }
+
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
         let result = try await bridge.resumeDeferredIssuance(deferredCredentialId: deferredCredentialID)
         return try Self.issuanceOutcome(result, operation: "resume deferred issuance")
@@ -243,7 +260,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             PresentationCredentialClaims(queryID: claim.queryId, credentialID: claim.credentialId, format: claim.format,
                 claimsJSON: claim.claimsJson, wholeCredential: claim.wholeCredential, locations: claim.locations.map {
                     PresentationClaimLocation(sourcePathJSON: $0.sourcePathJson, receivedPathJSON: $0.receivedPathJson,
-                        sharedBy: $0.sharedBy, alwaysCarried: $0.alwaysCarried)
+                        sharedBy: $0.sharedBy, alwaysCarried: $0.alwaysCarried, isBinary: $0.isBinary)
                 })
         })
     }
