@@ -243,9 +243,12 @@ private class DemoInteractions(
         var browserConfirmed = false
         waitUntil(if (attended) 90_000 else 40_000, "demo_dc_picker_or_review_missing") {
             requireProviderScreen()
-            if (!attended && !browserConfirmed && device.currentPackageName == CHROME_PACKAGE && confirmBrowserOrigin()) {
-                browserConfirmed = true
-                return@waitUntil false
+            if (!attended && device.currentPackageName == CHROME_PACKAGE) {
+                if (dismissChromeNotificationPrompt()) return@waitUntil false
+                if (!browserConfirmed && confirmBrowserOrigin()) {
+                    browserConfirmed = true
+                    return@waitUntil false
+                }
             }
             if (device.hasObject(By.res(reviewTag))) true else {
                 val shareSheet = device.hasObject(By.copy(picker).text("Share info"))
@@ -269,13 +272,21 @@ private class DemoInteractions(
         }
     }
 
+    private fun dismissChromeNotificationPrompt(): Boolean =
+        device.hasObject(By.pkg(CHROME_PACKAGE).text("Chrome notifications make things easier")) &&
+            clickChromeButton("No thanks")
+
     private fun confirmBrowserOrigin(): Boolean {
         val chrome = By.pkg(CHROME_PACKAGE)
         if (!device.hasObject(By.copy(chrome).text("Do you trust this site with your data?")) ||
             !device.hasObject(By.copy(chrome).textStartsWith("$itbHost wants to use personal info"))
         ) return false
-        val proceed = device.findObject(By.copy(chrome).text("Continue"))?.takeIf { it.isEnabled } ?: return false
-        (proceed.clickableAncestor() ?: proceed).click()
+        return clickChromeButton("Continue")
+    }
+
+    private fun clickChromeButton(text: String): Boolean {
+        val button = device.findObject(By.pkg(CHROME_PACKAGE).text(text))?.takeIf { it.isEnabled } ?: return false
+        (button.clickableAncestor() ?: button).click()
         return true
     }
 
