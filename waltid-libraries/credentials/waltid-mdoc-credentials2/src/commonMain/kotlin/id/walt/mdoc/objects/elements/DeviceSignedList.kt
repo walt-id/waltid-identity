@@ -1,11 +1,8 @@
 package id.walt.mdoc.objects.elements
 
-import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.serialization.Contextual
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.putJsonObject
@@ -28,11 +25,7 @@ data class DeviceNameSpaces(
         entries.forEach { (namespace, deviceSignedList) ->
             putJsonObject(namespace) {
                 deviceSignedList.entries.forEach { item: DeviceSignedItem ->
-                    val serialized: JsonElement = MdocsCborSerializer.lookupSerializer(namespace, item.key)
-                        ?.runCatching {
-                            Json.encodeToJsonElement(this as KSerializer<Any?>, item.value)
-                        }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
-                        ?: item.value.toSerializedJsonElement()
+                    val serialized: JsonElement = MdocsCborSerializer.toJsonElement(namespace, item.key, item.value)
 
                     put(item.key, serialized)
                 }
