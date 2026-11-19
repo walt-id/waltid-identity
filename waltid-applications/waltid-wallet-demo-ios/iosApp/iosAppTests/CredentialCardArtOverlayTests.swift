@@ -1,4 +1,4 @@
-import WalletDemoSharingUI
+@testable import WalletDemoSharingUI
 import XCTest
 
 final class CredentialCardArtOverlayTests: XCTestCase {
