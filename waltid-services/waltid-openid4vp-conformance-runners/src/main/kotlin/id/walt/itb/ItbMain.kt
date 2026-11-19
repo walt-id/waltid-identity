@@ -102,32 +102,54 @@ private suspend fun runItb(): Int {
 
 internal object ItbRunSelection {
     private val unattendedCases = setOf(
-        "tc_vci_001", "tc_vci_002", "tc_vci_003", "tc_vci_005", "tc_vci_006", "tc_vci_007", "tc_vci_008",
-        "tc_vp_001", "tc_vp_002", "tc_vp_003", "tc_vp_007", "tc_vp_011", "tc_vp_012", "tc_vp_013", "tc15",
-        "ts12_issue_01", "ts12_issue_02", "ts12_issue_03",
+        "cs01v1/tc_vci_001", "cs01v1/tc_vci_002", "cs01v1/tc_vci_003", "cs01v1/tc_vci_005",
+        "cs01v1/tc_vci_006", "cs01v1/tc_vci_007", "cs01v1/tc_vci_008",
+        "cs02v1/tc_vp_001", "cs02v1/tc_vp_002", "cs02v1/tc_vp_003", "cs02v1/tc_vp_007",
+        "cs02v1/tc_vp_011", "cs02v1/tc_vp_012", "cs02v1/tc_vp_013", "cts07/tc15",
+        "cs10-test-suite/rv_iss_01", "cs10-test-suite/rv_iss_02",
+        "ts12/ts12_issue_01", "ts12/ts12_issue_02", "ts12/ts12_issue_03",
     )
 
     private val prerequisites = mapOf(
-        "tc_vp_001" to "tc_vci_006", "tc_vp_002" to "tc_vci_006", "tc_vp_003" to "tc_vci_006",
-        "tc_vp_007" to "tc_vci_008", "tc15" to "tc_vci_006",
-        "tc_vp_011" to "tc_vci_006", "tc_vp_012" to "tc_vci_006", "tc_vp_013" to "tc_vci_006",
-        "ts12_pay_01" to "ts12_issue_01", "ts12_pay_02" to "ts12_issue_02", "ts12_pay_03" to "ts12_issue_03",
-        "ts12_pay_dc_api_01" to "ts12_issue_01", "ts12_pay_dc_api_02" to "ts12_issue_02", "ts12_pay_dc_api_03" to "ts12_issue_03",
+        "cs02v1/tc_vp_001" to "cs01v1/tc_vci_006",
+        "cs02v1/tc_vp_002" to "cs01v1/tc_vci_006",
+        "cs02v1/tc_vp_003" to "cs01v1/tc_vci_006",
+        "cs02v1/tc_vp_007" to "cs01v1/tc_vci_008",
+        "cs02v1/tc_vp_011" to "cs01v1/tc_vci_006",
+        "cs02v1/tc_vp_012" to "cs01v1/tc_vci_006",
+        "cs02v1/tc_vp_013" to "cs01v1/tc_vci_006",
+        "cts07/tc15" to "cs01v1/tc_vci_006",
+        "ts12/ts12_pay_01" to "ts12/ts12_issue_01",
+        "ts12/ts12_pay_02" to "ts12/ts12_issue_02",
+        "ts12/ts12_pay_03" to "ts12/ts12_issue_03",
+        "ts12/ts12_pay_dc_api_01" to "ts12/ts12_issue_01",
+        "ts12/ts12_pay_dc_api_02" to "ts12/ts12_issue_02",
+        "ts12/ts12_pay_dc_api_03" to "ts12/ts12_issue_03",
     )
 
     fun select(catalogue: ItbCatalogue, selection: String?, unattendedOnly: Boolean = false): List<Pair<ItbCatalogue.Suite, ItbCatalogue.Case>> {
         val all = catalogue.suites.flatMap { suite -> suite.cases.map { suite to it } }
-        if (!unattendedOnly && selection == null) return all
-        if (unattendedOnly) require(all.map { it.second.id }.containsAll(unattendedCases)) {
-            "The unattended ITB inventory no longer matches the deployed catalogue"
+            .associateBy { (suite, case) -> "${suite.id}/${case.id}" }
+        val requested = if (selection == null) {
+            if (unattendedOnly) unattendedCases else all.keys
+        } else {
+            selection.split(',').map { selector ->
+                val id = selector.trim()
+                if ('/' in id) {
+                    require(id in all) { "Unknown qualified ITB case selection" }
+                    id
+                } else {
+                    requireNotNull(all.entries.singleOrNull { it.value.second.id == id }) {
+                        "Unknown or ambiguous ITB case selection. Use suite/case for a repeated case ID"
+                    }.key
+                }
+            }.toSet()
         }
-        if (selection == null) return all.filter { it.second.id in unattendedCases }
-        val ids = selection.split(',').map(String::trim).toSet()
-        require(ids.isNotEmpty() && ids.all { id -> all.any { it.second.id == id } }) { "Unknown or empty ITB case selection" }
-        val expanded = ids + ids.mapNotNull(prerequisites::get)
+        val expanded = requested + requested.mapNotNull(prerequisites::get)
+        require(all.keys.containsAll(expanded)) { "A selected ITB case or prerequisite is missing from the catalogue" }
         if (unattendedOnly) require(expanded.all { it in unattendedCases }) {
-            "The selected ITB case requires operator authentication"
+            "The selected ITB case is outside the unattended inventory"
         }
-        return all.filter { it.second.id in expanded }
+        return all.filterKeys { it in expanded }.values.toList()
     }
 }

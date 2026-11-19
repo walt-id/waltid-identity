@@ -81,6 +81,7 @@ dependencies {
     implementation(identityLibs.kotlintest)
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.ktor.client.mock)
+    testImplementation(project(":waltid-libraries:credentials:waltid-status-list"))
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
@@ -357,6 +358,9 @@ registerWalletProfileTestTask(
 
 // The opt-in Android fixture compiles the same wallet driver, without the JVM software-key factory.
 kotlin.sourceSets.named("main") { kotlin.srcDir("src/deviceShared/kotlin") }
+kotlin.sourceSets.named("test") {
+    kotlin.srcDir("../../waltid-libraries/credentials/waltid-credential-status/src/jvmTestFixtures/kotlin")
+}
 
 val fixture = layout.projectDirectory.dir("../../waltid-applications/waltid-wallet-demo-test-fixtures/key-attestation")
 extra["demoKeyAttestationFixture"] = fixture

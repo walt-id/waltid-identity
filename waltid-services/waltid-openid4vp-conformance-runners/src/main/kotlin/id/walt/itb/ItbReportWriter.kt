@@ -33,7 +33,7 @@ object ItbReportWriter {
             appendLine()
             appendLine("Build: `${report.buildRevision}`. Catalogue: ${report.catalogueObservedOn}.")
             appendLine("Wallet execution: ${report.walletExecution}.")
-            appendLine("Key attestation: ${report.keyAttestation}; security, certification and status claims are simulated.")
+            appendLine("Key attestation: ${report.keyAttestation}. The attestation's security, certification and status claims are simulated.")
             report.androidApkSha256?.let { appendLine("Android test APK SHA-256: `$it`.") }
             appendLine("${report.cases.size - failures}/${report.cases.size} passed; $failures non-passing.")
             appendLine()
@@ -50,7 +50,7 @@ object ItbReportWriter {
                 appendLine("| ${result.suite} | ${result.case} | ${result.outcome} | $reason | $wallet | ${result.testBedVerdict ?: "unavailable"} | ${result.session ?: "not started"} |")
             }
             appendLine()
-            appendLine("Wallet protocol execution with a portal interaction bridge. Native mode uses operator authentication on Android; neither mode qualifies transaction-consent UI, browser/OS DC API delivery or formal SCA assurance.")
+            appendLine("Wallet SDK protocol evidence. Android native mode adds operator authentication for payment signing. App rendering, browser or OS delivery and formal assurance require separate evidence.")
         })
         writeAtomically(directory.resolve("junit.xml"), buildString {
             appendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")

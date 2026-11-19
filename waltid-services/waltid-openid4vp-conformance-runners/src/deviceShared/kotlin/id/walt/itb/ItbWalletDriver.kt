@@ -2,11 +2,13 @@
 
 package id.walt.itb
 
+import id.walt.credentials.status.CredentialStatusKind
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.handlers.*
+import id.walt.wallet2.status.WalletCredentialStatusService
 import io.ktor.client.HttpClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
@@ -18,6 +20,7 @@ import java.time.Instant
 /** Session-correlated inputs supplied by the test bed, never replacement reference-service requests. */
 sealed interface ItbWalletInteraction {
     class Offer(val url: Url, val transactionCode: String? = null) : ItbWalletInteraction
+    class RevocationOffer(val offer: Offer, val session: String, val step: ItbRevocationStep) : ItbWalletInteraction
     class Presentation(val url: Url) : ItbWalletInteraction
     class DigitalCredentials(
         val endpoint: Url,
@@ -33,7 +36,7 @@ sealed interface ItbWalletInteraction {
     )
 }
 
-class ItbWalletRejection(val code: String) : IllegalStateException("The wallet rejected the presentation request ($code)")
+class ItbWalletRejection(val code: String) : IllegalStateException("The ITB wallet operation failed ($code)")
 
 /** Only allowlisted error identifiers and a bounded HTTP status can leave the verifier response. */
 internal class ItbVerifierRejection(response: JsonElement?, status: HttpStatusCode? = null) :
@@ -58,16 +61,21 @@ class ItbWalletDriver internal constructor(
 ) {
     private val paymentTypes = TransactionDataTypeRegistry("urn:eudi:sca:payment:1")
     private val redirectUri = Url("openid://")
+    private data class PendingRevocation(val session: String, val credentialId: String)
+    private var pendingRevocation: PendingRevocation? = null
 
     suspend fun execute(interaction: ItbWalletInteraction) {
+        val previous = pendingRevocation
+        pendingRevocation = null
         when (interaction) {
             is ItbWalletInteraction.Offer -> receive(interaction)
+            is ItbWalletInteraction.RevocationOffer -> receiveRevocation(interaction, previous)
             is ItbWalletInteraction.Presentation -> present(interaction)
             is ItbWalletInteraction.DigitalCredentials -> presentDigitalCredentials(interaction)
         }
     }
 
-    private suspend fun receive(offer: ItbWalletInteraction.Offer) {
+    private suspend fun receive(offer: ItbWalletInteraction.Offer): List<String> {
         val resolved = WalletIssuanceHandler.resolveOffer(ResolveOfferRequest(offerUrl = offer.url))
         val result = if (resolved.grantType == "authorization_code") {
             val authorization = WalletIssuanceHandler.generateAuthorizationUrl(
@@ -110,6 +118,27 @@ class ItbWalletDriver internal constructor(
         }
         check(result.credentialIds.isNotEmpty() && result.deferredTransactionIds.isEmpty()) {
             "The wallet did not store the issued credential"
+        }
+        return result.credentialIds
+    }
+
+    private suspend fun receiveRevocation(interaction: ItbWalletInteraction.RevocationOffer, previous: PendingRevocation?) {
+        val first = if (interaction.step == ItbRevocationStep.SECOND_SHARED) {
+            checkNotNull(previous?.takeIf { it.session == interaction.session }) {
+                "The second revocation offer has no first credential in this session"
+            }.credentialId
+        } else null
+        val id = receive(interaction.offer).singleOrNull()
+            ?: throw ItbWalletRejection("status_expected_one_credential_per_offer")
+        when (interaction.step) {
+            ItbRevocationStep.FIRST_SHARED -> pendingRevocation = PendingRevocation(interaction.session, id)
+            ItbRevocationStep.SECOND_SHARED -> WalletCredentialStatusService(wallet).use { status ->
+                checkRevocationStatus(status, listOf(checkNotNull(first), id), CredentialStatusKind.CHECKED)
+            }
+            ItbRevocationStep.ALREADY_REVOKED -> WalletCredentialStatusService(wallet).use { status ->
+                // The wallet projects IETF Token Status List value 0x01 as INVALID.
+                checkRevocationStatus(status, listOf(id), CredentialStatusKind.INVALID)
+            }
         }
     }
 

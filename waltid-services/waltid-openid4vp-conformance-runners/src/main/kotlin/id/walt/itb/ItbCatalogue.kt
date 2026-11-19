@@ -42,9 +42,12 @@ data class ItbCatalogue(
         require(suites.isNotEmpty()) { "The ITB catalogue must contain suites" }
         require(suites.map { it.id }.distinct().size == suites.size) { "Duplicate ITB suite IDs" }
         suites.forEach { suite ->
-            require(suite.id.isNotBlank() && suite.name.isNotBlank() && suite.statement.isNotBlank() && suite.cases.isNotEmpty()) { "Empty ITB suite" }
+            require(suite.id.isNotBlank() && '/' !in suite.id && suite.name.isNotBlank() &&
+                suite.statement.isNotBlank() && suite.cases.isNotEmpty()) { "Invalid ITB suite" }
             require(suite.actor == null || suite.actor.isNotBlank()) { "Empty ITB actor label" }
-            require(suite.cases.all { it.id.isNotBlank() && it.name.isNotBlank() }) { "Empty ITB case identity" }
+            require(suite.cases.all { it.id.isNotBlank() && '/' !in it.id && it.name.isNotBlank() }) {
+                "Invalid ITB case identity"
+            }
             require(suite.cases.map { it.id }.distinct().size == suite.cases.size) {
                 "Duplicate ITB case IDs in ${suite.id}"
             }

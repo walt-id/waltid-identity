@@ -52,8 +52,8 @@ The broader profile work belongs with [WAL-1534](https://linear.app/walt-new/iss
 
 | Case family | Decision |
 | --- | --- |
-| CS-07 `tc16` | Deferred. It uses `navigator.credentials.create()` / `openid4vci-v1` with an authorization-code PID offer and an issuance-status capability. The existing bridge handles presentation descriptors, not DC API issuance. Extracting an offer and calling ordinary issuance would not prove native DC API delivery. |
-| CS-10 `rv_iss_01`, `rv_iss_02` | Deferred. The first requires two offers, shared-list/different-index assertions and authenticated status-token validation; the second requires a revoked-credential result. The current one-interaction issuance success check cannot establish either contract. |
+| CS-07 `tc16` | Requires a browser/provider issuance run and correlated issuer status. See the [negative control in the runner guide](ITB-WALLET.md#follow-up-coverage). |
+| CS-10 `rv_iss_01`, `rv_iss_02` | Selected. The runner verifies both credentials' shared list and distinct indices or the already-revoked credential's status, as specified by each case. See the [runner guide](ITB-WALLET.md#follow-up-coverage). |
 | TS12 `w01`, `w02`, `w03` | Excluded from the Wallet SUT inventory: these are Issuer/Verifier SUT cases using the reference wallet as counterpart. |
 | Trust Framework, QES and other suites | Remain separate coverage work. Similar labels do not establish matching trust configuration, credentials or interaction contracts. |
 | Six TS12 payment cases | Retained as local operator-assisted coverage. Per-use native authentication and genuine user approval remain required; hosted CI cannot supply that evidence. |
