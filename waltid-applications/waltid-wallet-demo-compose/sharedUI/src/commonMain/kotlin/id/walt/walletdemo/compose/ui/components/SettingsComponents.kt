@@ -54,16 +54,19 @@ internal fun SettingsActionRow(
     enabled: Boolean = true,
     destructive: Boolean = false,
     icon: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null,
 ) {
     val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     ListItem(
         headlineContent = { Text(title) },
         supportingContent = detail?.let { { Text(it) } },
         leadingContent = icon,
+        trailingContent = trailingIcon,
         colors = ListItemDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             headlineColor = if (enabled) tint else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f),
             leadingIconColor = if (enabled) tint else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f),
+            trailingIconColor = if (enabled) tint else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f),
         ),
         modifier = modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(enabled = enabled, role = Role.Button, onClick = onClick),
     )
@@ -198,7 +201,8 @@ internal fun SettingsCopyRow(
                 Row {
                     if (disclosureLabels != null) IconButton(onClick = { expanded = !expanded }) {
                         Icon(Icons.Default.KeyboardArrowDown,
-                            if (expanded) disclosureLabels.second else disclosureLabels.first, Modifier.rotate(rotation))
+                            if (expanded) disclosureLabels.second else disclosureLabels.first, Modifier.rotate(rotation),
+                            tint = MaterialTheme.colorScheme.primary)
                     }
                     SettingsIconButton(copyLabel, enabled = !value.isNullOrBlank(), onClick = {
                         value?.let { text ->

@@ -8,6 +8,8 @@ fun createIosDemoSharingSettingsStore(appGroupIdentifier: String): DemoSharingSe
     }
     val defaults = NSUserDefaults(suiteName = appGroupIdentifier)
     return PersistentDemoSharingSettingsStore(
+        readStatusChecks = { if (defaults.objectForKey(AUTOMATIC_CREDENTIAL_STATUS_CHECKS_KEY) == null) true else defaults.boolForKey(AUTOMATIC_CREDENTIAL_STATUS_CHECKS_KEY) },
+        writeStatusChecks = { defaults.setBool(it, forKey = AUTOMATIC_CREDENTIAL_STATUS_CHECKS_KEY) },
         readEnabled = {
             if (defaults.objectForKey(SHOW_DC_API_PRESENTATION_PREVIEW_KEY) == null) {
                 null

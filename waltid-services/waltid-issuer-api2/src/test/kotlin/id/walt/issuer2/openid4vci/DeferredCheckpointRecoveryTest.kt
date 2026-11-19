@@ -185,12 +185,14 @@ class DeferredCheckpointRecoveryTest {
         }
         assertEquals(1, proofVerifications, "The first request verifies its batch once")
         val transaction = if (deferred) assertNotNull(sessions.getSession(receipt.offerId).deferredState).transactions.values.single() else null
-        if (transaction != null) {
+        val checkpoint = if (transaction != null) {
             assertFalse(transaction.consumed)
-            if (failure != "signing" && failure != "checkpoint") assertNotNull(transaction.response)
+            transaction.response
         } else {
-            val operation = sessions.getSession(receipt.offerId).credentialStatusIssuance!!.operations.values.single()
-            if (failure != "signing") assertNotNull(operation.response)
+            sessions.getSession(receipt.offerId).credentialStatusIssuance!!.operations.values.single().response
+        }
+        if (failure != "signing" && failure != "checkpoint") {
+            assertNotNull(checkpoint?.notificationId)
         }
         val mismatched = submit(request(JWKKey.generate(KeyType.secp256r1)))
         assertEquals(400, mismatched.status)
@@ -210,6 +212,8 @@ class DeferredCheckpointRecoveryTest {
         val beforeRetry = proofVerifications
         val recovered = submit(request())
         assertEquals(200, recovered.status, recovered.payload.toString())
+        val notificationId = recovered.payload.getValue("notification_id").jsonPrimitive.content
+        if (checkpoint != null) assertEquals(checkpoint.notificationId, notificationId)
         assertEquals(beforeRetry + 1, proofVerifications, "A retry verifies fresh proofs once, even for a saved response")
         assertEquals(if (failure == "signing" || failure == "checkpoint") 2 else 1, issuanceInputRequests)
         if (preallocated) {
@@ -221,6 +225,7 @@ class DeferredCheckpointRecoveryTest {
         }
         val final = sessions.getSession(receipt.offerId)
         assertEquals(1, final.issuanceResults.size)
+        assertEquals(notificationId, final.issuanceResults.values.single().walletNotification?.notificationId)
         if (transaction != null) {
             assertTrue(final.deferredState!!.transactions.getValue(transaction.id).consumed)
             assertEquals(400, submit(request()).status)

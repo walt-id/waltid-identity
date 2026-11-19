@@ -1,5 +1,7 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.credentials.status.CredentialStatus
+
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.certificate.x509.X509CertificateUtil
@@ -16,6 +18,7 @@ import id.walt.wallet2.mobile.MobileWalletHolderBinding
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletClientIdScheme
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletCredentialRead
 import id.walt.wallet2.mobile.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
@@ -43,8 +46,17 @@ import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.waltid.openid4vci.wallet.metadata.MetadataSigner
 import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.awaitCancellation
+import id.walt.wallet2.status.CredentialStatusRefreshMode
+import id.walt.wallet2.status.CredentialStatusRefreshResult
+import id.walt.wallet2.status.WalletCredentialStatusSnapshot
+import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -103,6 +115,23 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<WalletIssuanceOutcome>>(result)
         assertEquals(WalletIssuanceOutcome.Cancelled("issuance-session"), result.value)
         assertEquals("issuance-session", operations.cancelledIssuanceSessionId)
+    }
+
+    @Test
+    fun bridgeRejectIssuedCredentialForwardsNotificationTarget() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.rejectIssuedCredential(
+            notificationId = "notification-id",
+            accessToken = "access-token",
+            credentialIssuerBaseUrl = "https://issuer.example",
+        )
+
+        assertIs<WalletBridgeResult.Success<Unit>>(result)
+        assertEquals("notification-id", operations.rejectedIssuedCredentialNotificationId)
+        assertEquals("access-token", operations.rejectedIssuedCredentialAccessToken)
+        assertEquals("https://issuer.example", operations.rejectedIssuedCredentialIssuer)
     }
 
     @Test
@@ -621,6 +650,37 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun statusStreamSerializesEmptyCollectionsAndReleasesTheNativeCollector() = runTest {
+        var released = false
+        val operations = FakeWalletSdkBridgeOperations()
+        operations.statusFlow = flow {
+            try {
+                emit(WalletCredentialStatusSnapshot(
+                    Instant.parse("2026-11-12T10:00:00Z"), emptyList()))
+                awaitCancellation()
+            } finally { released = true }
+        }
+        val bridge = WalletSdkBridge.forOperations(operations, emptyFlow())
+        val update = assertIs<WalletBridgeCredentialStatusUpdate.Snapshot>(bridge.credentialStatuses.first())
+        val json = Json.parseToJsonElement(update.snapshotJson).jsonObject
+        assertEquals("[]", json.getValue("credentials").toString())
+        assertEquals("[]", json.getValue("refreshing").toString())
+        assertEquals(true, released)
+    }
+
+    @Test
+    fun statusStreamSanitizesFailuresAndDoesNotConvertCancellationToAnUpdate() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations, emptyFlow())
+        operations.statusFlow = flow { throw IllegalStateException("secret-status-url") }
+        val failure = assertIs<WalletBridgeCredentialStatusUpdate.Failure>(bridge.credentialStatuses.first())
+        assertEquals(WalletBridgeErrorCategory.internalFailure, failure.error.category)
+        assertEquals("Credential status observation failed", failure.error.message)
+        operations.statusFlow = flow { throw CancellationException("owner ended") }
+        assertFailsWith<CancellationException> { bridge.credentialStatuses.first() }
+    }
+
+    @Test
     fun bridgeExposesCommonMobileWalletEvents() = runTest {
         val events = MutableSharedFlow<MobileWalletEvent>(replay = 1)
         val bridge = WalletSdkBridge.forOperations(
@@ -675,6 +735,12 @@ class WalletSdkBridgeTest {
             private set
         var cancelledIssuanceSessionId: String? = null
             private set
+        var rejectedIssuedCredentialNotificationId: String? = null
+            private set
+        var rejectedIssuedCredentialAccessToken: String? = null
+            private set
+        var rejectedIssuedCredentialIssuer: String? = null
+            private set
         override suspend fun keyUseAuthorizationPreflight(
             keyType: MobileWalletKeyType,
             policy: KeyUseAuthorizationPolicy,
@@ -708,8 +774,31 @@ class WalletSdkBridgeTest {
 
         override suspend fun listDeferredIssuance(): List<id.walt.wallet2.handlers.WalletIssuanceContinuation> = emptyList()
 
+        override suspend fun rejectIssuedCredential(
+            notificationId: String,
+            accessToken: String,
+            credentialIssuerBaseUrl: String?,
+            notificationEndpoint: String?,
+            eventDescription: String?,
+        ) {
+            rejectedIssuedCredentialNotificationId = notificationId
+            rejectedIssuedCredentialAccessToken = accessToken
+            rejectedIssuedCredentialIssuer = credentialIssuerBaseUrl ?: notificationEndpoint
+        }
+
         override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
             error("Not used by this test fake")
+
+        override suspend fun credentialReads(): List<MobileWalletCredentialRead> = credentials().map {
+            MobileWalletCredentialRead(it, CredentialStatus.references(), Clock.System.now().toString())
+        }
+        var statusFlow: Flow<WalletCredentialStatusSnapshot> = emptyFlow()
+        override val credentialStatuses: Flow<WalletCredentialStatusSnapshot>
+            get() = statusFlow
+        override suspend fun credentialStatusSnapshot(): WalletCredentialStatusSnapshot =
+            WalletCredentialStatusSnapshot(Clock.System.now(), emptyList())
+        override suspend fun refreshCredentialStatuses(credentialIds: List<String>?, mode: CredentialStatusRefreshMode): List<CredentialStatusRefreshResult> = emptyList()
+        override suspend fun close() = Unit
 
         override suspend fun credentials(): List<MobileWalletCredential> =
             listOf(

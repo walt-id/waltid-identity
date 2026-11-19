@@ -6,6 +6,12 @@ import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.credentials.status.CredentialStatusCoverage
+import id.walt.credentials.status.CredentialStatusFreshness
+import id.walt.credentials.status.CredentialStatusIssue
+import id.walt.credentials.status.CredentialStatusKind
+import id.walt.credentials.status.StatusMeaning
+import id.walt.credentials.status.StatusProtocol
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -20,6 +26,8 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.handlers.WalletIssuanceMetadataProvenance
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.status.CredentialStatusRefreshMode
+import id.walt.wallet2.status.CredentialStatusRefreshOutcome
 import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
@@ -59,6 +67,7 @@ import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -126,22 +135,27 @@ class MobileWalletIntegrationTest {
     @Test
     fun receiveEudiPidSdJwtFromEudi() = runBlocking {
         val client = createEudiWallet(
-            MobileWalletConfig(defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+            walletConfig("eudi-pid-status")
         )
-        client.signingIdentity.initialize().activeIdentity()
+        try {
+            client.signingIdentity.initialize().activeIdentity()
 
-        val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
-        val session = client.startIssuance(
-            MobileWalletIssuanceRequest(
-                offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
+            val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
+            val session = client.startIssuance(
+                MobileWalletIssuanceRequest(
+                    offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
+                )
             )
-        )
-        assertTrue(session.offer.issuer.identifier.isNotBlank(), "Resolved issuer metadata should include its identifier")
-        assertTrue(session.offer.credentials.isNotEmpty(), "Offer should resolve credential metadata")
-        assertTrue(session.offer.credentials.all { it.configurationId.isNotBlank() && it.format.isNotBlank() })
-        assertNotNull(session.offer.transactionCode, "EUDI offer should require a transaction code")
-        val credentialIds = client.continuePreAuthorizedIssuance(session.id, offer.txCode).storedCredentialIds()
-        assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
+            assertTrue(session.offer.issuer.identifier.isNotBlank(), "Resolved issuer metadata should include its identifier")
+            assertTrue(session.offer.credentials.isNotEmpty(), "Offer should resolve credential metadata")
+            assertTrue(session.offer.credentials.all { it.configurationId.isNotBlank() && it.format.isNotBlank() })
+            assertNotNull(session.offer.transactionCode, "EUDI offer should require a transaction code")
+            val credentialIds = client.continuePreAuthorizedIssuance(session.id, offer.txCode).storedCredentialIds()
+            assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
+            client.checkEudiPidStatus(credentialIds)
+        } finally {
+            client.close()
+        }
     }
 
     @Test
@@ -424,17 +438,53 @@ class MobileWalletIntegrationTest {
         val walletConfig = walletConfig("eudi-pid-sd-jwt-persistence")
 
         val client1 = createEudiWallet(walletConfig)
-        client1.signingIdentity.initialize().activeIdentity()
-
-        val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
-        client1.receiveCredential(
-            offerUrl = offer.offerUrl,
-            transactionCode = offer.txCode,
-        )
-
+        val (ids, checkedAt) = try {
+            client1.signingIdentity.initialize().activeIdentity()
+            val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
+            val ids = client1.receiveCredential(offer.offerUrl, offer.txCode)
+            client1.checkEudiPidStatus(ids)
+            ids to client1.credentialStatusSnapshot().credentials.associate {
+                it.reference.credentialId to assertNotNull(it.presentation.lastCheckedAt)
+            }
+        } finally {
+            client1.close()
+        }
         val client2 = createEudiWallet(walletConfig)
-        val credentials = client2.credentials()
-        assertTrue(credentials.isNotEmpty(), "Credentials should persist across client recreation")
+        try {
+            val credentials = client2.credentials()
+            assertEquals(ids.toSet(), credentials.map { it.id }.toSet(), "The issued credentials must survive recreation")
+            val restored = client2.credentialStatusSnapshot().credentials
+            assertEquals(ids.toSet(), restored.map { it.reference.credentialId }.toSet())
+            restored.forEach {
+                assertEquals(checkedAt.getValue(it.reference.credentialId), it.presentation.lastCheckedAt)
+                assertEquals(CredentialStatusFreshness.STALE, it.presentation.freshness, "Restored evidence is historical until authenticated again")
+            }
+            client2.checkEudiPidStatus(ids)
+            client2.credentialStatusSnapshot().credentials.forEach {
+                assertTrue(assertNotNull(it.presentation.lastCheckedAt) > assertNotNull(checkedAt.getValue(it.reference.credentialId)))
+            }
+        } finally {
+            client2.close()
+        }
+    }
+
+    private suspend fun MobileWallet.checkEudiPidStatus(ids: List<String>) {
+        val results = refreshCredentialStatuses(ids, CredentialStatusRefreshMode.FORCE)
+        assertEquals(ids.toSet(), results.map { it.reference.credentialId }.toSet())
+        results.forEach { assertEquals(CredentialStatusRefreshOutcome.COMPLETED, it.outcome) }
+        val records = credentialStatusSnapshot().credentials.filter { it.reference.credentialId in ids }
+        assertEquals(ids.size, records.size)
+        records.forEach { record ->
+            val status = record.presentation
+            assertEquals(CredentialStatusKind.CHECKED, status.kind, "EUDI PID must have authenticated status, not merely a completed attempt")
+            assertEquals(CredentialStatusFreshness.FRESH, status.freshness)
+            assertEquals(CredentialStatusCoverage.COMPLETE, status.coverage)
+            assertEquals(CredentialStatusIssue.NONE, status.issue)
+            assertNull(status.failure)
+            assertNotNull(status.lastCheckedAt)
+            assertEquals(StatusProtocol.TOKEN_STATUS_LIST, status.references.single().protocol)
+            assertEquals(StatusMeaning.CLEAR, status.references.single().result)
+        }
     }
 
     private fun walletConfig(

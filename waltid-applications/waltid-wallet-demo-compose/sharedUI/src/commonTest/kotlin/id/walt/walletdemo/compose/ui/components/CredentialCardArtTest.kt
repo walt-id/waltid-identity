@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.ui.components
 
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
 import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
+import androidx.compose.ui.unit.dp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

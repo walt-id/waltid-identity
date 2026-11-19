@@ -579,14 +579,32 @@ class Issuer2SharedCredentialStatusTest {
             requests.first().credentialIdentifier, fixture.twoProofs(resolved, configurationId),
         ))
         assertEquals(HttpStatusCode.OK, fixedResponse.status, fixedResponse.bodyAsText())
-        assertStatuses(fixedResponse.body(), "dc+sd-jwt", fixed.runtimeOverrides!!.credentialStatus!!)
+        val fixedCredentialResponse = fixedResponse.body<JsonObject>()
+        assertStatuses(fixedCredentialResponse, "dc+sd-jwt", fixed.runtimeOverrides!!.credentialStatus!!)
         assertNull(fixture.repository.get(offer.offerId)!!.credentialStatusIssuance!!.leaseId)
+        val notificationId = fixedCredentialResponse.getValue("notification_id")
+        val allocationClaim = assertNotNull(sessions.claimCredentialStatusSession(offer.offerId))
+        val reported = fixture.client.post(assertNotNull(resolved.issuerMetadata.notificationEndpoint)) {
+            bearerAuth(token.access_token)
+            contentType(ContentType.Application.Json)
+            setBody(buildJsonObject {
+                put("notification_id", notificationId)
+                put("event", "credential_accepted")
+            })
+        }
+        assertEquals(HttpStatusCode.NoContent, reported.status, reported.bodyAsText())
+        sessions.releaseCredentialStatusSession(allocationClaim)
+
         val allocatedResponse = fixture.issue(resolved, token.access_token, credentialRequestByIdentifier(
             requests.last().credentialIdentifier, fixture.twoProofs(resolved, configurationId),
         ))
         assertEquals(HttpStatusCode.OK, allocatedResponse.status, allocatedResponse.bodyAsText())
         assertPreallocatedStatuses(allocatedResponse.body(), "dc+sd-jwt",
             preallocated.runtimeOverrides!!.credentialStatus!!.jsonArray.take(2))
+        val storedReport = fixture.repository.get(offer.offerId)!!.issuanceResults
+            .getValue(requests.first().credentialIdentifier).walletNotification
+        assertEquals(notificationId.jsonPrimitive.content, storedReport?.notificationId)
+        assertEquals("credential_accepted", storedReport?.event?.wireValue)
     }
 
     private fun assertPreallocatedStatuses(response: JsonObject, format: String, expected: List<JsonElement>) {
@@ -823,12 +841,15 @@ class Issuer2SharedCredentialStatusTest {
         private val raw = InMemoryPersistence<String>(discriminator, 5.minutes)
         override fun get(id: String) = raw[id]?.let(IssuanceSessionStorageCodec::decode)
         override fun getAndRemove(id: String) = raw.getAndRemove(id)?.let(IssuanceSessionStorageCodec::decode)
-        override fun compareAndSet(id: String, expected: IssuanceSession?, replacement: IssuanceSession, ttl: Duration?): Boolean {
-            beforeCompareAndSet(expected, replacement)
-            return raw.compareAndSet(id, expected?.let { Json.encodeToString(it) }, Json.encodeToString(replacement), ttl)
-        }
         override fun set(id: String, value: IssuanceSession) = set(id, value, null)
         override fun set(id: String, value: IssuanceSession, ttl: Duration?) = raw.set(id, Json.encodeToString(value), ttl)
+        override fun compareAndSet(id: String, expected: IssuanceSession?, replacement: IssuanceSession, ttl: Duration?): Boolean {
+            val stored = raw[id]
+            val current = stored?.let(IssuanceSessionStorageCodec::decode)
+            if (Json.encodeToString(current) != Json.encodeToString(expected)) return false
+            beforeCompareAndSet(expected, replacement)
+            return raw.compareAndSet(id, stored, Json.encodeToString(replacement), ttl)
+        }
         override fun remove(id: String) = raw.remove(id)
         override fun contains(id: String) = id in raw
         override fun listAllKeys() = raw.listAllKeys()

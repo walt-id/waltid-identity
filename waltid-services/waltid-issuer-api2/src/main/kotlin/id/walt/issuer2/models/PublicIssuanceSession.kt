@@ -1,10 +1,13 @@
 package id.walt.issuer2.models
 
+import id.walt.issuer2.domain.IssuanceResult
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.CredentialStatusConfiguration
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.mapSerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.builtins.nullable
@@ -16,13 +19,28 @@ import kotlinx.serialization.json.*
 @Serializable(with = PublicIssuanceSessionSerializer::class)
 data class PublicIssuanceSession(val session: IssuanceSession)
 
+private val publicIssuanceResultDescriptor: SerialDescriptor =
+    buildClassSerialDescriptor("id.walt.issuer2.models.PublicIssuanceResult") {
+        val result = IssuanceResult.serializer().descriptor
+        for (index in 0 until result.elementsCount) {
+            val name = result.getElementName(index)
+            if (name != "walletNotification") element(name, result.getElementDescriptor(index), isOptional = result.isElementOptional(index))
+        }
+        element("walletNotificationId", String.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationEvent", NotificationEvent.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationEventDescription", String.serializer().nullable.descriptor, isOptional = true)
+    }
+
 val multiIssuanceSessionDescriptor: SerialDescriptor =
     buildClassSerialDescriptor("id.walt.issuer2.models.MultiIssuanceSession") {
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name !in setOf("deferredState", "credentialStatusIssuance"))
-                element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
+            if (name !in setOf("deferredState", "issuanceClaimId", "credentialStatusIssuance")) element(
+                name,
+                if (name == "issuanceResults") mapSerialDescriptor(String.serializer().descriptor, publicIssuanceResultDescriptor) else session.getElementDescriptor(index),
+                isOptional = session.isElementOptional(index),
+            )
         }
     }
 
@@ -32,7 +50,7 @@ val singleIssuanceSessionDescriptor: SerialDescriptor =
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState", "credentialStatusIssuance"))
+            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState", "issuanceClaimId", "credentialStatusIssuance"))
                 element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
         }
         val request = id.walt.issuer2.domain.IssuanceRequest.serializer().descriptor
@@ -46,6 +64,9 @@ val singleIssuanceSessionDescriptor: SerialDescriptor =
         }
         element("expectedCredentialProofKeyJwk", JsonObject.serializer().nullable.descriptor, isOptional = true)
         element("issuedCredentialFormat", String.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationId", String.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationEvent", NotificationEvent.serializer().nullable.descriptor, isOptional = true)
+        element("walletNotificationEventDescription", String.serializer().nullable.descriptor, isOptional = true)
     }
 
 object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
@@ -62,6 +83,7 @@ object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
 fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
     val encoded = JsonObject(json.encodeToJsonElement(this).jsonObject - buildSet {
         add("deferredState")
+        add("issuanceClaimId")
         add("credentialStatusIssuance")
         if (deferredStatus == null) add("deferredStatus")
     })
@@ -70,9 +92,22 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
         return if (CredentialStatusConfiguration.isPreallocated(request.credentialStatus))
             JsonObject(value - "credentialStatus") else value
     }
-    if (issuanceRequests.size != 1) return JsonObject(encoded + (
-        "issuanceRequests" to JsonArray(issuanceRequests.map(::publicRequest))
-    ))
+    if (issuanceRequests.size != 1) {
+        val publicRequests = JsonObject(encoded + ("issuanceRequests" to JsonArray(issuanceRequests.map(::publicRequest))))
+        val results = encoded["issuanceResults"] as? JsonObject ?: return publicRequests
+        return JsonObject(publicRequests + ("issuanceResults" to JsonObject(results.mapValues { (identifier, value) ->
+            val fields = (value.jsonObject - "walletNotification").toMutableMap()
+            val notification = issuanceResults[identifier]?.walletNotification
+            fun putNotificationField(name: String, value: String?) {
+                if (value != null) fields[name] = JsonPrimitive(value)
+                else if (json.configuration.encodeDefaults && json.configuration.explicitNulls) fields[name] = JsonNull
+            }
+            putNotificationField("walletNotificationId", notification?.notificationId)
+            putNotificationField("walletNotificationEvent", notification?.event?.wireValue)
+            putNotificationField("walletNotificationEventDescription", notification?.eventDescription)
+            JsonObject(fields)
+        })))
+    }
     val request = issuanceRequests.single()
     val fields = encoded.toMutableMap()
     fields.keys.removeAll(setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
@@ -93,5 +128,9 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
     if (format != null) fields["issuedCredentialFormat"] = JsonPrimitive(format)
     else if (json.configuration.encodeDefaults && json.configuration.explicitNulls) fields["issuedCredentialFormat"] =
         JsonNull
+    val result = issuanceResults[request.credentialIdentifier]
+    result?.walletNotification?.notificationId?.let { fields["walletNotificationId"] = JsonPrimitive(it) }
+    result?.walletNotification?.event?.let { fields["walletNotificationEvent"] = JsonPrimitive(it.wireValue) }
+    result?.walletNotification?.eventDescription?.let { fields["walletNotificationEventDescription"] = JsonPrimitive(it) }
     return JsonObject(fields)
 }

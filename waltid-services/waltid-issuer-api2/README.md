@@ -40,7 +40,7 @@ Before launch, verify that unauthenticated callers cannot create offers or read 
 
 ## Features
 
-- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, and credential endpoints
+- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, credential, and notification endpoints
 - **Credential profiles** — Configurable issuance profiles in `issuer2-profiles.conf`
 - **Metadata endpoints** — Credential issuer, authorization server, JWT VC issuer, JWKS, and VCT metadata
 - **Grant types** — Pre-authorized code and authorization code flows
@@ -81,6 +81,8 @@ deployments read this variable from the `client-secret` key of the
 `issuer2-keycloak` Secret in their namespace.
 
 The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
+
+Issuer metadata always advertises `notification_endpoint`, and successful credential responses that contain credentials include `notification_id`. `POST /openid4vci/notification` accepts `credential_accepted`, `credential_failure`, and `credential_deleted` with the same access token. The session stores a notification ID and the latest wallet event for each issued credential.
 
 `ciTokenStoredKey` optionally carries an encoded crypto2 `StoredKey` sidecar for `ciTokenKey` and takes precedence at startup. The service validates that both values identify the same signing and verification key. If the sidecar is absent, a legacy JWK is migrated only in memory; the configuration file is never rewritten. A malformed or mismatched sidecar fails startup without falling back to `ciTokenKey`.
 
@@ -435,6 +437,7 @@ the first item's credential references index 94567 and the second item's credent
 | `POST` | `/openid4vci/token` | Token endpoint |
 | `POST` | `/openid4vci/nonce` | Nonce endpoint |
 | `POST` | `/openid4vci/credential` | Credential endpoint |
+| `POST` | `/openid4vci/notification` | Wallet notification endpoint |
 
 ## Issuance Lifecycle Events
 
@@ -455,6 +458,9 @@ Issuer sessions publish the same `KtorSessionUpdate` envelope to SSE and to an o
 | W3C VC credential request | `credential_request_w3c_vc_succeeded`, `credential_request_w3c_vc_failed` |
 | mdoc credential request | `credential_request_mso_mdoc_succeeded`, `credential_request_mso_mdoc_failed` |
 | Session lifecycle | `issuance_status_changed` |
+| Wallet result | `wallet_credential_accepted`, `wallet_credential_failure`, `wallet_credential_deleted` |
+
+A wallet notification is published on the offer webhook and the issuer SSE stream only when the stored event or description changes. It does not change the issuance status. `credential_request_*_succeeded` still means the issuer issued the credential.
 
 Kotlin enum constants are `SCREAMING_SNAKE_CASE`; webhook and SSE payloads use the lowercase `value` strings above.
 

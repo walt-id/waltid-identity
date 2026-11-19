@@ -3,16 +3,11 @@ package id.walt.issuer2.testsupport
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.sdjwt.SDJwt
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonElement
@@ -42,13 +37,9 @@ suspend fun assertSessionStatus(
     sessionId: String,
     expectedStatus: String,
 ) {
-    val response = client.get("/issuer2/sessions/$sessionId")
-    assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
-
-    // ACTIVE is the default enum value and is omitted from JSON when encodeDefaults=false.
-    // Decode the session so Kotlin serialization applies the same default the service uses.
-    val session = response.bodyAsText().let(IssuanceSessionStorageCodec::decode)
-    assertEquals(expectedStatus, session.status.name)
+    // Public session JSON uses flat notification fields; getSession maps them onto the stored model
+    // (and restores ACTIVE, which encodeDefaults=false omits).
+    assertEquals(expectedStatus, client.getSession(sessionId).status.name)
 }
 
 fun assertJwtVcJsonCredentialPayload(credentialPayload: JsonObject): String {

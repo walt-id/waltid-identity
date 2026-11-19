@@ -5,7 +5,10 @@ import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotification
 import id.walt.sdjwt.SDMap
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
@@ -47,6 +50,7 @@ data class IssuanceRequest(
 @Serializable
 data class IssuanceResult(
     val issuedCredentialFormat: String,
+    val walletNotification: IssuedCredentialNotification? = null,
 )
 
 @Serializable
@@ -69,6 +73,10 @@ data class IssuanceSession(
     val authorizedCredentialIdentifiers: List<String>? = null,
     val deferredStatus: id.walt.openid4vci.deferred.DeferredStatus? = null,
     val deferredState: id.walt.openid4vci.deferred.DeferredIssuanceState? = null,
+    /** Ownership of an immediate credential request while the session remains visible to notifications. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    internal val issuanceClaimId: String? = null,
     /** Private checkpoints for immediate issuance with preallocated credential status. */
     val credentialStatusIssuance: CredentialStatusIssuanceState? = null,
 ) {

@@ -82,6 +82,46 @@ should use `engine { configureSession { URLCache = null } }`; a custom `URLSessi
 should set `configuration.urlCache = nil` before creating the session. A request
 policy that ignores cached responses does not prevent storing new response bodies.
 
+## Credential status
+
+Status reads are local. Use `credentialReads()` for composed credential/status data or
+`credentialStatuses` for status-only updates. Observe without rebuilding credential artwork:
+
+```kotlin
+val observation = scope.launch {
+    wallet.credentialStatuses.collect { snapshot -> renderStatus(snapshot) }
+}
+// App-owned foreground check: reuse authenticated evidence while it is fresh.
+val foreground = wallet.refreshCredentialStatuses()
+// A user-requested check requires revalidation.
+val manual = wallet.refreshCredentialStatuses(
+    credentialIds = listOf(credentialId),
+    mode = CredentialStatusRefreshMode.FORCE,
+)
+observation.cancel()
+wallet.close() // Cancels owned work; does not delete wallet data.
+```
+
+`scope`, `renderStatus` and `credentialId` belong to your app. Import
+`id.walt.wallet2.status.CredentialStatusRefreshMode`. Inspect per-credential outcomes and use the
+snapshot's shared `presentation` for wording, coverage, freshness and consent revisions.
+A previous result after a failed check, no status, unchecked and unsupported are not all-clear.
+Reads, matching, opening review facts and submitting never trigger issuer status checks. An app can
+offer explicit refresh inside an online review: keep its selection and prior evidence, wait only for
+that review's requested operation, render the result/error, then require a new deliberate submit
+with the displayed revisions. Cancel the old UI interest on lock, disposal or request/wallet replacement;
+do not apply its late result to a successor review. Provider/nearby hosts need no additional networking.
+The app owns preferences and
+foreground/manual scheduling; the SDK installs no background worker. The snapshot
+`nextRefreshAt` supports an app-owned timer while active. Cancel it during lock, background and consent,
+and use bounded retry spacing for a past due time.
+
+Managed persistence retains only minimal last-known metadata. Default mobile snapshots restore as
+historical/stale evidence after reopen; a refresh re-establishes current evidence. No-store results
+are not persisted. Custom stores need the optional shared snapshot-store capability for durability.
+See [credential-status profiles, trust hooks, cache rules and lifecycle](../../credentials/waltid-credential-status/README.md)
+and the Swift [credential-status guide](../waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/CheckingCredentialStatus.md).
+
 ## Receiving credentials
 
 When an issuer advertises `key_attestations_required`, attach an application-supplied
@@ -121,6 +161,12 @@ val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode)
 val credentialIds = (outcome as? WalletIssuanceOutcome.Stored)?.credentialIds
     ?: error("Issuance did not store credentials: $outcome")
 ```
+
+Continuing a session posts OpenID4VCI `credential_accepted` when the issuer
+advertised a notification endpoint. After an isolated fetch that left
+`storeInWallet` false, call `wallet.rejectIssuedCredential(...)` to post
+`credential_deleted` instead of storing the credential. Offer-level
+`cancelIssuance` has no `notification_id` yet.
 
 `MobileWalletCredentialOffer.Uri` is used for deep-link / QR offers.
 `MobileWalletCredentialOffer.InlineJson` is the Credential Offer object from an
@@ -216,6 +262,13 @@ when (val encryption = preview.request.responseEncryption) {
 
 Response-encryption metadata describes protection of the authorization response. It
 does not establish verifier trust and does not expose verifier key material.
+
+In the effective review returned by `reviewPresentation` or `reviewDigitalCredentialPresentation`,
+a location with `isBinary` identifies an mdoc byte string. Its value in `claimsJson` is an
+unpadded base64url string and has one claim location. Use the flag to display it as binary data
+and use the source path for its label and selection information.
+Effective mdoc review paths follow the signed CBOR structure. Display serializers can still
+format the stored credential view.
 
 ### TS-12 payment consent
 

@@ -5,7 +5,6 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.issuer2Module
-import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferCreateRequest
@@ -18,6 +17,7 @@ import id.walt.issuer2.testsupport.assertBearerAccessToken
 import id.walt.issuer2.testsupport.assertJwtVcJsonCredentialPayload
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.createCredentialOffer
+import id.walt.issuer2.testsupport.getSession
 import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
 import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.installIssuer2AuthenticationForTests
@@ -484,7 +484,7 @@ class IssuanceNotificationRouteTest {
                 },
             )
 
-            val storedSession = client.get("/issuer2/sessions/${createdOffer.offerId}").bodyAsText().let(IssuanceSessionStorageCodec::decode)
+            val storedSession = client.getSession(createdOffer.offerId)
             assertEquals(IssuanceSessionStatus.ACTIVE, storedSession.status)
             assertEquals(false, storedSession.isClosed)
             assertNull(storedSession.failure)

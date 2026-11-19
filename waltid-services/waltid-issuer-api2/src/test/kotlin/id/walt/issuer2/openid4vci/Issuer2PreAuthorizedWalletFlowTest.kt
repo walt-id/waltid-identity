@@ -855,8 +855,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
                 "given_name" to "John",
             ),
         )
-        // Claiming removes the session while the credential is built, so the losing request cannot
-        // resolve it and is rejected as an unusable access token instead of receiving a credential.
+        // A competing Credential Request is rejected while the first request owns issuance.
         val rejected = responses.single { it.status == HttpStatusCode.Unauthorized }
         val rejectedBody = rejected.body<JsonObject>()
         assertEquals(OAuthErrorCodes.INVALID_TOKEN, rejectedBody["error"]?.jsonPrimitive?.content)
