@@ -105,7 +105,7 @@ class ItbPortalBridge(
     override suspend fun readNext(session: ItbSession): ItbWalletInteraction {
         val dialog = dialog()
         val interaction = dialog.getByText(Pattern.compile(
-            "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request)\\s*$",
+            "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request|Prepare offer and invoke wallet for PID issuance)\\s*$",
         ))
         val portalError = page.getByText("Unexpected Error", Page.GetByTextOptions().setExact(true))
         // Some reference-service starts take longer than the ordinary 15-second DOM timeout.
@@ -131,6 +131,7 @@ class ItbPortalBridge(
             text.contains("VP request") -> ItbWalletInteraction.Presentation(
                 Url(ItbPresentationQr.decode(download(row("Credential QR code")))),
             )
+            text.contains(ISSUANCE_LABEL) -> parseDigitalIssuance(preview(ISSUANCE_LABEL))
             text.contains("TS12 payment Digital Credentials API presentation request") -> parseDigitalCredentials(
                 preview("TS12 payment Digital Credentials API presentation request"),
             )
@@ -215,14 +216,26 @@ class ItbPortalBridge(
     companion object {
         internal const val APPLICATION_READY_TIMEOUT_MILLIS = 60_000.0
 
+        private const val ISSUANCE_LABEL = "Prepare offer and invoke wallet for PID issuance"
+
+        internal fun parseDigitalIssuance(script: String): ItbWalletInteraction.DigitalIssuance =
+            ItbWalletInteraction.DigitalIssuance(
+                Url(string(script, "offerEndpoint")), string(script, "scenario"),
+                string(script, "credentialType"), string(script, "protocol"),
+            ).also {
+                require(it.scenario == "pid-authorization-code" && it.credentialType == "urn:eu.europa.ec.eudi:pid:1" &&
+                    it.protocol == "openid4vci-v1") { "Unexpected CS-07 DC API issuance profile" }
+            }
+
+        private fun string(script: String, name: String): String {
+            val matches = Regex("\\b(?:const|let|var)\\s+${Regex.escape(name)}\\s*=\\s*[\"']([^\"'\\r\\n]+)[\"']\\s*;")
+                .findAll(script).toList()
+            require(matches.size == 1) { "The deployed DC API interaction has no unique $name" }
+            return matches.single().groupValues[1]
+        }
+
         /** Read only the deployed script's declarative inputs; never execute supplied JavaScript in the wallet. */
         internal fun parseDigitalCredentials(script: String): ItbWalletInteraction.DigitalCredentials {
-            fun string(name: String): String {
-                val matches = Regex("\\b(?:const|let|var)\\s+${Regex.escape(name)}\\s*=\\s*[\"']([^\"'\\r\\n]+)[\"']\\s*;")
-                    .findAll(script).toList()
-                require(matches.size == 1) { "The deployed DC API interaction has no unique $name" }
-                return matches.single().groupValues[1]
-            }
             val payment = if (Regex("\\b(?:const|let|var)\\s+attestationType\\s*=").containsMatchIn(script)) {
                 fun literal(name: String): String {
                     val matches = Regex("\\b${Regex.escape(name)}\\s*:\\s*[\"']([^\"'\\r\\n]+)[\"']")
@@ -231,14 +244,14 @@ class ItbPortalBridge(
                     return matches.single().groupValues[1]
                 }
                 ItbWalletInteraction.Payment(
-                    string("attestationType"), literal("merchant"), literal("payee_id"),
+                    string(script, "attestationType"), literal("merchant"), literal("payee_id"),
                     literal("currency"), literal("amount"), literal("transaction_id"),
                 )
             } else null
             return ItbWalletInteraction.DigitalCredentials(
-                Url(string(if (payment == null) "presentationRequestEndpoint" else "requestEndpoint")),
-                string(if (payment == null) "validationSessionId" else "sessionId"),
-                string("profile"), string("dcApiProtocol"), payment,
+                Url(string(script, if (payment == null) "presentationRequestEndpoint" else "requestEndpoint")),
+                string(script, if (payment == null) "validationSessionId" else "sessionId"),
+                string(script, "profile"), string(script, "dcApiProtocol"), payment,
             )
         }
     }

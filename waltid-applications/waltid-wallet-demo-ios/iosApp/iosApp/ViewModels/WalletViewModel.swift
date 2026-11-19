@@ -30,6 +30,8 @@ private struct WalletStatusBannerModel {
 private enum WalletDeepLinkScheme: String {
     case credentialOffer = "openid-credential-offer"
     case presentationRequest = "openid4vp"
+    case eaapPresentationRequest = "eu-eaap"
+    case haipPresentationRequest = "haip-vp"
     case authorizationCallback = "openid"
 }
 
@@ -1038,7 +1040,8 @@ class WalletViewModel: ObservableObject {
         logE2E("Deep link received: \(url.scheme ?? "unknown")")
         switch (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:)) {
         case .credentialOffer: openResolvedLink(url, kind: .offer)
-        case .presentationRequest: openResolvedLink(url, kind: .presentation)
+        case .presentationRequest, .eaapPresentationRequest, .haipPresentationRequest:
+            openResolvedLink(url, kind: .presentation)
         case .authorizationCallback: continueAuthorization(callbackURI: url)
         case nil:
             if WalletLinkKind.classify(url.absoluteString) == .authorizationCallback {

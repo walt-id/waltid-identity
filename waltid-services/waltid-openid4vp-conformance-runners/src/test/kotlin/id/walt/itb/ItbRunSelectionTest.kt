@@ -9,15 +9,15 @@ class ItbRunSelectionTest {
     fun defaultSelectionIncludesEverySelectedCase() {
         assertEquals("https://dev-i4mlab.aegean.gr", catalogue.origin.toString().trimEnd('/'))
         val selected = ItbRunSelection.select(catalogue, null)
-        assertEquals(mapOf("cs01v1" to 7, "cs02v1" to 7, "cts07" to 1, "cs10-test-suite" to 2, "ts12" to 9),
+        assertEquals(mapOf("cs01v1" to 7, "cs02v1" to 7, "cts07" to 1, "ts12" to 9),
             selected.groupingBy { it.first.id }.eachCount())
-        assertEquals(26, selected.size)
+        assertEquals(24, selected.size)
     }
 
     @Test
     fun unattendedSelectionIncludesOnlyCasesWithoutUserAuthentication() {
         val selected = ItbRunSelection.select(catalogue, null, unattendedOnly = true)
-        assertEquals(mapOf("cs01v1" to 7, "cs02v1" to 7, "cts07" to 1, "cs10-test-suite" to 2, "ts12" to 3),
+        assertEquals(mapOf("cs01v1" to 7, "cs02v1" to 7, "cts07" to 1, "ts12" to 3),
             selected.groupingBy { it.first.id }.eachCount())
         assertTrue(selected.none { it.second.id.startsWith("ts12_pay_") })
     }
@@ -43,7 +43,9 @@ class ItbRunSelectionTest {
     @Test
     fun duplicateCaseIdsRequireQualificationAndDoNotSharePrerequisitesOrCiEligibility() {
         val presentation = catalogue.suites.single { it.id == "cs02v1" }
-        val parallelSuite = presentation.copy(id = "another-suite")
+        val parallelSuite = presentation.copy(id = "another-suite", cases = presentation.cases.map {
+            it.copy(prerequisite = null, attended = true)
+        })
         val inventory = catalogue.copy(suites = catalogue.suites + parallelSuite)
 
         assertFailsWith<IllegalArgumentException> { ItbRunSelection.select(inventory, "tc_vp_007") }
@@ -63,6 +65,15 @@ class ItbRunSelectionTest {
         assertEquals(listOf("tc_vci_006", "tc_vp_011", "tc_vp_012", "tc_vp_013"), selected.map { it.second.id })
         assertEquals(listOf(null, "openid4vp", "eu-eaap", "haip-vp"), selected.map { it.second.invocationScheme })
         assertFailsWith<IllegalArgumentException> { ItbCatalogue.Case("test", "Test", "https") }
+    }
+
+    @Test
+    fun dcIssuanceRequiresTheDemoBrowserPath() {
+        assertFailsWith<IllegalArgumentException> { ItbRunSelection.select(catalogue, "cts07/tc16") }
+        assertFailsWith<IllegalArgumentException> { ItbRunSelection.select(catalogue, "rv_iss_02") }
+        val unattended = ItbRunSelection.select(catalogue, null, unattendedOnly = true, demoApp = true)
+        assertEquals(21, unattended.size)
+        assertEquals(listOf("tc15", "tc16"), unattended.filter { it.first.id == "cts07" }.map { it.second.id })
     }
 
     @Test

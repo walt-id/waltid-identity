@@ -2,13 +2,11 @@
 
 package id.walt.itb
 
-import id.walt.credentials.status.CredentialStatusKind
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.handlers.*
-import id.walt.wallet2.status.WalletCredentialStatusService
 import io.ktor.client.HttpClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
@@ -16,27 +14,6 @@ import io.ktor.http.*
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import java.time.Instant
-
-/** Session-correlated inputs supplied by the test bed, never replacement reference-service requests. */
-sealed interface ItbWalletInteraction {
-    class Offer(val url: Url, val transactionCode: String? = null) : ItbWalletInteraction
-    class RevocationOffer(val offer: Offer, val session: String, val step: ItbRevocationStep) : ItbWalletInteraction
-    class Presentation(val url: Url) : ItbWalletInteraction
-    class DigitalCredentials(
-        val endpoint: Url,
-        val validationSession: String,
-        val profile: String,
-        val protocol: String,
-        val payment: Payment? = null,
-    ) : ItbWalletInteraction
-
-    data class Payment(
-        val attestationType: String, val merchant: String, val payeeId: String,
-        val currency: String, val amount: String, val transactionId: String,
-    )
-}
-
-class ItbWalletRejection(val code: String) : IllegalStateException("The ITB wallet operation failed ($code)")
 
 /** Only allowlisted error identifiers and a bounded HTTP status can leave the verifier response. */
 internal class ItbVerifierRejection(response: JsonElement?, status: HttpStatusCode? = null) :
@@ -61,18 +38,18 @@ class ItbWalletDriver internal constructor(
 ) {
     private val paymentTypes = TransactionDataTypeRegistry("urn:eudi:sca:payment:1")
     private val redirectUri = Url("openid://")
-    private data class PendingRevocation(val session: String, val credentialId: String)
-    private var pendingRevocation: PendingRevocation? = null
-
-    suspend fun execute(interaction: ItbWalletInteraction) {
-        val previous = pendingRevocation
-        pendingRevocation = null
-        when (interaction) {
-            is ItbWalletInteraction.Offer -> receive(interaction)
-            is ItbWalletInteraction.RevocationOffer -> receiveRevocation(interaction, previous)
-            is ItbWalletInteraction.Presentation -> present(interaction)
-            is ItbWalletInteraction.DigitalCredentials -> presentDigitalCredentials(interaction)
+    suspend fun execute(interaction: ItbWalletInteraction): ItbWalletResult = when (interaction) {
+        is ItbWalletInteraction.Offer -> ItbWalletResult(issuedCredentialIds = receive(interaction))
+        is ItbWalletInteraction.Presentation -> {
+            present(interaction)
+            ItbWalletResult()
         }
+        is ItbWalletInteraction.DigitalCredentials -> {
+            presentDigitalCredentials(interaction)
+            ItbWalletResult()
+        }
+        is ItbWalletInteraction.DigitalIssuance, is ItbWalletInteraction.CheckStatus ->
+            error("This interaction requires the demo app")
     }
 
     private suspend fun receive(offer: ItbWalletInteraction.Offer): List<String> {
@@ -122,26 +99,6 @@ class ItbWalletDriver internal constructor(
         return result.credentialIds
     }
 
-    private suspend fun receiveRevocation(interaction: ItbWalletInteraction.RevocationOffer, previous: PendingRevocation?) {
-        val first = if (interaction.step == ItbRevocationStep.SECOND_SHARED) {
-            checkNotNull(previous?.takeIf { it.session == interaction.session }) {
-                "The second revocation offer has no first credential in this session"
-            }.credentialId
-        } else null
-        val id = receive(interaction.offer).singleOrNull()
-            ?: throw ItbWalletRejection("status_expected_one_credential_per_offer")
-        when (interaction.step) {
-            ItbRevocationStep.FIRST_SHARED -> pendingRevocation = PendingRevocation(interaction.session, id)
-            ItbRevocationStep.SECOND_SHARED -> WalletCredentialStatusService(wallet).use { status ->
-                checkRevocationStatus(status, listOf(checkNotNull(first), id), CredentialStatusKind.CHECKED)
-            }
-            ItbRevocationStep.ALREADY_REVOKED -> WalletCredentialStatusService(wallet).use { status ->
-                // The wallet projects IETF Token Status List value 0x01 as INVALID.
-                checkRevocationStatus(status, listOf(id), CredentialStatusKind.INVALID)
-            }
-        }
-    }
-
     private suspend fun present(interaction: ItbWalletInteraction.Presentation) {
         val preview = WalletPresentationHandler.previewPresentationWithTrust(
             wallet, PreviewPresentationRequest(interaction.url),
@@ -151,7 +108,7 @@ class ItbWalletDriver internal constructor(
         usePreview(discard = { WalletPresentationHandler.discardPreview(wallet, preview.handle) }) {
             if (preview is PreviewPresentationResult.Invalid) throw ItbWalletRejection(preview.error.code.code)
             check(preview is PreviewPresentationResult.Ready)
-            val selection = select(preview.credentialOptions, preview.credentialRequirements)
+            val selection = select(preview.credentialOptions, preview.credentialRequirements, interaction.credentialId)
             val result = WalletPresentationHandler.submitPresentation(
                 wallet, SubmitPresentationRequest(preview.handle, selection),
                 transactionDataTypeRegistry = paymentTypes,
@@ -166,18 +123,7 @@ class ItbWalletDriver internal constructor(
         val response = client.post(interaction.endpoint) {
             header(HttpHeaders.Origin, trustedOrigin.toString().trimEnd('/'))
             contentType(ContentType.Application.Json)
-            setBody(buildJsonObject {
-                put("profile", interaction.profile)
-                put("sessionId", interaction.validationSession)
-                interaction.payment?.let {
-                    put("attestation_type", it.attestationType)
-                    put("merchant", it.merchant)
-                    put("payee_id", it.payeeId)
-                    put("currency", it.currency)
-                    put("amount", it.amount)
-                    put("transaction_id", it.transactionId)
-                }
-            }.toString())
+            setBody(interaction.descriptorRequest().toString())
         }
         check(response.status.isSuccess()) { "The ITB DC API descriptor endpoint rejected the request" }
         val descriptor = Json.parseToJsonElement(response.bodyAsText()).jsonObject
@@ -204,7 +150,7 @@ class ItbWalletDriver internal constructor(
         )
         val credential = WalletPresentationHandler.submitDcApiPresentation(
             wallet, SubmitDcApiPresentationRequest(
-                preview.requestId, select(preview.credentialOptions, preview.credentialRequirements),
+                preview.requestId, select(preview.credentialOptions, preview.credentialRequirements, interaction.credentialId),
             ),
             transactionDataTypeRegistry = paymentTypes,
             scaAuthorizer = scaAuthorizer,
@@ -260,8 +206,9 @@ class ItbWalletDriver internal constructor(
         internal fun select(
             options: List<PresentationCredentialOption>,
             requirements: List<PresentationCredentialRequirement>,
+            credentialId: String? = null,
         ): List<PresentationCredentialSelection> {
-            val byQuery = options.groupBy { it.queryId }
+            val byQuery = options.filter { credentialId == null || it.credentialId == credentialId }.groupBy { it.queryId }
             val queries = requirements.flatMap { requirement ->
                 requirement.options.firstOrNull { alternative -> alternative.all { it in byQuery } }
                     ?: error("No stored credentials satisfy an ITB presentation requirement")

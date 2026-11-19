@@ -30,12 +30,12 @@ class ItbDeviceWireTest {
 
     @Test
     fun `device authentication requires the exact token and protocol`() {
-        fun init(secret: String = token, version: Int = 1) = buildJsonObject {
+        fun init(secret: String = token, version: Int = ItbDeviceWire.VERSION) = buildJsonObject {
             put("token", secret); put("version", version)
         }
         ItbDeviceWire.authenticate(init(), token)
         assertFailsWith<IllegalArgumentException> { ItbDeviceWire.authenticate(init("b".repeat(64)), token) }
-        assertFailsWith<IllegalArgumentException> { ItbDeviceWire.authenticate(init(version = 2), token) }
+        assertFailsWith<IllegalArgumentException> { ItbDeviceWire.authenticate(init(version = 1), token) }
         assertFailsWith<IllegalArgumentException> { ItbDeviceWire.authenticate(init(), "short") }
     }
 
@@ -48,9 +48,10 @@ class ItbDeviceWireTest {
                 Url("https://verifier.example/descriptor"), "session", "profile", "openid4vp-v1-signed",
                 ItbWalletInteraction.Payment("sca-iban", "Merchant", "payee", "EUR", "12.95", "transaction"),
             ),
-            ItbWalletInteraction.RevocationOffer(
-                ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer_uri=https://issuer.example/second")),
-                "00000000-0000-0000-0000-000000000001", ItbRevocationStep.SECOND_SHARED,
+            ItbWalletInteraction.CheckStatus(listOf("first", "second"), ItbExpectedStatus.CLEAR),
+            ItbWalletInteraction.DigitalIssuance(
+                Url("https://issuer.example/vci/dc-api/offer"), "pid-authorization-code",
+                "urn:eu.europa.ec.eudi:pid:1", "openid4vci-v1",
             ),
         )
         inputs.forEach { input ->
@@ -91,7 +92,7 @@ class ItbDeviceWireTest {
     fun `a completed operation cannot be replayed`() = withSockets { client, server ->
         var calls = 0
         val job = async {
-            runCatching { ItbDeviceWire.serve(server) { calls++ } }
+            runCatching { ItbDeviceWire.serve(server) { calls++; ItbWalletResult() } }
         }
         ItbDeviceWire.write(client, operation(1))
         assertTrue(ItbDeviceWire.read(client).getValue("success").jsonPrimitive.boolean)
@@ -104,7 +105,10 @@ class ItbDeviceWireTest {
     fun `wallet failure returns no protocol data and permits the next case`() = withSockets { client, server ->
         var calls = 0
         val job = launch {
-            ItbDeviceWire.serve(server) { if (++calls == 1) error("secret bearer URL must not be returned") }
+            ItbDeviceWire.serve(server) {
+                if (++calls == 1) error("secret bearer URL must not be returned")
+                ItbWalletResult(issuedCredentialIds = listOf("case-credential"))
+            }
         }
         ItbDeviceWire.write(client, operation(1))
         val failure = ItbDeviceWire.read(client)
@@ -112,7 +116,10 @@ class ItbDeviceWireTest {
         assertEquals("IllegalStateException", failure.getValue("failure").jsonPrimitive.content)
         assertFalse(failure.toString().contains("secret"))
         ItbDeviceWire.write(client, operation(2))
-        assertTrue(ItbDeviceWire.read(client).getValue("success").jsonPrimitive.boolean)
+        val success = ItbDeviceWire.read(client)
+        assertTrue(success.getValue("success").jsonPrimitive.boolean)
+        assertEquals("case-credential", success.getValue("observation").jsonObject
+            .getValue("issuedCredentialIds").jsonArray.single().jsonPrimitive.content)
         client.close(); job.join()
     }
 

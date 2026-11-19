@@ -258,6 +258,15 @@ internal object WalletComposeE2EHelper {
         }
     }
 
+    fun tapStoredCard(device: UiDevice, id: String) {
+        val frame = requireNotNull(device.findObject(By.res(id))).visibleBounds
+        val lowerEdge = device.findObjects(By.res(Pattern.compile("wallet\\.credentialCard\\..*")))
+            .filter { it.resourceName != id }.map { it.visibleBounds }
+            .filter { it.top > frame.top && Rect.intersects(it, frame) }.minOfOrNull { it.top } ?: frame.bottom
+        assertTrue("The selected card needs an exposed band", lowerEdge > frame.top)
+        device.click(frame.centerX(), (frame.top + lowerEdge) / 2)
+    }
+
     fun clickByTag(device: UiDevice, tag: String) {
         val initialNode = waitForVisibleResource(device, tag, CLICK_VISIBLE_TIMEOUT)
             ?: findResourceAfterScrolling(device, tag)

@@ -1,49 +1,40 @@
 # Operator-assisted Android ITB execution
 
-The ordinary JVM runner has a software holder key and cannot supply real TS12 authentication evidence. The optional Android fixture executes the same issuance and reviewed-presentation driver on a physical phone, using a disposable, hardware-backed P-256 key. Per-use biometric authentication is the default; the optional timed mode retains a ten-second key and requests fresh biometrics for every payment proof. The native SCA adapter supplies factors only for an eligible key; successful signing is still required before releasing a proof.
+The attended path drives the actual Compose Wallet Preview Debug app on a
+physical Android phone. The operator reviews the payee and amount in the app and
+confirms the transaction with hardware-backed, per-use authentication. The test
+uses the same browser and provider entry points as the unattended runs for DC API
+interactions. The desktop retains portal and organisation credentials, ITB session
+correlation and cleanup. The installed app retains its own keys and credentials.
 
-The desktop retains the portal login, organisation API key, case/session correlation, verdict collection and cleanup. Only wallet interactions and the configured reference CA cross the device bridge. Credential storage and private-key operations stay on the phone. The bridge never exposes a generic signing operation.
+Use a dedicated test phone with a screen lock and enrolled strong biometrics.
+Initialize Chrome and select it as the browser. Build Preview Debug and its
+instrumentation APK from the same checkout as the coordinator. The Preview Debug
+trust flag pins the reference payment issuer's public signing key from
+[its published JWKS](https://dev-i4mlab.aegean.gr/rfc-issuer/.well-known/jwks.json).
+The app still verifies the issued credential and resolves its payment display
+metadata. The reference issuer accepts the [synthetic key attestation](ITB-WALLET.md)
+used for interoperability tests.
 
-This is operator-assisted protocol testing, not transaction-consent UI, browser-mediated DC API delivery, formal SCA qualification or an unattended CI mode. The iOS synthetic physical fixture is separate; this live bridge currently supports Android only.
+```bash
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebug \
+  :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebugAndroidTest \
+  -PenableAndroidBuild=true -PwalletSigningProtectionMode=required -PitbDemoPaymentTrust=true
 
-The issuer requires a wallet-provider key attestation before issuing an SCA
-credential. This test uses the runner's [synthetic attestation fixture](ITB-WALLET.md)
-to reach the payment flow. Its acceptance by the test issuer is not evidence
-of Wallet Provider assurance or certification.
+ITB_CASES=ts12_pay_01,ts12_pay_02,ts12_pay_03,ts12_pay_dc_api_01,ts12_pay_dc_api_02,ts12_pay_dc_api_03 \
+  scripts/itb/android-demo.sh attended <physical-serial>
+```
 
-## Run
+Provide the usual [ITB environment](ITB-WALLET.md#hosted-cases). Use a fresh
+Preview installation. The instrumented setup opens the usual wallet key setup.
+Follow the on-device prompts to create the hardware-backed key. For each payment,
+review the transaction and approve it on the phone. The selected payments pull in
+their issuance prerequisites, and every case reports its own exact ITB session.
 
-1. Build and install `:waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleAndroidDeviceTest` with `-PenableAndroidBuild=true`. Record the source revision, any working-tree patch, and the test APK SHA-256. Use a physical phone with strong biometrics enrolled and a screen lock. Explicitly select its ADB serial.
-2. Generate a fresh 256-bit token (`openssl rand -hex 32`). Keep it out of reports and shell tracing. Choose an unused device loopback port, for example 39143. Use `adb -s <serial> forward tcp:0 tcp:39143` and retain the returned desktop port.
-3. Start the instrumentation in a terminal that remains running:
-
-   ```sh
-   adb -s <serial> shell am instrument -w -r \
-     -e class id.walt.wallet2.mobile.ItbNativeWalletDeviceTest \
-     -e wallet.itb.port 39143 \
-     -e wallet.itb.token "$ITB_ANDROID_TOKEN" \
-     id.walt.wallet2.mobile.test/androidx.test.runner.AndroidJUnitRunner
-   ```
-
-   Add `-e wallet.itb.biometricPolicy timed` to exercise the ten-second key through
-   the production payment authorizer and signer. `per-use` remains the default.
-   Ordinary issuance uses the key's normal reuse behavior; each payment gets a
-   fresh biometric prompt after the driver's reviewed selection.
-
-4. Run the normal `itbWallet` task with its existing tenant credentials and these additional environment variables:
-
-   | Variable | Value |
-   | --- | --- |
-   | `ITB_ANDROID_PORT` | Desktop port returned by ADB forwarding |
-   | `ITB_ANDROID_TOKEN` | Same fresh token supplied to instrumentation |
-   | `ITB_ANDROID_APK_SHA256` | SHA-256 of the installed test APK |
-
-   Start with `ITB_CASES=ts12_pay_01,ts12_pay_dc_api_01`; the runner includes the issuance prerequisite. For the full operator-required set, select `ts12_pay_01,ts12_pay_02,ts12_pay_03,ts12_pay_dc_api_01,ts12_pay_dc_api_02,ts12_pay_dc_api_03`; the runner includes all three issuance prerequisites. Approve the authentication prompts for those synthetic test operations. Each case still has a 120-second limit. Do not set `CI=true` for this local run: CI selection rejects operator-required cases before starting a session.
-5. On completion, check both the normal ITB reports and instrumentation outcome. Remove the specific ADB forward and unset the temporary token. A normal channel close releases the fixture and deletes the disposable native key in `finally`. If the process is force-killed, normal cleanup cannot be guaranteed; clear only this disposable test application's data before reuse.
-
-The fixture binds only to device loopback and accepts the approved Aegean tenant origin. A fresh token authenticates the coordinator before key creation. Messages are size-bounded and strictly sequenced; disconnect cancels pending work and a broken channel is never retried. Keep the ADB transport restricted to the operator's machine. The token is a local test-channel credential, not an ITB organisation key.
-
-Reports distinguish `JVM_SOFTWARE` from `ANDROID_NATIVE` and include the operator-supplied APK digest. They require wallet success and correlated terminal ITB `SUCCESS`. The fixture uses the production wallet's issuance, request-validation and proof-generation paths; verifier rejections remain failures. A native prompt or successful signature alone is not a passing ITB case.
+Reports identify the attended demo mode and both APK digests. The optional
+`ItbNativeWalletDeviceTest` SDK fixture is also available for protocol diagnostics
+with a physical key. Historical references to that fixture cover SDK signing in
+isolation from the demo app's review screen.
 
 ## SCA-User audience compatibility
 

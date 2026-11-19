@@ -29,7 +29,14 @@ data class ItbCatalogue(
     )
 
     @Serializable
-    data class Case(val id: String, val name: String, val invocationScheme: String? = null) {
+    data class Case(
+        val id: String,
+        val name: String,
+        val invocationScheme: String? = null,
+        val prerequisite: String? = null,
+        val attended: Boolean = false,
+        val demoOnly: Boolean = false,
+    ) {
         init {
             require(invocationScheme == null || invocationScheme in setOf("openid4vp", "eu-eaap", "haip-vp")) {
                 "Unsupported ITB invocation scheme"

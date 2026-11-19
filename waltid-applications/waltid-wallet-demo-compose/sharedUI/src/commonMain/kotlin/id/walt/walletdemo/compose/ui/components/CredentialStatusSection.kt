@@ -85,7 +85,7 @@ internal fun CredentialStatusSection(credentialId: String, compact: Boolean = fa
                 Row(header.padding(start = 16.dp, end = if (disclosure || refreshVisible) 4.dp else 16.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CredentialStatusIcon(status, size = glyphSize)
-                    Text(status.title(), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(status.title(), Modifier.weight(1f).testTag("credential-status-headline-$credentialId"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 }
                 if (refreshVisible) StatusRefreshButton(credentialId)
                 if (disclosure) IconButton(onClick = toggleDisclosure, enabled = disclosureEnabled,

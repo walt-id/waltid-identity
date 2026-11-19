@@ -36,11 +36,26 @@ private suspend fun runItb(): Int {
     val catalogue = ItbCatalogue.walletCases()
     val origin = catalogue.origin
     val directory = Path.of(System.getenv("ITB_REPORT_DIR") ?: "build/reports/itb-wallet")
-    val selected = ItbRunSelection.select(catalogue, System.getenv("ITB_CASES"), unattendedOnly = System.getenv("CI") == "true")
+    val demoMode = System.getenv("ITB_ANDROID_DEMO_MODE")?.also { require(it in setOf("attended", "unattended")) }
+    val ci = System.getenv("CI") == "true"
+    require(!ci || demoMode != "attended") { "Attended demo tests require an operator outside CI" }
+    val selected = ItbRunSelection.select(
+        catalogue, System.getenv("ITB_CASES"),
+        unattendedOnly = ci || demoMode == "unattended", demoApp = demoMode != null,
+    )
     val started = Instant.now().toString()
     val androidPort = System.getenv("ITB_ANDROID_PORT")?.toInt()?.also { require(it in 1024..65535) }
     val androidApkSha256 = androidPort?.let {
         required("ITB_ANDROID_APK_SHA256").also { require(it.matches(Regex("[0-9a-f]{64}"))) }
+    }
+    val appApkSha256 = if (demoMode == null) null else {
+        checkNotNull(androidPort) { "The demo app needs the device bridge" }
+        required("ITB_WALLET_APP_APK_SHA256").also { require(it.matches(Regex("[0-9a-f]{64}"))) }
+    }
+    val execution = when (demoMode) {
+        "unattended" -> ItbRunReport.WalletExecution.ANDROID_DEMO_UNATTENDED
+        "attended" -> ItbRunReport.WalletExecution.ANDROID_DEMO_ATTENDED
+        else -> if (androidPort == null) ItbRunReport.WalletExecution.JVM_SOFTWARE else ItbRunReport.WalletExecution.ANDROID_NATIVE
     }
     val results = selected.map { (suite, case) ->
         ItbCaseResult(suite.id, case.id, null, ItbCaseResult.Outcome.NOT_RUN, ItbCaseResult.Phase.START,
@@ -48,9 +63,10 @@ private suspend fun runItb(): Int {
     }.toMutableList()
     fun writeReport() = ItbReportWriter.write(directory, ItbRunReport(
         revision, catalogue.observedOn, results.toList(),
-        walletExecution = if (androidPort == null) ItbRunReport.WalletExecution.JVM_SOFTWARE else ItbRunReport.WalletExecution.ANDROID_NATIVE,
+        walletExecution = execution,
         keyAttestation = ItbRunReport.KeyAttestation.SYNTHETIC_TEST_FIXTURE,
         androidApkSha256 = androidApkSha256,
+        walletAppApkSha256 = appApkSha256,
     ))
     writeReport()
 
@@ -68,29 +84,56 @@ private suspend fun runItb(): Int {
     val trust = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(certificates))
 
     Playwright.create().use { playwright ->
-        playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(true)).use { browser ->
+        playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(true).setArgs(listOf("--disable-http2"))).use { browser ->
             browser.newContext(Browser.NewContextOptions().setViewportSize(1440, 1000)).use { context ->
                 val page = context.newPage()
                 page.setDefaultTimeout(15_000.0)
                 ItbPortalLogin.login(page, catalogue.testBed, username, password)
                 itbHttpClient().use { client ->
+                    val caseTimeoutMillis = if (demoMode == null) 120_000L else if (demoMode == "attended") 300_000L else 210_000L
                     val native = androidPort?.let {
-                        ItbAndroidWalletDriver.connect(it, required("ITB_ANDROID_TOKEN"), origin, pem, Dispatchers.IO)
+                        ItbAndroidWalletDriver.connect(
+                            it, required("ITB_ANDROID_TOKEN"), origin, pem, Dispatchers.IO,
+                            provider = demoMode?.let { "android-demo-$it" } ?: "android-native-biometric",
+                            operationTimeoutMillis = caseTimeoutMillis - 10_000,
+                        )
                     }
+                    val chromePort = if (demoMode != null && selected.any { (suite, case) ->
+                        suite.id == "cts07" || case.id.startsWith("ts12_pay_dc_api_")
+                    }) required("ITB_CHROME_PORT").toInt().also { require(it in 1024..65535) } else null
                     try {
-                        val executeWallet: suspend (ItbWalletInteraction) -> Unit = native?.let { it::execute }
-                            ?: ItbWalletDriver.create(client, origin, trust) { url, callback ->
-                                ItbReferenceAuthorization.resolve(client, origin, url, callback)
-                            }.let { it::execute }
+                        val driver = native?.let { it::execute } ?: ItbWalletDriver.create(client, origin, trust) { url, callback ->
+                            ItbReferenceAuthorization.resolve(client, origin, url, callback)
+                        }.let { it::execute }
                         client.config { followRedirects = false }.use { restClient ->
-                            val api = ItbRestClient(restClient, Url("${catalogue.testBed}/api/rest"), organisationKey)
-                            val bridge = ItbPortalBridge(page, "${catalogue.testBed}/app#/organisation/conformance/$organisationId", catalogue.systemName)
-                            val runner = ItbCaseRunner(api, bridge, executeWallet)
-                            selected.forEachIndexed { index, (suite, case) ->
-                                results[index] = runner.run(suite, case)
-                                writeReport()
-                                println("${suite.id}/${case.id}: ${results[index].outcome}")
+                            val chrome = chromePort?.let {
+                                playwright.chromium().connectOverCDP("http://127.0.0.1:$it",
+                                    BrowserType.ConnectOverCDPOptions().setTimeout(20_000.0))
                             }
+                            try {
+                                val androidBrowser = chrome?.let { ItbAndroidBrowser(it, restClient, origin, required("ANDROID_SERIAL")) }
+                                val executeWallet: suspend (ItbWalletInteraction) -> ItbWalletResult = { interaction ->
+                                    when {
+                                        androidBrowser != null && interaction is ItbWalletInteraction.DigitalCredentials ->
+                                            androidBrowser.present(interaction, driver)
+                                        androidBrowser != null && interaction is ItbWalletInteraction.DigitalIssuance ->
+                                            androidBrowser.issue(interaction, driver)
+                                        else -> driver(interaction)
+                                    }
+                                }
+                                val api = ItbRestClient(restClient, Url("${catalogue.testBed}/api/rest"), organisationKey)
+                                val bridge = ItbPortalBridge(page, "${catalogue.testBed}/app#/organisation/conformance/$organisationId", catalogue.systemName)
+                                val runner = ItbCaseRunner(api, bridge, executeWallet, caseTimeoutMillis = caseTimeoutMillis)
+                                val completed = mutableMapOf<String, ItbCaseResult>()
+                                selected.forEachIndexed { index, (suite, case) ->
+                                    val prerequisite = case.prerequisite?.let { ItbRunSelection.prerequisiteCredential(completed[it]) }
+                                    val result = runner.run(suite, case, prerequisite)
+                                    results[index] = result
+                                    completed["${suite.id}/${case.id}"] = result
+                                    writeReport()
+                                    println("${suite.id}/${case.id}: ${results[index].outcome}")
+                                }
+                            } finally { chrome?.close() }
                         }
                     } finally { native?.close() }
                 }
@@ -101,37 +144,17 @@ private suspend fun runItb(): Int {
 }
 
 internal object ItbRunSelection {
-    private val unattendedCases = setOf(
-        "cs01v1/tc_vci_001", "cs01v1/tc_vci_002", "cs01v1/tc_vci_003", "cs01v1/tc_vci_005",
-        "cs01v1/tc_vci_006", "cs01v1/tc_vci_007", "cs01v1/tc_vci_008",
-        "cs02v1/tc_vp_001", "cs02v1/tc_vp_002", "cs02v1/tc_vp_003", "cs02v1/tc_vp_007",
-        "cs02v1/tc_vp_011", "cs02v1/tc_vp_012", "cs02v1/tc_vp_013", "cts07/tc15",
-        "cs10-test-suite/rv_iss_01", "cs10-test-suite/rv_iss_02",
-        "ts12/ts12_issue_01", "ts12/ts12_issue_02", "ts12/ts12_issue_03",
-    )
-
-    private val prerequisites = mapOf(
-        "cs02v1/tc_vp_001" to "cs01v1/tc_vci_006",
-        "cs02v1/tc_vp_002" to "cs01v1/tc_vci_006",
-        "cs02v1/tc_vp_003" to "cs01v1/tc_vci_006",
-        "cs02v1/tc_vp_007" to "cs01v1/tc_vci_008",
-        "cs02v1/tc_vp_011" to "cs01v1/tc_vci_006",
-        "cs02v1/tc_vp_012" to "cs01v1/tc_vci_006",
-        "cs02v1/tc_vp_013" to "cs01v1/tc_vci_006",
-        "cts07/tc15" to "cs01v1/tc_vci_006",
-        "ts12/ts12_pay_01" to "ts12/ts12_issue_01",
-        "ts12/ts12_pay_02" to "ts12/ts12_issue_02",
-        "ts12/ts12_pay_03" to "ts12/ts12_issue_03",
-        "ts12/ts12_pay_dc_api_01" to "ts12/ts12_issue_01",
-        "ts12/ts12_pay_dc_api_02" to "ts12/ts12_issue_02",
-        "ts12/ts12_pay_dc_api_03" to "ts12/ts12_issue_03",
-    )
-
-    fun select(catalogue: ItbCatalogue, selection: String?, unattendedOnly: Boolean = false): List<Pair<ItbCatalogue.Suite, ItbCatalogue.Case>> {
+    fun select(
+        catalogue: ItbCatalogue,
+        selection: String?,
+        unattendedOnly: Boolean = false,
+        demoApp: Boolean = false,
+    ): List<Pair<ItbCatalogue.Suite, ItbCatalogue.Case>> {
         val all = catalogue.suites.flatMap { suite -> suite.cases.map { suite to it } }
             .associateBy { (suite, case) -> "${suite.id}/${case.id}" }
+        fun available(case: ItbCatalogue.Case) = (!case.attended || !unattendedOnly) && (!case.demoOnly || demoApp)
         val requested = if (selection == null) {
-            if (unattendedOnly) unattendedCases else all.keys
+            all.filterValues { (_, case) -> available(case) }.keys
         } else {
             selection.split(',').map { selector ->
                 val id = selector.trim()
@@ -145,11 +168,28 @@ internal object ItbRunSelection {
                 }
             }.toSet()
         }
-        val expanded = requested + requested.mapNotNull(prerequisites::get)
-        require(all.keys.containsAll(expanded)) { "A selected ITB case or prerequisite is missing from the catalogue" }
-        if (unattendedOnly) require(expanded.all { it in unattendedCases }) {
-            "The selected ITB case is outside the unattended inventory"
+        val selected = linkedMapOf<String, Pair<ItbCatalogue.Suite, ItbCatalogue.Case>>()
+        val visiting = mutableSetOf<String>()
+        fun include(id: String) {
+            if (id in selected) return
+            val entry = requireNotNull(all[id]) { "An ITB prerequisite is missing from the catalogue" }
+            require(available(entry.second)) { "The selected ITB case is unavailable with this driver" }
+            require(visiting.add(id)) { "Cyclic ITB prerequisites" }
+            entry.second.prerequisite?.let(::include)
+            visiting.remove(id)
+            selected[id] = entry
         }
-        return all.filterKeys { it in expanded }.values.toList()
+        // Expand prerequisites while preserving catalogue order for independent cases.
+        val expanded = requested.toMutableSet()
+        var size: Int
+        do {
+            size = expanded.size
+            expanded.addAll(expanded.mapNotNull { all[it]?.second?.prerequisite })
+        } while (expanded.size != size)
+        all.keys.filter(expanded::contains).forEach(::include)
+        return selected.values.toList()
     }
+
+    fun prerequisiteCredential(result: ItbCaseResult?): String? =
+        result?.takeIf { it.outcome == ItbCaseResult.Outcome.PASSED }?.issuedCredentialIds?.singleOrNull()
 }
