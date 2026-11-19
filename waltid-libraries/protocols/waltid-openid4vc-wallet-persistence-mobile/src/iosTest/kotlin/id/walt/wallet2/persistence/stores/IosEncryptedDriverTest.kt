@@ -20,20 +20,26 @@ class IosEncryptedDriverTest {
         fun open() = factory.openExistingEncryptedDriver(name, location, key, name)
         try {
             assertNull(open())
-            factory.createEncryptedDriver(name, key).use { foreground ->
+            val foreground = factory.createEncryptedDriver(name, key)
+            try {
                 val foregroundQueries = WalletPersistenceDatabase(foreground).walletPersistenceQueries
                 foregroundQueries.setCredentialStatusMaintenance(name, "grant")
-                assertNotNull(open()).use { maintenance ->
+                val maintenance = assertNotNull(open())
+                try {
                     val queries = WalletPersistenceDatabase(maintenance).walletPersistenceQueries
                     queries.transaction {
                         assertEquals("grant", queries.selectCredentialStatusMaintenance(name).executeAsOne().grant_id)
                         queries.setCredentialStatusMaintenance(name, null)
                     }
                     assertNull(foregroundQueries.selectCredentialStatusMaintenance(name).executeAsOne().grant_id)
+                } finally {
+                    maintenance.close()
                 }
                 assertFailsWith<StatusMaintenanceStorageException> {
                     factory.openExistingEncryptedDriver(name, location, DatabaseEncryptionKey(name, ByteArray(32)), name)
                 }
+            } finally {
+                foreground.close()
             }
         } finally {
             factory.deleteDatabase(name)
