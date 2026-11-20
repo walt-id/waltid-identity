@@ -17,6 +17,13 @@
 </a>
 </div>
 
+<br>
+<p align="center">
+  <a href="mailto:contact@walt.id?subject=walt.id%20Community%20Stack">
+    <img src="assets/btn-soft-mail.svg" alt="Built something with walt.id or need support? Email us at contact@walt.id" width="604">
+  </a>
+</p>
+
 ## What is walt.id?
 
 walt.id is a Vienna-based digital identity and wallet infrastructure company whose open-source and enterprise software lets governments and businesses worldwide issue, hold and verify digital credentials, including for eIDAS 2 and the EU Digital Identity (EUDI) Wallet. walt.id's software is used by more than 70,000 developers and organizations, including the European Union (EUDI Wallet reference implementation), governments (EMEA, APAC, Americas), hundreds of banks and global enterprises in technology, telco, payments, identity, security, trust services, travel, education among others.
@@ -115,13 +122,11 @@ Some popular libraries you may want to look at are:
 - **OpenID4VP** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vp)) - implementation of the OpenID4VP 1.0 protocol. Results from [OpenID Foundation's Conformance Suite](https://conformance.waltid.cloud/logs.html)
 - **Core Wallet** ([GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc-wallet)) - implementation of the Core Wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
 
-
-
-## Join the community
-
-- Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-- Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
-- Find more indepth documentation on our [docs site](https://docs.walt.id)
+## Get in touch
+**Built something with walt.id or need support?** Email us at [contact@walt.id](mailto:contact@walt.id?subject=My%20project%20with%20walt.id).
+- Questions, feature requests and bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+- Docs and guides: [docs.walt.id](https://docs.walt.id)
+- Updates:  [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
 
 ## License
 
