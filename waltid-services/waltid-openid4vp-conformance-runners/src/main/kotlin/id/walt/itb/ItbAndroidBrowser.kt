@@ -1,6 +1,7 @@
 package id.walt.itb
 
 import com.microsoft.playwright.Browser
+import com.microsoft.playwright.Locator
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.Route
 import com.microsoft.playwright.TimeoutError
@@ -8,10 +9,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.*
 import java.net.URI
@@ -101,13 +99,20 @@ internal class ItbAndroidBrowser(
         page: Page,
         interaction: ItbWalletInteraction,
         execute: suspend (ItbWalletInteraction) -> ItbWalletResult,
-    ): ItbWalletResult = supervisorScope {
+    ): ItbWalletResult {
         page.bringToFront()
         check(page.evaluate("() => !document.hidden") == true) { "The test browser is in the background" }
-        val device = async(start = CoroutineStart.UNDISPATCHED) { execute(interaction) }
-        page.locator("#invoke").click()
+        val invoke = page.locator("#invoke")
+        check(invoke.isVisible && invoke.isEnabled) { "The Digital Credentials API trigger is unavailable" }
         try {
-            device.await()
+            // A headless Android emulator can paint the button without delivering animation frames.
+            invoke.click(Locator.ClickOptions().setForce(true).setTimeout(10_000.0))
+        } catch (_: TimeoutError) {
+            throw ItbWalletRejection("dc_browser_trigger_timeout")
+        }
+        // A timeout before dispatch leaves the device channel available for the next case.
+        return try {
+            execute(interaction)
         } catch (error: ItbWalletRejection) {
             requireBrowserSuccess(page)
             throw error

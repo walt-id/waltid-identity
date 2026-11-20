@@ -24,6 +24,8 @@ internal class ItbPortalInputError(val reason: Reason) : IllegalArgumentExceptio
         PRESENTATION_QR_IMAGE_READ,
         PRESENTATION_QR_UNREADABLE,
         PRESENTATION_QR_INVALID_URL,
+        ISSUANCE_OFFER_QR_MISSING,
+        ISSUANCE_OFFER_INVALID_URL,
     }
 }
 
@@ -138,7 +140,15 @@ class ItbPortalBridge(
                 require(session.testSuite != "cs01v1" || session.testCase != "tc_vci_007" || pin != null) {
                     "The ITB interaction did not supply its transaction code"
                 }
-                ItbWalletInteraction.Offer(Url(preview("VCI request")), pin)
+                val offer = offerUrl(preview("VCI request")) ?: run {
+                    // The issuer adapter can expose a non-QR barcode decode in its derived VCI text.
+                    val qr = row(Pattern.compile("^(?:VCI request QR code|Credential QR code|Credential Offer QR code|QR code)$",
+                        Pattern.CASE_INSENSITIVE))
+                    if (qr.count() != 1) throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_QR_MISSING)
+                    offerUrl(ItbPresentationQr.decode(download(qr)))
+                        ?: throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_INVALID_URL)
+                }
+                ItbWalletInteraction.Offer(offer, pin)
             }
             // Consume the wallet-facing QR directly; ITB's derived text can be a false EAN/UPC decode.
             text.contains("VP request") -> {
@@ -162,9 +172,20 @@ class ItbPortalBridge(
         }
     }
 
-    private fun row(label: String): Locator {
-        return dialog().locator("app-any-content-view").filter(
+    private fun offerUrl(value: String): Url? = try {
+        Url(value).takeIf { it.protocol.name == "openid-credential-offer" }
+    } catch (_: URLParserException) {
+        null
+    }
+
+    private fun row(label: String): Locator =
+        dialog().locator("app-any-content-view").filter(
             Locator.FilterOptions().setHas(page.getByText(label, Page.GetByTextOptions().setExact(true))),
+        )
+
+    private fun row(label: Pattern): Locator {
+        return dialog().locator("app-any-content-view").filter(
+            Locator.FilterOptions().setHas(page.getByText(label)),
         )
     }
 

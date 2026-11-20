@@ -79,9 +79,9 @@ internal object WalletComposeE2EHelper {
             fail("SCA setup choice '$text' did not become available")
         }
         launch(context, signingProtectionMode = "required")
-        println(if (timedApproval) "SCA_OPERATOR: skip the optional biometric unlock setup and use the wallet PIN"
-            else "SCA_OPERATOR: approve wallet biometric opt-in, then key setup and issuance prompts")
+        if (!timedApproval) println("SCA_OPERATOR: approve wallet biometric opt-in, then key setup and issuance prompts")
         unlock(device, initializeSigningIdentity = false)
+        if (timedApproval) continueWithPinOnly(device)
         assertNotNull("Operator-assisted setup did not reach signing-key configuration: ${foregroundWindowSnapshot(device)}",
             waitForResource(device, "wallet.keySetupEdit.Storage", 180_000L))
         clickByTag(device, "wallet.keySetupEdit.Storage")
@@ -94,6 +94,29 @@ internal object WalletComposeE2EHelper {
         clickByTag(device, "wallet.keySetupContinue")
         assertNotNull("App key setup failed: ${foregroundWindowSnapshot(device)}",
             waitForResource(device, "wallet.scanButton", 180_000L))
+    }
+
+    private fun continueWithPinOnly(device: UiDevice) {
+        val optIn = By.pkg("com.android.systemui").text("Enable biometric unlock")
+        val continueWithPin = By.pkg(walletPackage).res("wallet.biometricSetupContinue").enabled(true)
+        val deadline = SystemClock.uptimeMillis() + UI_ELEMENT_TIMEOUT
+        var dismissed = false
+        while (SystemClock.uptimeMillis() < deadline) {
+            try {
+                if (!dismissed && device.hasObject(optIn)) {
+                    dismissed = device.pressBack()
+                }
+                val choice = device.findObject(continueWithPin)
+                if (choice != null) {
+                    (choice.clickableAncestorOrSelf() ?: choice).click()
+                    return
+                }
+            } catch (_: StaleObjectException) {
+                // Cancelling the optional prompt replaces the setup nodes.
+            }
+            Thread.sleep(200)
+        }
+        fail("The optional biometric unlock setup did not offer PIN-only access")
     }
 
     fun receiveThroughApp(device: UiDevice, offerUrl: String) {
