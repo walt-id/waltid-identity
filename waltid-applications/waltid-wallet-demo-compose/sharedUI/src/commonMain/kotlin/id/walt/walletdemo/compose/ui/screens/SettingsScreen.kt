@@ -291,8 +291,9 @@ internal fun SettingsScreen(
                                 SettingsDestination.CredentialStatus -> CredentialStatusSettings(custodial = onSignOut != null)
                                 SettingsDestination.DigitalCredentialsApi -> {
                                     WalletSection(footer = stringResource(Res.string.settings_review_description)) {
-                                    SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,
-                                        onShowDcApiPresentationPreviewChange, Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview))
+                                        SettingsToggleRow(stringResource(Res.string.settings_skip_review), !currentState.showDcApiPresentationPreview,
+                                            { skipReview -> onShowDcApiPresentationPreviewChange(!skipReview) },
+                                            Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview))
                                     }
                                     SettingsNotice(stringResource(digitalCredentialsRequirements))
                                 }

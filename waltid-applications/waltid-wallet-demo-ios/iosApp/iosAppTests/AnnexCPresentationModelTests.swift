@@ -171,6 +171,27 @@ final class AnnexCPresentationModelTests: XCTestCase {
     }
 
     @MainActor
+    func testOneTapSharesThePickedCredentialWithoutConsultingItsCachedStatus() async throws {
+        let status = try WalletVisualFixtures().credentialStatus("revoked_current")
+        let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [
+            CredentialStatusRecord(credentialID: "cred-mdl", storeIndex: 0, value: status),
+        ], refreshingCredentialIDs: [])
+        let context = StubRequestContext(rawRequest: Self.rawRequestJSON)
+        let wallet = StubWallet(preview: Self.preview(documentTypes: ["org.iso.18013.5.1.mDL"]),
+            responseJSON: #"{"response":"-_--An8"}"#, statusSnapshot: snapshot)
+        let model = AnnexCPresentationModel(context: context, makeWallet: { wallet })
+
+        await model.prepare(reviewStatus: false)
+        await model.submit()
+
+        XCTAssertEqual(wallet.statusReadCount, 0)
+        XCTAssertEqual(wallet.statusSubscriptionCount, 0)
+        XCTAssertNil(wallet.reviewedStatus)
+        XCTAssertEqual(wallet.ordinarySubmissions, 1)
+        XCTAssertEqual(context.sentResponse, Data([0xfb, 0xff, 0xbe, 0x02, 0x7f]))
+    }
+
+    @MainActor
     func testStatusChangeWithAnUnreadableRereadReturnsTheProviderToReviewWithoutSealing() async throws {
         let status = try WalletVisualFixtures().credentialStatus("revoked_current")
         let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [
@@ -319,6 +340,7 @@ final class AnnexCPresentationModelTests: XCTestCase {
         private var recorded: SubmittedPresentation?
         private var recordedStatus: [String: String]?
         private var statusReads = 0
+        private var statusSubscriptions = 0
         private var ordinaryCount = 0
         private var closeCount = 0
 
@@ -327,6 +349,8 @@ final class AnnexCPresentationModelTests: XCTestCase {
         var reviewedStatus: [String: String]? { lock.withLock { recordedStatus } }
         var ordinarySubmissions: Int { lock.withLock { ordinaryCount } }
         var closed: Int { lock.withLock { closeCount } }
+        var statusReadCount: Int { lock.withLock { statusReads } }
+        var statusSubscriptionCount: Int { lock.withLock { statusSubscriptions } }
 
         init(
             preview: AnnexCPresentationPreview,
@@ -348,6 +372,11 @@ final class AnnexCPresentationModelTests: XCTestCase {
             let shouldFail = lock.withLock { statusReads += 1; return failStatusReread && statusReads > 1 }
             if shouldFail { throw StubWalletFailure() }
             return statusSnapshot
+        }
+
+        func cachedCredentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> {
+            lock.withLock { statusSubscriptions += 1 }
+            return AsyncThrowingStream { $0.finish() }
         }
 
         func closeStatusWallet() async throws { lock.withLock { closeCount += 1 } }
