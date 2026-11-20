@@ -40,6 +40,9 @@ data class WebhookDelivery(
     val leaseUntilEpochMilliseconds: Long? = null,
     /** Nullable for outbox records written before outbound signing was supported. */
     val signingSecret: String? = null,
+    /** Internal storage key for erasure, independent of the receiver-visible session ID. */
+    val sessionOwner: String? = null,
+    val retainOnFailure: Boolean = true,
 ) {
     fun deadLetter(): WebhookDeadLetter = WebhookDeadLetter(
         deliveryId = deliveryId,

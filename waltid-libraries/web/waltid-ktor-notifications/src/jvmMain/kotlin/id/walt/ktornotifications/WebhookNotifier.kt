@@ -13,6 +13,9 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.header
 import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
+import io.ktor.serialization.kotlinx.json.DefaultJson
+import io.ktor.http.content.OutgoingContent
+import io.ktor.utils.io.ByteReadChannel
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
@@ -32,7 +35,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.ZonedDateTime
@@ -62,6 +64,7 @@ internal class KtorWebhookTransport(
         // Redirects stay off. The guard checks the address OkHttp connects to, and a redirect would
         // send credentials to an unconfigured URL and invalidate URL-bound signatures.
         followRedirects = false
+        engine { config { retryOnConnectionFailure(false) } }
         install(HttpTimeout) {
             connectTimeoutMillis = 10_000
             requestTimeoutMillis = 30_000
@@ -98,7 +101,14 @@ internal class KtorWebhookTransport(
                         ),
                     )
                 }
-                setBody(delivery.payload)
+                // Ktor's OkHttp engine marks streaming bodies as one-shot. This also prevents
+                // OkHttp from replaying a 503 with Retry-After: 0 within a single queue attempt.
+                val bytes = delivery.payload.encodeToByteArray()
+                setBody(object : OutgoingContent.ReadChannelContent() {
+                    override val contentType = ContentType.Application.Json
+                    override val contentLength = bytes.size.toLong()
+                    override fun readFrom() = ByteReadChannel(bytes)
+                })
 
                 if (delivery.basicAuthUser != null && delivery.basicAuthPass != null) {
                     basicAuth(delivery.basicAuthUser, delivery.basicAuthPass)
@@ -186,8 +196,10 @@ internal class WebhookDeliveryQueue(
     suspend fun enqueue(
         update: KtorSessionUpdate,
         config: VerificationSessionWebhookNotification,
+        sessionOwner: String? = null,
+        retainOnFailure: Boolean = true,
     ): String {
-        val payload = Json.encodeToString(update)
+        val payload = DefaultJson.encodeToString(update)
         val now = clock()
         val delivery = WebhookDelivery(
             deliveryId = UUID.randomUUID().toString(),
@@ -202,6 +214,8 @@ internal class WebhookDeliveryQueue(
             bearerToken = config.bearerToken,
             signingSecret = config.signingSecret,
             retryPolicy = config.retryPolicy,
+            sessionOwner = sessionOwner,
+            retainOnFailure = retainOnFailure,
             enqueueOrder = enqueueSequence.updateAndGet { previous ->
                 maxOf(previous + 1, now * 1_000)
             },
@@ -234,6 +248,8 @@ internal class WebhookDeliveryQueue(
         claims.size
     }
 
+    suspend fun eraseSession(sessionOwner: String) = store.eraseSession(sessionOwner)
+
     suspend fun deadLetters(): List<WebhookDeadLetter> = store.deadLetters()
 
     suspend fun redrive(deliveryId: String): Boolean {
@@ -244,6 +260,7 @@ internal class WebhookDeliveryQueue(
 
     private suspend fun process(claim: WebhookDeliveryClaim) {
         val delivery = claim.delivery
+        if (delivery.sessionOwner != null && store.pending(delivery.deliveryId)?.leaseId != claim.leaseId) return
         val now = clock()
         val attempt = delivery.attemptCount + 1
         val result = try {
@@ -270,6 +287,11 @@ internal class WebhookDeliveryQueue(
         val error = result.failureMessage()
         val exhausted = attempt >= attempted.retryPolicy.maxAttempts
         if (!result.retryable || exhausted) {
+            if (!delivery.retainOnFailure) {
+                store.markDelivered(claim)
+                log.warn { "Discarded unsuccessful webhook for non-persisted result (deliveryId=${delivery.deliveryId})" }
+                return
+            }
             val moved = store.moveToDeadLetter(
                 claim,
                 attempted.copy(
@@ -361,10 +383,21 @@ object WebhookNotifier {
         update: KtorSessionUpdate,
         config: VerificationSessionWebhookNotification,
     ): String {
+        return enqueue(update, config, sessionOwner = null, retainOnFailure = true)
+    }
+
+    internal suspend fun enqueue(
+        update: KtorSessionUpdate,
+        config: VerificationSessionWebhookNotification,
+        sessionOwner: String?,
+        retainOnFailure: Boolean,
+    ): String {
         val activeQueue = queue()
         activeQueue.start()
-        return activeQueue.enqueue(update, config)
+        return activeQueue.enqueue(update, config, sessionOwner, retainOnFailure)
     }
+
+    suspend fun eraseSession(sessionOwner: String) = queue().eraseSession(sessionOwner)
 
     suspend fun deadLetters(): List<WebhookDeadLetter> = queue().deadLetters()
 

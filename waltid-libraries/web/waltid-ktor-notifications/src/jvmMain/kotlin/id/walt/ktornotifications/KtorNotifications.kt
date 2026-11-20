@@ -9,13 +9,22 @@ private val log = KotlinLogging.logger { }
 object KtorNotifications {
 
     suspend fun KtorSessionUpdate.notifySessionUpdate(sessionId: String, sessionNotifications: KtorSessionNotifications?) {
+        notifySessionUpdate(sessionId, sessionNotifications, sessionOwner = null, retainOnFailure = true)
+    }
+
+    suspend fun KtorSessionUpdate.notifySessionUpdate(
+        sessionId: String,
+        sessionNotifications: KtorSessionNotifications?,
+        sessionOwner: String?,
+        retainOnFailure: Boolean = true,
+    ) {
         val update = this
 
         SseNotifier.notify(sessionId, update)
 
         if (sessionNotifications != null && sessionNotifications.webhook != null) {
             log.debug { "Webhook configured for session $sessionId, sending notification for event: ${update.event}" }
-            WebhookNotifier.notify(update = update, config = sessionNotifications.webhook!!)
+            WebhookNotifier.enqueue(update, sessionNotifications.webhook!!, sessionOwner, retainOnFailure)
         } else {
             log.trace { "No webhook configured for session $sessionId (notifications: ${sessionNotifications != null}, webhook: ${sessionNotifications?.webhook != null})" }
         }
