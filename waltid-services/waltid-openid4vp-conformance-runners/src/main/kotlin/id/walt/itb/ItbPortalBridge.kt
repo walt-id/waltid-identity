@@ -142,7 +142,8 @@ class ItbPortalBridge(
             }
             // Consume the wallet-facing QR directly; ITB's derived text can be a false EAN/UPC decode.
             text.contains("VP request") -> {
-                val invocation = ItbPresentationQr.decode(download(row("Credential QR code")))
+                val qrLabel = if (session.testSuite == "ts12") "VP request QR code" else "Credential QR code"
+                val invocation = ItbPresentationQr.decode(download(row(qrLabel)))
                 val url = try {
                     Url(invocation)
                 } catch (_: URLParserException) {

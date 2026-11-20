@@ -60,7 +60,7 @@ internal object WalletComposeE2EHelper {
     }
 
     /** Uses the normal setup UI; the operator approves each native signing prompt. */
-    fun launchAndCreateScaIdentity(context: Context, device: UiDevice) {
+    fun launchAndCreateScaIdentity(context: Context, device: UiDevice, timedApproval: Boolean = false) {
         fun choose(text: String) {
             val deadline = SystemClock.uptimeMillis() + UI_ELEMENT_TIMEOUT
             while (SystemClock.uptimeMillis() < deadline) {
@@ -79,7 +79,8 @@ internal object WalletComposeE2EHelper {
             fail("SCA setup choice '$text' did not become available")
         }
         launch(context, signingProtectionMode = "required")
-        println("SCA_OPERATOR: approve wallet biometric opt-in, then key setup and issuance prompts")
+        println(if (timedApproval) "SCA_OPERATOR: skip the optional biometric unlock setup and use the wallet PIN"
+            else "SCA_OPERATOR: approve wallet biometric opt-in, then key setup and issuance prompts")
         unlock(device, initializeSigningIdentity = false)
         assertNotNull("Operator-assisted setup did not reach signing-key configuration: ${foregroundWindowSnapshot(device)}",
             waitForResource(device, "wallet.keySetupEdit.Storage", 180_000L))
@@ -87,7 +88,7 @@ internal object WalletComposeE2EHelper {
         choose("Hardware required")
         clickByTag(device, "wallet.keySetupContinue")
         clickByTag(device, "wallet.keySetupEdit.Approval")
-        choose("Current biometrics only")
+        choose(if (timedApproval) "Biometrics with timed approval" else "Current biometrics only")
         clickByTag(device, "wallet.keySetupContinue")
         println("SCA_OPERATOR: approve native key setup prompts")
         clickByTag(device, "wallet.keySetupContinue")

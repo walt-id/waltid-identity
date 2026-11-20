@@ -67,6 +67,18 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun readsTheTs12PaymentQrFromItsDeployedRow() = runBlocking<Unit> {
+        withPage(inlineInteraction = "12345678", presentationQrLabel = "VP request QR code") { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            val session = bridge.prepare(suite.copy(id = "ts12"), case.copy(id = "ts12_pay_02"))
+            val interaction = assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
+            assertEquals("https://verifier.example/request", interaction.url.parameters["request_uri"])
+            assertEquals(1, page.evaluate("window.qrDownloadCount"))
+            assertEquals(0, page.evaluate("window.textDownloadCount"))
+        }
+    }
+
+    @Test
     fun neverFallsBackToTextWhenThePresentationQrIsInvalid() = runBlocking<Unit> {
         withPage(
             inlineInteraction = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Fshort",
@@ -291,6 +303,7 @@ class ItbPortalBridgeBrowserTest {
         inlineInteraction: String? = null,
         interactionLabel: String = "VP request",
         presentationQr: ByteArray = ItbQrFixtures.qr("openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"),
+        presentationQrLabel: String = "Credential QR code",
         interactionDelayMillis: Int = 30,
         downloadDelayMillis: Int = 0,
         failStart: Boolean = false,
@@ -308,7 +321,7 @@ class ItbPortalBridgeBrowserTest {
                             val html = fixture(
                                 session, systemName, interactionDelayMillis, downloadDelayMillis, failStart,
                                 startNeverEnabled, actorVisible, applicationDelayMillis, inlineInteraction,
-                                interactionLabel, Base64.getEncoder().encodeToString(presentationQr),
+                                interactionLabel, presentationQrLabel, Base64.getEncoder().encodeToString(presentationQr),
                             )
                             route.fulfill(Route.FulfillOptions().setContentType("text/html").setBody(html))
                         } else route.abort()
@@ -324,7 +337,7 @@ class ItbPortalBridgeBrowserTest {
     private fun fixture(
         session: String, systemName: String, interactionDelayMillis: Int, downloadDelayMillis: Int, failStart: Boolean,
         startNeverEnabled: Boolean, actorVisible: Boolean, applicationDelayMillis: Int, inlineInteraction: String?,
-        interactionLabel: String, qrBase64: String,
+        interactionLabel: String, presentationQrLabel: String, qrBase64: String,
     ) = """
         <script>
         setTimeout(() => {
@@ -383,9 +396,9 @@ class ItbPortalBridgeBrowserTest {
                     return;
                 }
                 const dialog = document.createElement('ngb-modal-window');
-                // Exact QR label observed in the deployed interaction, independent of the bridge selector.
-                dialog.innerHTML = `<app-any-content-view><div> VP request QR code </div><button ngbtooltip="Download" onclick="download(false)">Download</button></app-any-content-view>
-                  <app-any-content-view><div> Credential QR code </div><button ngbtooltip="Download" onclick="download(true)">Download</button></app-any-content-view>
+                // A different suite's label must not select the attachment.
+                dialog.innerHTML = `<app-any-content-view><div> ${if (presentationQrLabel == "Credential QR code") "VP request QR code" else "Credential QR code"} </div><button ngbtooltip="Download" onclick="download(false)">Download</button></app-any-content-view>
+                  <app-any-content-view><div> $presentationQrLabel </div><button ngbtooltip="Download" onclick="download(true)">Download</button></app-any-content-view>
                   <app-any-content-view><div> $interactionLabel </div>${
                       if (inlineInteraction == null) """<button ngbtooltip="Download" onclick="download(false)">Download</button>"""
                       else """<div class="content-value">$inlineInteraction </div><button ngbtooltip="Copy" onclick="window.copyCount++">Copy</button>"""

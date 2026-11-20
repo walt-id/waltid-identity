@@ -13,6 +13,7 @@ import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.itb.ItbDeviceWire
 import id.walt.itb.ItbStatusObservation
 import id.walt.itb.ItbWalletInteraction
@@ -21,6 +22,7 @@ import id.walt.itb.ItbWalletResult
 import id.walt.itb.checkStatusListReferences
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.identity.SigningIdentityState
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResourceAfterScrolling
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
@@ -94,8 +96,13 @@ class ItbDemoWalletTest {
                 try {
                     check(wallet.credentials().isEmpty()) { "Use a fresh Preview installation for live ITB" }
                     try {
-                        if (attended) WalletComposeE2EHelper.launchAndCreateScaIdentity(context, device)
-                        else WalletComposeE2EHelper.launchAndUnlock(context, device)
+                        if (attended) {
+                            WalletComposeE2EHelper.launchAndCreateScaIdentity(context, device, timedApproval = true)
+                            val identity = (wallet.signingIdentity.state() as? SigningIdentityState.Active)?.identity
+                            check(identity?.authorization == KeyUseAuthorizationPolicy.BiometricTimedReuse(10)) {
+                                "The attended wallet did not select the 10-second biometric signing policy"
+                            }
+                        } else WalletComposeE2EHelper.launchAndUnlock(context, device)
                     } catch (_: AssertionError) {
                         error("Demo wallet setup failed")
                     }
@@ -172,7 +179,15 @@ private class DemoInteractions(
         if (credentialId != null) selectCredential(credentialId)
         if (payment) {
             check(attended) { "Payment requires operator consent" }
-            waitFor("payment-consent")
+            if (waitForResourceAfterScrolling(device, "payment-consent") == null) {
+                val reason = when {
+                    device.hasObject(By.res("payment-consent-blocked")) -> "demo_payment_review_blocked"
+                    device.hasObject(By.res("payment-consent-loading")) -> "demo_payment_review_loading"
+                    device.hasObject(By.text("Couldn't update the information to share.")) -> "demo_payment_claim_review_failed"
+                    else -> "demo_payment_review_missing"
+                }
+                throw ItbWalletRejection(reason)
+            }
             println("ITB_OPERATOR: review the payee and amount in the wallet, then confirm and approve the native signing prompt.")
         } else {
             waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_submit_disabled") {
