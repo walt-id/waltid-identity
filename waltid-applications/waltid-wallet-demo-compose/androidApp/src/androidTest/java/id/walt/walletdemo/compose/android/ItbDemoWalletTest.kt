@@ -309,8 +309,8 @@ private class DemoInteractions(
         var browserConfirmed = false
         waitUntil(if (attended) 90_000 else 40_000, "demo_dc_picker_or_review_missing") {
             requireProviderScreen()
-            if (!attended && device.currentPackageName == CHROME_PACKAGE) {
-                if (dismissChromeNotificationPrompt()) return@waitUntil false
+            if (device.currentPackageName == CHROME_PACKAGE) {
+                if (!attended && dismissChromeNotificationPrompt()) return@waitUntil false
                 if (!browserConfirmed && confirmBrowserOrigin()) {
                     browserConfirmed = true
                     return@waitUntil false
@@ -324,7 +324,7 @@ private class DemoInteractions(
                     val approvedOrigin = if (combinedHeading) {
                         device.hasObject(By.copy(picker).text(shareWithHost))
                     } else device.hasObject(By.copy(picker).text(itbHost))
-                    if (!attended && approvedOrigin) {
+                    if (approvedOrigin) {
                         device.findObject(By.copy(picker).text("Agree and continue"))
                     } else null
                 } else {
