@@ -3,8 +3,6 @@ package id.walt.mdoc.objects
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.KSerializer
@@ -76,11 +74,8 @@ object MdocsCborSerializer {
     fun lookupSerializer(namespace: String, elementIdentifier: String): KSerializer<*>? =
         serializerLookupMap[namespace]?.get(elementIdentifier)
 
-    /** Converts preserved CBOR directly, otherwise uses the registered typed serializer with generic fallback. */
-    @OptIn(ExperimentalSerializationApi::class)
+    /** Tries the registered serializer first, with generic conversion as a fallback. */
     fun toJsonElement(namespace: String, elementIdentifier: String, value: Any?): JsonElement {
-        // CBOR elements already carry their type; a Kotlin Boolean serializer cannot encode CborBoolean.
-        if (value is CborElement) return value.toSerializedJsonElement()
         val serializer = lookupSerializer(namespace, elementIdentifier) ?: return value.toSerializedJsonElement()
         return try {
             // The heterogeneous registry erases the element type, just as in encode().
@@ -88,8 +83,8 @@ object MdocsCborSerializer {
             Json.encodeToJsonElement(serializer as KSerializer<Any?>, value)
         } catch (cause: CancellationException) {
             throw cause
-        } catch (cause: Exception) {
-            log.trace(cause) { "Unable to encode $namespace/$elementIdentifier with its registered JSON serializer" }
+        } catch (_: Exception) {
+            log.trace { "Unable to encode $namespace/$elementIdentifier with its registered JSON serializer" }
             value.toSerializedJsonElement()
         }
     }
