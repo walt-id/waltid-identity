@@ -80,6 +80,14 @@ public final class DemoBackend {
 
     public static let presentationScenarios = scenarios
 
+    /// Ordinary EMVCo payment attestation; this does not claim biometric TS-12 SCA qualification.
+    public static let credentialStatusPaymentScenario = DemoCredentialScenario(
+        id: "emvco-payment-mdoc", displayName: "EMVCo Digital Payment Credential",
+        profileId: "emvcoDpcMdoc", credentialConfigurationId: "emvco_dpc_mso_mdoc", format: "mso_mdoc",
+        verifierCredentialQuery: mdocQuery(id: "payment_card", doctype: "org.emvco.dpc.1", namespace: "org.emvco.dpc.1",
+            claims: ["card_scheme", "card_last4", "card_holder_name"])
+    )
+
     /// Operator-assisted payment fixture; excluded from ordinary software-key scenarios.
     public static let scaPaymentScenario = DemoCredentialScenario(
         id: "sca-payment-sdjwt", displayName: "SCA Payment Card SD-JWT (demo)",
@@ -293,6 +301,55 @@ public final class DemoBackend {
         signedRequest: Bool = false,
         clientID: String = DemoBackend.verifierClientID
     ) async throws -> DemoVerifierSession {
+        try await createVerifierSession(credentialQueries: [scenario.verifierCredentialQuery],
+            transactionData: transactionData, signedRequest: signedRequest, clientID: clientID)
+    }
+
+    /// Real public-verifier request for the controlled access credential and the public-demo PID.
+    public func createCredentialStatusVerifierSession() async throws -> DemoVerifierSession {
+        let pid = Self.scenarios.first { $0.id == "eudi-pid-sdjwt" }!
+        return try await createVerifierSession(credentialQueries: [pid.verifierCredentialQuery, Self.workplaceQuery()],
+            transactionData: [], signedRequest: true, clientID: Self.didVerifierClientID)
+    }
+
+    private static func workplaceQuery(multiple: Bool = false) -> [String: Any] { [
+        "id": "workplace", "format": "jwt_vc_json",
+        "multiple": multiple,
+        "meta": ["type_values": [["VerifiableCredential", "WorkplaceAccessCredential"]]],
+    ] }
+
+    /// Unlike the ordinary mixed request, this explicitly requires a clear revocation bit.
+    public func createStatusEnforcementVerifierSession() async throws -> DemoVerifierSession {
+        try await createVerifierSession(credentialQueries: [Self.workplaceQuery(multiple: true)], transactionData: [],
+            signedRequest: true, clientID: Self.didVerifierClientID, policies: ["vc_policies": [
+                ["policy": "signature"],
+                ["policy": "credential-status", "argument": [
+                    "discriminator": "w3c", "value": 0, "purpose": "revocation", "type": "BitstringStatusList",
+                ]],
+            ]])
+    }
+
+    /// Generic payment terms bind the PID; the payment attestation and adverse access are requested alongside it.
+    public func createCredentialStatusPaymentVerifierSession() async throws -> DemoVerifierSession {
+        let fields = try await transactionDataProfileFields(type: Self.paymentAuthorizationType)
+        guard Self.requiredPaymentAuthorizationFields.isSubset(of: fields) else {
+            throw NSError(domain: "WalletE2E", code: 324,
+                userInfo: [NSLocalizedDescriptionKey: "The public payment profile lacks required terms"])
+        }
+        let transaction = Self.paymentAuthorizationTransactionData(credentialID: "pid", fields: fields)
+        let pid = Self.scenarios.first { $0.id == "eudi-pid-sdjwt" }!
+        return try await createVerifierSession(credentialQueries: [pid.verifierCredentialQuery,
+            Self.credentialStatusPaymentScenario.verifierCredentialQuery, Self.workplaceQuery(multiple: true)],
+            transactionData: [transaction], signedRequest: true, clientID: Self.didVerifierClientID)
+    }
+
+    private func createVerifierSession(
+        credentialQueries: [[String: Any]],
+        transactionData: [[String: Any]],
+        signedRequest: Bool,
+        clientID: String,
+        policies: [String: Any]? = nil
+    ) async throws -> DemoVerifierSession {
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
             .appendingPathComponent("create")
@@ -300,9 +357,10 @@ public final class DemoBackend {
         var coreFlow: [String: Any] = [
             "signed_request": signedRequest,
             "dcql_query": [
-                "credentials": [scenario.verifierCredentialQuery],
+                "credentials": credentialQueries,
             ],
         ]
+        if let policies { coreFlow["policies"] = policies }
         if signedRequest {
             coreFlow["clientId"] = clientID
             coreFlow["key"] = Self.verifierRequestSigningKey
@@ -402,6 +460,62 @@ public final class DemoBackend {
         }
 
         return DemoVerifierSession(sessionID: sessionID, authorizationRequestUri: requestURL)
+    }
+
+    /// A policy failure only qualifies when the signed credential passed and the actual bit was 1.
+    public func verifyCredentialStatusPolicy(sessionID: String, clear: Bool, timeoutSeconds: TimeInterval) async throws {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while Date() < deadline {
+            let response = try await client.jsonRequest(url: Self.verifierBaseURL
+                .appendingPathComponent("verification-session").appendingPathComponent(sessionID).appendingPathComponent("info"))
+            let state = (response["status"] as? String)?.uppercased()
+            if ["SUCCESSFUL", "FAILED", "ERROR", "EXPIRED"].contains(state ?? "") {
+                let policies = response["policy_results"] as? [String: Any]
+                let results = policies?["vc_policies"] as? [[String: Any]] ?? []
+                func policyID(_ result: [String: Any]) -> String? {
+                    let policy = result["policy"] as? [String: Any]
+                    return policy?["id"] as? String ?? policy?["policy"] as? String
+                }
+                // Diagnostics contain verdicts/errors only, never raw presentations or credentials.
+                let credentialSummary = results.map { result in [
+                    "policy": policyID(result) ?? "unknown", "success": result["success"] as? Bool ?? false,
+                    "error": result["error"] as? String ?? "", "query": result["query_id"] as? String ?? "",
+                ] as [String: Any] }
+                let presentations = policies?["vp_policies"] as? [String: [String: [String: Any]]] ?? [:]
+                let presentationSummary = presentations.flatMap { query, group in group.map { id, result in [
+                    "policy": id, "query": query, "success": result["success"] as? Bool ?? false,
+                    "error": String(describing: result["error"] ?? ""),
+                ] as [String: Any] } }
+                let summary = ["credential": credentialSummary, "presentation": presentationSummary]
+                let diagnostic = String(decoding: try JSONSerialization.data(withJSONObject: summary, options: [.sortedKeys]), as: UTF8.self)
+                func require(_ condition: Bool, _ message: String) throws {
+                    if !condition { throw NSError(domain: "WalletE2E", code: 322,
+                        userInfo: [NSLocalizedDescriptionKey: message + ". Executed policies: " + diagnostic]) }
+                }
+                try require(state == (clear ? "SUCCESSFUL" : "FAILED"), "Unexpected status-enforcement session result: \(state ?? "UNKNOWN")")
+                let statuses = results.filter { policyID($0) == "credential-status" && $0["query_id"] as? String == "workplace" }
+                let status = statuses.first ?? [:]
+                try require(statuses.count == 1 && status["success"] as? Bool == clear,
+                    "The credential-status policy did not execute with the expected result")
+                try require((status["result"] as? [String: Any])?["policy_available"] as? Bool != false,
+                    "The verifier did not find the issued credential's actual status reference")
+                let signatures = results.filter { policyID($0) == "signature" }
+                try require(signatures.count == 1 && signatures.first?["success"] as? Bool == true,
+                    "Credential signature validation must succeed before qualifying status enforcement")
+                if !clear {
+                    let error = status["error"] as? String ?? ""
+                    try require(error.contains("Status validation failed:") && error.contains("got 1"),
+                        "Verifier failure did not establish revocation-bit rejection")
+                }
+                try require(!presentations.isEmpty && presentations.values.allSatisfy { group in
+                    group.values.allSatisfy { $0["success"] as? Bool == true }
+                }, "Presentation authentication must succeed independently of the status policy")
+                return
+            }
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+        throw NSError(domain: "WalletE2E", code: 323,
+            userInfo: [NSLocalizedDescriptionKey: "The verifier did not finish the status-enforcement session"])
     }
 
     /// Verify the actual proof and executed policies; aggregate SUCCESSFUL alone is insufficient.

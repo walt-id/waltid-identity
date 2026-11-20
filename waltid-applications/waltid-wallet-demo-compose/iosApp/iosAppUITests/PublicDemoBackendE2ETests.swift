@@ -7,9 +7,37 @@ import XCTest
 /// and keep received credentials across app restart.
 @MainActor
 final class PublicDemoBackendE2ETests: XCTestCase {
+    func testCredentialStatusLifecycleWithPublicAndControlledIssuers() async throws {
+        guard ProcessInfo.processInfo.environment["WALLET_STATUS_CONTROL_URL"] != nil else {
+            throw XCTSkip("Run explicitly with the isolated controlled status issuer")
+        }
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        try await runCredentialStatusLifecycle(app, capturePrefix: "compose-ios", openWalletLink: ui.openWalletLink,
+            returnToWallet: ui.returnToWallet, relaunch: {
+                ui.launch(initializeSigningIdentity: false)
+                XCTAssertEqual(ui.waitUntilWalletReady(timeout: self.walletReadyTimeout), "Wallet ready")
+            })
+    }
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
+    }
+
+    func testControlledStatusIssuanceAndRevocation() async throws {
+        guard ProcessInfo.processInfo.environment["WALLET_STATUS_CONTROL_URL"] != nil else {
+            throw XCTSkip("Run explicitly with the isolated controlled status issuer")
+        }
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        try await runControlledStatusIssuanceAndRevocation(app, capturePrefix: "compose-ios", openWalletLink: ui.openWalletLink)
     }
 
 
@@ -41,6 +69,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         let environment = isolatedWalletEnvironment()
         ui.launch(environment: environment)
+        var previousCards = Set<String>()
         for index in 0..<2 {
             if index == 1 {
                 app.terminate()
@@ -64,7 +93,17 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             let cards = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
             XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))
-            XCTAssertEqual(Set(cards.allElementsBoundByIndex.map(\.identifier)).count, index + 1)
+            let currentCards = Set(cards.allElementsBoundByIndex.map(\.identifier))
+            XCTAssertEqual(currentCards.count, index + 1)
+            let added = currentCards.subtracting(previousCards)
+            XCTAssertEqual(added.count, 1, "EUDI issuance must add exactly one stored credential")
+            let card = try XCTUnwrap(added.first)
+            let element = app.descendants(matching: .any).matching(identifier: card).firstMatch
+            XCTAssertTrue(element.isHittable, app.debugDescription)
+            element.tap()
+            await assertEudiStatusRefresh(app, card: card)
+            ui.returnToWallet()
+            previousCards = currentCards
         }
     }
 

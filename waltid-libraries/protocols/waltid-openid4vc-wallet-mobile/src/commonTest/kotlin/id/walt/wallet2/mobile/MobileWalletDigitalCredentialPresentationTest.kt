@@ -51,6 +51,8 @@ import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
@@ -82,6 +84,40 @@ import kotlin.test.assertTrue
  * become the metadata the provider consent UI renders.
  */
 class MobileWalletDigitalCredentialPresentationTest {
+
+    @Test
+    fun statusReviewedSubmissionOwnsSelectionsBeforeItsFirstSuspendedRead() = runTest {
+        val fixture = walletFixture(sdJwtCredential())
+        try {
+            val preview = fixture.wallet.previewDigitalCredentialPresentation(dcApiRequest(data = sdJwtQuery()))
+            val option = preview.credentialOptions.single()
+            val selections = preview.credentialOptions.selections().toMutableList()
+            val disclosures = option.disclosures.filter { it.selectivelyDisclosable }.map {
+                MobileWalletPresentationDisclosureSelection(option.queryId, option.credentialId, it.path)
+            }.toMutableList()
+            assertTrue(disclosures.isNotEmpty())
+            val reviewed = fixture.wallet.credentialStatusSnapshot().credentials.associate {
+                it.reference.credentialId to it.presentation.advisoryRevision
+            }
+            val reading = CompletableDeferred<Unit>()
+            val resumeReading = CompletableDeferred<Unit>()
+            fixture.beforeNextCredentialRead {
+                reading.complete(Unit)
+                resumeReading.await()
+            }
+            val submitted = async {
+                fixture.wallet.submitStatusReviewedDigitalCredentialPresentation(preview.requestId, selections, disclosures, reviewed)
+            }
+            try {
+                reading.await()
+                selections.clear()
+                disclosures.clear()
+            } finally { resumeReading.complete(Unit) }
+            val data = Json.parseToJsonElement(submitted.await().dataJson).jsonObject
+            val presented = SDJwt.parse(fixture.presentationFor("pid", data))
+            assertTrue(presented.fullPayload.containsKey("family_name"))
+        } finally { fixture.wallet.close() }
+    }
 
     @Test
     fun previewsAndSubmitsAnSdJwtVcRequestThroughTheDigitalCredentialsApi() = runTest {
@@ -936,6 +972,8 @@ class MobileWalletDigitalCredentialPresentationTest {
             credentialStore.reads = 0
         }
 
+        fun beforeNextCredentialRead(block: suspend () -> Unit) { credentialStore.beforeNextRead = block }
+
         /**
          * The registry entry id the platform would have been handed for [credentialId], read back from
          * the published projection rather than recomputed, so no test can pass against an entry id the
@@ -1185,6 +1223,7 @@ class MobileWalletDigitalCredentialPresentationTest {
     private class RecordingCredentialStore : WalletCredentialStore {
         private val credentials = mutableMapOf<String, StoredCredential>()
         var reads: Int = 0
+        var beforeNextRead: (suspend () -> Unit)? = null
 
         override suspend fun getCredential(id: String): StoredCredential? {
             reads++
@@ -1193,6 +1232,7 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         override suspend fun listCredentials(): Flow<StoredCredential> {
             reads++
+            beforeNextRead?.also { beforeNextRead = null }?.invoke()
             return credentials.values.toList().asFlow()
         }
 
