@@ -18,6 +18,7 @@ interface DemoWallet {
     suspend fun close() {}
     fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = emptyFlow()
     suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = WalletDemoCredentialStatuses()
+    suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) {}
     suspend fun refreshCredentialStatuses(ids: Set<String>? = null, force: Boolean = false): WalletDemoStatusRefreshSummary =
         WalletDemoStatusRefreshSummary(0, 0, 0, 0)
     suspend fun submitStatusReviewedPresentation(

@@ -241,9 +241,18 @@ internal class MobileDemoWallet(
     override suspend fun invalidateCredentialStatusSnapshot() = mobileWallet.invalidateCredentialStatusSnapshot()
 
     override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> =
-        flow { mobileWallet.credentialStatuses.collect { emit(it.toDemoStatuses()) } }
+        flow { mobileWallet.credentialStatuses.collect { emit(it.toDemoStatuses().withStatusNotices()) } }
 
-    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = mobileWallet.credentialStatusSnapshot().toDemoStatuses()
+    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses =
+        mobileWallet.credentialStatusSnapshot().toDemoStatuses().withStatusNotices()
+
+    private suspend fun WalletDemoCredentialStatuses.withStatusNotices(): WalletDemoCredentialStatuses =
+        copy(pendingNotices = mobileWallet.pendingCredentialStatusNotices().map {
+            WalletDemoCredentialStatusNotice(it.reference.credentialId, it.version, it.kind.name, it.checkedAt.toString(), it.historical)
+        })
+
+    override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) =
+        mobileWallet.acknowledgeCredentialStatusNotice(credentialId, version)
 
     override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary =
         mobileWallet.refreshCredentialStatuses(ids?.toList(),

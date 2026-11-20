@@ -233,6 +233,7 @@ internal fun createSqlDelightMobileWallet(
     val queries = db.walletPersistenceQueries
     val keyStore = SqlDelightKeyStore(keyProvider, queries, config.walletId)
     val credentialStore = config.persistence.credentialStore ?: SqlDelightCredentialStore(queries)
+    val managedStatus = config.persistence.databaseKey == MobileWalletDatabaseKey.Managed && config.persistence.credentialStore == null
     val didStore = config.persistence.didStore?.let { delegate ->
         object : WalletDidStore by delegate {
             override suspend fun getDefaultDid(): String? =
@@ -252,10 +253,9 @@ internal fun createSqlDelightMobileWallet(
         keyStore = keyStore,
         didStore = didStore,
         credentialStore = credentialStore,
+        managedCredentialStatus = managedStatus,
         statusMaintenance = StatusMaintenanceEnrollmentStore(config.walletId, queries) {
-            if (config.persistence.databaseKey == MobileWalletDatabaseKey.Managed && config.persistence.credentialStore == null) {
-                maintenanceLocation()
-            } else null
+            if (managedStatus) maintenanceLocation() else null
         },
         issuanceSessionStore = issuanceSessionStore,
         runKeyUseAuthorizationPreflight = { keyType, policy ->

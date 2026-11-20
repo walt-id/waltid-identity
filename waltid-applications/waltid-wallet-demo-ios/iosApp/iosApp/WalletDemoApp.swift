@@ -127,8 +127,12 @@ private struct WalletForegroundRoot: View {
         .onReceive(NotificationCenter.default.publisher(for: .backgroundCredentialStatusDidFinish)) { _ in
             viewModel.invalidateBackgroundStatusSnapshot()
         }
+        .onReceive(NotificationCenter.default.publisher(for: WalletDemoCredentialStatusNotifications.openHome)) { _ in
+            handleStatusNotification()
+        }
         .task {
             handlePendingURL()
+            handleStatusNotification()
             guard scenePhase == .active else { return }
             viewModel.handleApplicationBecameActive()
         }
@@ -142,10 +146,18 @@ private struct WalletForegroundRoot: View {
                 if phase == .background { viewModel.handleApplicationEnteredBackground() }
                 return
             }
+            handlePendingURL()
+            handleStatusNotification()
             viewModel.handleApplicationBecameActive()
             if #available(iOS 26.0, *) {
                 Task { await DemoIdentityDocumentRegistration.updateFromPlatformCallback() }
             }
+        }
+    }
+
+    private func handleStatusNotification() {
+        if WalletDemoCredentialStatusNotifications.shared.takeHomeRequest() {
+            viewModel.handleCredentialStatusNotification()
         }
     }
 
@@ -200,6 +212,7 @@ private extension Notification.Name {
 @MainActor
 private final class NativeBackgroundStatusDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        WalletDemoCredentialStatusNotifications.shared.register()
         WalletDemoBackgroundStatusScheduler.shared.register { binding, finish in
             let task = Task { @MainActor in
                 let namespace = IdentityDocumentNamespace.nativeDemo
@@ -214,7 +227,7 @@ private final class NativeBackgroundStatusDelegate: NSObject, UIApplicationDeleg
                         )
                     )
                     switch result {
-                    case .finished: finish(.finished)
+                    case .finished(_, _, _, let hasNewNotice): finish(hasNewNotice ? .finishedWithNotice : .finished)
                     case .deferred: finish(.deferred)
                     case .ineligible: finish(.ineligible)
                     }

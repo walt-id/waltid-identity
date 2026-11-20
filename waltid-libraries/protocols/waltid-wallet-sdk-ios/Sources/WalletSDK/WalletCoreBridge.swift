@@ -8,6 +8,8 @@ protocol WalletCoreBridge: Sendable {
     func credentialStatusMaintenanceEnrollment() async throws -> CredentialStatusMaintenanceEnrollment?
     func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment?
     func invalidateCredentialStatusSnapshot() async throws
+    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice]
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult]
     func close() async throws
     var signingIdentityCore: any SigningIdentityCore { get }
@@ -310,4 +312,6 @@ extension WalletCoreBridge {
     func credentialStatusMaintenanceEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? { nil }
     func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
     func invalidateCredentialStatusSnapshot() async throws {}
+    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice] { [] }
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {}
 }

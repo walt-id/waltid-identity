@@ -51,6 +51,8 @@ internal class WalletDemoActivityModel(
         reconcileBackgroundStatusSchedule = { binding ->
             AndroidBackgroundCredentialStatus.reconcile(applicationContext, binding)
         },
+        initialForeground = false,
+        clearStatusNotification = { AndroidCredentialStatusNotifications.clear(applicationContext) },
         canOpenExternalRequest = { !proximityController.state.value.active },
         scope = viewModelScope,
     )

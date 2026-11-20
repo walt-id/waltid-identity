@@ -62,6 +62,11 @@ internal object AndroidBackgroundCredentialStatus {
         result: CredentialStatusMaintenanceResult,
     ) {
         if (result != CredentialStatusMaintenanceResult.Ineligible) {
+            if (result is CredentialStatusMaintenanceResult.Finished && result.hasNewNotice) {
+                scheduleMutex.withLock {
+                    if (binding != null && binding(context) == binding) AndroidCredentialStatusNotifications.postIfAllowed(context)
+                }
+            }
             changes.tryEmit(Unit)
             return
         }

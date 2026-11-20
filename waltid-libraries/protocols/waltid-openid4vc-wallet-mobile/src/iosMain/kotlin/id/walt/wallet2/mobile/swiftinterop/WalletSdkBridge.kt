@@ -103,6 +103,16 @@ public class WalletSdkBridge private constructor(
     public suspend fun invalidateCredentialStatusSnapshot(): WalletBridgeResult<Unit> =
         walletBridgeCall { operations.invalidateCredentialStatusSnapshot() }
 
+    /** Local, versioned notices for the authenticated wallet. */
+    public suspend fun pendingCredentialStatusNotices(): WalletBridgeResult<List<WalletBridgeCredentialStatusNotice>> =
+        walletBridgeCall { operations.pendingCredentialStatusNotices().map {
+            WalletBridgeCredentialStatusNotice(it.reference.credentialId, it.version, it.kind.name, it.checkedAt.toString(), it.historical)
+        } }
+
+    /** Acknowledges the exact notice that was displayed. */
+    public suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String): WalletBridgeResult<Unit> =
+        walletBridgeCall { operations.acknowledgeCredentialStatusNotice(credentialId, version) }
+
     /** Explicit wallet-scoped status check, preserving typed partial outcomes. */
     public suspend fun refreshCredentialStatuses(credentialIds: List<String>? = null, force: Boolean = false): WalletBridgeResult<String> = walletBridgeCall {
         credentialStatusJson.encodeToString(ListSerializer(CredentialStatusRefreshResult.serializer()),
@@ -437,6 +447,8 @@ internal interface WalletSdkBridgeOperations {
     suspend fun credentialStatusMaintenanceEnrollment(): CredentialStatusMaintenanceEnrollment? = null
     suspend fun setCredentialStatusMaintenance(preference: CredentialStatusMaintenancePreference): CredentialStatusMaintenanceEnrollment? = null
     suspend fun invalidateCredentialStatusSnapshot() {}
+    suspend fun pendingCredentialStatusNotices(): List<id.walt.wallet2.status.PendingCredentialStatusNotice> = emptyList()
+    suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) {}
 
     suspend fun attachKeyAttestationProviderResolver(resolver: WalletBridgeKeyAttestationProviderResolver): Unit =
         error("Key attestation resolution is not implemented by this test bridge")
@@ -570,6 +582,9 @@ internal class MobileWalletSdkBridgeOperations(
     override suspend fun setCredentialStatusMaintenance(preference: CredentialStatusMaintenancePreference) =
         wallet.setCredentialStatusMaintenance(preference)
     override suspend fun invalidateCredentialStatusSnapshot() = wallet.invalidateCredentialStatusSnapshot()
+    override suspend fun pendingCredentialStatusNotices() = wallet.pendingCredentialStatusNotices()
+    override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) =
+        wallet.acknowledgeCredentialStatusNotice(credentialId, version)
 
     override suspend fun attachKeyAttestationProviderResolver(resolver: WalletBridgeKeyAttestationProviderResolver) {
         wallet.attachKeyAttestationProviderResolver(resolver.toKeyAttestationProviderResolver())

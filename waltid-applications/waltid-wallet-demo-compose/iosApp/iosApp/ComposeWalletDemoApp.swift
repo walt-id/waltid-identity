@@ -42,6 +42,9 @@ struct ComposeWalletDemoApp: App {
             .onOpenURL { url in
                 sharedUI.WalletDemoIosKt.handleWalletDemoDeepLink(url: url.absoluteString)
             }
+            .onReceive(NotificationCenter.default.publisher(for: WalletDemoCredentialStatusNotifications.openHome)) { _ in
+                handleStatusNotification()
+            }
         }
     }
 
@@ -62,6 +65,7 @@ struct ComposeWalletDemoApp: App {
             },
             signingProtectionMode: signingProtectionMode,
             onBackgroundStatusEnrollmentChanged: { WalletDemoBackgroundStatusScheduler.shared.reconcile(binding: $0) },
+            onCredentialStatusNoticesCleared: { WalletDemoCredentialStatusNotifications.shared.clear() },
             backgroundStatusSchedulingAvailable: { WalletDemoBackgroundStatusScheduler.shared.canSchedule }
         )
         .ignoresSafeArea()
@@ -78,6 +82,7 @@ struct ComposeWalletDemoApp: App {
     private func enterForeground() async {
         guard scenePhase == .active else { return }
         activated = true
+        handleStatusNotification()
         sharedUI.WalletDemoIosKt.setWalletDemoBackgroundStatusSchedulingAvailable(
             available: WalletDemoBackgroundStatusScheduler.shared.canSchedule
         )
@@ -85,6 +90,12 @@ struct ComposeWalletDemoApp: App {
         enteredForeground = true
         sharedUI.WalletDemoIosKt.handleWalletDemoApplicationForegrounded()
         await Self.reconcileRegistrations()
+    }
+
+    private func handleStatusNotification() {
+        if WalletDemoCredentialStatusNotifications.shared.takeHomeRequest() {
+            sharedUI.WalletDemoIosKt.handleWalletDemoCredentialStatusNotification()
+        }
     }
 
     private static let namespace = IdentityDocumentNamespace.composeDemo
@@ -114,6 +125,7 @@ struct ComposeWalletDemoApp: App {
 @MainActor
 private final class ComposeBackgroundStatusDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        WalletDemoCredentialStatusNotifications.shared.register()
         WalletDemoBackgroundStatusScheduler.shared.register { binding, finish in
             let namespace = IdentityDocumentNamespace.composeDemo
             guard let keychain = namespace.keychainAccessGroup else {
@@ -126,6 +138,7 @@ private final class ComposeBackgroundStatusDelegate: NSObject, UIApplicationDele
                     MainActor.assumeIsolated {
                         switch outcome {
                         case .finished: finish(.finished)
+                        case .finishedWithNotice: finish(.finishedWithNotice)
                         case .ineligible: finish(.ineligible)
                         default: finish(.deferred)
                         }
