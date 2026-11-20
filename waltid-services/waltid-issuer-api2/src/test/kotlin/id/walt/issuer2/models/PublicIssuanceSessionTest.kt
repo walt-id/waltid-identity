@@ -14,6 +14,36 @@ import kotlin.time.Instant
 
 class PublicIssuanceSessionTest {
     @Test
+    fun preallocatedInventoryAndPreparedResponsesArePrivateInBothSessionViews() {
+        val original = IssuanceSessionStorageCodec.decode(Json.encodeToString(baseline()))
+        val request = original.issuanceRequests.single().copy(
+            credentialStatus = JsonArray(listOf(JsonArray(listOf(buildJsonObject { put("unused", "private-status") })))),
+        )
+        val state = id.walt.issuer2.domain.CredentialStatusIssuanceState(
+            leaseId = "private-lease",
+            operations = mapOf("configuration" to id.walt.issuer2.domain.CredentialStatusIssuanceOperation(
+                "private-operation", listOf("private-holder"),
+                id.walt.openid4vci.responses.credential.CredentialResponse(listOf(
+                    id.walt.openid4vci.responses.credential.IssuedCredential(JsonPrimitive("private-signed-response")),
+                )),
+            )),
+        )
+        for (requests in listOf(listOf(request), listOf(request, request.copy(credentialIdentifier = "B")))) {
+            val session = original.copy(issuanceRequests = requests, credentialStatusIssuance = state)
+            assertTrue(Json.encodeToString(session).contains("private-signed-response"))
+            val public = session.toPublicJson().toString()
+            assertFalse(public.contains("private-"))
+            assertFalse(public.contains("credentialStatusIssuance"))
+        }
+        assertTrue((0 until singleIssuanceSessionDescriptor.elementsCount).none {
+            singleIssuanceSessionDescriptor.getElementName(it) == "credentialStatusIssuance"
+        })
+        assertTrue((0 until multiIssuanceSessionDescriptor.elementsCount).none {
+            multiIssuanceSessionDescriptor.getElementName(it) == "credentialStatusIssuance"
+        })
+    }
+
+    @Test
     fun `single session JSON equals the baseline serializer with every optional-field mode`() {
         for (defaults in listOf(false, true)) for (nulls in listOf(false, true)) for (completed in listOf(false, true)) {
             val json = Json { encodeDefaults = defaults; explicitNulls = nulls }
@@ -79,6 +109,7 @@ class PublicIssuanceSessionTest {
             val publicBatch = JsonObject((internal - buildSet {
                 add("deferredState")
                 add("issuanceClaimId")
+                add("credentialStatusIssuance")
                 if (batch.deferredStatus == null) add("deferredStatus")
             }) + ("issuanceResults" to buildJsonObject { put("configuration", publicResult) }))
             assertEquals(batch, IssuanceSessionStorageCodec.decode(internal.toString()))

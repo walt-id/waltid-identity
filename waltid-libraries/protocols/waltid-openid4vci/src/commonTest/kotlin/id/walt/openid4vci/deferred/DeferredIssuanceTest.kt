@@ -164,6 +164,33 @@ class DeferredIssuanceTest {
         assertIs<DeferredIssuance.Collection.Claimed>(service().collect("offer", sibling.id, setOf("sibling"), "wallet"))
     }
 
+    @Test fun discardingUnissuedAcceptanceFencesStaleClaimsAndPreservesOtherTransactions() = runTest {
+        val coordinator = service()
+        coordinator.start("offer", time + 7.days)
+        coordinator.decide("offer", DeferredStatus.READY)
+        val transaction = coordinator.accept("offer", accepted())
+        val sibling = coordinator.accept("offer", accepted("sibling"))
+        suspend fun claim(id: String, credential: String) = assertIs<DeferredIssuance.Collection.Claimed>(
+            coordinator.collect("offer", id, setOf(credential), "wallet"),
+        ).transaction
+
+        val stale = claim(transaction.id, "credential")
+        time += 6.minutes
+        val current = claim(transaction.id, "credential")
+        val signed = claim(sibling.id, "sibling")
+        val response = CredentialResponse(listOf(IssuedCredential(JsonPrimitive("signed"))))
+        coordinator.checkpoint("offer", signed, response)
+        assertFailsWith<IllegalStateException> { coordinator.discardUnissued("offer", stale) }
+        assertFailsWith<IllegalStateException> { coordinator.discardUnissued("offer", signed) }
+
+        coordinator.discardUnissued("offer", current)
+        assertEquals("invalid_transaction_id", assertFailsWith<DeferredProtocolException> {
+            coordinator.collect("offer", transaction.id, setOf("credential"), "wallet")
+        }.error.error)
+        assertNotEquals(transaction.id, service().accept("offer", accepted()).id)
+        assertEquals(response, service().accept("offer", accepted("sibling")).response)
+    }
+
     private class Store(var value: DeferredSessionSnapshot?) : DeferredIssuanceStore {
         private val mutex = Mutex()
         override suspend fun get(id: String) = mutex.withLock { value?.takeIf { it.id == id } }
