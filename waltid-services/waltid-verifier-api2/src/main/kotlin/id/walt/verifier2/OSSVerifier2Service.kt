@@ -197,9 +197,12 @@ object Verifier2Service {
             }) {
                 if (FeatureManager.isFeatureEnabled(CommonsFeatureCatalog.proximityVerifierFeature)) {
                     post<ExternalReaderDeviceResponse>("proximity/device-response", ExternalReaderDeviceResponseOpenApi.docs) { request ->
+                        // An IllegalArgumentException describes the submission (the setup and reader checks,
+                        // Base64 and CBOR decoding), so its reason is returned. Anything else is not the
+                        // caller's input and is left to StatusPages, which hides its message.
                         val submission = try {
                             request.parse()
-                        } catch (cause: Exception) {
+                        } catch (cause: IllegalArgumentException) {
                             throw BadRequestException("Invalid external-reader submission: ${cause.message}", cause)
                         }
                         val outcome = ExternalReaderVerification.verify(

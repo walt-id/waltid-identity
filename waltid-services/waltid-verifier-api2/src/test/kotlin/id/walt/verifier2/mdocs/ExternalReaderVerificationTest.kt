@@ -98,6 +98,7 @@ import kotlin.io.encoding.Base64
 import kotlin.io.path.deleteIfExists
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import io.ktor.client.statement.bodyAsText
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -356,6 +357,9 @@ class ExternalReaderVerificationTest {
         for (body in invalid) {
             assertEquals(HttpStatusCode.BadRequest, http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(body) }.status)
         }
+        // A rejection of the submission itself keeps the verifier's reason, so the reader can fix it.
+        val privateKeyRejection = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(invalid[3]) }.bodyAsText()
+        assertTrue("eReaderKey must contain public key material only" in privateKeyRejection, privateKeyRejection)
         assertNull(repository.get("must-not-exist"))
         assertEquals(0, repository.size)
     }
