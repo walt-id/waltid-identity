@@ -115,9 +115,9 @@ row. The portal exposes Copy instead of Download for short inline values; the
 bridge never accesses the clipboard. It reads declarative
 DC API inputs without executing supplied JavaScript. Downloads are removed immediately after reading. For DC API cases, the app
 driver uses Chrome at the counterpart's origin and the Android credential picker.
-The unattended emulator confirms Chrome's disclosure prompt and Android's
-sharing sheet for the configured ITB host. In attended mode the operator
-confirms those prompts.
+Both demo modes confirm Chrome's disclosure prompt and Android's sharing
+sheet when the displayed origin matches the configured ITB host. The operator
+reviews and approves each payment in the wallet and authenticates on the phone.
 The unattended driver declines Chrome's separate notification onboarding if it
 appears during the credential flow.
 The hosted emulator enables Chrome's Digital Credentials issuance feature. This

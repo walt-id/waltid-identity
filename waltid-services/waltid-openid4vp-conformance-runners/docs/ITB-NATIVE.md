@@ -35,7 +35,8 @@ their issuance prerequisites, and every case reports its own exact ITB session.
 For a watched run of all 27 selected cases on the phone, leave `ITB_CASES` unset,
 set `ITB_SHOW_BROWSER=true` and open `android device hub --device <physical-serial>`.
 The desktop browser shows the portal. The mirror shows the wallet, Android Chrome
-and provider handoffs. Complete biometric prompts on the phone itself.
+and provider handoffs. The driver confirms the browser and Android sharing prompts
+for the configured ITB host. Complete payment consent and biometrics on the phone.
 
 Reports identify the attended demo mode and both APK digests. The optional
 `ItbNativeWalletDeviceTest` SDK fixture is also available for protocol diagnostics
