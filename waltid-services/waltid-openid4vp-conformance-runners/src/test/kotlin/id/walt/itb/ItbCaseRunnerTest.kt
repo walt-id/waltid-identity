@@ -15,7 +15,7 @@ import java.net.ServerSocket
 import kotlin.test.*
 
 class ItbCaseRunnerTest {
-    private val suite = ItbCatalogue.walletCases().suites.first()
+    private val suite = ItbCatalogue.walletCases().suites.single { it.id == "cs01v1" }
     private val case = suite.cases.single { it.id == "tc_vci_006" }
     private val session = "00000000-0000-0000-0000-000000000001"
     private val report = javaClass.getResource("/itb/vci006-success.xml")!!.readText()
@@ -26,6 +26,8 @@ class ItbCaseRunnerTest {
         var interaction: ItbWalletInteraction = ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer=%7B%7D"))
         var reads = 0
         var completed = false
+        var confirmed = false
+        var nextInteraction: ItbWalletInteraction? = null
         var readFailure: Exception? = null
         override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case) =
             ItbSession(suite.id, case.id, session)
@@ -34,7 +36,16 @@ class ItbCaseRunnerTest {
             readFailure?.let { throw it }
             return interaction
         }
+        override suspend fun readNext(session: ItbSession): ItbWalletInteraction {
+            check(completed) { "The previous interaction has not been acknowledged" }
+            completed = false
+            return checkNotNull(nextInteraction)
+        }
         override suspend fun complete() { completed = true }
+        override suspend fun confirmRevocation(session: ItbSession) {
+            check(completed)
+            confirmed = true
+        }
     }
 
     @Test
@@ -49,7 +60,7 @@ class ItbCaseRunnerTest {
                 else -> error("Unexpected request")
             }, headers = headersOf(HttpHeaders.ContentType, "application/json"))
         }).use { client ->
-            val runner = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, { walletCalls++ }, pollMillis = 1)
+            val runner = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, { walletCalls++; ItbWalletResult() }, pollMillis = 1)
             val result = runner.run(suite, case)
             assertEquals(ItbCaseResult.Outcome.PASSED, result.outcome)
             assertEquals(2, statusCalls)
@@ -82,12 +93,84 @@ class ItbCaseRunnerTest {
                     else -> error("Unexpected request")
                 }, headers = headersOf(HttpHeaders.ContentType, "application/json"))
             }).use { client ->
-                val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, { walletCalls++ })
-                    .run(suite, case.copy(invocationScheme = expected))
+                val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, {
+                    walletCalls++
+                    assertEquals("required-pid", assertIs<ItbWalletInteraction.Presentation>(it).credentialId)
+                    ItbWalletResult()
+                }).run(suite, case.copy(invocationScheme = expected), "required-pid")
                 assertEquals(if (valid) ItbCaseResult.Outcome.PASSED else ItbCaseResult.Outcome.ERROR, result.outcome)
                 assertEquals(if (valid) 1 else 0, walletCalls)
                 assertEquals(!valid, stopped)
                 if (!valid) assertEquals(ItbCaseResult.Phase.INTERACTION, result.phase)
+            }
+        }
+    }
+
+    @Test
+    fun missingRequiredCredentialNeverStartsTheDependentSession() = runBlocking<Unit> {
+        val catalogue = ItbCatalogue.walletCases()
+        val presentation = catalogue.suites.single { it.id == "cs02v1" }
+        val vp = presentation.cases.single { it.id == "tc_vp_012" }
+        HttpClient(MockEngine { error("No tenant request should be made") }).use { client ->
+            val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), {
+                error("No wallet operation should be performed")
+            }).run(presentation, vp)
+            assertNull(result.session)
+            assertEquals(ItbCaseResult.Outcome.PREREQUISITE_FAILED, result.outcome)
+            assertEquals("cs01v1/tc_vci_006", result.errorCode)
+        }
+    }
+
+    @Test
+    fun sharedRevocationCaseRequiresTwoDifferentOffersInOneSession() = runBlocking<Unit> {
+        val suite = ItbCatalogue.walletCases().suites.single { it.id == "cs10-test-suite" }
+        val case = suite.cases.single { it.id == "rv_iss_01" }
+        for (second in listOf(
+            ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer_uri=https://issuer.example/second")),
+            null,
+        )) {
+            val bridge = Bridge().apply { nextInteraction = second ?: interaction }
+            val walletSteps = mutableListOf<ItbWalletInteraction>()
+            var stopped = false
+            HttpClient(MockEngine { request ->
+                respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                    "status" -> status(bridge.confirmed)
+                    "stop" -> { stopped = true; "" }
+                    session -> report.replace("id=\"tc_vci_006\"", "id=\"rv_iss_01\"")
+                    else -> error("Unexpected request")
+                })
+            }).use { client ->
+                val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, {
+                    walletSteps += it
+                    when (it) {
+                        is ItbWalletInteraction.Offer -> ItbWalletResult(issuedCredentialIds = listOf("issued-${walletSteps.size}"))
+                        is ItbWalletInteraction.CheckStatus -> ItbWalletResult(
+                            statusObservations = List(2) { ItbStatusObservation("Not checked", "Status clear") },
+                        )
+                        else -> error("Unexpected wallet operation")
+                    }
+                }).run(suite, case)
+                assertEquals(1, bridge.reads)
+                if (second != null) {
+                    assertEquals(
+                        listOf(bridge.interaction, second, ItbWalletInteraction.CheckStatus(
+                            listOf("issued-1", "issued-2"), ItbExpectedStatus.CLEAR,
+                        )),
+                        walletSteps,
+                    )
+                    assertEquals(2, result.statusObservations.size)
+                    assertEquals(ItbCaseResult.Outcome.PASSED, result.outcome)
+                    assertTrue(result.walletSucceeded)
+                    assertTrue(bridge.confirmed)
+                    assertFalse(stopped)
+                } else {
+                    assertEquals(listOf(bridge.interaction), walletSteps)
+                    assertEquals(ItbCaseResult.Phase.INTERACTION, result.phase)
+                    assertEquals(ItbCaseResult.Outcome.ERROR, result.outcome)
+                    assertFalse(result.walletSucceeded)
+                    assertFalse(bridge.confirmed)
+                    assertTrue(stopped)
+                }
             }
         }
     }
@@ -191,7 +274,7 @@ class ItbCaseRunnerTest {
             "token_endpoint_http_0",
     )
 
-    private suspend fun assertTokenFailureReported(expected: String, execute: suspend (ItbWalletInteraction) -> Unit) {
+    private suspend fun assertTokenFailureReported(expected: String, execute: suspend (ItbWalletInteraction) -> ItbWalletResult) {
         HttpClient(MockEngine { request ->
             respond(when (request.url.encodedPath.substringAfterLast('/')) {
                 "status" -> status(false, "UNDEFINED")
@@ -262,7 +345,7 @@ class ItbCaseRunnerTest {
                 else -> error("Unexpected request")
             }, headers = headersOf(HttpHeaders.ContentType, "application/json"))
         }).use { client ->
-            val runner = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), {})
+            val runner = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), { ItbWalletResult() })
             val result = runner.run(suite, case)
             assertEquals(ItbCaseResult.Outcome.ERROR, result.outcome)
             assertNull(result.testBedVerdict)
@@ -283,7 +366,7 @@ class ItbCaseRunnerTest {
                     else -> error("Unexpected request")
                 })
             }).use { client ->
-                val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), {})
+                val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(), { ItbWalletResult() })
                     .run(suite, case)
                 assertEquals(expected, result.outcome)
                 assertTrue(result.walletSucceeded && result.testBedCompleted)
@@ -304,7 +387,7 @@ class ItbCaseRunnerTest {
         }).use { client ->
             val result = ItbCaseRunner(
                 ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), Bridge(),
-                { kotlinx.coroutines.delay(Long.MAX_VALUE) }, caseTimeoutMillis = 100,
+                { awaitCancellation() }, caseTimeoutMillis = 100,
             ).run(suite, case)
             assertEquals(ItbCaseResult.Outcome.TIMED_OUT, result.outcome)
             assertTrue(stopped)
@@ -344,7 +427,9 @@ class ItbCaseRunnerTest {
                 throw IllegalStateException("private portal details")
             }
             override suspend fun read(session: ItbSession): ItbWalletInteraction = error("Must not start")
+            override suspend fun readNext(session: ItbSession): ItbWalletInteraction = error("Must not read")
             override suspend fun complete() = error("Must not complete")
+            override suspend fun confirmRevocation(session: ItbSession) = error("Must not confirm")
         }
         HttpClient(MockEngine { error("No owned session exists; do not query or stop tenant sessions") }).use { client ->
             val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, {
@@ -367,7 +452,9 @@ class ItbCaseRunnerTest {
                 ItbSession(suite.id, case.id, session)
             override suspend fun read(session: ItbSession): ItbWalletInteraction =
                 throw ItbPortalStepTimeout(ItbPortalStepTimeout.Step.START)
+            override suspend fun readNext(session: ItbSession): ItbWalletInteraction = error("Must not read")
             override suspend fun complete() = error("Must not complete")
+            override suspend fun confirmRevocation(session: ItbSession) = error("Must not confirm")
         }
         HttpClient(MockEngine { request ->
             respond(when (request.url.encodedPath.substringAfterLast('/')) {

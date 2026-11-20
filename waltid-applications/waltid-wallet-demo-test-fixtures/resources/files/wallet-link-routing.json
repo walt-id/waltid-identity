@@ -1,4 +1,6 @@
 [
+  { "input": "eu-eaap://?request_uri=https%3A%2F%2Fverifier.example%2Frequest", "kind": "Presentation" },
+  { "input": "haip-vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest", "kind": "Presentation" },
   {
     "input": "",
     "kind": "Empty"

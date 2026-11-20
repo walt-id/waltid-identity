@@ -15,6 +15,7 @@ import kotlin.coroutines.coroutineContext
 
 /** Test-only, bounded messages over loopback + adb forwarding. No private-key signing RPC. */
 internal object ItbDeviceWire {
+    const val VERSION = 2
     private const val MAX_BYTES = 1024 * 1024
 
     fun approvedOrigin(value: String): Url = Url(value).also {
@@ -59,47 +60,83 @@ internal object ItbDeviceWire {
         require(MessageDigest.isEqual(received.encodeToByteArray(), expected.encodeToByteArray())) {
             "ITB device authentication failed"
         }
-        require(request["version"]?.jsonPrimitive?.intOrNull == 1) { "Unsupported device protocol" }
+        require(request["version"]?.jsonPrimitive?.intOrNull == VERSION) { "Unsupported device protocol" }
     }
 
     fun encode(interaction: ItbWalletInteraction): JsonObject = buildJsonObject {
         when (interaction) {
             is ItbWalletInteraction.Offer -> {
-                put("kind", "offer"); put("url", interaction.url.toString())
+                put("kind", "offer")
+                put("url", interaction.url.toString())
                 interaction.transactionCode?.let { put("transactionCode", it) }
             }
-            is ItbWalletInteraction.Presentation -> { put("kind", "presentation"); put("url", interaction.url.toString()) }
+            is ItbWalletInteraction.CheckStatus -> {
+                put("kind", "check_status")
+                put("credentialIds", JsonArray(interaction.credentialIds.map(::JsonPrimitive)))
+                put("expected", interaction.expected.name)
+            }
+            is ItbWalletInteraction.Presentation -> {
+                put("kind", "presentation")
+                put("url", interaction.url.toString())
+                interaction.credentialId?.let { put("credentialId", it) }
+                put("attended", interaction.attended)
+            }
             is ItbWalletInteraction.DigitalCredentials -> {
-                put("kind", "dc"); put("endpoint", interaction.endpoint.toString())
-                put("validationSession", interaction.validationSession); put("profile", interaction.profile)
+                put("kind", "dc")
+                put("endpoint", interaction.endpoint.toString())
+                put("validationSession", interaction.validationSession)
+                put("profile", interaction.profile)
                 put("protocol", interaction.protocol)
-                interaction.payment?.let { payment -> put("payment", buildJsonObject {
-                    put("attestationType", payment.attestationType); put("merchant", payment.merchant)
-                    put("payeeId", payment.payeeId); put("currency", payment.currency)
-                    put("amount", payment.amount); put("transactionId", payment.transactionId)
-                }) }
+                interaction.credentialId?.let { put("credentialId", it) }
+                interaction.payment?.let { payment ->
+                    put("payment", buildJsonObject {
+                        put("attestationType", payment.attestationType)
+                        put("merchant", payment.merchant)
+                        put("payeeId", payment.payeeId)
+                        put("currency", payment.currency)
+                        put("amount", payment.amount)
+                        put("transactionId", payment.transactionId)
+                    })
+                }
+            }
+            is ItbWalletInteraction.DigitalIssuance -> {
+                put("kind", "dc_issuance")
+                put("endpoint", interaction.endpoint.toString())
+                put("scenario", interaction.scenario)
+                put("credentialType", interaction.credentialType)
+                put("protocol", interaction.protocol)
             }
         }
     }
 
     fun decode(value: JsonObject): ItbWalletInteraction {
         fun JsonObject.text(name: String) = getValue(name).jsonPrimitive.content
+        val credentialId = value["credentialId"]?.jsonPrimitive?.content
         return when (value.text("kind")) {
             "offer" -> ItbWalletInteraction.Offer(Url(value.text("url")), value["transactionCode"]?.jsonPrimitive?.content)
-            "presentation" -> ItbWalletInteraction.Presentation(Url(value.text("url")))
+            "check_status" -> ItbWalletInteraction.CheckStatus(
+                value.getValue("credentialIds").jsonArray.map { it.jsonPrimitive.content },
+                ItbExpectedStatus.valueOf(value.text("expected")),
+            )
+            "presentation" -> ItbWalletInteraction.Presentation(
+                Url(value.text("url")), credentialId, value.getValue("attended").jsonPrimitive.boolean,
+            )
             "dc" -> ItbWalletInteraction.DigitalCredentials(
                 Url(value.text("endpoint")), value.text("validationSession"), value.text("profile"), value.text("protocol"),
                 value["payment"]?.jsonObject?.let { ItbWalletInteraction.Payment(
                     it.text("attestationType"), it.text("merchant"), it.text("payeeId"),
                     it.text("currency"), it.text("amount"), it.text("transactionId"),
-                ) },
+                ) }, credentialId,
+            )
+            "dc_issuance" -> ItbWalletInteraction.DigitalIssuance(
+                Url(value.text("endpoint")), value.text("scenario"), value.text("credentialType"), value.text("protocol"),
             )
             else -> error("Unsupported wallet operation")
         }
     }
 
     /** EOF cancels an in-flight wallet operation, including an outstanding native prompt. */
-    suspend fun serve(socket: Socket, execute: suspend (ItbWalletInteraction) -> Unit) = coroutineScope {
+    suspend fun serve(socket: Socket, execute: suspend (ItbWalletInteraction) -> ItbWalletResult) = coroutineScope {
         val scope = this
         val requests = Channel<JsonObject>()
         val reader = launch {
@@ -115,9 +152,12 @@ internal object ItbDeviceWire {
                 require(request["sequence"]?.jsonPrimitive?.intOrNull == expected++) { "Out-of-order wallet operation" }
                 require(expected <= 101) { "Device run exceeds its bounded operation count" }
                 val result = try {
-                    execute(decode(request.getValue("interaction").jsonObject))
+                    val observation = execute(decode(request.getValue("interaction").jsonObject))
                     coroutineContext.ensureActive()
-                    buildJsonObject { put("success", true) }
+                    buildJsonObject {
+                        put("success", true)
+                        put("observation", Json.encodeToJsonElement(ItbWalletResult.serializer(), observation))
+                    }
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Exception) {
                     // Never send exception messages, credentials or protocol values to the host report.

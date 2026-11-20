@@ -70,7 +70,7 @@ suspend fun createAndroidDemoMobileWallet(
                 attestationConfig = config.toWalletAttestationConfig(),
                 walletProvider = config.toWalletProviderConfig(),
                 transactionDataProfiles = transactionDataProfiles.profiles,
-                paymentCredentialIssuers = demoPaymentCredentialIssuers,
+                paymentCredentialIssuers = config.paymentCredentialIssuers(),
                 preferredLocales = LocaleList.getDefault().let { locales ->
                     List(locales.size()) { index -> locales[index].toLanguageTag() }
                 },

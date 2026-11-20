@@ -7,7 +7,7 @@ import id.walt.wallet2.consent.PaymentCredentialIssuer
  * The issuer string must equal the credential `iss` claim, and the JWK must be the
  * public half of the key that signed it.
  */
-internal val demoPaymentCredentialIssuers = listOf(
+private val demoPaymentCredentialIssuers = listOf(
     PaymentCredentialIssuer(
         issuer = "https://issuer2.demo.walt.id/openid4vci",
         publicJwkJson = """{"kty":"EC","crv":"P-256","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}""",
@@ -17,3 +17,9 @@ internal val demoPaymentCredentialIssuers = listOf(
         publicJwkJson = """{"kty":"EC","crv":"P-256","x":"dUpq6W-c6yLniF3k5Lj5j4rFysYXmnHTSK_aOb2JV_A","y":"urKlUBnHoHIeBP9YuCj9ZwVBewS4yNkaT1J64gQLnEw"}""",
     ),
 )
+
+
+internal fun DemoWalletConfig.paymentCredentialIssuers(): List<PaymentCredentialIssuer> =
+    demoPaymentCredentialIssuers + paymentCredentialIssuerKeys.map { (issuer, jwk) ->
+        PaymentCredentialIssuer(issuer = issuer, publicJwkJson = jwk)
+    }

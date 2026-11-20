@@ -1,3 +1,4 @@
+import com.android.build.api.variant.BuildConfigField
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -5,6 +6,7 @@ plugins {
     id("com.android.application")
     id("waltid.licensee")
     kotlin("plugin.compose")
+    alias(identityLibs.plugins.kotlin.serialization)
     alias(identityLibs.plugins.google.services)
 }
 
@@ -46,6 +48,7 @@ android {
         buildConfigField("String", "ATTESTATION_BEARER_TOKEN", "\"${providers.gradleProperty("attestation.bearerToken").getOrElse("")}\"")
         buildConfigField("String", "ATTESTATION_HOST_HEADER", "\"${providers.gradleProperty("attestation.hostHeader").getOrElse("")}\"")
         buildConfigField("String", "TRANSACTION_DATA_PROFILES_URL", "\"${providers.gradleProperty("transactionDataProfiles.url").getOrElse(publicDemoTransactionDataProfilesUrl)}\"")
+        buildConfigField("boolean", "ITB_PAYMENT_TRUST", "false")
         buildConfigField("String", "WALLET_SIGNING_PROTECTION_MODE", "\"$walletSigningProtectionMode\"")
     }
 
@@ -89,7 +92,17 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
-    sourceSets["androidTest"].kotlin.directories.add("../androidTestFixtures/kotlin")
+    sourceSets["androidTest"].kotlin.directories.addAll(listOf(
+        "../androidTestFixtures/kotlin",
+        "../../../waltid-services/waltid-openid4vp-conformance-runners/src/deviceShared/kotlin",
+    ))
+}
+
+// The reference payment issuer is trusted only by a deliberately built Preview Debug APK.
+if (providers.gradleProperty("itbDemoPaymentTrust").orNull == "true") {
+    androidComponents.onVariants(androidComponents.selector().withBuildType("debug").withFlavor("environment" to "preview")) {
+        requireNotNull(it.buildConfigFields).put("ITB_PAYMENT_TRUST", BuildConfigField("boolean", "true", null))
+    }
 }
 
 dependencies {
@@ -97,6 +110,7 @@ dependencies {
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedUI"))
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
     implementation(identityLibs.androidx.activity.compose)
+    implementation(identityLibs.androidx.browser)
     implementation(identityLibs.androidx.credentials.registry.provider)
     debugImplementation(identityLibs.androidx.credentials.play.services.auth)
     debugImplementation(identityLibs.androidx.lifecycle.runtime)
@@ -115,6 +129,8 @@ dependencies {
     androidTestImplementation(identityLibs.coil.compose)
     androidTestImplementation(identityLibs.androidx.test.uiautomator)
     androidTestImplementation(identityLibs.ktor.client.android)
+    androidTestImplementation(identityLibs.oshai.kotlinlogging)
+    androidTestImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
     androidTestImplementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
     // The Annex C E2E is its own reader, because Annex C has no back-channel: the encrypted
     // DeviceResponse returns through the OS to whoever called getCredential. It builds the request

@@ -15,6 +15,32 @@ class ItbPortalContractTest {
     """.trimIndent()
 
     @Test
+    fun dcIssuanceUsesTheDeployedPidProfileAndPinsTheIssuerStatusRoute() {
+        val script = """
+            const offerEndpoint = 'https://dev-i4mlab.aegean.gr/rfc-issuer/vci/dc-api/offer';
+            const scenario = 'pid-authorization-code';
+            const credentialType = 'urn:eu.europa.ec.eudi:pid:1';
+            const protocol = 'openid4vci-v1';
+        """.trimIndent()
+        val issue = ItbPortalBridge.parseDigitalIssuance(script)
+        assertEquals("pid-authorization-code", issue.scenario)
+        assertEquals("openid4vci-v1", issue.protocol)
+        assertFailsWith<IllegalArgumentException> {
+            ItbPortalBridge.parseDigitalIssuance(script.replace("openid4vci-v1", "other"))
+        }
+        assertEquals(
+            "https://dev-i4mlab.aegean.gr/rfc-issuer/vci/dc-api/session/owned",
+            ItbAndroidBrowser.issuanceStatusEndpoint(issue.endpoint, "owned", "/vci/dc-api/session/owned").toString(),
+        )
+        for (advertised in listOf("/vci/dc-api/session/other", "https://other.example/vci/dc-api/session/owned",
+            "/vci/dc-api/session/owned?token=unexpected")) {
+            assertFailsWith<IllegalArgumentException> {
+                ItbAndroidBrowser.issuanceStatusEndpoint(issue.endpoint, "owned", advertised)
+            }
+        }
+    }
+
+    @Test
     fun readsTheDeployedScriptsSessionAndProtocolWithoutExecutingIt() {
         val request = ItbPortalBridge.parseDigitalCredentials(script)
         assertEquals("00000000-0000-0000-0000-000000000001", request.validationSession)

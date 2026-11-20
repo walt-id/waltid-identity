@@ -4,7 +4,9 @@ import com.microsoft.playwright.Page
 import com.microsoft.playwright.Locator
 import com.microsoft.playwright.TimeoutError
 import com.microsoft.playwright.options.AriaRole
+import com.microsoft.playwright.options.ElementState
 import com.microsoft.playwright.options.WaitUntilState
+import io.ktor.http.URLParserException
 import io.ktor.http.Url
 import java.nio.ByteBuffer
 import java.util.regex.Pattern
@@ -13,12 +15,26 @@ import java.nio.file.Files
 /** The owned session started, but the portal displayed its generic execution error. */
 internal class ItbPortalExecutionError : IllegalStateException("The ITB portal could not start the wallet interaction")
 
+/** A fixed reason suitable for reports that must never include the downloaded interaction. */
+internal class ItbPortalInputError(val reason: Reason) : IllegalArgumentException(reason.name) {
+    enum class Reason {
+        INTERACTION_DOWNLOAD_SIZE,
+        PRESENTATION_QR_IMAGE_FORMAT,
+        PRESENTATION_QR_IMAGE_DIMENSIONS,
+        PRESENTATION_QR_IMAGE_READ,
+        PRESENTATION_QR_UNREADABLE,
+        PRESENTATION_QR_INVALID_URL,
+        ISSUANCE_OFFER_QR_MISSING,
+        ISSUANCE_OFFER_INVALID_URL,
+    }
+}
+
 /** A bounded portal step timed out; the step name is safe to include in sanitized reports. */
 internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The ITB portal timed out at $step") {
     enum class Step {
         LOGIN_NAVIGATION, LOGIN_FORM, LOGIN_SUBMIT, LOGIN_HOME,
         NAVIGATION, SYSTEM, STATEMENT, ACTOR, EXECUTION_MODE, CASE,
-        SESSION, START, INTERACTION, DIALOG, DOWNLOAD_CONTROL, DOWNLOAD_EVENT,
+        SESSION, START, INTERACTION, DIALOG, CONFIRMATION, DOWNLOAD_CONTROL, DOWNLOAD_EVENT,
     }
 }
 
@@ -77,6 +93,7 @@ class ItbPortalBridge(
     )
 
     private fun sessionId(): String = page.locator(".session-table-title-value .value").innerText().trim()
+    private fun dialog(): Locator = page.locator("ngb-modal-window:not([aria-hidden=true])")
 
     private inline fun <T> step(name: ItbPortalStepTimeout.Step, action: () -> T): T = try {
         action()
@@ -85,17 +102,25 @@ class ItbPortalBridge(
     }
 
     override suspend fun read(session: ItbSession): ItbWalletInteraction {
-        check(step(ItbPortalStepTimeout.Step.SESSION, ::sessionId) == session.session) {
-            "The portal is not showing the owned ITB session"
-        }
+        verifySession(session)
         // Interactive execution keeps DC API instructions pending; REST background starts skip those steps.
         step(ItbPortalStepTimeout.Step.START) {
             page.waitForCondition { startButton().isEnabled }
             startButton().click()
         }
-        val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
+        return readNext(session)
+    }
+
+    private fun verifySession(session: ItbSession) {
+        check(step(ItbPortalStepTimeout.Step.SESSION, ::sessionId) == session.session) {
+            "The portal is not showing the owned ITB session"
+        }
+    }
+
+    override suspend fun readNext(session: ItbSession): ItbWalletInteraction {
+        val dialog = dialog()
         val interaction = dialog.getByText(Pattern.compile(
-            "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request)\\s*$",
+            "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request|Prepare offer and invoke wallet for PID issuance)\\s*$",
         ))
         val portalError = page.getByText("Unexpected Error", Page.GetByTextOptions().setExact(true))
         // Some reference-service starts take longer than the ordinary 15-second DOM timeout.
@@ -107,17 +132,36 @@ class ItbPortalBridge(
             )
         }
         if (portalError.count() > 0 && interaction.count() == 0) throw ItbPortalExecutionError()
+        verifySession(session)
         val text = step(ItbPortalStepTimeout.Step.DIALOG) { dialog.innerText() }
         return when {
             text.contains("VCI request") -> {
                 val pin = Regex("\\bPIN\\s+([0-9]+)\\b").find(text)?.groupValues?.get(1)
-                require(session.testCase != "tc_vci_007" || pin != null) { "The ITB interaction did not supply its transaction code" }
-                ItbWalletInteraction.Offer(Url(preview("VCI request")), pin)
+                require(session.testSuite != "cs01v1" || session.testCase != "tc_vci_007" || pin != null) {
+                    "The ITB interaction did not supply its transaction code"
+                }
+                val offer = offerUrl(preview("VCI request")) ?: run {
+                    // The issuer adapter can expose a non-QR barcode decode in its derived VCI text.
+                    val qr = row(Pattern.compile("^(?:VCI request QR code|Credential QR code|Credential Offer QR code|QR code)$",
+                        Pattern.CASE_INSENSITIVE))
+                    if (qr.count() != 1) throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_QR_MISSING)
+                    offerUrl(ItbPresentationQr.decode(download(qr)))
+                        ?: throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_INVALID_URL)
+                }
+                ItbWalletInteraction.Offer(offer, pin)
             }
             // Consume the wallet-facing QR directly; ITB's derived text can be a false EAN/UPC decode.
-            text.contains("VP request") -> ItbWalletInteraction.Presentation(
-                Url(ItbPresentationQr.decode(download(row("Credential QR code")))),
-            )
+            text.contains("VP request") -> {
+                val qrLabel = if (session.testSuite == "ts12") "VP request QR code" else "Credential QR code"
+                val invocation = ItbPresentationQr.decode(download(row(qrLabel)))
+                val url = try {
+                    Url(invocation)
+                } catch (_: URLParserException) {
+                    throw ItbPortalInputError(ItbPortalInputError.Reason.PRESENTATION_QR_INVALID_URL)
+                }
+                ItbWalletInteraction.Presentation(url)
+            }
+            text.contains(ISSUANCE_LABEL) -> parseDigitalIssuance(preview(ISSUANCE_LABEL))
             text.contains("TS12 payment Digital Credentials API presentation request") -> parseDigitalCredentials(
                 preview("TS12 payment Digital Credentials API presentation request"),
             )
@@ -128,10 +172,20 @@ class ItbPortalBridge(
         }
     }
 
-    private fun row(label: String): Locator {
-        val dialog = page.locator("ngb-modal-window:not([aria-hidden=true])")
-        return dialog.locator("app-any-content-view").filter(
+    private fun offerUrl(value: String): Url? = try {
+        Url(value).takeIf { it.protocol.name == "openid-credential-offer" }
+    } catch (_: URLParserException) {
+        null
+    }
+
+    private fun row(label: String): Locator =
+        dialog().locator("app-any-content-view").filter(
             Locator.FilterOptions().setHas(page.getByText(label, Page.GetByTextOptions().setExact(true))),
+        )
+
+    private fun row(label: Pattern): Locator {
+        return dialog().locator("app-any-content-view").filter(
+            Locator.FilterOptions().setHas(page.getByText(label)),
         )
     }
 
@@ -164,29 +218,67 @@ class ItbPortalBridge(
         }
         return try {
             val path = download.path()
-            require(Files.size(path) <= 1024 * 1024) { "The ITB interaction exceeds the size limit" }
+            if (Files.size(path) !in 1..1024 * 1024) {
+                throw ItbPortalInputError(ItbPortalInputError.Reason.INTERACTION_DOWNLOAD_SIZE)
+            }
             Files.readAllBytes(path)
         } finally {
             download.delete()
         }
     }
 
-    override suspend fun complete() {
-        page.locator("ngb-modal-window:not([aria-hidden=true])")
-            .getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(Pattern.compile("Close"))).click()
+    override suspend fun complete() = step(ItbPortalStepTimeout.Step.DIALOG) { close(dialog()) }
+
+    override suspend fun confirmRevocation(session: ItbSession) {
+        val label = when ("${session.testSuite}/${session.testCase}") {
+            "cs10-test-suite/rv_iss_01" -> "Confirm both credentials are shown as valid."
+            "cs10-test-suite/rv_iss_02" -> "Confirm the wallet reports the credential as revoked."
+            else -> error("This ITB case has no revocation confirmation")
+        }
+        val confirmation = dialog().filter(Locator.FilterOptions().setHas(
+            page.getByText(label, Page.GetByTextOptions().setExact(true)),
+        ))
+        step(ItbPortalStepTimeout.Step.CONFIRMATION) {
+            confirmation.waitFor(Locator.WaitForOptions().setTimeout(45_000.0))
+            verifySession(session)
+            close(confirmation)
+        }
+    }
+
+    private fun close(dialog: Locator) {
+        val previous = dialog.elementHandle()
+        try {
+            dialog.getByRole(AriaRole.BUTTON, Locator.GetByRoleOptions().setName(Pattern.compile("Close"))).click()
+            // The following interaction may reuse the same labels.
+            previous.waitForElementState(ElementState.HIDDEN)
+        } finally {
+            previous.dispose()
+        }
     }
 
     companion object {
         internal const val APPLICATION_READY_TIMEOUT_MILLIS = 60_000.0
 
+        private const val ISSUANCE_LABEL = "Prepare offer and invoke wallet for PID issuance"
+
+        internal fun parseDigitalIssuance(script: String): ItbWalletInteraction.DigitalIssuance =
+            ItbWalletInteraction.DigitalIssuance(
+                Url(string(script, "offerEndpoint")), string(script, "scenario"),
+                string(script, "credentialType"), string(script, "protocol"),
+            ).also {
+                require(it.scenario == "pid-authorization-code" && it.credentialType == "urn:eu.europa.ec.eudi:pid:1" &&
+                    it.protocol == "openid4vci-v1") { "Unexpected CS-07 DC API issuance profile" }
+            }
+
+        private fun string(script: String, name: String): String {
+            val matches = Regex("\\b(?:const|let|var)\\s+${Regex.escape(name)}\\s*=\\s*[\"']([^\"'\\r\\n]+)[\"']\\s*;")
+                .findAll(script).toList()
+            require(matches.size == 1) { "The deployed DC API interaction has no unique $name" }
+            return matches.single().groupValues[1]
+        }
+
         /** Read only the deployed script's declarative inputs; never execute supplied JavaScript in the wallet. */
         internal fun parseDigitalCredentials(script: String): ItbWalletInteraction.DigitalCredentials {
-            fun string(name: String): String {
-                val matches = Regex("\\b(?:const|let|var)\\s+${Regex.escape(name)}\\s*=\\s*[\"']([^\"'\\r\\n]+)[\"']\\s*;")
-                    .findAll(script).toList()
-                require(matches.size == 1) { "The deployed DC API interaction has no unique $name" }
-                return matches.single().groupValues[1]
-            }
             val payment = if (Regex("\\b(?:const|let|var)\\s+attestationType\\s*=").containsMatchIn(script)) {
                 fun literal(name: String): String {
                     val matches = Regex("\\b${Regex.escape(name)}\\s*:\\s*[\"']([^\"'\\r\\n]+)[\"']")
@@ -195,14 +287,14 @@ class ItbPortalBridge(
                     return matches.single().groupValues[1]
                 }
                 ItbWalletInteraction.Payment(
-                    string("attestationType"), literal("merchant"), literal("payee_id"),
+                    string(script, "attestationType"), literal("merchant"), literal("payee_id"),
                     literal("currency"), literal("amount"), literal("transaction_id"),
                 )
             } else null
             return ItbWalletInteraction.DigitalCredentials(
-                Url(string(if (payment == null) "presentationRequestEndpoint" else "requestEndpoint")),
-                string(if (payment == null) "validationSessionId" else "sessionId"),
-                string("profile"), string("dcApiProtocol"), payment,
+                Url(string(script, if (payment == null) "presentationRequestEndpoint" else "requestEndpoint")),
+                string(script, if (payment == null) "validationSessionId" else "sessionId"),
+                string(script, "profile"), string(script, "dcApiProtocol"), payment,
             )
         }
     }

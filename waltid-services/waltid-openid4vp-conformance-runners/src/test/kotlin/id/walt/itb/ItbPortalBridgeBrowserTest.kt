@@ -67,13 +67,26 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun readsTheTs12PaymentQrFromItsDeployedRow() = runBlocking<Unit> {
+        withPage(inlineInteraction = "12345678", presentationQrLabel = "VP request QR code") { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            val session = bridge.prepare(suite.copy(id = "ts12"), case.copy(id = "ts12_pay_02"))
+            val interaction = assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
+            assertEquals("https://verifier.example/request", interaction.url.parameters["request_uri"])
+            assertEquals(1, page.evaluate("window.qrDownloadCount"))
+            assertEquals(0, page.evaluate("window.textDownloadCount"))
+        }
+    }
+
+    @Test
     fun neverFallsBackToTextWhenThePresentationQrIsInvalid() = runBlocking<Unit> {
         withPage(
             inlineInteraction = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Fshort",
             presentationQr = byteArrayOf(1, 2, 3),
         ) { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
-            assertFailsWith<IllegalArgumentException> { bridge.read(bridge.prepare(suite, case)) }
+            val rejection = assertFailsWith<ItbPortalInputError> { bridge.read(bridge.prepare(suite, case)) }
+            assertEquals(ItbPortalInputError.Reason.PRESENTATION_QR_IMAGE_FORMAT, rejection.reason)
             assertEquals(1, page.evaluate("window.qrDownloadCount"))
             assertEquals(0, page.evaluate("window.textDownloadCount"))
             assertEquals(1, page.evaluate("window.startCount"))
@@ -165,6 +178,32 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun acknowledgesOnlyTheMatchingRevocationConfirmation() = runBlocking<Unit> {
+        withPage { page ->
+            val session = ItbSession("cs10-test-suite", "rv_iss_02", "00000000-0000-0000-0000-000000000001")
+            page.setContent("""
+                <div class="session-table-title-value"><div class="value">${session.session}</div></div>
+                <ngb-modal-window id="other">
+                  <div>Confirm both credentials are shown as valid.</div>
+                  <button onclick="this.parentElement.remove()">Close</button>
+                </ngb-modal-window>
+                <ngb-modal-window id="expected">
+                  <div>Confirm the wallet reports the credential as revoked.</div>
+                  <button onclick="this.parentElement.remove()">Close</button>
+                </ngb-modal-window>
+            """.trimIndent())
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            assertFailsWith<IllegalStateException> {
+                bridge.confirmRevocation(session.copy(session = "00000000-0000-0000-0000-000000000002"))
+            }
+            assertEquals(1, page.locator("#expected").count())
+            bridge.confirmRevocation(session)
+            assertEquals(0, page.locator("#expected").count())
+            assertEquals(1, page.locator("#other").count())
+        }
+    }
+
+    @Test
     fun reportsPortalExecutionErrorWithoutRetryingTheStart() = runBlocking<Unit> {
         withPage(failStart = true) { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
@@ -200,29 +239,45 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
-    fun loginFailureReportsTheSafeStepWithoutRetryingOrLeakingInputs() {
+    fun loginReloadsAnUnrenderedFormBeforeSubmittingOnce() {
+        withLoginPage(formOnLoad = 2) { page ->
+            page.setDefaultTimeout(500.0)
+            ItbPortalLogin.login(page, "https://itb.example", "test-user", "test-password", 1_000.0)
+            assertEquals("https://itb.example/app#/home", page.url())
+            assertEquals(2, page.evaluate("window.appLoads"))
+            assertEquals(1, page.evaluate("window.submits"))
+        }
+    }
+
+    @Test
+    fun loginFailureReportsTheSafeStepWithoutResubmittingOrLeakingInputs() {
         for (showForm in listOf(false, true)) {
-            withLoginPage(showForm = showForm, acceptLogin = false) { page ->
+            withLoginPage(formOnLoad = if (showForm) 1 else Int.MAX_VALUE, acceptLogin = false) { page ->
                 page.setDefaultTimeout(500.0)
                 val failure = assertFailsWith<ItbPortalStepTimeout> {
-                    ItbPortalLogin.login(page, "https://itb.example", "private-user", "private-password", 500.0)
+                    ItbPortalLogin.login(page, "https://itb.example", "private-user", "private-password", 1_000.0)
                 }
                 assertEquals(if (showForm) ItbPortalStepTimeout.Step.LOGIN_HOME else ItbPortalStepTimeout.Step.LOGIN_FORM, failure.step)
+                assertEquals(if (showForm) 1 else 2, page.evaluate("window.appLoads"))
                 assertEquals(if (showForm) 1 else 0, page.evaluate("window.submits"))
                 assertFalse(failure.toString().contains("private"))
             }
         }
     }
 
-    private fun withLoginPage(showForm: Boolean = true, acceptLogin: Boolean = true, block: (Page) -> Unit) {
+    private fun withLoginPage(formOnLoad: Int = 1, acceptLogin: Boolean = true, block: (Page) -> Unit) {
         Playwright.create().use { playwright ->
             playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(true)).use { browser ->
                 browser.newContext().use { context ->
+                    var appLoads = 0
                     context.route("**/*") { route ->
                         if (route.request().url() == "https://itb.example/app") {
+                            appLoads++
+                            val showForm = appLoads >= formOnLoad
                             route.fulfill(Route.FulfillOptions().setContentType("text/html").setBody("""
                                 <img src="/slow-image">
                                 <script>
+                                window.appLoads = $appLoads;
                                 window.submits = 0; window.loaded = false;
                                 window.addEventListener('load', () => window.loaded = true);
                                 if ($showForm) setTimeout(() => {
@@ -248,6 +303,7 @@ class ItbPortalBridgeBrowserTest {
         inlineInteraction: String? = null,
         interactionLabel: String = "VP request",
         presentationQr: ByteArray = ItbQrFixtures.qr("openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"),
+        presentationQrLabel: String = "Credential QR code",
         interactionDelayMillis: Int = 30,
         downloadDelayMillis: Int = 0,
         failStart: Boolean = false,
@@ -265,7 +321,7 @@ class ItbPortalBridgeBrowserTest {
                             val html = fixture(
                                 session, systemName, interactionDelayMillis, downloadDelayMillis, failStart,
                                 startNeverEnabled, actorVisible, applicationDelayMillis, inlineInteraction,
-                                interactionLabel, Base64.getEncoder().encodeToString(presentationQr),
+                                interactionLabel, presentationQrLabel, Base64.getEncoder().encodeToString(presentationQr),
                             )
                             route.fulfill(Route.FulfillOptions().setContentType("text/html").setBody(html))
                         } else route.abort()
@@ -281,7 +337,7 @@ class ItbPortalBridgeBrowserTest {
     private fun fixture(
         session: String, systemName: String, interactionDelayMillis: Int, downloadDelayMillis: Int, failStart: Boolean,
         startNeverEnabled: Boolean, actorVisible: Boolean, applicationDelayMillis: Int, inlineInteraction: String?,
-        interactionLabel: String, qrBase64: String,
+        interactionLabel: String, presentationQrLabel: String, qrBase64: String,
     ) = """
         <script>
         setTimeout(() => {
@@ -340,9 +396,9 @@ class ItbPortalBridgeBrowserTest {
                     return;
                 }
                 const dialog = document.createElement('ngb-modal-window');
-                // Exact QR label observed in the deployed interaction, independent of the bridge selector.
-                dialog.innerHTML = `<app-any-content-view><div> VP request QR code </div><button ngbtooltip="Download" onclick="download(false)">Download</button></app-any-content-view>
-                  <app-any-content-view><div> Credential QR code </div><button ngbtooltip="Download" onclick="download(true)">Download</button></app-any-content-view>
+                // A different suite's label must not select the attachment.
+                dialog.innerHTML = `<app-any-content-view><div> ${if (presentationQrLabel == "Credential QR code") "VP request QR code" else "Credential QR code"} </div><button ngbtooltip="Download" onclick="download(false)">Download</button></app-any-content-view>
+                  <app-any-content-view><div> $presentationQrLabel </div><button ngbtooltip="Download" onclick="download(true)">Download</button></app-any-content-view>
                   <app-any-content-view><div> $interactionLabel </div>${
                       if (inlineInteraction == null) """<button ngbtooltip="Download" onclick="download(false)">Download</button>"""
                       else """<div class="content-value">$inlineInteraction </div><button ngbtooltip="Copy" onclick="window.copyCount++">Copy</button>"""
