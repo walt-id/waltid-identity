@@ -47,6 +47,17 @@ internal fun statusCodeForException(cause: Throwable): HttpStatusCode = when (ca
     else -> HttpStatusCode.InternalServerError
 }
 
+/**
+ * The message [exceptionMap] shows a client for [cause], or null when it hides it because the failure is
+ * server-side. For code that records an exception somewhere clients can read it, such as an event log,
+ * so it discloses no more there than the HTTP response does.
+ */
+fun clientVisibleMessage(cause: Throwable): String? = when {
+    cause is SerializableWebException -> cause.message
+    statusCodeForException(cause).value >= 500 -> null
+    else -> humanizeRequestBodyError(cause)?.message ?: cause.message
+}
+
 fun exceptionMap(
     cause: Throwable,
     status: HttpStatusCode,
