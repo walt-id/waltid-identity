@@ -1,5 +1,8 @@
 package id.walt.issuer2.testsupport
 
+import id.walt.commons.config.ConfigManager
+import id.walt.issuer2.config.AuthenticationServiceConfig
+import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.issuer2Module
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.java.Java
@@ -15,16 +18,23 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerCon
 import io.ktor.server.application.install
 
 class Issuer2BrowserTestServer(
-    val baseUrl: String = DEFAULT_REAL_SERVER_BASE_URL,
+    val baseUrl: String = System.getenv("ISSUER2_BROWSER_TEST_BASE_URL")?.takeIf(String::isNotBlank) ?: DEFAULT_REAL_SERVER_BASE_URL,
     val requirePar: Boolean = false,
 ) : AutoCloseable {
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
 
     fun start(): Issuer2BrowserTestServer {
         loadIssuer2ConfigFiles(baseUrlOverride = baseUrl)
-        val config = id.walt.commons.config.ConfigManager.getConfig<id.walt.issuer2.config.Issuer2ServiceConfig>()
-        id.walt.commons.config.ConfigManager.loadedConfigurations["issuer-service" to id.walt.issuer2.config.Issuer2ServiceConfig::class] =
+        val config = ConfigManager.getConfig<Issuer2ServiceConfig>()
+        ConfigManager.loadedConfigurations["issuer-service" to Issuer2ServiceConfig::class] =
             config.copy(enforcePushedAuthorizationRequests = requirePar)
+        System.getenv("KEYCLOAK_URL")?.takeIf(String::isNotBlank)?.trimEnd('/')?.let { realm ->
+            val auth = ConfigManager.getConfig<AuthenticationServiceConfig>()
+            ConfigManager.loadedConfigurations["authentication-service" to AuthenticationServiceConfig::class] = auth.copy(
+                authorizeUrl = "$realm/protocol/openid-connect/auth",
+                accessTokenUrl = "$realm/protocol/openid-connect/token",
+            )
+        }
         val url = Url(baseUrl)
         server = embeddedServer(
             factory = CIO,
