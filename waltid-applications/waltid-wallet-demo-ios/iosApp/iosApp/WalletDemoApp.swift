@@ -204,7 +204,7 @@ private final class NativeBackgroundStatusDelegate: NSObject, UIApplicationDeleg
             let task = Task { @MainActor in
                 let namespace = IdentityDocumentNamespace.nativeDemo
                 guard let keychain = namespace.keychainAccessGroup else {
-                    finish(false)
+                    finish(.deferred)
                     return
                 }
                 do {
@@ -213,9 +213,13 @@ private final class NativeBackgroundStatusDelegate: NSObject, UIApplicationDeleg
                             appGroupIdentifier: namespace.appGroupIdentifier, keychainAccessGroup: keychain
                         )
                     )
-                    finish(result != .deferred)
+                    switch result {
+                    case .finished: finish(.finished)
+                    case .deferred: finish(.deferred)
+                    case .ineligible: finish(.ineligible)
+                    }
                 } catch {
-                    finish(false)
+                    finish(.deferred)
                 }
             }
             return { task.cancel() }

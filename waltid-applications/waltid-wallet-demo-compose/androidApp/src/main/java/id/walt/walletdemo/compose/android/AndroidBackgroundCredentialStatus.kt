@@ -12,6 +12,7 @@ import androidx.work.await
 import id.walt.wallet2.mobile.CredentialStatusMaintenanceResult
 import id.walt.wallet2.mobile.refreshDueStatusesForExistingWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -54,17 +55,39 @@ internal object AndroidBackgroundCredentialStatus {
         }
     }
 
-    fun notifyLocalRead() { changes.tryEmit(Unit) }
+    suspend fun recordOutcome(
+        context: Context,
+        workId: UUID,
+        binding: String?,
+        result: CredentialStatusMaintenanceResult,
+    ) {
+        if (result != CredentialStatusMaintenanceResult.Ineligible) {
+            changes.tryEmit(Unit)
+            return
+        }
+        withContext(Dispatchers.IO) {
+            val cancellation = scheduleMutex.withLock {
+                val preferences = preferences(context)
+                if (preferences.getString(BINDING, null) != binding) return@withLock null
+                if (binding != null) {
+                    check(preferences.edit().remove(BINDING).commit()) { "Could not clear background status enrollment" }
+                }
+                // This work ID belongs to the delivery being retired.
+                WorkManager.getInstance(context).cancelWorkById(workId)
+            }
+            cancellation?.await()
+        }
+    }
 }
 
 /** WorkManager instantiates this with only the application context and a constant task name. */
 class CredentialStatusWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result {
-        val binding = AndroidBackgroundCredentialStatus.binding(applicationContext) ?: return Result.success()
         return try {
-            val result = refreshDueStatusesForExistingWallet(applicationContext, binding)
-            if (result != CredentialStatusMaintenanceResult.Ineligible) AndroidBackgroundCredentialStatus.notifyLocalRead()
-            // This periodic request supplies the next opportunity even after transient storage or budget deferral.
+            val binding = AndroidBackgroundCredentialStatus.binding(applicationContext)
+            val result = binding?.let { refreshDueStatusesForExistingWallet(applicationContext, it) }
+                ?: CredentialStatusMaintenanceResult.Ineligible
+            AndroidBackgroundCredentialStatus.recordOutcome(applicationContext, id, binding, result)
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled

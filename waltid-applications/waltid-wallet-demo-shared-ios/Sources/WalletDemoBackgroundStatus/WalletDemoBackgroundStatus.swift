@@ -5,18 +5,30 @@ import UIKit
 /// The single app-owned refresh request. Both demo shells provide their own SDK entry point.
 @MainActor
 public final class WalletDemoBackgroundStatusScheduler {
-    public typealias Finish = @MainActor (Bool) -> Void
+    public enum Outcome: Sendable {
+        case finished
+        case deferred
+        case ineligible
+    }
+
+    public typealias Finish = @MainActor (Outcome) -> Void
     public typealias Start = @MainActor (String, @escaping Finish) -> (@Sendable () -> Void)
-    public static let shared = WalletDemoBackgroundStatusScheduler()
+    public static let shared = WalletDemoBackgroundStatusScheduler(defaults: .standard) {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: $0)
+    }
 
     private let identifier = (Bundle.main.bundleIdentifier ?? "") + ".credential-status-refresh"
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+    private let cancelRequest: (String) -> Void
     private let bindingKey = "wallet.credential-status.maintenance.binding"
     private var registered = false
     private var request: Task<Void, Never>?
     private var running: BackgroundStatusCompletion?
 
-    private init() {}
+    init(defaults: UserDefaults, cancelRequest: @escaping (String) -> Void) {
+        self.defaults = defaults
+        self.cancelRequest = cancelRequest
+    }
 
     public var canSchedule: Bool {
         registered && UIApplication.shared.backgroundRefreshStatus == .available
@@ -41,7 +53,7 @@ public final class WalletDemoBackgroundStatusScheduler {
             request?.cancel()
             running?.finish(success: false, cancel: true)
             running = nil
-            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+            cancelRequest(identifier)
         }
         requestNext()
     }
@@ -61,7 +73,7 @@ public final class WalletDemoBackgroundStatusScheduler {
         }
     }
 
-    private func deliver(_ completion: BackgroundStatusCompletion, start: Start, onResult: @escaping @MainActor () -> Void) {
+    func deliver(_ completion: BackgroundStatusCompletion, start: Start, onResult: @escaping @MainActor () -> Void) {
         guard let binding = defaults.string(forKey: bindingKey) else {
             completion.finish(success: true)
             return
@@ -72,10 +84,17 @@ public final class WalletDemoBackgroundStatusScheduler {
             return
         }
         running = completion
-        let cancel = start(binding) { [weak self] success in
-            completion.finish(success: success)
-            guard let self, self.running === completion else { return }
+        let cancel = start(binding) { [weak self] outcome in
+            let success = outcome != .deferred
+            guard let self, self.running === completion else {
+                completion.finish(success: success)
+                return
+            }
             self.running = nil
+            if outcome == .ineligible, self.defaults.string(forKey: self.bindingKey) == binding {
+                self.reconcile(binding: nil)
+            }
+            completion.finish(success: success)
             onResult()
         }
         completion.install(cancel: cancel)

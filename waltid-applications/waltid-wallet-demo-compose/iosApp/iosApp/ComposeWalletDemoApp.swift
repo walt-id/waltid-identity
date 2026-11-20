@@ -117,13 +117,19 @@ private final class ComposeBackgroundStatusDelegate: NSObject, UIApplicationDele
         WalletDemoBackgroundStatusScheduler.shared.register { binding, finish in
             let namespace = IdentityDocumentNamespace.composeDemo
             guard let keychain = namespace.keychainAccessGroup else {
-                finish(false)
+                finish(.deferred)
                 return {}
             }
             let run = sharedUI.WalletDemoIosKt.startWalletDemoBackgroundStatus(
                 binding: binding, appGroupIdentifier: namespace.appGroupIdentifier, keychainAccessGroup: keychain,
-                onFinished: { success in
-                    MainActor.assumeIsolated { finish(success.boolValue) }
+                onFinished: { outcome in
+                    MainActor.assumeIsolated {
+                        switch outcome {
+                        case .finished: finish(.finished)
+                        case .ineligible: finish(.ineligible)
+                        default: finish(.deferred)
+                        }
+                    }
                 }
             )
             return { run.cancel() }

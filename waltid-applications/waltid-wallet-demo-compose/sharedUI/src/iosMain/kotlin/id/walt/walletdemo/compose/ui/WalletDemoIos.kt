@@ -207,21 +207,28 @@ class ComposeBackgroundStatusRun internal constructor(private val job: Job) {
     fun cancel() { job.cancel() }
 }
 
+enum class ComposeBackgroundStatusOutcome { FINISHED, DEFERRED, INELIGIBLE }
+
 fun startWalletDemoBackgroundStatus(
     binding: String,
     appGroupIdentifier: String,
     keychainAccessGroup: String,
-    onFinished: (Boolean) -> Unit,
+    onFinished: (ComposeBackgroundStatusOutcome) -> Unit,
 ): ComposeBackgroundStatusRun = ComposeBackgroundStatusRun(CoroutineScope(Dispatchers.Main).launch {
-    var delivered = false
+    var outcome = ComposeBackgroundStatusOutcome.DEFERRED
     try {
-        delivered = refreshDueStatusesForExistingWallet(binding,
-            MobileWalletCrossProcessAccess(appGroupIdentifier, keychainAccessGroup)) != CredentialStatusMaintenanceResult.Deferred
+        outcome = when (refreshDueStatusesForExistingWallet(
+            binding, MobileWalletCrossProcessAccess(appGroupIdentifier, keychainAccessGroup),
+        )) {
+            is CredentialStatusMaintenanceResult.Finished -> ComposeBackgroundStatusOutcome.FINISHED
+            CredentialStatusMaintenanceResult.Deferred -> ComposeBackgroundStatusOutcome.DEFERRED
+            CredentialStatusMaintenanceResult.Ineligible -> ComposeBackgroundStatusOutcome.INELIGIBLE
+        }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
         // Scheduler success and issuer observations are distinct. Report a failed delivery without wallet data.
     } finally {
-        onFinished(delivered)
+        onFinished(outcome)
     }
 })
