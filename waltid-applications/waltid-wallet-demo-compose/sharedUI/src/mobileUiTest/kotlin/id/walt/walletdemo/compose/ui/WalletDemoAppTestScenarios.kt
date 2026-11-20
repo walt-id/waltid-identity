@@ -1714,6 +1714,10 @@ class WalletDemoAppTestScenarios(
         val requireTrusted = onNodeWithTag(
             WalletUiTestTags.SettingsReaderPolicyRequireTrusted
         )
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodes(hasTestTag(WalletUiTestTags.SettingsReaderPolicyRequireTrusted) and isEnabled())
+                .fetchSemanticsNodes().size == 1
+        }
         allowUntrusted.assertHasClickAction()
         requireTrusted.assertHasClickAction()
         assertEquals(
@@ -1726,7 +1730,12 @@ class WalletDemoAppTestScenarios(
         )
 
         requireTrusted.performClick()
-        waitForIdle()
+        // The controller saves on a worker dispatcher outside Compose's idle tracking.
+        waitUntil(timeoutMillis = 5_000) {
+            with(controller.state.value) {
+                !importInProgress && settings.readerPolicy == ProximityReaderPolicy.RequireTrusted
+            }
+        }
         assertEquals(
             ProximityReaderPolicy.RequireTrusted,
             store.load().readerPolicy,
@@ -1819,7 +1828,11 @@ class WalletDemoAppTestScenarios(
         waitForIdle()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportReview).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportConfirm).performClick()
-        waitForIdle()
+        waitUntil(timeoutMillis = 5_000) {
+            with(controller.state.value) {
+                !importInProgress && settings.trustAnchors.size == 1
+            }
+        }
 
         assertEquals(null, controller.state.value.pendingImport)
         assertEquals(1, store.load().trustAnchors.size)

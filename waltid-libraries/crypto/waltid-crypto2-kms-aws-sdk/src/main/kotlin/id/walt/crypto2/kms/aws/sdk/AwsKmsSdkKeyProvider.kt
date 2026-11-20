@@ -32,6 +32,7 @@ import id.walt.crypto2.keys.Encryptor
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyDeleter
 import id.walt.crypto2.keys.KeyDeletionResult
+import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
@@ -118,20 +119,16 @@ class AwsKmsSdkKeyProvider(
                 "AWS KMS did not return a public key"
             }
         }
-        val storedData = AwsSdkStoredKeyData(options.copy(tags = emptyMap()), remoteKeyId)
-        return key(
-            StoredKey.Managed(
-                version = StoredKey.CURRENT_VERSION,
+        return restore(
+            storedKeyForExisting(
                 id = request.id,
                 spec = request.spec,
                 usages = request.usages,
-                provider = id,
-                providerSchemaVersion = PROVIDER_SCHEMA_VERSION,
-                providerData = storedData.encode(),
+                options = options,
+                remoteKeyId = remoteKeyId,
                 publicKey = EncodedKey.SpkiDer(BinaryData(publicKey)),
                 metadata = request.metadata,
             ),
-            storedData,
         )
     }
 
@@ -306,6 +303,31 @@ class AwsKmsSdkKeyProvider(
     companion object {
         val ID = ProviderId("aws-kms-sdk")
         private const val PROVIDER_SCHEMA_VERSION = 1
+
+        /** Builds a descriptor from a trusted key ID and public key already obtained from AWS KMS. */
+        fun storedKeyForExisting(
+            id: KeyId,
+            spec: KeySpec,
+            usages: Set<KeyUsage>,
+            options: AwsKmsSdkOptions,
+            remoteKeyId: String,
+            publicKey: EncodedKey.SpkiDer,
+            metadata: Map<String, String> = emptyMap(),
+        ): StoredKey.Managed {
+            require(remoteKeyId.isNotBlank()) { "AWS KMS key ID cannot be blank" }
+            spec.toAwsKeySpec()
+            return StoredKey.Managed(
+                version = StoredKey.CURRENT_VERSION,
+                id = id,
+                spec = spec,
+                usages = usages,
+                provider = ID,
+                providerSchemaVersion = PROVIDER_SCHEMA_VERSION,
+                providerData = AwsSdkStoredKeyData(options.copy(tags = emptyMap()), remoteKeyId).encode(),
+                publicKey = publicKey,
+                metadata = metadata,
+            )
+        }
     }
 }
 
