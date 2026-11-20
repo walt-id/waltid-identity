@@ -21,7 +21,12 @@ data class CredentialResponse(
     @SerialName("transaction_id") val transactionId: String? = null,
     val interval: Long? = null,
     @SerialName("notification_id") val notificationId: String? = null,
-)
+    /** Response-creation output; ciphertext is never persisted in a credential checkpoint. */
+    @kotlinx.serialization.Transient internal val preparedBody: CredentialResponseBody? = null,
+) {
+    val isDeferred: Boolean
+        get() = transactionId != null && credentials == null
+}
 
 @Serializable
 data class IssuedCredential(
@@ -60,12 +65,15 @@ data class CredentialResponseHttp(
     val status: Int,
     val body: CredentialResponseBody,
     val headers: Map<String, String> = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
+    /** Service-side outcome metadata; never encoded in the HTTP response body. */
+    val retryable: Boolean = false,
 ) {
     constructor(
         status: Int,
         payload: Map<String, JsonElement>,
         headers: Map<String, String> = OpenId4VciResponseHeaders.NO_STORE_WITH_PRAGMA,
-    ) : this(status, CredentialResponseBody.Json(payload), headers)
+        retryable: Boolean = false,
+    ) : this(status, CredentialResponseBody.Json(payload), headers, retryable)
 
     val payload: Map<String, JsonElement>
         get() = when (body) {

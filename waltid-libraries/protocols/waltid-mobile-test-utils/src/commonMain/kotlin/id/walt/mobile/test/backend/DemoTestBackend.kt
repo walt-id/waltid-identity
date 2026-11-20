@@ -15,7 +15,11 @@ import id.waltid.openid4vci.wallet.metadata.MetadataSigner
 import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.request.*
+import io.ktor.client.request.accept
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -25,6 +29,8 @@ import io.ktor.http.isSuccess
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonArray
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -164,6 +170,21 @@ object DemoTestBackend {
     )
 
     val presentationScenarios = scenarios
+
+    /** Ordinary payment attestation; the emulator journey does not qualify biometric TS-12 SCA. */
+    val credentialStatusPaymentScenario = CredentialScenario(
+        id = "emvco-payment-mdoc",
+        displayName = "EMVCo Digital Payment Credential",
+        profileId = "emvcoDpcMdoc",
+        credentialConfigurationId = "emvco_dpc_mso_mdoc",
+        format = "mso_mdoc",
+        verifierCredentialQuery = mdocQuery(
+            id = "payment_card",
+            doctype = "org.emvco.dpc.1",
+            namespace = "org.emvco.dpc.1",
+            claims = listOf("card_scheme", "card_last4", "card_holder_name"),
+        ),
+    )
 
     val optionalBirthDatePresentationScenario = scenarios.first { it.id == "eudi-pid-sdjwt" }.copy(
         id = "eudi-pid-sdjwt-optional-birth-date",
@@ -376,6 +397,61 @@ object DemoTestBackend {
         )
     }
 
+    /** One real request selecting the public PID and an independently issued workplace credential. */
+    suspend fun createCredentialStatusVerifierSession(): VerifierSession = createVerifierSession(
+        credentialQuery = scenarios.first { it.id == "eudi-pid-sdjwt" }.verifierCredentialQuery,
+        additionalCredentialQueries = listOf(workplaceQuery()),
+        transactionData = emptyList(),
+        signedRequest = true,
+        clientId = PUBLIC_DEMO_DID_VERIFIER_CLIENT_ID,
+    )
+
+    private fun workplaceQuery(multiple: Boolean = false) = buildJsonObject {
+        put("id", "workplace")
+        put("format", "jwt_vc_json")
+        put("multiple", multiple)
+        putJsonObject("meta") {
+            putJsonArray("type_values") {
+                addJsonArray {
+                    add(JsonPrimitive("VerifiableCredential"))
+                    add(JsonPrimitive("WorkplaceAccessCredential"))
+                }
+            }
+        }
+    }
+
+    /** Unlike default-policy sharing, this request explicitly requires a clear revocation bit. */
+    suspend fun createStatusEnforcementVerifierSession(): VerifierSession = createVerifierSession(
+        credentialQuery = workplaceQuery(multiple = true),
+        transactionData = emptyList(),
+        signedRequest = true,
+        clientId = PUBLIC_DEMO_DID_VERIFIER_CLIENT_ID,
+        policies = buildJsonObject {
+            putJsonArray("vc_policies") {
+                add(buildJsonObject { put("policy", "signature") })
+                add(buildJsonObject {
+                    put("policy", "credential-status")
+                    putJsonObject("argument") {
+                        put("discriminator", "w3c")
+                        put("value", 0)
+                        put("purpose", "revocation")
+                        put("type", "BitstringStatusList")
+                    }
+                })
+            }
+        },
+    )
+
+    suspend fun createCredentialStatusPaymentVerifierSession(): VerifierSession {
+        return createVerifierSession(
+            credentialQuery = scenarios.first { it.id == "eudi-pid-sdjwt" }.verifierCredentialQuery,
+            additionalCredentialQueries = listOf(credentialStatusPaymentScenario.verifierCredentialQuery, workplaceQuery(multiple = true)),
+            transactionData = listOf(paymentAuthorizationTransactionData("pid")),
+            signedRequest = true,
+            clientId = PUBLIC_DEMO_DID_VERIFIER_CLIENT_ID,
+        )
+    }
+
     suspend fun createTransactionDataVerifierSession(
         scenario: CredentialScenario = transactionDataPresentationScenario,
     ): VerifierSession = createVerifierSession(
@@ -469,12 +545,15 @@ object DemoTestBackend {
         transactionData: List<JsonObject>,
         signedRequest: Boolean = false,
         clientId: String = PUBLIC_DEMO_VERIFIER_CLIENT_ID,
+        additionalCredentialQueries: List<JsonObject> = emptyList(),
+        policies: JsonObject? = null,
     ): VerifierSession {
         val requestedSessionId = Uuid.random().toString().takeUnless { signedRequest }
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
                 put("signed_request", signedRequest)
+                policies?.let { put("policies", it) }
                 if (signedRequest) {
                     put("clientId", clientId)
                     put("key", verifierRequestSigningKey)
@@ -487,6 +566,7 @@ object DemoTestBackend {
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         add(credentialQuery)
+                        additionalCredentialQueries.forEach { add(it) }
                     }
                 }
             }
@@ -708,6 +788,52 @@ object DemoTestBackend {
 
             delay(2_000.milliseconds)
         }
+    }
+
+    /** Qualifies bit rejection only after credential and presentation authentication succeed. */
+    suspend fun verifyCredentialStatusPolicy(sessionId: String, clear: Boolean, timeoutMs: Long = 30_000) {
+        val mark = TimeSource.Monotonic.markNow()
+        while (mark.elapsedNow() <= timeoutMs.milliseconds) {
+            val info = verifierSessionInfo(sessionId)
+            val state = info["status"]?.jsonPrimitive?.contentOrNull?.uppercase()
+            if (state in setOf("SUCCESSFUL", "FAILED", "ERROR", "EXPIRED")) {
+                check(state == if (clear) "SUCCESSFUL" else "FAILED") { "Unexpected status-enforcement result: $state" }
+                val policies = requireNotNull(info["policy_results"]).jsonObject
+                val results = requireNotNull(policies["vc_policies"]).jsonArray.map { it.jsonObject }
+                fun policyID(result: JsonObject): String? = result["policy"]?.jsonObject?.let {
+                    (it["id"] ?: it["policy"])?.jsonPrimitive?.contentOrNull
+                }
+                val statuses = results.filter {
+                    policyID(it) == "credential-status" && it["query_id"]?.jsonPrimitive?.contentOrNull == "workplace"
+                }
+                check(statuses.size == 1 && statuses.single()["success"]?.jsonPrimitive?.booleanOrNull == clear) {
+                    "The actual credential-status policy must execute with the expected verdict"
+                }
+                val status = statuses.single()
+                check(status["result"]?.jsonObject?.get("policy_available")?.jsonPrimitive?.booleanOrNull != false) {
+                    "The verifier must find the issued credential's status reference"
+                }
+                val signatures = results.filter { policyID(it) == "signature" }
+                check(signatures.size == 1 && signatures.single()["success"]?.jsonPrimitive?.booleanOrNull == true) {
+                    "Credential signature authentication must succeed independently"
+                }
+                if (!clear) {
+                    val error = status["error"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    check("Status validation failed:" in error && "got 1" in error) {
+                        "The verifier must reject the authenticated revocation bit, not an unrelated failure"
+                    }
+                }
+                val presentations = requireNotNull(policies["vp_policies"]).jsonObject
+                check(presentations.keys == setOf("workplace") && presentations.values.all { group ->
+                    group.jsonObject.isNotEmpty() && group.jsonObject.values.all {
+                        it.jsonObject["success"]?.jsonPrimitive?.booleanOrNull == true
+                    }
+                }) { "Presentation authentication must succeed independently of status enforcement" }
+                return
+            }
+            delay(1_000.milliseconds)
+        }
+        error("The verifier did not finish the status-enforcement session")
     }
 
     suspend fun waitForVerifierFailure(

@@ -1,7 +1,50 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.material3.Text
+import androidx.compose.ui.test.assertTextEquals
+
+import id.walt.credentials.status.presentation
+import id.walt.credentials.status.CredentialStatus
+import id.walt.credentials.status.CredentialStatusPresentationData
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import id.walt.walletdemo.compose.ui.components.CredentialStatusSection
+import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
+import id.walt.walletdemo.compose.ui.components.WalletControlsPreview
+import id.walt.walletdemo.compose.ui.components.WalletHeaderButton
+import id.walt.walletdemo.compose.ui.components.title
+import id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator
+import id.walt.walletdemo.compose.logic.DemoBiometricKind
+import id.walt.walletdemo.compose.logic.DemoBiometricResult
+import id.walt.walletdemo.compose.logic.DemoPinStore
+import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
+import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
+import id.walt.walletdemo.compose.logic.InMemoryDemoReaderTrustSettingsStore
+import id.walt.walletdemo.compose.logic.PinSetupStep
+import id.walt.walletdemo.compose.logic.WalletAccessNotice
+import id.walt.walletdemo.compose.logic.WalletAccessOperation
+import id.walt.walletdemo.compose.logic.WalletAccessState
+import id.walt.walletdemo.compose.logic.WalletAuthState
+import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement
+import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
+import id.walt.walletdemo.compose.logic.WalletDemoSharingRequester
+import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
+import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
+import id.walt.walletdemo.compose.logic.WalletDemoStatusRefreshSummary
+import id.walt.walletdemo.compose.logic.WalletExternalFlow
+import id.walt.walletdemo.compose.logic.WalletPinChange
+import id.walt.walletdemo.compose.logic.consent
+import id.walt.walletdemo.compose.logic.defaultCredentialSelection
+import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.problem
 import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -12,10 +55,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
+import id.walt.walletdemo.compose.logic.ClaimItem
+import id.walt.walletdemo.compose.logic.ClaimItemPath
+import id.walt.walletdemo.compose.logic.DisplayValue
+import id.walt.walletdemo.compose.logic.WalletDateTime
+import id.walt.walletdemo.compose.ui.components.ClaimValueRow
+import kotlin.time.Instant
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletDemoContinuationStatus
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceProblem
@@ -30,6 +85,12 @@ import id.walt.wallet2.mobile.ProximityEngagement
 import id.walt.wallet2.mobile.ProximityHostActionResult
 import id.walt.wallet2.mobile.ProximityState
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import id.walt.walletdemo.compose.ui.components.CredentialCardStack
+import id.walt.walletdemo.compose.ui.components.WalletCredentialContentMaxWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.Alignment
+import kotlin.test.assertTrue
 import id.walt.walletdemo.compose.ui.components.OfferedCredentialDetails
 import id.walt.walletdemo.compose.ui.screens.ReceiveTab
 import id.walt.walletdemo.compose.ui.screens.SettingsScreen
@@ -40,6 +101,7 @@ import id.walt.walletdemo.compose.ui.screens.CredentialsTab
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletOperationState
+import id.walt.walletdemo.compose.logic.WalletDemoPaymentFieldPlacement
 
 /** Content and readiness are shared; the platform adapter owns the renderer and baseline path. */
 @OptIn(ExperimentalTestApi::class)
@@ -49,26 +111,232 @@ internal class WalletVisualScenarios(
     private val platformTheme: @Composable (@Composable () -> Unit) -> Unit = { it() },
 ) {
     private var layoutDirection = "ltr"
+    private var statusContext = CredentialStatusUiContext(WalletVisualFixtures.noReferenceStatuses)
+    private var captureIdentifier: String? = null
+    private val captureFailures = mutableListOf<AssertionError>()
+
+    fun execute(block: WalletVisualScenarios.() -> Unit) {
+        block()
+        captureFailures.firstOrNull()?.let { failure ->
+            captureFailures.drop(1).forEach(failure::addSuppressed)
+            throw failure
+        }
+    }
 
     private fun capture(id: String) {
         // Capture the settled Compose state after interactions and navigation.
         // Advancing virtual time keeps this independent of host rendering speed.
         test.mainClock.advanceTimeBy(1_000)
         test.waitForIdle()
-        captureImage(id, layoutDirection)
+        // Keep later states and interaction assertions in a journey reachable after a pixel diff.
+        // The platform test still fails after the scenario; references are never accepted here.
+        try { captureImage(captureIdentifier ?: id, layoutDirection) } catch (failure: AssertionError) { captureFailures += failure }
     }
 
     private fun content(body: @Composable () -> Unit) {
         test.setContent {
             platformTheme {
                 WalletDemoTheme {
-                    Surface(modifier = Modifier.fillMaxSize(), content = body)
+                    Surface(modifier = Modifier.fillMaxSize()) {
+                        CompositionLocalProvider(LocalCredentialStatusUi provides statusContext, content = body)
+                    }
                 }
             }
         }
         test.waitUntil {
             test.onAllNodesWithTag(WalletUiTestTags.PresentationReview).fetchSemanticsNodes().isEmpty() ||
                 test.onAllNodesWithTag("review-information-to-share").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    fun credentialStatusHome() {
+        val ready = WalletVisualFixtures.partialResult.session as WalletSessionState.Ready
+        statusContext = CredentialStatusUiContext(WalletDemoCredentialStatuses(
+            ready.credentials.associate { it.id to WalletVisualFixtures.credentialStatus("revoked_partial") }))
+        captureIdentifier = "status.home.issue"
+        walletHome()
+    }
+
+    fun credentialStatusMixedArtwork(rtl: Boolean = false) = with(test) {
+        val images = WalletVisualImages()
+        images.install()
+        statusContext = CredentialStatusUiContext(WalletArtworkFixtures.statuses)
+        layoutDirection = if (rtl) "rtl" else "ltr"
+        try {
+            content {
+                CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                        .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = WalletCredentialContentMaxWidth).padding(20.dp)) {
+                        CredentialCardStack(WalletArtworkFixtures.cards, onOpenDetails = {})
+                    }
+                }
+            }
+            WalletArtworkFixtures.images.keys.forEach { uri -> waitUntil { images.isReady(uri) } }
+            waitForIdle()
+            WalletArtworkFixtures.cards.forEachIndexed { index, card ->
+                val status = WalletArtworkFixtures.statuses.credentials.getValue(card.id)
+                val badge = onNodeWithTag("credential-status-icon-${card.id}", useUnmergedTree = true)
+                if (!status.hasIssue) badge.assertDoesNotExist()
+                else {
+                    badge.assertExists()
+                    if (index == WalletArtworkFixtures.cards.lastIndex) badge.assertIsDisplayed()
+                    val bounds = badge.fetchSemanticsNode().boundsInRoot
+                    val cardBounds = onNodeWithTag(WalletUiTestTags.credentialCard(card.id)).fetchSemanticsNode().boundsInRoot
+                    assertTrue(bounds.right < cardBounds.center.x, "Artwork accessory remains physically left in both reading directions")
+                    assertTrue(bounds.left > cardBounds.left)
+                    assertTrue(bounds.center.y > cardBounds.center.y, "Artwork accessory belongs to the bottom of the card")
+                    assertTrue(bounds.bottom < cardBounds.bottom)
+                }
+            }
+            capture(if (rtl) "status.home.mixed_artwork.dark_large_text_rtl" else "status.home.mixed_artwork")
+        } finally { images.close() }
+    }
+
+    fun credentialStatusDetails(adverse: Boolean = false, expanded: Boolean = false) = with(test) {
+        val details = WalletVisualFixtures.credentialDetails
+        val status = WalletVisualFixtures.credentialStatus(if (adverse) "revoked_partial" else "clear")
+        statusContext = CredentialStatusUiContext(WalletDemoCredentialStatuses(mapOf(details.summary.id to status)), check = {})
+        content {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+                CredentialDetailsContent(details)
+            }
+        }
+        onNodeWithTag("credential-status-${details.summary.id}").performScrollTo().assertIsDisplayed()
+        onNodeWithText(if (adverse) "Last known: revoked" else "Status clear").assertIsDisplayed()
+        onNodeWithTag("credential-status-check-${details.summary.id}").assertIsEnabled()
+        if (expanded) {
+            onNodeWithTag("credential-status-details-${details.summary.id}").performScrollTo().performClick()
+            onNodeWithText("Revocation").assertExists()
+            onNodeWithText("Partly checked").assertExists()
+            onNodeWithText("The latest check could not complete. Previous results keep their original check time.")
+                .performScrollTo().assertIsDisplayed()
+        }
+        capture(if (expanded) "status.details.expanded" else if (adverse) "status.details.adverse" else "status.details.clear")
+    }
+
+    fun credentialStatusKinds(compactRtl: Boolean = false) = with(test) {
+        // Both UI renderers consume these shared semantic fixtures; validate them against the evaluator.
+        WalletVisualFixtures.statusData.forEach { (_, raw) ->
+            val value = raw.jsonObject
+            val metadata = Json.decodeFromJsonElement<CredentialStatus>(value.getValue("status"))
+            val expected = Json.decodeFromJsonElement<CredentialStatusPresentationData>(value.getValue("presentation"))
+            assertEquals(expected, metadata.presentation(Instant.parse(value.getValue("evaluatedAt").jsonPrimitive.content)).toData())
+        }
+        val names = if (compactRtl) listOf("revoked_partial", "unverified", "unsupported")
+            else listOf("not_provided", "not_checked", "clear", "stale", "unsupported", "unverified", "suspended")
+        statusContext = CredentialStatusUiContext(WalletDemoCredentialStatuses(names.associateWith(WalletVisualFixtures::credentialStatus)))
+        layoutDirection = if (compactRtl) "rtl" else "ltr"
+        content {
+            CompositionLocalProvider(LocalLayoutDirection provides if (compactRtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+                    names.forEach { CredentialStatusSection(it, compact = true) }
+                }
+            }
+        }
+        onNodeWithText(if (compactRtl) "Last known: revoked" else "Not checked").assertIsDisplayed()
+        capture(if (compactRtl) "status.compact.dark_large_text_rtl" else "status.states")
+    }
+
+    fun credentialStatusSharing() = with(test) {
+        val review = WalletVisualFixtures.providerReview
+        val values = review.credentialOptions.associate { it.credentialId to WalletVisualFixtures.credentialStatus("revoked_partial") }
+        statusContext = CredentialStatusUiContext(WalletDemoCredentialStatuses(values))
+        var submitted: WalletDemoSharingSelection? = null
+        content {
+            WalletDemoSharingReviewScreen(review = review, title = "Share documents",
+                onSubmit = { submitted = it }, onCancel = {}, onBackAtRoot = {})
+        }
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
+        onNodeWithText("Share anyway").assertDoesNotExist()
+        onNodeWithTag("sharing-credential-status-advisory").assertDoesNotExist()
+        capture("status.sharing.review")
+        val id = review.credentialOptions.first().credentialId
+        onNodeWithTag("credential-status-details-$id").performScrollToContent(this).performClick()
+        onNodeWithText("Revocation").assertExists()
+        onNodeWithText("Partly checked").assertExists()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
+        onNodeWithText("Share with status issues?").assertIsDisplayed()
+        assertEquals(null, submitted)
+        onNodeWithTag("credential-status-back").performClick()
+        assertEquals(null, submitted)
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performClick()
+        onNodeWithTag("credential-status-confirm").performClick()
+        assertEquals(review.defaultCredentialSelection(), submitted?.credentials,
+            "Expanding status Details must not toggle the credential selection")
+        assertEquals(values.mapValues { it.value.advisoryRevision }, submitted?.credentialStatusRevisions)
+    }
+
+    fun credentialStatusConfirmation(payment: Boolean = false) = with(test) {
+        val review = if (payment) WalletVisualFixtures.paymentReview else WalletVisualFixtures.providerReview
+        val affectedID = review.credentialOptions.first().credentialId
+        val values = review.credentialOptions.associate {
+            it.credentialId to WalletVisualFixtures.credentialStatus(if (it.credentialId == affectedID) "revoked_current" else "not_provided")
+        }
+        statusContext = CredentialStatusUiContext(WalletDemoCredentialStatuses(values))
+        var submitted = false
+        content {
+            WalletDemoSharingReviewScreen(review = review, title = if (payment) "Payment" else "Share documents",
+                onSubmit = { submitted = true }, onCancel = {}, compact = false,
+                preparePaymentConsent = if (payment) ({ WalletVisualFixtures.payment }) else null)
+        }
+        val submit = onNodeWithTag(WalletUiTestTags.PresentationSubmitButton)
+        submit.assertIsDisplayed().assertIsEnabled().performClick()
+        val confirm = if (payment) "payment-unsigned-confirm" else "credential-status-confirm"
+        val back = if (payment) "payment-unsigned-back" else "credential-status-back"
+        onNodeWithTag(confirm).assertIsDisplayed()
+        onNodeWithText(if (payment) "Unsigned payment request" else "Share with status issues?").assertIsDisplayed()
+        assertFalse(submitted)
+        capture(if (payment) "status.payment.confirmation" else "status.sharing.confirmation")
+        onNodeWithTag(back).performClick()
+        onNodeWithTag(confirm).assertDoesNotExist()
+        assertFalse(submitted)
+    }
+
+    fun credentialStatusPayment() = with(test) {
+        val review = WalletVisualFixtures.paymentReview
+        val affected = review.credentialOptions.first()
+        statusContext = CredentialStatusUiContext(WalletDemoCredentialStatuses(review.credentialOptions.associate {
+            it.credentialId to WalletVisualFixtures.credentialStatus(
+                if (it.credentialId == affected.credentialId) "revoked_partial" else "not_provided")
+        }))
+        content {
+            WalletDemoSharingReviewScreen(review = review, title = "Payment", onSubmit = {}, onCancel = {},
+                preparePaymentConsent = { WalletVisualFixtures.paymentTerms(recurring = false) })
+        }
+        onNodeWithTag(WalletUiTestTags.presentationCredential(affected.selection.id))
+            .performScrollToContent(this).assertIsDisplayed()
+        onNodeWithTag("credential-status-${review.credentialOptions.last().credentialId}")
+            .performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Status not provided").assertIsDisplayed()
+        onNodeWithText("Last known: revoked").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
+            .assertTextEquals("Confirm payment")
+        onAllNodesWithText("Share anyway").assertCountEquals(0)
+        capture("status.payment.review")
+    }
+
+    fun credentialStatusSettings(checking: Boolean = false, helpExpanded: Boolean = false) {
+        var checks = 0
+        val preferenceChanges = mutableListOf<Boolean>()
+        statusContext = CredentialStatusUiContext(automatic = false, checking = checking, checkAll = { checks++ },
+            setAutomatic = { preferenceChanges += it },
+            summary = if (checking) null else WalletDemoStatusRefreshSummary(2, 1, 1, 1))
+        captureIdentifier = if (helpExpanded) "status.settings.help" else if (checking) "status.settings.checking" else "status.settings.partial"
+        settingsRoot(if (helpExpanded) "credential_status_help" else "credential_status")
+        with(test) {
+            onNodeWithTag("settings-credential-status-automatic").assertIsOff()
+            if (checking) onNodeWithTag("settings-credential-status-check-all").assertIsNotEnabled()
+            else onNodeWithText("Some checks were deferred. Try again later.").assertIsDisplayed()
+            if (helpExpanded) {
+                val explanation = onNodeWithText("“With check errors” counts credentials with failed checks, conflicting results or unreadable status information. These credentials are also included in the other counts.")
+                explanation.assertIsDisplayed()
+                onNodeWithTag("settings-credential-status-how").performClick()
+                explanation.assertDoesNotExist()
+                onNodeWithTag("settings-credential-status-automatic").assertIsOff()
+                onNodeWithText("Processed").assertIsDisplayed()
+                assertEquals(0, checks)
+                assertEquals(emptyList(), preferenceChanges)
+            }
         }
     }
 
@@ -85,6 +353,34 @@ internal class WalletVisualScenarios(
         capture(if (rtl) "components.controls.rtl" else "components.controls.default")
         onNodeWithTag("preview.copies.more").performClick()
         onNodeWithText("Copies: 2").assertIsDisplayed()
+    }
+
+    fun dateValues(rtl: Boolean = false) = with(test) {
+        layoutDirection = if (rtl) "rtl" else "ltr"
+        val values = listOf(
+            ClaimItem(ClaimItemPath.topLevel("iat"), label = "Issued at",
+                value = DisplayValue.InstantValue(Instant.parse("2026-10-25T00:30:00Z")), rawValue = null),
+            ClaimItem(ClaimItemPath.topLevel("exp"), label = "Expires",
+                value = DisplayValue.InstantValue(Instant.parse("2026-10-25T01:30:00Z")), rawValue = null),
+            ClaimItem(ClaimItemPath.topLevel("birth_date"), label = "Birth date",
+                value = DisplayValue.Text("1990-05-21"), rawValue = null),
+        )
+        content {
+            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                LocalWalletTimeFormatter provides { WalletDateTime.format(it, "Europe/Budapest", if (rtl) "ar" else "en-GB", true) }) {
+                Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    values.forEach { ClaimValueRow(it) }
+                }
+            }
+        }
+        values.forEach { onNodeWithTag(WalletUiTestTags.claim(it.path.id)).assertIsDisplayed() }
+        onNodeWithText("1990-05-21").assertIsDisplayed()
+        if (!rtl) {
+            onNodeWithText("02:30 \u2068(Budapest, CEST)\u2069", substring = true).assertIsDisplayed()
+            onNodeWithText("02:30 \u2068(Budapest, CET)\u2069", substring = true).assertIsDisplayed()
+        }
+        capture(if (rtl) "components.dates.compact_large_text_rtl" else "components.dates")
     }
 
     fun walletOpening(failure: Boolean = false) = with(test) {
@@ -286,6 +582,8 @@ internal class WalletVisualScenarios(
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportConfirm).assertIsDisplayed().assertIsEnabled()
         onNodeWithTag(WalletUiTestTags.SettingsReaderTrustImportCancel).assertIsDisplayed()
         onNodeWithText("Example Reader CA", substring = false).assertIsDisplayed()
+        onNodeWithText("Jan 1, 2031", substring = true).performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("Valid until", substring = false).assertIsDisplayed()
         capture("settings.reader.import_review")
     }
 
@@ -305,11 +603,16 @@ internal class WalletVisualScenarios(
                 onRequestSigningProtectionChange = {}, onConfirmSigningProtectionChange = {},
                 onCancelSigningProtectionChange = {}, onProximityApprovalModeChange = {},
                 readerTrustSettingsContent = { DemoReaderTrustSettings(trust) },
+                walletAccessContent = { Text("Wallet access") },
             )
         }
         onNodeWithTag(WalletUiTestTags.SettingsSigningKey).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).assertIsDisplayed()
         when (destination) {
+            "credential_status", "credential_status_help" -> {
+                onNodeWithTag("settings-credential-status").performClick()
+                if (destination == "credential_status_help") onNodeWithTag("settings-credential-status-how").performClick()
+            }
             "dc_api" -> {
                 onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).performClick()
                 val toggle = onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview)
@@ -406,6 +709,8 @@ internal class WalletVisualScenarios(
         }
         onNodeWithTag(WalletUiTestTags.credentialDetails(details.summary.id)).assertExists()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("resident_address"))
+            .performScrollTo().performClick()
         onNodeWithText("Vienna").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").assertIsDisplayed()
         capture("credential.details.identity")
@@ -419,8 +724,12 @@ internal class WalletVisualScenarios(
         }
         onNodeWithText("Familienname").assertIsDisplayed()
         onNodeWithText("Vorname").assertIsDisplayed()
-        onNodeWithText("Name im Namensraum").assertIsDisplayed()
-        onNodeWithText("Straße").assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim(ClaimItemPath.topLevel("ns.with.dots").id))
+            .performScrollTo().performClick()
+        onNodeWithText("Name im Namensraum").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("address"))
+            .performScrollTo().performClick()
+        onNodeWithText("Straße").performScrollTo().assertIsDisplayed()
         capture("credential.details.localized_metadata")
     }
 
@@ -442,7 +751,7 @@ internal class WalletVisualScenarios(
         val availableWidth = rootBounds.right - rootBounds.left - 40.dp
         val requiredWidth = primaryBounds.right - primaryBounds.left + secondaryBounds.right - secondaryBounds.left + 8.dp
         if (requiredWidth <= availableWidth) {
-            kotlin.test.assertEquals(secondaryBounds.top, primaryBounds.top,
+            assertEquals(secondaryBounds.top, primaryBounds.top,
                 "Actions that fit must share one row, including at large text sizes")
         } else {
             kotlin.test.assertTrue(primaryBounds.top >= secondaryBounds.bottom,
@@ -572,7 +881,7 @@ internal class WalletVisualScenarios(
             } else WalletDemoProximityScreen(state, fixtures.details,
                 WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                 onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> }, onContinueAfterResponseChange = {},
-                onApprove = {}, onDecline = {}, onRetry = {}, onRemediate = { _, _ -> },
+                onApprove = { _, _ -> }, onDecline = {}, onRetry = {}, onRemediate = { _, _ -> },
                 onCancel = {}, onDismiss = {}, onRestart = {}, headerOwnsClose = true)
         } }
         when (kind) {
@@ -601,7 +910,7 @@ internal class WalletVisualScenarios(
                 credentialDetailsById = emptyMap(),
                 hostActions = WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                 onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> }, onContinueAfterResponseChange = {},
-                onApprove = {}, onDecline = {}, onRetry = {}, onRemediate = { _, _ -> },
+                onApprove = { _, _ -> }, onDecline = {}, onRetry = {}, onRemediate = { _, _ -> },
                 onCancel = {}, onDismiss = {}, onRestart = {}, onConnectionOptions = {}, headerOwnsClose = true,
             )
         } } }
@@ -637,8 +946,8 @@ internal class WalletVisualScenarios(
         capture(if (compact) "sharing.provider.compact_dark_large_text" else "sharing.provider.review")
     }
 
-    fun sharingInformation(alternative: Boolean = false, multiple: Boolean = false) = with(test) {
-        val options = WalletVisualFixtures.informationCredentials.take(if (multiple) 3 else 2)
+    fun sharingInformation(alternative: Boolean = false, multiple: Boolean = false, dates: Boolean = false) = with(test) {
+        val options = if (dates) WalletVisualFixtures.dateCredentials else WalletVisualFixtures.informationCredentials.take(if (multiple) 3 else 2)
         val review = id.walt.walletdemo.compose.logic.WalletDemoSharingReview(
             id.walt.walletdemo.compose.logic.WalletDemoSharingRequest(
                 id.walt.walletdemo.compose.logic.WalletDemoSharingRequester(
@@ -655,13 +964,14 @@ internal class WalletVisualScenarios(
         options.mapNotNull { it.issuer }.distinct().forEach { issuer ->
             onAllNodesWithText(issuer).assertCountEquals(1)
         }
-        val heading = if (alternative) "City ID" else "National ID"
+        val heading = if (dates) "PID (SD-JWT VC)" else if (alternative) "City ID" else "National ID"
         onAllNodes(hasText(heading) and SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)).assertCountEquals(1)
-        onNodeWithText(if (multiple) "MEM-1234" else if (alternative) "Lovelace" else "Ada")
+        if (dates) onNodeWithText("Oct 30, 2026", substring = true).assertIsDisplayed()
+        onNodeWithText(if (dates) "Jan 28, 2027" else if (multiple) "MEM-1234" else if (alternative) "Lovelace" else "Ada", substring = dates)
             .performScrollToContent(this).assertIsDisplayed()
         if (alternative) onNodeWithText("Always included by this credential").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
-        capture("sharing.information." + if (multiple) "multiple" else if (alternative) "alternative" else "selected")
+        capture("sharing.information." + if (dates) "dates" else if (multiple) "multiple" else if (alternative) "alternative" else "selected")
     }
 
     fun providerOfferReview() = with(test) {
@@ -733,10 +1043,76 @@ internal class WalletVisualScenarios(
                 onSubmit = {}, onCancel = {}, compact = false,
                 preparePaymentConsent = { WalletVisualFixtures.localizedPayment })
         }
-        onNodeWithText("11.56 EUR").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
+        onNodeWithText("11.56").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
         onNodeWithTag("payment-unsigned-warning").assertDoesNotExist()
         capture("payment.localized.compact_large_text")
+    }
+
+    fun paymentTerms(recurring: Boolean, compact: Boolean = false, details: Boolean = false) = with(test) {
+        val consent = WalletVisualFixtures.paymentTerms(recurring)
+        var cancelled = false
+        var submitted = false
+        content {
+            WalletDemoSharingReviewScreen(review = WalletVisualFixtures.paymentReview, title = "Payment",
+                onSubmit = { submitted = true }, onCancel = { cancelled = true }, compact = false,
+                preparePaymentConsent = { consent })
+        }
+        waitUntil(timeoutMillis = 5_000) {
+            onAllNodesWithTag("payment-payee-logo").fetchSemanticsNodes().isNotEmpty()
+        }
+        onNodeWithText("Payee logo").assertDoesNotExist()
+        onNodeWithText("Currency").assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).assertIsDisplayed().assertIsEnabled()
+        onNodeWithText(if (recurring) "Monthly" else "Execution date and time").assertExists()
+        if (!recurring) {
+            onNodeWithText("2099-01-01T12:00:00Z").assertDoesNotExist()
+            onNodeWithText("(UTC)", substring = true).assertExists()
+        }
+        onNodeWithText("Requested credentials").assertExists()
+        onNodeWithText("https://verifier.example").assertExists()
+        consent.fields.filter { it.path != listOf("payee", "logo") && it.path != listOf("currency") }.forEach { field ->
+            when (field.placement) {
+                WalletDemoPaymentFieldPlacement.Prominent, WalletDemoPaymentFieldPlacement.Main ->
+                    onNodeWithText(field.label).assertExists("Main payment field must not require expansion: ${field.label}")
+                WalletDemoPaymentFieldPlacement.Details, WalletDemoPaymentFieldPlacement.Omitted ->
+                    onNodeWithText(field.label).assertDoesNotExist()
+            }
+        }
+        if (recurring) onNodeWithText("Payment terms").assertExists()
+        if (compact) {
+            onNodeWithText("Payment terms").performScrollToContent(this, alignTop = true).assertIsDisplayed()
+        }
+        if (compact) onNodeWithText("Monthly").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout ->
+            val results = mutableListOf<TextLayoutResult>()
+            kotlin.test.assertTrue(layout(results))
+            assertEquals(1.5f, results.single().layoutInput.density.fontScale)
+        }
+        val id = if (recurring) "payment.recurring" else "payment.scheduled"
+        if (!details) capture(if (compact) "$id.compact_large_text" else "$id.main")
+        if (details || compact) {
+            onNodeWithTag("payment-payee-details-toggle").performScrollToContent(this).performClick()
+            onNodeWithText("https://shop.example ↗").performScrollToContent(this).assertIsDisplayed()
+            if (recurring) onNodeWithText("0.1234567890123456789").performScrollToContent(this).assertIsDisplayed()
+            onNodeWithTag("payment-details-toggle").performScrollToContent(this).performClick()
+            onNodeWithText("Example Payments Ltd").performScrollToContent(this).assertIsDisplayed()
+            if (details) {
+                onNodeWithTag("payment-details-toggle").performScrollToContent(this, alignTop = true).assertIsDisplayed()
+                capture("$id.details")
+            }
+            consent.fields.forEach { field ->
+                when (field.path) {
+                    listOf("payee", "logo") -> onNodeWithTag("payment-payee-logo").performScrollToContent(this).assertIsDisplayed()
+                    listOf("currency") -> onNodeWithText("EUR").performScrollToContent(this).assertIsDisplayed()
+                    else -> onNodeWithText(field.label).assertExists("Payment field is missing: ${field.label}")
+                        .performScrollToContent(this).assertIsDisplayed()
+                }
+            }
+        }
+        onNodeWithText("Cancel payment").assertIsDisplayed().performClick()
+        kotlin.test.assertTrue(cancelled)
+        kotlin.test.assertFalse(submitted)
     }
 
     fun paymentReview() = with(test) {
@@ -749,9 +1125,9 @@ internal class WalletVisualScenarios(
             )
         }
         onNodeWithText("Confirm payment").performScrollTo().assertIsDisplayed()
-        onNodeWithText("11.56 EUR").performScrollTo().assertIsDisplayed()
+        onNodeWithText("11.56").performScrollTo().assertIsDisplayed()
         onNodeWithText("Pay €11.56").assertIsDisplayed()
-        onNodeWithText("bound-but-hidden").assertDoesNotExist()
+        onNodeWithText("Technical reference").assertDoesNotExist()
         capture("payment.mixed_credentials.main")
         onNodeWithTag("payment-details-toggle").performScrollTo().performClick()
         onNodeWithText("example-transaction-001").performScrollTo().assertIsDisplayed()

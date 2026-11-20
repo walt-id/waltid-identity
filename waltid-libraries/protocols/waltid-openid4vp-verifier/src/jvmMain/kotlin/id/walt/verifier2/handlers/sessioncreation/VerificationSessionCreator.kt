@@ -189,6 +189,7 @@ object VerificationSessionCreator {
         /** Verifier-level retention, overridden by the request and ignored when it is not finite. */
         retention: Duration? = null,
     ): Verification2Session {
+        require(setup !is ExternalReaderFlowSetup) { "Use proximity/device-response for external-reader submissions" }
         require(key == null || crypto2Key == null) { "Provide either a v1 or crypto2 verifier signing key" }
         val signingKey = crypto2Key?.let {
             VerifierSigningKey.Crypto2(
@@ -200,10 +201,13 @@ object VerificationSessionCreator {
         val sessionId = setup.core.sessionId ?: Uuid.random().toString()
 
         val isAnnexC = setup is DcApiAnnexCFlowSetup
-        val isSignedRequest = setup.core.signedRequest
+        val isSignedRequest = setup.core.signedRequest || setup.core.encryptedRequest
         val isEncryptedResponse = setup.core.encryptedResponse || isAnnexC
         val isCrossDevice = setup is CrossDeviceFlowSetup
         val isDcApi = setup is DcApiAnnexDFlowSetup || isAnnexC
+        require(!setup.core.encryptedRequest || !isDcApi) {
+            "encrypted_request requires request_uri_method=post and is not supported for DC API"
+        }
         val isDcApiHaip = isDcApi && (setup is DcApiAnnexDFlowSetup && setup.haip)
         val openIdConfig = (setup as? OpenID4VP1FlowSetup)?.openid
         val responseType = openIdConfig?.responseType ?: OpenID4VPResponseType.VP_TOKEN
@@ -484,14 +488,8 @@ object VerificationSessionCreator {
 
         val now = Clock.System.now()
         val expiration = setup.core.expirationDate
-        // Per-session first, then whatever the verifier is configured to retain for, then the historical
-        // default. A configured retention of Duration.INFINITE means keep indefinitely, which
-        // persistenceExpirationDate() expresses as null - no expiry date, so nothing ever discards it.
-        val retentionDate = when {
-            setup.core.retentionDate != null -> setup.core.retentionDate
-            retention != null -> retention.takeIf { it.isFinite() }?.let { now.plus(it) }
-            else -> now.plus(DEFAULT_RETENTION_YEARS, DateTimeUnit.YEAR, TimeZone.UTC)
-        }
+        // see effectiveRetentionDate() for shared retention precedence.
+        val retentionDate = setup.core.effectiveRetentionDate(retention, now)
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
@@ -526,8 +524,11 @@ object VerificationSessionCreator {
         // A signed cross-device session exposes a self-contained full URL. The bootstrap URL
         // remains the request_uri entry point for wallets that need nonce-bound POST retrieval.
         // DC API keeps request_uri-based authorizationRequestUrl construction.
+        // Encrypted requests must use POST key delivery, including the full URL returned by the API.
         val walletFacingAuthorizationRequest = authorizationRequest.withoutPreRegisteredInBandMetadata()
-        val authorizationRequestUrl = if (signedAuthorizationRequest != null && isCrossDevice) {
+        val authorizationRequestUrl = if (setup.core.encryptedRequest) {
+            requireNotNull(bootstrapAuthorizationRequest).toHttpUrl(URLBuilder(urlHost))
+        } else if (signedAuthorizationRequest != null && isCrossDevice) {
             walletFacingAuthorizationRequest.copy(
                 request = signedAuthorizationRequest,
                 requestUri = null,

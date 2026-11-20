@@ -37,4 +37,5 @@ private fun AuthorizationCodeRecord.toDefaultRecord() = DefaultAuthorizationCode
     grantedAudience = grantedAudience,
     session = session,
     expiresAt = expiresAt,
+    pkceBinding = pkceBinding,
 )

@@ -29,3 +29,9 @@ the current Swift facade remains correct.
   `WalletPersistenceDatabase.Companion`. The Android and native ABI changes are
   additive. No Swift facade change is needed because `WalletSDK` does not expose
   generated persistence types; wallet storage and deletion remain internal.
+- 2026-11-09: Added scoped fresh-biometric signing to `PlatformManagedKeyProvider`
+  for TS-12 payments using timed keys. The Swift facade needs no new public method:
+  its existing reviewed payment submission reaches the shared native authorizer,
+  which requests fresh authentication and bounds the signing lifetime. Ordinary
+  ten-second signing and persisted key policy are unchanged. The isolated physical
+  test host exercises the iOS provider through the production payment pipeline.

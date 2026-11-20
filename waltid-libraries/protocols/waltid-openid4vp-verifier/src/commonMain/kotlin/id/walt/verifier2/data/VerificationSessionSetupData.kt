@@ -2,6 +2,7 @@
 
 package id.walt.verifier2.data
 
+import id.walt.verifier.openid.transactiondata.TransactionDataObjectsSerializer
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
@@ -37,11 +38,13 @@ data class GeneralFlowConfig(
     val requestedElements: AnnexCDocTypeToRequestedElements? = null,
 
     @SerialName("signed_request") val signedRequest: Boolean = false,
+    /** Sign then encrypt the Request Object to the wallet's POST-supplied key. Requires a URL-based flow. */
+    @SerialName("encrypted_request") val encryptedRequest: Boolean = false,
     @SerialName("encrypted_response") val encryptedResponse: Boolean = false,
 
     val notifications: KtorSessionNotifications? = null,
 
-    /** Allow further presentations until expiry. False consumes the session after its first success. */
+    /** Allow further presentations until expiry. False consumes the session after its first success. Ignored when [sessionUsage] is set. */
     val reattemptable: Boolean = true,
 
     /** Expiration duration in ISO-8601 duration format. Used to calculate expiration date. */
@@ -74,7 +77,10 @@ data class GeneralFlowConfig(
     /** certificate chain for signed request */
     val x5c: List<String>? = null,
 
-    @SerialName("verifier_info") val verifierInfo: List<VerifierInfoItem>? = null
+    @SerialName("verifier_info") val verifierInfo: List<VerifierInfoItem>? = null,
+
+    /** Overrides reattemptable. Omitted preserves its existing single-success or reusable behavior. */
+    @SerialName("session_usage") val sessionUsage: VerificationSessionUsage? = null,
 ) {
     init {
         require(dcqlQuery == null || requestedElements == null) { "Use either dcql_query or requestedElements, not both." }
@@ -123,6 +129,7 @@ fun VerificationSessionSetup.withCoreKeyIfMissing(key: Key): VerificationSession
     if (core.key != null) return this
     val newCore = core.copy(key = DirectSerializedKey(key))
     return when (this) {
+        is ExternalReaderFlowSetup -> copy(core = newCore)
         is CrossDeviceFlowSetup -> copy(core = newCore)
         is SameDeviceFlowSetup -> copy(core = newCore)
         is DcApiAnnexDFlowSetup -> copy(core = newCore)
@@ -131,6 +138,7 @@ fun VerificationSessionSetup.withCoreKeyIfMissing(key: Key): VerificationSession
 }
 
 internal fun VerificationSessionSetup.publicView(): VerificationSessionSetup = when (this) {
+    is ExternalReaderFlowSetup -> copy(core = core.publicView())
     is CrossDeviceFlowSetup -> copy(core = core.publicView())
     is SameDeviceFlowSetup -> copy(core = core.publicView())
     is DcApiAnnexDFlowSetup -> copy(core = core.publicView())
@@ -161,6 +169,7 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 
 @Serializable
 data class OpenId4VPConfig(
+    @Serializable(with = TransactionDataObjectsSerializer::class)
     val transactionData: List<JsonObject>? = null,
     val responseType: OpenID4VPResponseType = OpenID4VPResponseType.VP_TOKEN,
     val scope: String? = null,
@@ -438,6 +447,36 @@ typealias AnnexCDocTypeToRequestedElements = Map<String, AnnexCNamespaceRequeste
 typealias AnnexCNamespaceRequestedElements = Map<String, List<String>>
 
 /**
+ * Internal matching adapter only. Doctypes are valid ISO identifiers and are used as
+ * query ids here; this must not run OpenID4VP [DcqlQuery.precheck].
+ */
+internal fun buildRequestedElementsDcqlQuery(
+    namespaceRequestedElements: AnnexCDocTypeToRequestedElements,
+): DcqlQuery {
+    require(namespaceRequestedElements.isNotEmpty()) {
+        "requestedElements cannot be empty"
+    }
+
+    val credentials = namespaceRequestedElements.entries
+
+    val dcqlIndividualQueries: List<CredentialQuery> = credentials.map { (docType, requestedElements) ->
+        CredentialQuery(
+            id = docType,
+            format = CredentialFormat.MSO_MDOC,
+            meta = MsoMdocMeta(doctypeValue = docType),
+            claims = requestedElements.entries.sortedBy { it.key }.flatMap { (namespace, elements) ->
+                elements.distinct().sorted().map { elementId ->
+                    ClaimsQuery(pathStrings = listOf(namespace, elementId))
+                }
+            }
+        )
+    }
+
+    return DcqlQuery(credentials = dcqlIndividualQueries)
+}
+
+
+/**
  * ISO 18013-7 Annex C (DC API) flow using the unified /verification-session endpoints.
  */
 // TODO: Not optimal with such custom logic
@@ -449,7 +488,7 @@ data class DcApiAnnexCFlowSetup(
 ) : VerificationSessionSetup {
 
     @Transient
-    val generatedDcqlQuery: DcqlQuery = buildAnnexCDcqlQuery(
+    val generatedDcqlQuery: DcqlQuery = buildRequestedElementsDcqlQuery(
         requireNotNull(coreFlow.requestedElements) { "core_flow.requestedElements is required for ISO 18013-7 DC API" }
     )
 
@@ -473,35 +512,6 @@ data class DcApiAnnexCFlowSetup(
     }
 
     companion object {
-        /**
-         * Internal matching adapter only. Doctypes are valid ISO identifiers and are used as
-         * query ids here; this must not run OpenID4VP [DcqlQuery.precheck].
-         */
-        private fun buildAnnexCDcqlQuery(
-            namespaceRequestedElements: AnnexCDocTypeToRequestedElements,
-        ): DcqlQuery {
-            require(namespaceRequestedElements.isNotEmpty()) {
-                "requestedElements cannot be empty"
-            }
-
-            val credentials = namespaceRequestedElements.entries
-
-            val dcqlIndividualQueries: List<CredentialQuery> = credentials.map { (docType, requestedElements) ->
-                CredentialQuery(
-                    id = docType,
-                    format = CredentialFormat.MSO_MDOC,
-                    meta = MsoMdocMeta(doctypeValue = docType),
-                    claims = requestedElements.entries.sortedBy { it.key }.flatMap { (namespace, elements) ->
-                        elements.distinct().sorted().map { elementId ->
-                            ClaimsQuery(pathStrings = listOf(namespace, elementId))
-                        }
-                    }
-                )
-            }
-
-            return DcqlQuery(credentials = dcqlIndividualQueries)
-        }
-
         val EXTENDED_MDL_EXAMPLE = DcApiAnnexCFlowSetup(
             coreFlow = GeneralFlowConfig(
                 requestedElements = mapOf(

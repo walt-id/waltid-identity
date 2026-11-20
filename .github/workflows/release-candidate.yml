@@ -11,8 +11,9 @@ on:
         required: true
 
 concurrency:
-  group: release-candidate-${{ inputs.release_version }}
-  cancel-in-progress: false
+  # Promotion verifies and deploys the version tags written by this workflow.
+  group: release-pipeline
+  queue: max
 
 jobs:
   version:
@@ -134,6 +135,7 @@ jobs:
       run-issuer-conformance: true
       run-haip-conformance: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'
+      job-name-prefix: gradle
       conformance-report-check-name: 'gradle / wallet/verifier-conformance'
       upload-test-results: true
   integration-test-aws:
@@ -165,13 +167,13 @@ jobs:
           wait-for-completion: true
           sync-status: true
   sonar-snapshot:
-    name: SonarCloud snapshot
+    name: SonarQube Cloud release scan
     runs-on: ubuntu-latest
+    timeout-minutes: 55
     needs: [ version, tag ]
     steps:
-      # SonarCloud only reports on the latest analysis of main, so record it for the release evidence
-      # now, while main still points at the tagged commits. Waits up to 30 minutes for the analysis.
       - name: Dispatch release-sonar-snapshot.yml and wait
+        id: scan
         uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: release-sonar-snapshot.yml
@@ -179,10 +181,24 @@ jobs:
           ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
           wait-for-completion: true
-          wait-timeout-seconds: 2700
+          wait-timeout-seconds: 3000
           wait-interval-seconds: 30
           sync-status: true
           inputs: '{"version": "${{ needs.version.outputs.release_version }}"}'
+      - name: Require a successful scan of the tagged Enterprise commit
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          RUN_ID: ${{ steps.scan.outputs.runId }}
+          ENTERPRISE_SHA: ${{ fromJSON(needs.tag.outputs.checkout-refs).enterprise }}
+          VERSION: ${{ needs.version.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]] || ! gh api "repos/walt-id/waltid-identity-enterprise/actions/runs/$RUN_ID" \
+            | jq -e --arg sha "$ENTERPRISE_SHA" --arg title "Release Sonar scan $VERSION" \
+              '.head_sha == $sha and .display_title == $title and .status == "completed" and .conclusion == "success"' > /dev/null; then
+            echo "::error::No successful SonarQube Cloud release scan was confirmed for $ENTERPRISE_SHA."
+            exit 1
+          fi
   docker:
     uses: ./.github/workflows/docker.yml
     secrets: inherit
@@ -196,24 +212,38 @@ jobs:
     uses: ./.github/workflows/api-docker.yml
     secrets: inherit
     needs: [ version, tag ]
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     with:
       version: ${{ needs.version.outputs.release_version }}
       checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
       tags: '[]'
       publish: true
+      attest-provenance: true
+  # Same producer as main CI, checked out at the tagged revisions. sdk-docs restores
+  # this artifact and does not link WalletCore again.
+  wallet-core-framework:
+    needs: tag
+    uses: ./.github/workflows/wallet-core-framework.yml
+    secrets: inherit
+    with:
+      checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
   sdk-docs:
     uses: ./.github/workflows/mobile-sdk-docs.yml
     secrets: inherit
-    needs: [ version, tag ]
+    needs: [ version, tag, wallet-core-framework ]
     with:
       deploy: true
       version: ${{ needs.version.outputs.release_version }}
-      checkout-refs: ${{ needs.tag.outputs.checkout-refs }}
+      checkout-refs: ${{ needs.wallet-core-framework.outputs.checkout-refs }}
+      wallet-core-artifact: ${{ needs.wallet-core-framework.outputs.artifact-name }}
       tags: '[]'
   deploy-license:
     name: Deploy license (staging)
     runs-on: ubuntu-latest
-    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, integration-test-aws, integration-test-azure ]
+    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, sonar-snapshot, integration-test-aws, integration-test-azure ]
     if: ${{ needs.tag.outputs.is-latest == 'true' }}
     steps:
       - name: Dispatch deploy-k8s.yml and wait

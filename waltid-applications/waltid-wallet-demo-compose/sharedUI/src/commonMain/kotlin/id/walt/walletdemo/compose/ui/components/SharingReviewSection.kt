@@ -28,6 +28,8 @@ internal fun SharingReviewSection(
     readOnly: Boolean = false,
     compact: Boolean = false,
     paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
+    claimReview: WalletDemoClaimReview = WalletDemoClaimReview.Legacy,
+    onRetryClaimReview: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val options = information.orEmpty()
@@ -53,6 +55,7 @@ internal fun SharingReviewSection(
                 if (index > 0) androidx.compose.material3.HorizontalDivider()
                 SharingCredentialRow(
                     information = information,
+                    showAdditionalInformationHint = claimReview is WalletDemoClaimReview.Legacy,
                     selectedCredentialOptions = selectedCredentialOptions,
                     enabled = enabled,
                     readOnly = readOnly || !review.allowsCredentialSelection(information.option),
@@ -61,7 +64,9 @@ internal fun SharingReviewSection(
                 )
             }
         }
-        if (information != null) SharingInformationSection(groups, selectedDisclosureOptions,
+        if (claimReview !is WalletDemoClaimReview.Legacy) EffectiveSharingInformationSection(
+            claimReview, enabled, readOnly, onToggleDisclosure, onRetryClaimReview)
+        else if (information != null) SharingInformationSection(groups, selectedDisclosureOptions,
             enabled, readOnly, onToggleDisclosure)
 
     }
@@ -69,9 +74,12 @@ internal fun SharingReviewSection(
 
 /** The host uses this same snapshot to gate confirmation until the reviewed values are rendered. */
 @Composable
-internal fun rememberSharingInformation(options: List<WalletDemoPresentationCredentialOption>): State<List<SharingCredentialInformation>?> =
-    key(options) {
+internal fun rememberSharingInformation(
+    options: List<WalletDemoPresentationCredentialOption>,
+    includeDisclosures: Boolean,
+): State<List<SharingCredentialInformation>?> =
+    key(options, includeDisclosures) {
         produceState<List<SharingCredentialInformation>?>(null) {
-            value = withContext(Dispatchers.Default) { options.map { it.toSharingInformation() } }
+            value = withContext(Dispatchers.Default) { options.map { it.toSharingInformation(includeDisclosures = includeDisclosures) } }
         }
     }

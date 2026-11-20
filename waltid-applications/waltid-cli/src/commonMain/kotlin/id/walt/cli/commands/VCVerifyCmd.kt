@@ -51,9 +51,13 @@ class VCVerifyCmd : CliktCommand(name = "verify") {
             "schema",
             "allowed-issuer",
             "webhook",
+            "x509-trust",
         )
         .multiple()
-        .help("Additional policies to run. Signature is mandatory; expiration and not-before are added by default.")
+        .help(
+            "Additional policies to run. Signature is mandatory; expiration and not-before are added by default. " +
+                    "The signature policy does not check an x5c chain; add x509-trust with --arg=trust-root=/path/to/root.pem to check it."
+        )
 
     private val rawArguments by option("-a", "--arg")
         .convert { value ->

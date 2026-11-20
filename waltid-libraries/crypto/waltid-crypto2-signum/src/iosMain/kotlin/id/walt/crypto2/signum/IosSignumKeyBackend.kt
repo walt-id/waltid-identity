@@ -188,6 +188,11 @@ class IosSignumKeyBackend : SignumPlatformBackend, SignumPrivateKeyImportBackend
                 exporter.exportPrivateKey()
             }
         } }
+        override suspend fun <T> withFreshBiometricAuthorization(operation: suspend (Signer) -> T): T = lifecycle.withLock {
+            requireIosKeyBiometrics(key.alias, record.policy)
+            validateOwnedEntry(key.alias, record)
+            key.withFreshBiometricAuthorization(operation)
+        }
         override suspend fun sign(data: ByteArray, algorithm: SignatureAlgorithm): ByteArray = lifecycle.withLock {
             requireIosKeyBiometrics(key.alias, record.policy)
             validateOwnedEntry(key.alias, record)

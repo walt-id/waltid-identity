@@ -198,7 +198,7 @@ class StatusCredentialTestServer {
         return TestStatusResource(
             id = id,
             data = sourceData.copy(
-                statusCredential = issuer.signJwt(sourceData.statusCredential, subject ?: uri, exp),
+                statusCredential = issuer.signJwt(sourceData.statusCredential, subject ?: uri, exp, issuedAt = exp?.minus(1)),
                 holderCredential = holder(issuer.did, id, source.id, sourceData.holderCredential),
                 valid = false,
                 exception = exception,
@@ -225,7 +225,7 @@ class StatusCredentialTestServer {
             CwtStatusListToken(
                 sub = subjectOverride ?: uri,
                 exp = exp,
-                iat = 1_700_000_000,
+                iat = 1_699_999_999,
                 statusList = IETFStatusContent(size = 1, list = list),
             )
         )
@@ -278,7 +278,7 @@ class StatusCredentialTestServer {
             private set
         private lateinit var keyId: String
 
-        suspend fun signJwt(jwt: String, statusListUri: String, exp: Long? = null): String {
+        suspend fun signJwt(jwt: String, statusListUri: String, exp: Long? = null, issuedAt: Long? = null): String {
             ensureReady()
             val payload = json.parseToJsonElement(
                 jwt.substringAfter('.').substringBefore('.').base64UrlDecode().decodeToString()
@@ -286,7 +286,8 @@ class StatusCredentialTestServer {
             val updated = payload + mapOf(
                 "iss" to JsonPrimitive(did),
                 "sub" to JsonPrimitive(statusListUri),
-            ) + (exp?.let { mapOf("exp" to JsonPrimitive(it)) } ?: emptyMap())
+            ) + (exp?.let { mapOf("exp" to JsonPrimitive(it)) } ?: emptyMap()) +
+                (issuedAt?.let { mapOf("iat" to JsonPrimitive(it)) } ?: emptyMap())
             return signJwtPayload(JsonObject(updated))
         }
 
@@ -295,6 +296,7 @@ class StatusCredentialTestServer {
             return CoseSign1.createAndSign(
                 protectedHeaders = CoseHeaders(
                     algorithm = -8,
+                    type = IetfStatusListTokens.statusListCwtType,
                     kid = keyId.encodeToByteArray(),
                 ),
                 payload = payload,

@@ -7,6 +7,10 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     sourceSets {
         commonMain.dependencies {
             // Coroutines
@@ -20,6 +24,7 @@ kotlin {
 
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
 
             /*
              * walt.id:

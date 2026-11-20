@@ -5,6 +5,16 @@ plugins {
 
 group = "id.walt.protocols"
 
+kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
+kotlin.sourceSets.named("test") {
+    kotlin.srcDir("../../credentials/waltid-credential-status/src/jvmTestFixtures/kotlin")
+}
+
 dependencies {
     // The base wallet library — all protocol logic
     api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
@@ -35,6 +45,7 @@ dependencies {
     testImplementation(identityLibs.ktor.client.mock)
     testImplementation(identityLibs.ktor.client.content.negotiation)
     testImplementation(identityLibs.kotlinx.coroutines.test)
+    testImplementation(project(":waltid-libraries:credentials:waltid-status-list"))
 }
 
 mavenPublishing {

@@ -54,10 +54,12 @@ class ItbNativeWalletDeviceTest {
         ) as ScaAuthorizationTestActivity
         instrumentation.runOnMainSync {
             activity.setContentView(android.widget.TextView(activity).apply {
-                text = "WAL-1423 live ITB test. Approve only the synthetic test operations requested by the operator."
+                text = "Live ITB wallet test. Approve only the synthetic test operations requested by the operator."
             })
         }
         val provider = AndroidPlatformKeyProvider(activity) { activity }
+        val timed = args.getString("wallet.itb.biometricPolicy") == "timed"
+        require(args.getString("wallet.itb.biometricPolicy") in setOf(null, "per-use", "timed"))
         var generated: ManagedKey? = null
         try {
             withTimeout(30 * 60_000L) {
@@ -80,12 +82,13 @@ class ItbNativeWalletDeviceTest {
                         require(certificates.isNotEmpty())
                         val requirements = WalletKeyRequirements(
                             KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-                            KeyUseAuthorizationPolicy.BiometricCurrentSet, WalletKeyProtection.HardwareRequired,
+                            if (timed) KeyUseAuthorizationPolicy.BiometricTimedReuse(10) else KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                            WalletKeyProtection.HardwareRequired,
                         )
                         check(provider.preflight(requirements) is KeyUseAuthorizationSupport.Supported)
                         val key = provider.generateManagedKey(WalletKeyCreationRequest(
-                            KeyId("wal1423-itb-${UUID.randomUUID()}"), requirements,
-                            KeyUseAuthorizationPrompt("Authorize this WAL-1423 ITB test operation"),
+                            KeyId("itb-test-${UUID.randomUUID()}"), requirements,
+                            KeyUseAuthorizationPrompt("Authorize this ITB wallet test operation"),
                         )).also { generated = it }
                         val restored = provider.restoreManagedKey(key.storedKey) as PlatformManagedKeyRestoration.Restored
                         val wallet = Wallet(

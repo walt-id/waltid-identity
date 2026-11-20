@@ -5,11 +5,13 @@ public struct WalletSection<Content: View>: View {
     private let title: String?
     private let titleIdentifier: String?
     private let content: Content
+    private let background: Color
 
-    public init(_ title: String? = nil, titleIdentifier: String? = nil, @ViewBuilder content: () -> Content) {
+    public init(_ title: String? = nil, titleIdentifier: String? = nil, background: Color = Color(.secondarySystemGroupedBackground), @ViewBuilder content: () -> Content) {
         self.title = title
         self.titleIdentifier = titleIdentifier
         self.content = content()
+        self.background = background
     }
 
     public var body: some View {
@@ -24,7 +26,7 @@ public struct WalletSection<Content: View>: View {
             }
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemGroupedBackground))
+                .background(background)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }

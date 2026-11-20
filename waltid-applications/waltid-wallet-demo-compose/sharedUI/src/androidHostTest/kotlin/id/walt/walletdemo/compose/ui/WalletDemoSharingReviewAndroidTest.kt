@@ -4,11 +4,32 @@ import kotlin.test.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class WalletDemoSharingReviewAndroidTest {
     private val scenarios = WalletDemoSharingReviewTestScenarios()
+
+    @Test
+    fun compactClaimChoicesKeepSelectionAndExpansionIndependent() =
+        scenarios.compactClaimChoicesKeepSelectionAndExpansionIndependent()
+
+    @Test
+    fun selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff() =
+        scenarios.selectionAwareTreeShowsParentConsequencesAndRemovesThemWhenTheChoiceIsOff()
+
+    @Test
+    fun statusConfirmationUsesOnlyDistinctSelectedCredentialsAndCapturedRevisions() = scenarios.statusConfirmationUsesOnlyDistinctSelectedCredentialsAndCapturedRevisions()
+
+    @Test
+    fun statusConfirmationInvalidatesReviewedChangesButNotUnselectedOrTimestampChanges() = scenarios.statusConfirmationInvalidatesReviewedChangesButNotUnselectedOrTimestampChanges()
+
+    @Test
+    fun unavailableStatusCannotInventAcknowledgementAndLegacyFallbackIsExplicit() = scenarios.unavailableStatusCannotInventAcknowledgementAndLegacyFallbackIsExplicit()
+
+    @Test
+    fun unsignedPaymentAndAdverseStatusUseOneDialogAndPreservePaymentActions() = scenarios.unsignedPaymentAndAdverseStatusUseOneDialogAndPreservePaymentActions()
 
     @Test
     fun choosingFromTheWholeRowUpdatesInformationAndSubmission() =
@@ -31,8 +52,19 @@ class WalletDemoSharingReviewAndroidTest {
         scenarios.unsignedConfirmationIsInvalidatedByNewConsentAndDisabledState()
 
     @Test
+    fun compactStatusRefreshRequiresAnExplicitActionAndRespectsHostCapability() =
+        scenarios.compactStatusRefreshRequiresAnExplicitActionAndRespectsHostCapability()
+
+    @Test
     fun paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements() =
         scenarios.paymentReviewUsesResolvedLabelsActionsAndAllFourPlacements()
+
+    @Test
+    fun payeeWebsiteOpensOnlyOnExplicitTap() = scenarios.payeeWebsiteOpensOnlyOnExplicitTap()
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun paymentMoneyUsesAvailableWidthAtLargeText() = scenarios.paymentMoneyUsesAvailableWidthAtLargeText()
 
     @Test
     fun unavailablePaymentInstructionsBlockSubmissionWithoutGenericFallback() =

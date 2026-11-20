@@ -2,6 +2,7 @@
 
 package id.walt.issuer2.openid4vci
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
@@ -22,6 +23,7 @@ import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.issuer2.testsupport.*
@@ -41,7 +43,9 @@ import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.proofs.CredentialNonceBinding
 import id.walt.openid4vci.proofs.CredentialNonceValidationResult
-import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
+import id.walt.openid4vci.pkce.Pkce
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
@@ -72,11 +76,129 @@ import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.*
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 class Issuer2AttestationChallengeTest {
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
     @AfterEach
-    fun clear() = clearIssuer2TestEnvironment()
+    fun clear() {
+        try {
+            catalogues.forEach { it.close() }
+        } finally {
+            clearIssuer2TestEnvironment()
+        }
+    }
+
+    @Test
+    fun `PKCE token exchange is enforced by the provider through HTTP`() = testApplication {
+        val fixture = fixture(enabled = false)
+        val client = install(fixture)
+        val verifier = id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs.PKCE_VERIFIER_EXAMPLE
+        val cases = listOf(
+            listOf(verifier) to null,
+            null to "invalid_request",
+            listOf(verifier, "") to "invalid_request",
+            listOf("") to "invalid_request",
+            listOf("", "") to "invalid_request",
+            listOf("x".repeat(43)) to "invalid_grant",
+            listOf("é".repeat(43)) to "invalid_grant",
+        )
+        for ((values, expectedError) in cases) {
+            val code = fixture.authorizationCode(verifier)
+            val response = client.token(fixture, Parameters.build {
+                append("grant_type", "authorization_code"); append("client_id", "wallet")
+                append("redirect_uri", REDIRECT); append("code", code)
+                values?.forEach { append("code_verifier", it) }
+            }, null)
+            if (expectedError == null) response.assertToken() else {
+                assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+                assertEquals(expectedError, response.body<JsonObject>().string("error"))
+                assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
+            }
+        }
+    }
+
+    @Test
+    fun `empty PKCE values are omitted by token and PAR endpoints`() = testApplication {
+        val fixture = fixture(enabled = false)
+        val client = install(fixture)
+        val code = fixture.authorizationCode()
+        client.token(fixture, Parameters.build {
+            append("grant_type", "authorization_code"); append("client_id", "wallet")
+            append("redirect_uri", REDIRECT); append("code", code); append("code_verifier", "")
+        }, null).assertToken()
+        val par = client.par(fixture, null, Parameters.build {
+            appendAll(parParameters()); append("code_challenge", ""); append("code_challenge_method", "")
+        })
+        assertEquals(HttpStatusCode.Created, par.status, par.bodyAsText())
+        assertNotNull(par.body<JsonObject>()["request_uri"])
+    }
+
+    @Test
+    fun `configured PKCE requirement rejects missing challenges and accepts S256 through HTTP`() = testApplication {
+        val fixture = fixture(enabled = false, requirePkce = true)
+        val client = install(fixture)
+        for (emptyPkce in listOf(false, true)) {
+            val parameters = Parameters.build {
+                appendAll(parParameters())
+                if (emptyPkce) {
+                    append("code_challenge", ""); append("code_challenge_method", "")
+                }
+            }
+            val authorization = client.get("/openid4vci/authorize") {
+                parameters.forEach { name, values -> values.forEach { parameter(name, it) } }
+            }
+            assertEquals(HttpStatusCode.BadRequest, authorization.status, authorization.bodyAsText())
+            assertEquals("invalid_request", authorization.body<JsonObject>().string("error"))
+            assertEquals("PKCE code_challenge is required", authorization.body<JsonObject>().string("error_description"))
+            assertEquals("no-store", authorization.headers[HttpHeaders.CacheControl])
+            val par = client.par(fixture, null, parameters)
+            assertEquals(HttpStatusCode.BadRequest, par.status, par.bodyAsText())
+            assertEquals("invalid_request", par.body<JsonObject>().string("error"))
+            assertEquals("PKCE code_challenge is required", par.body<JsonObject>().string("error_description"))
+        }
+
+        val verifier = id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs.PKCE_VERIFIER_EXAMPLE
+        val code = fixture.authorizationCode(verifier)
+        val token = client.token(fixture, Parameters.build {
+            append("grant_type", "authorization_code"); append("client_id", "wallet")
+            append("redirect_uri", REDIRECT); append("code", code); append("code_verifier", verifier)
+        }, null).assertToken()
+        client.token(fixture, Parameters.build {
+            append("grant_type", "refresh_token"); append("client_id", "wallet")
+            append("refresh_token", token.string("refresh_token"))
+        }, null).assertToken()
+        val preAuthorizedCode = fixture.preAuthorizedCode("wallet")
+        client.token(fixture, Parameters.build {
+            append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
+            append("client_id", "wallet"); append("pre-authorized_code", preAuthorizedCode)
+        }, null).assertToken()
+    }
+
+    @Test
+    fun `PKCE downgrade and invalid PAR challenge are rejected through HTTP`() = testApplication {
+        val fixture = fixture(enabled = false)
+        val client = install(fixture)
+        val code = fixture.authorizationCode()
+        val response = client.token(fixture, Parameters.build {
+            append("grant_type", "authorization_code"); append("client_id", "wallet")
+            append("redirect_uri", REDIRECT); append("code", code)
+            append("code_verifier", "x".repeat(43))
+        }, null)
+        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+        assertEquals("invalid_grant", response.body<JsonObject>().string("error"))
+        val headers = fixture.headers(null)
+        val par = client.submitForm("/openid4vci/par", Parameters.build {
+            appendAll(parParameters()); append("code_challenge", "bad"); append("code_challenge_method", "S256")
+        }) {
+            header(ClientAttestationHeaders.CLIENT_ATTESTATION, headers.attestationJwt)
+            header(ClientAttestationHeaders.CLIENT_ATTESTATION_POP, headers.popJwt)
+        }
+        assertEquals(HttpStatusCode.BadRequest, par.status, par.bodyAsText())
+        assertEquals("invalid_request", par.body<JsonObject>().string("error"))
+    }
 
     @Test
     fun `production module starts with challenges and includes endpoint in signed discovery`() = testApplication {
@@ -331,6 +453,7 @@ class Issuer2AttestationChallengeTest {
         lifetime: Long = 300,
         tokenKey: JWKKey? = null,
         storedKey: String? = null,
+        requirePkce: Boolean = false,
     ): Fixture {
         val resolvedTokenKey = tokenKey ?: JWKKey.generate(KeyType.secp256r1)
         val material = createIssuer2ClientAttestationTestMaterial()
@@ -339,6 +462,7 @@ class Issuer2AttestationChallengeTest {
             baseUrl = "http://localhost",
             ciTokenKey = KeySerialization.serializeKey(resolvedTokenKey),
             ciTokenStoredKey = storedKey,
+            requirePkce = requirePkce,
             clientAuthenticationConfig = auth.copy(supportedMethods = auth.supportedMethods +
                     if (anonymous) listOf(ClientAuthenticationMethodConfig.PreAuthAnonymous) else emptyList()),
         ), resolvedTokenKey, material, generateIssuer2WalletInstanceKey())
@@ -359,7 +483,7 @@ class Issuer2AttestationChallengeTest {
         return apiClient()
     }
 
-    private class Fixture(
+    private inner class Fixture(
         val config: Issuer2ServiceConfig,
         val tokenKey: JWKKey,
         val material: Issuer2ClientAttestationTestMaterial,
@@ -375,11 +499,18 @@ class Issuer2AttestationChallengeTest {
             }
         }
         val preAuthorizedCodes = InMemoryPreAuthorizedCodeRepository()
-        val module = OpenId4VciModule.create(config, codes, preAuthorizedCodes, InMemoryPARRepository(), InMemoryRefreshTokenRepository())
-        val challenges get() = assertNotNull(module.attestationChallengeService)
         val metadataConfig = Issuer2MetadataConfig(credentialConfigurations = mapOf("identity" to buildJsonObject {
             put("format", "dc+sd-jwt"); put("vct", "https://example.com/identity"); put("scope", "identity")
         }))
+        private val typeMetadata = IssuerTypeMetadataCatalogue(
+            config, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
+        val module = OpenId4VciModule.create(
+            config, codes, preAuthorizedCodes, InMemoryPARRepository(), InMemoryRefreshTokenRepository(),
+            metadataResolver = typeMetadata,
+        )
+        val challenges get() = assertNotNull(module.attestationChallengeService)
+
         val profiles = CredentialProfileService(Issuer2ProfilesConfig(), metadataConfig)
         val sessions = IssuanceSessionService(object : IssuanceSessionRepository {
             val records = mutableMapOf<String, IssuanceSession>()
@@ -387,10 +518,12 @@ class Issuer2AttestationChallengeTest {
             override suspend fun get(sessionId: String) = records[sessionId]
             override suspend fun list() = records.values.toList()
             override suspend fun remove(sessionId: String) { records.remove(sessionId) }
-            override suspend fun take(sessionId: String) = records.remove(sessionId)
+            override suspend fun compareAndSet(expected: IssuanceSession, replacement: IssuanceSession): Boolean =
+                records.replace(expected.sessionId, expected, replacement)
         })
-        val metadata = MetadataService(config, metadataConfig, profiles, sessions,
-            preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported)
+        val metadata = MetadataService(config, metadataConfig, profiles, sessions, typeMetadata,
+            preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,
+            pkceServiceConfig = module.pkceServiceConfig)
         val notifications = IssuanceNotificationService()
         val nonceBinding = CredentialNonceBinding(issuer, "$issuer/credential", "$issuer/nonce")
 
@@ -400,7 +533,7 @@ class Issuer2AttestationChallengeTest {
         )
 
         fun controller(service: AttestationChallengeService?) = OpenId4VciController(
-            metadata, protocol(service), CredentialOfferService(profiles, sessions, module.preAuthorizedCodeIssuer, config, notifications), notifications,
+            metadata, protocol(service), CredentialOfferService(profiles, sessions, module.preAuthorizedCodeIssuer, config, notifications, typeMetadata), notifications,
         )
 
         suspend fun headers(challenge: String?) = material.attestationAssembler.buildAttestationHeaders(
@@ -414,16 +547,19 @@ class Issuer2AttestationChallengeTest {
                     credentialData = JsonObject(emptyMap()))),
                 expiresAt = Clock.System.now() + 10.minutes,
             )
-            sessions.saveSession(session)
+            sessions.createSession(session)
             return DefaultSession(subject = session.sessionId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to session.expiresAt))
         }
 
-        suspend fun authorizationCode(): String {
+        suspend fun authorizationCode(verifier: String? = null): String {
             val session = session(AuthenticationMethod.AUTHORIZED)
-            val code = UUID.randomUUID().toString()
-            codes.save(DefaultAuthorizationCodeRecord(code, "wallet", REDIRECT, setOf("identity"), emptySet(), session,
-                session.expiresAt.getValue(TokenType.ACCESS_TOKEN)))
-            return code
+            val request = assertIs<AuthorizationRequestResult.Success>(module.oauth2Provider.createAuthorizationRequest(
+                mapOf("response_type" to listOf("code"), "client_id" to listOf("wallet"),
+                    "redirect_uri" to listOf(REDIRECT), "scope" to listOf("identity")) +
+                    (verifier?.let { mapOf("code_challenge" to listOf(Pkce.generateS256CodeChallenge(it)),
+                        "code_challenge_method" to listOf("S256")) } ?: emptyMap())
+            )).request
+            return assertIs<AuthorizationResponseResult.Success>(module.oauth2Provider.createAuthorizationResponse(request, session)).response.code
         }
 
         suspend fun preAuthorizedCode(clientId: String?) = module.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
@@ -436,9 +572,13 @@ class Issuer2AttestationChallengeTest {
         ).issue(issuer)
     }
 
-    private suspend fun HttpClient.par(fixture: Fixture, challenge: String?): HttpResponse {
+    private suspend fun HttpClient.par(
+        fixture: Fixture,
+        challenge: String?,
+        parameters: Parameters = parParameters(),
+    ): HttpResponse {
         val headers = fixture.headers(challenge)
-        return submitForm("/openid4vci/par", parParameters()) {
+        return submitForm("/openid4vci/par", parameters) {
             header(ClientAttestationHeaders.CLIENT_ATTESTATION, headers.attestationJwt)
             header(ClientAttestationHeaders.CLIENT_ATTESTATION_POP, headers.popJwt)
             header(HttpHeaders.Origin, "https://wallet.example")

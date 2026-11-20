@@ -1,14 +1,87 @@
 package id.walt.walletdemo.compose.logic
 
 import kotlin.io.encoding.Base64
+import kotlin.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CredentialDisplayNormalizerTest {
+
+    @Test
+    fun consentPreservesNormalizedClaimsAcrossCredentialFormats() {
+        for (format in listOf("dc+sd-jwt", "vc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc", "mso_mdoc")) {
+            val option = WalletDemoPresentationCredentialOption(
+                queryId = "identity", credentialId = "one", format = format,
+                issuer = null, subject = null, label = "Identity",
+                credentialDataJson = """{"iat":1793318400,"exp":1801094400,"nbf":1793318400.25}""",
+                disclosures = listOf("iat" to "1793318400", "exp" to "1801094400", "nbf" to "1793318400.25").map { (name, value) ->
+                    WalletDemoPresentationDisclosure(path = name, label = name, valueJson = value,
+                        displayValue = value, selectivelyDisclosable = false)
+                },
+            )
+            val requested = option.toSharingInformation().fields.map { it.item }
+            val expected = listOf("2026-10-30T00:00:00Z", "2027-01-28T00:00:00Z", "2026-10-30T00:00:00.25Z")
+            assertEquals(expected.map { DisplayValue.InstantValue(Instant.parse(it)) }, requested.map { it.value }, format)
+            val stored = option.toCredentialSummary().toCredentialDetails().groups.flatMap { it.items }.associateBy { it.path.id }
+            option.disclosures.forEachIndexed { index, disclosure ->
+                assertEquals(DisplayValue.InstantValue(Instant.parse(expected[index])), stored.getValue(disclosure.path).value, format)
+                assertEquals(disclosure.valueJson, requested[index].rawValue)
+            }
+        }
+    }
+
+    @Test
+    fun temporalFormattingPreservesSecondsAndRejectsUnitGuessing() {
+        val cases = listOf(
+            "-62135596800" to "0001-01-01T00:00:00Z",
+            "0" to "1970-01-01T00:00:00Z",
+            "-1" to "1969-12-31T23:59:59Z",
+            "-0.25" to "1969-12-31T23:59:59.75Z",
+            "1.793318400125e9" to "2026-10-30T00:00:00.125Z",
+            "1793318400.123456789" to "2026-10-30T00:00:00.123456789Z",
+            "10000000000" to "2286-11-20T17:46:40Z",
+            "253402300799" to "9999-12-31T23:59:59Z",
+        )
+        for ((raw, expected) in cases) {
+            assertEquals(DisplayValue.InstantValue(Instant.parse(expected)), disclosureValue("iat", raw), raw)
+            assertEquals(DisplayValue.Text(raw), disclosureValue("validFrom", "\"$raw\""), raw)
+        }
+        for (raw in listOf("1793318400000", "253402300800", "1e100", "1793318400.1234567891")) {
+            assertEquals(DisplayValue.NumberValue(raw), disclosureValue("exp", raw), raw)
+        }
+    }
+
+    @Test
+    fun typedClaimFallbackDoesNotChangeSourceMeaning() {
+        assertEquals(DisplayValue.BooleanValue(true), disclosureValue("age_over_18", "true"))
+        assertEquals(DisplayValue.Text("true"), disclosureValue("custom", "\"true\""))
+        assertEquals(DisplayValue.Text("false"), disclosureValue("custom", "\"false\""))
+        assertEquals(DisplayValue.NumberValue("1793318400"), disclosureValue("idx", "1793318400"))
+        assertEquals(DisplayValue.Text("00123"), disclosureValue("document_number", "\"00123\""))
+        assertEquals(DisplayValue.NullValue, disclosureValue("custom", "null"))
+        for (date in listOf("1990-01-01", "2026-10-30T23:30:00", "2026-02-30T12:00:00Z", "2026-10-30T23:30:60Z", "2026-10-30T23:30:00.1234567891Z", "not a date", "SGVsbG8gd29ybGQ=")) {
+            assertEquals(DisplayValue.Text(date), disclosureValue("expiry_date", "\"$date\""))
+        }
+        assertEquals(DisplayValue.Text("Fallback"), disclosureValue("custom", "{"))
+    }
+
+    @Test
+    fun nestedAndArrayTemporalValuesUseTheSameFormatting() {
+        val value = disclosureValue("history", """[{"issued_at":1793318400,"flags":[true,"true"]}]""")
+        val item = assertIs<DisplayValue.ObjectValue>(assertIs<DisplayValue.ListValue>(value).values.single())
+        assertEquals(DisplayValue.InstantValue(Instant.parse("2026-10-30T00:00:00Z")), item.entries.first().value)
+        assertEquals(DisplayValue.ListValue(listOf(DisplayValue.BooleanValue(true), DisplayValue.Text("true"))), item.entries.last().value)
+        assertEquals(DisplayValue.ListValue(listOf(DisplayValue.InstantValue(Instant.parse("2026-10-30T00:00:00Z")))),
+            disclosureValue("exp", "[1793318400]"))
+    }
+
+    private fun disclosureValue(name: String, json: String): DisplayValue =
+        CredentialDisplayNormalizer.toDisclosureValue(json, "Fallback", ClaimPath.topLevel(name), "dc+sd-jwt")
 
     @Test
     fun claimIdentityPreservesNamespacesPunctuationAndArrayIndices() {
@@ -68,14 +141,16 @@ class CredentialDisplayNormalizerTest {
         assertEquals(DisplayValue.NumberValue("28"), personal.items.first { it.path.id == "age" }.value)
 
         val address = assertNotNull(details.groups.firstOrNull { it.title == "Address" })
-        assertEquals("Street address", address.items.first { it.path.id == "resident_address.street_address" }.label)
-        assertEquals(DisplayValue.Text("1 Infinite Loop"), address.items.first { it.path.id == "resident_address.street_address" }.value)
-        assertEquals("Locality", address.items.first { it.path.id == "resident_address.locality" }.label)
+        val addressRows = allHierarchyItems(address.items)
+        assertIs<DisplayValue.ObjectValue>(address.items.single().value)
+        assertEquals("Street address", addressRows.first { it.path.id == "resident_address.street_address" }.label)
+        assertEquals(DisplayValue.Text("1 Infinite Loop"), addressRows.first { it.path.id == "resident_address.street_address" }.value)
+        assertEquals("Locality", addressRows.first { it.path.id == "resident_address.locality" }.label)
 
         val systemInfo = assertNotNull(details.toSystemInfoGroup())
         assertEquals("About this credential", systemInfo.title)
         assertFalse(systemInfo.initiallyExpanded)
-        assertEquals(DisplayValue.Text("2026-07-09T12:00:00Z"), systemInfo.items.first { it.path.id == "system.added" }.value)
+        assertEquals(DisplayValue.InstantValue(Instant.parse("2026-07-09T12:00:00Z")), systemInfo.items.first { it.path.id == "system.added" }.value)
         assertEquals(DisplayValue.Text("cred-1"), systemInfo.items.first { it.path.id == "system.id" }.value)
         assertEquals(DisplayValue.Text("vc+sd-jwt"), systemInfo.items.first { it.path.id == "system.format" }.value)
         assertEquals(DisplayValue.Text("did:web:issuer.example"), systemInfo.items.first { it.path.id == "system.issuer" }.value)
@@ -99,7 +174,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun flattensNamespacedMdocObjectClaimsIntoDisplayRows() {
+    fun retainsNamespacedMdocObjectsWithTheirSourcePaths() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
                 id = "cred-1",
@@ -125,17 +200,18 @@ class CredentialDisplayNormalizerTest {
         assertEquals(
             listOf(
                 "docType",
-                "[\"eu.europa.ec.eudi.pid.1\"].birth_place.locality",
-                "[\"eu.europa.ec.eudi.pid.1\"].birth_place.country",
+                "[\"eu.europa.ec.eudi.pid.1\"].birth_place",
                 "[\"eu.europa.ec.eudi.pid.1\"].resident_state",
             ),
             credentialData.items.map { it.path.id },
         )
-        assertTrue(credentialData.items.none { it.value is DisplayValue.ObjectValue })
+        val birthplace = assertIs<DisplayValue.ObjectValue>(credentialData.items.single { it.path.id.endsWith(".birth_place") }.value)
+        assertEquals(listOf("Locality", "Country"), birthplace.entries.map { it.label })
+        assertEquals(listOf(DisplayValue.Text("Vienna"), DisplayValue.Text("Austria")), birthplace.entries.map { it.value })
     }
 
     @Test
-    fun rendersMdocAgeAttestationsWithoutAbsentClaims() {
+    fun retainsMdocNamespacesExplicitNullsAndTypedAgeValues() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
                 id = "cred-1",
@@ -161,23 +237,17 @@ class CredentialDisplayNormalizerTest {
             )
         )
 
-        val age = assertNotNull(details.groups.firstOrNull { it.title == "Age attestations" })
-        assertFalse(age.initiallyExpanded)
-        assertEquals(
-            listOf("18 or older", "21 or older", "65 or older"),
-            age.items.map { it.label },
-        )
-        assertEquals(
-            listOf(
-                DisplayValue.BooleanValue(true),
-                DisplayValue.Text("Unsupported value"),
-                DisplayValue.BooleanValue(false),
-            ),
-            age.items.map { it.value },
-        )
-        assertTrue(details.groups.flatMap { it.items }.none { it.path.id.contains("age_over_62") })
-        assertTrue(details.groups.none { it.title == "Travel document data" })
-        assertTrue(details.groups.first { it.title == "Credential data" }.initiallyExpanded)
+        val namespaces = details.groups.flatMap { it.items }
+        val person = assertIs<DisplayValue.ObjectValue>(namespaces.single { it.path.id == "[\"org.iso.23220.1\"]" }.value)
+        val ages = person.entries.associate { it.label to it.value }
+        assertEquals(DisplayValue.NullValue, ages["62 or older"])
+        assertEquals(DisplayValue.BooleanValue(false), ages["65 or older"])
+        assertEquals(DisplayValue.BooleanValue(true), ages["18 or older"])
+        assertEquals(DisplayValue.Text("Unsupported value"), ages["21 or older"])
+        val travel = assertIs<DisplayValue.ObjectValue>(namespaces.single { it.path.id == "[\"org.iso.23220.dtc.1\"]" }.value)
+        assertEquals(3, travel.entries.size)
+        assertTrue(travel.entries.all { it.value == DisplayValue.NullValue })
+        assertFalse(details.groups.single { it.title == "Travel document data" }.initiallyExpanded)
     }
 
     @Test
@@ -287,9 +357,7 @@ class CredentialDisplayNormalizerTest {
                 "given_name",
                 "family_name",
                 "birthdate",
-                "place_of_birth.locality",
-                "place_of_birth.country",
-                "place_of_birth.region",
+                "place_of_birth",
                 "nationalities",
                 "portrait",
             ),
@@ -315,6 +383,7 @@ class CredentialDisplayNormalizerTest {
                       "iat": 1736899200,
                       "exp": 1894699800,
                       "vct": "eu.europa.ec.eudi.pid.1",
+                      "vct#integrity": "sha256-test",
                       "_sd_alg": "sha-256",
                       "cnf": {
                         "jwk": {
@@ -342,7 +411,7 @@ class CredentialDisplayNormalizerTest {
         val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
         assertEquals("Alice", (personal.items.first { it.path.id == "given_name" }.value as DisplayValue.Text).value)
         assertEquals("Date of birth", personal.items.first { it.path.id == "birthdate" }.label)
-        assertEquals("Locality", personal.items.first { it.path.id == "place_of_birth.locality" }.label)
+        assertEquals("Locality", allHierarchyItems(personal.items).first { it.path.id == "place_of_birth.locality" }.label)
 
         val address = assertNotNull(details.groups.firstOrNull { it.title == "Address" })
         assertEquals("Resident country", address.items.first { it.path.id == "resident_country" }.label)
@@ -352,10 +421,11 @@ class CredentialDisplayNormalizerTest {
         assertEquals("Document number", credentialData.items.first { it.path.id == "document_number" }.label)
 
         val technical = assertNotNull(details.groups.firstOrNull { it.title == "Credential metadata" })
-        assertEquals(DisplayValue.Text("2 undisclosed claim values"), technical.items.first { it.path.id == "_sd" }.value)
+        assertEquals(DisplayValue.Text("sha256-test"), technical.items.single { it.label == "Type metadata integrity" }.value)
+        assertEquals(DisplayValue.Text("2 disclosure digests"), technical.items.first { it.path.id == "_sd" }.value)
         assertEquals(DisplayValue.Text("Key-bound credential - EC - P-256"), technical.items.first { it.path.id == "cnf" }.value)
-        assertEquals(DisplayValue.Text("2025-01-15"), technical.items.first { it.path.id == "iat" }.value)
-        assertEquals(DisplayValue.Text("2030-01-15"), technical.items.first { it.path.id == "exp" }.value)
+        assertEquals(DisplayValue.InstantValue(Instant.parse("2025-01-15T00:00:00Z")), technical.items.first { it.path.id == "iat" }.value)
+        assertEquals(DisplayValue.InstantValue(Instant.parse("2030-01-15T09:30:00Z")), technical.items.first { it.path.id == "exp" }.value)
         assertTrue(technical.items.none { item ->
             item.value == DisplayValue.Text("very-long-x-coordinate") ||
                 item.value == DisplayValue.Text("very-long-y-coordinate")
@@ -405,8 +475,8 @@ class CredentialDisplayNormalizerTest {
         assertTrue(details.groups.none { it.title == "Address" })
 
         val metadata = assertNotNull(details.groups.firstOrNull { it.title == "Credential metadata" })
-        assertEquals("Undisclosed claims", metadata.items.first { it.path.id == "_sd" }.label)
-        assertEquals(DisplayValue.Text("3 undisclosed claim values"), metadata.items.first { it.path.id == "_sd" }.value)
+        assertEquals("Disclosure digests", metadata.items.first { it.path.id == "_sd" }.label)
+        assertEquals(DisplayValue.Text("3 disclosure digests"), metadata.items.first { it.path.id == "_sd" }.value)
         assertEquals(DisplayValue.Text("Pid 1 (urn:eudi:pid:1)"), metadata.items.first { it.path.id == "vct" }.value)
         assertEquals(
             DisplayValue.Text("Status list index 8965 - https://issuer.eudiw.dev/token_status_list/FC/urn:eudi:pid:1/15a4de9f-d535-4441-8564-02784d7b1d30"),
@@ -592,11 +662,13 @@ class CredentialDisplayNormalizerTest {
                     credentialDataJson = case.credentialDataJson,
                 )
             )
-            val claims = details.groups.flatMap { it.items }
+            val claims = allHierarchyItems(details.groups.flatMap { it.items })
 
             assertEquals(details.toCardDisplayData(), details.summary.toCardDisplayData(), case.label)
             assertTrue(claims.any { it.path.id == case.expectedClaimPath }, case.label)
-            assertTrue(claims.none { it.value is DisplayValue.ObjectValue }, case.label)
+            if (case.format in setOf("jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc")) {
+                assertTrue(details.groups.flatMap { it.items }.none { it.path.id in setOf("vc", "credentialSubject", "vc.credentialSubject") }, case.label)
+            }
         }
     }
 
@@ -643,7 +715,7 @@ class CredentialDisplayNormalizerTest {
         assertTrue(technical.items.any { it.path.id == "[\"@context\"]" })
         assertTrue(technical.items.any { it.path.id == "type" })
         assertTrue(technical.items.any { it.path.id == "issuer" })
-        assertTrue(technical.items.any { it.path.id == "proof.type" })
+        assertTrue(allHierarchyItems(technical.items).any { it.path.id == "proof.type" })
     }
 
     @Test
@@ -716,7 +788,7 @@ class CredentialDisplayNormalizerTest {
             )
         )
 
-        val claims = details.groups.flatMap { it.items }
+        val claims = allHierarchyItems(details.groups.flatMap { it.items })
         assertEquals(DisplayValue.DecodedText("Hello, wallet"), claims.first { it.path.id == "plain_note" }.value)
         assertEquals(DisplayValue.Text("age proof"), claims.first { it.path.id == "json_note.purpose" }.value)
     }
@@ -741,7 +813,7 @@ class CredentialDisplayNormalizerTest {
             )
         )
 
-        val claims = details.groups.flatMap { it.items }
+        val claims = allHierarchyItems(details.groups.flatMap { it.items })
         assertEquals(DisplayValue.Text("age proof"), claims.first { it.path.id == "json_note.purpose" }.value)
         assertEquals(DisplayValue.DecodedText("Hello, wallet"), claims.first { it.path.id == "plain_note" }.value)
         assertIs<DisplayValue.Image>((claims.first { it.path.id == "portrait" }.value as DisplayValue.DeferredImage).resolve())
@@ -772,7 +844,7 @@ class CredentialDisplayNormalizerTest {
             )
         )
 
-        val claims = details.groups.flatMap { it.items }
+        val claims = allHierarchyItems(details.groups.flatMap { it.items })
         listOf("given_name", "invalid_image", "unsupported_image", "non_image_data_url", "plain_base64")
             .forEach { path ->
                 assertFalse(claims.first { it.path.id == path }.value is DisplayValue.Image)
@@ -895,7 +967,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun presentationCredentialOptionPrependsReadableRequestedDisclosures() {
+    fun sharingReviewShowsReadableRequestedDisclosures() {
         val option = WalletDemoPresentationCredentialOption(
             queryId = "pid",
             credentialId = "credential-1",
@@ -931,22 +1003,20 @@ class CredentialDisplayNormalizerTest {
             ),
         )
 
-        val details = option.toCredentialDetails()
+        val requested = option.toSharingInformation().fields.map { it.item }
+        assertEquals(listOf("Given name", "Portrait"), requested.map { it.label })
+        assertEquals(listOf("disclosures[0].given_name", "disclosures[1].portrait"), requested.map { it.path.id })
+        assertEquals(DisplayValue.Text("Ada"), requested.first().value)
+        assertIs<DisplayValue.Image>(assertIs<DisplayValue.DeferredImage>(requested.last().value).resolve())
 
-        val requested = assertNotNull(details.groups.firstOrNull())
-        assertEquals("Requested disclosures", requested.title)
-        assertEquals(listOf("Given name", "Portrait"), requested.items.map { it.label })
-        assertEquals(listOf("disclosures[0].given_name", "disclosures[1].portrait"), requested.items.map { it.path.id })
-        assertEquals(DisplayValue.Text("Ada"), requested.items.first().value)
-        assertIs<DisplayValue.Image>((requested.items.last().value as DisplayValue.DeferredImage).resolve())
-
+        val details = option.toCredentialSummary().toCredentialDetails()
         val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
         assertEquals(listOf("Given name", "Family name"), personal.items.map { it.label })
         assertEquals(option.selection.id, details.summary.id)
     }
 
     @Test
-    fun presentationCredentialOptionOmitsRequestedDisclosuresWhenEmpty() {
+    fun sharingReviewShowsNoFieldsWhenThereAreNoPreviewDisclosures() {
         val option = WalletDemoPresentationCredentialOption(
             queryId = "pid",
             credentialId = "credential-1",
@@ -962,10 +1032,7 @@ class CredentialDisplayNormalizerTest {
             disclosures = emptyList(),
         )
 
-        val details = option.toCredentialDetails()
-
-        assertFalse(details.groups.any { it.title == "Requested disclosures" })
-        assertEquals("Personal details", details.groups.firstOrNull()?.title)
+        assertTrue(option.toSharingInformation().fields.isEmpty())
     }
 
     @Test
@@ -991,7 +1058,7 @@ class CredentialDisplayNormalizerTest {
             """.trimIndent(),
         )
 
-        val card = option.toCredentialDetails().toCardDisplayData()
+        val card = option.toSharingInformation(includeDisclosures = false).summary
 
         assertEquals("https://issuer.example/pid-bg.png", card.backgroundImageUri)
         assertEquals("Personal ID", card.title)
@@ -1158,7 +1225,7 @@ class CredentialDisplayNormalizerTest {
             )
         )
 
-        val claims = details.groups.flatMap { it.items }
+        val claims = allHierarchyItems(details.groups.flatMap { it.items })
         assertEquals("Locality", claims.first { it.path.id == "place_of_birth.locality" }.label)
         assertEquals("Country", claims.first { it.path.id == "place_of_birth.country" }.label)
     }
@@ -1178,4 +1245,210 @@ class CredentialDisplayNormalizerTest {
         val syntheticPngBase64 = Base64.Default.encode(syntheticPngBytes)
         val syntheticJpegBase64 = Base64.Default.encode(syntheticJpegBytes)
     }
+
+    @Test
+    fun wildcardAndIndexLabelsMatchWithoutAliasingStringKeysOrParents() {
+        val metadata = StoredCredentialMetadataParser.claims("""{"credentialClaims":[
+          {"path":["people",null,"name"],"display":[{"name":"Person name"}]},
+          {"path":["address",0,"city"],"display":[{"name":"Primary city"}]},
+          {"path":["object_address","0","city"],"display":[{"name":"Object city"}]}
+        ]}""")
+        for ((path, label) in listOf(
+            "people[0].name" to "Person name",
+            "people[2].name" to "Person name",
+            "people.name" to "Fallback",
+            "people[0]" to "Fallback",
+            """people["0"].name""" to "Fallback",
+            "address[0].city" to "Primary city",
+            "address[1].city" to "Fallback",
+            """object_address["0"].city""" to "Object city",
+            "object_address[0].city" to "Fallback",
+            """address["0"].city""" to "Fallback",
+        )) {
+            val item = metadataClaimItem().withClaimMetadata(metadata, "dc+sd-jwt", ClaimPathExpression.parse(path))
+            assertEquals(label, item.label, path)
+            assertEquals(DisplayValue.Text("Value"), item.value)
+        }
+    }
+
+    @Test
+    fun invalidPathsNeverLoseSegmentsAndAccidentallyMatch() {
+        val metadata = StoredCredentialMetadataParser.claims("""{"credentialClaims":[{"path":["people","name"],"display":[{"name":"Wrong match"}]}]}""")
+        for (path in listOf("""["people",true,"name"]""", """["people",1.5,"name"]""", """["people",1e2,"name"]""", """["people",18446744073709551615,"name"]""")) {
+            assertEquals("Fallback", metadataClaimItem().withClaimMetadata(metadata, "dc+sd-jwt", ClaimPathExpression.parse(path)).label, path)
+        }
+    }
+
+    @Test
+    fun labelsReachNestedArrayValuesWithoutChangingCredentialData() {
+        val details = CredentialDisplayNormalizer.toDetails(CredentialSummary(
+            id = "typed-metadata", format = "dc+sd-jwt", issuer = "Issuer", label = "Credential",
+            credentialDataJson = """{"people":[{"name":"Alice"},{"name":"Bob"}]}""",
+            metadataJson = """{"credentialClaims":[{"path":["people",null,"name"],"display":[{"name":"Person name"}]}]}""",
+        ))
+        val people = details.groups.flatMap { it.items }.single { it.path.id == "people" }
+        val values = assertIs<DisplayValue.ListValue>(people.value).values
+        val rows = values.map { assertIs<DisplayValue.ObjectValue>(it).entries.single() }
+        assertEquals(listOf("Person name", "Person name"), rows.map { it.label })
+        assertEquals(listOf(DisplayValue.Text("Alice"), DisplayValue.Text("Bob")), rows.map { it.value })
+        assertEquals(listOf("people[0].name", "people[1].name"), rows.map { it.path.id })
+    }
+
+    @Test
+    fun literalKeysRemainDistinctFromPathsAndWildcards() {
+        val metadata = StoredCredentialMetadataParser.claims("""{"credentialClaims":[
+          {"path":[""],"display":[{"name":"Empty key"}]},
+          {"path":[" "],"display":[{"name":"Space key"}]},
+          {"path":["a.b"],"display":[{"name":"Dotted key"}]},
+          {"path":["0"],"display":[{"name":"Zero key"}]},
+          {"path":["*"],"display":[{"name":"Star key"}]}
+        ]}""")
+        assertEquals(5, metadata.size)
+        for ((path, label) in listOf(
+            """[""]""" to "Empty key", """[" "]""" to "Space key",
+            """["a.b"]""" to "Dotted key", """["0"]""" to "Zero key",
+            """["*"]""" to "Star key", "a.b" to "Fallback", "[0]" to "Fallback", "[*]" to "Fallback",
+        )) assertEquals(label, metadataClaimItem().withClaimMetadata(metadata, "dc+sd-jwt", ClaimPathExpression.parse(path)).label, path)
+    }
+
+    private fun metadataClaimItem() = ClaimItem(path = ClaimItemPath.topLevel("claim"), label = "Fallback", value = DisplayValue.Text("Value"))
+    private fun hierarchyDetails(data: String, format: String = "dc+sd-jwt", metadata: String? = null) =
+        CredentialDisplayNormalizer.toDetails(CredentialSummary(
+            id = "hierarchy", format = format, issuer = null, label = "Identity",
+            credentialDataJson = data, metadataJson = metadata,
+        ))
+
+    @Test fun addressAndBirthplaceKeepTheirOwnChildren() {
+        val items = hierarchyDetails("""{"address":{"country":"NL","locality":"Utrecht"},"place_of_birth":{"country":"DE","locality":"Berlin"}}""")
+            .groups.flatMap { it.items }
+        val address = assertIs<DisplayValue.ObjectValue>(items.single { it.path.id == "address" }.value)
+        val birthplace = assertIs<DisplayValue.ObjectValue>(items.single { it.path.id == "place_of_birth" }.value)
+        assertEquals(listOf("address.country", "address.locality"), address.entries.map { it.path.id })
+        assertEquals(DisplayValue.Text("NL"), address.entries.first().value)
+        assertEquals(DisplayValue.Text("DE"), birthplace.entries.first().value)
+    }
+
+    @Test fun emptyContainersAndScalarValuesRemainDistinct() {
+        val items = hierarchyDetails("""{"object":{},"array":[],"zero":0,"false":false,"null":null,"empty":""}""")
+            .groups.flatMap { it.items }.associateBy { it.path.id }
+        assertEquals(DisplayValue.ObjectValue(emptyList()), items.getValue("object").value)
+        assertEquals(DisplayValue.ListValue(emptyList()), items.getValue("array").value)
+        assertEquals(DisplayValue.NumberValue("0"), items.getValue("zero").value)
+        assertEquals(DisplayValue.BooleanValue(false), items.getValue("false").value)
+        assertEquals(DisplayValue.NullValue, items.getValue("null").value)
+        assertEquals(DisplayValue.Text(""), items.getValue("empty").value)
+    }
+
+    @Test fun metadataOrderStaysInsideItsParent() {
+        val metadata = """{"credentialClaims":[
+            {"path":["address","postal_code"],"display":[{"name":"Postcode"}]},
+            {"path":["place_of_birth","country"],"display":[{"name":"Birth country"}]},
+            {"path":["address","country"],"display":[{"name":"Residence country"}]}]}"""
+        val items = hierarchyDetails(
+            """{"address":{"country":"NL","postal_code":"00123"},"place_of_birth":{"country":"DE"}}""",
+            metadata = metadata,
+        ).groups.flatMap { it.items }
+        val address = assertIs<DisplayValue.ObjectValue>(items.single { it.path.id == "address" }.value)
+        assertEquals(listOf("Postcode", "Residence country"), address.entries.map { it.label })
+        assertEquals(DisplayValue.Text("00123"), address.entries.first().value)
+        assertEquals(setOf("address", "place_of_birth"), items.map { it.path.id }.toSet())
+    }
+
+    @Test fun objectArraysKeepOrderPathsAndDuplicateValues() {
+        val details = hierarchyDetails("""{"jobs":[{"name":"A","address":{"country":"NL"}},{"name":"A"}],"matrix":[[0,false],[]]}""")
+        val items = details.groups.flatMap { it.items }
+        val jobs = assertIs<DisplayValue.ListValue>(items.single { it.path.id == "jobs" }.value)
+        assertEquals(2, jobs.values.size)
+        val first = assertIs<DisplayValue.ObjectValue>(jobs.values[0])
+        val second = assertIs<DisplayValue.ObjectValue>(jobs.values[1])
+        assertEquals("jobs[0].name", first.entries[0].path.id)
+        assertEquals("jobs[1].name", second.entries[0].path.id)
+        assertIs<DisplayValue.ObjectValue>(first.entries[1].value)
+        assertEquals(DisplayValue.Text("A"), first.entries[0].value)
+        assertEquals(first.entries[0].value, second.entries[0].value)
+        val matrix = assertIs<DisplayValue.ListValue>(items.single { it.path.id == "matrix" }.value)
+        assertEquals(DisplayValue.ListValue(listOf(DisplayValue.NumberValue("0"), DisplayValue.BooleanValue(false))), matrix.values[0])
+        assertEquals(DisplayValue.ListValue(emptyList()), matrix.values[1])
+    }
+
+    @Test fun w3cEnvelopeDoesNotBecomeAnExtraVisibleParent() {
+        val items = hierarchyDetails(
+            """{"vc":{"type":["VerifiableCredential"],"credentialSubject":{"given_name":"Ada","address":{"country":"NL"}}}}""",
+            format = "jwt_vc_json",
+        ).groups.flatMap { it.items }
+        assertEquals(DisplayValue.Text("Ada"), items.single { it.path.id == "vc.credentialSubject.given_name" }.value)
+        assertIs<DisplayValue.ObjectValue>(items.single { it.path.id == "vc.credentialSubject.address" }.value)
+    }
+
+    @Test fun multipleMdocNamespacesRemainSeparate() {
+        val items = hierarchyDetails("""{"docType":"custom","namespace.one":{"name":"A"},"namespace.two":{"name":"B"}}""", "mso_mdoc")
+            .groups.flatMap { it.items }
+        val namespaces = items.filter { it.value is DisplayValue.ObjectValue }
+        assertEquals(2, namespaces.size)
+        assertNotEquals(namespaces[0].path, namespaces[1].path)
+    }
+
+    private fun allHierarchyItems(items: List<ClaimItem>): List<ClaimItem> = items.flatMap { item ->
+        listOf(item) + hierarchyValueItems(item.value)
+    }
+
+    private fun hierarchyValueItems(value: DisplayValue): List<ClaimItem> = when (value) {
+        is DisplayValue.ObjectValue -> allHierarchyItems(value.entries)
+        is DisplayValue.ListValue -> value.values.flatMap(::hierarchyValueItems)
+        else -> emptyList()
+    }
+
+    @Test fun contradictoryArrayMetadataUsesWalletFallbackWithoutReorderingEntries() {
+        val details = hierarchyDetails("""{"people":[{"name":"A"},{"name":"B"}]}""", metadata = """{"credentialClaims":[
+            {"path":["people",null,"name"],"display":[{"name":"Person"}]},
+            {"path":["people",0,"name"],"display":[{"name":"Primary person"}]}]}""")
+        val people = assertIs<DisplayValue.ListValue>(details.groups.flatMap { it.items }.single().value)
+        assertEquals(listOf("Name", "Name"), people.values.map { assertIs<DisplayValue.ObjectValue>(it).entries.single().label })
+    }
+
+    @Test fun mixedArraysAndLiteralParentsNeverChangeTheirSourceIdentity() {
+        val details = hierarchyDetails("""{"a.b":{"0":{"country":"EX"}},"mix":[null,false,0,"",{},[],{"name":"A"}]}""")
+        val roots = details.groups.flatMap { it.items }
+        val literal = assertIs<DisplayValue.ObjectValue>(roots.single { it.path.id == "[\"a.b\"]" }.value)
+        val zero = assertIs<DisplayValue.ObjectValue>(literal.entries.single().value)
+        assertEquals("[\"a.b\"][\"0\"].country", zero.entries.single().path.id)
+        val mix = assertIs<DisplayValue.ListValue>(roots.single { it.path.id == "mix" }.value)
+        assertEquals(listOf(DisplayValue.NullValue, DisplayValue.BooleanValue(false), DisplayValue.NumberValue("0"), DisplayValue.Text(""),
+            DisplayValue.ObjectValue(emptyList()), DisplayValue.ListValue(emptyList())), mix.values.take(6))
+    }
+
+    @Test fun nestedProtocolLikeNamesRemainOrdinaryClaimObjects() {
+        val details = hierarchyDetails("""{"profile":{"status":{"kind":"resident"},"cnf":{"key":"value"}}}""")
+        val profile = assertIs<DisplayValue.ObjectValue>(details.groups.flatMap { it.items }.single().value)
+        assertEquals(listOf("profile.status", "profile.cnf"), profile.entries.map { it.path.id })
+        profile.entries.forEach { assertIs<DisplayValue.ObjectValue>(it.value) }
+    }
+
+    @Test fun scalarArrayMetadataLabelsPreserveValuesAndConcreteIndexes() {
+        val details = hierarchyDetails("""{"nationalities":["EX","YY"],"other_nationalities":["AA","BB"],"matrix":[[0,false],[0,false]]}""", metadata = """{"credentialClaims":[
+            {"path":["other_nationalities",null],"display":[{"name":"Nationality"}]},
+            {"path":["nationalities",0],"display":[{"name":"Primary nationality"}]},
+            {"path":["matrix",null,0],"display":[{"name":"First cell"}]}]}""")
+        val roots = details.groups.flatMap { it.items }
+        val nationalities = assertIs<DisplayValue.ListValue>(roots.single { it.path.id == "nationalities" }.value)
+        assertEquals(listOf(DisplayValue.Text("EX"), DisplayValue.Text("YY")), nationalities.values)
+        assertEquals(mapOf(0 to "Primary nationality"), nationalities.labels)
+        val others = assertIs<DisplayValue.ListValue>(roots.single { it.path.id == "other_nationalities" }.value)
+        assertEquals(mapOf(0 to "Nationality", 1 to "Nationality"), others.labels)
+        val matrix = assertIs<DisplayValue.ListValue>(roots.single { it.path.id == "matrix" }.value)
+        assertTrue(matrix.labels.isEmpty())
+        matrix.values.forEach { row ->
+            val cells = assertIs<DisplayValue.ListValue>(row)
+            assertEquals(listOf(DisplayValue.NumberValue("0"), DisplayValue.BooleanValue(false)), cells.values)
+            assertEquals(mapOf(0 to "First cell"), cells.labels)
+        }
+    }
+
+    @Test fun blankLiteralKeysKeepIdentityAndHaveVisibleFallbackLabels() {
+        val roots = hierarchyDetails("""{"":"empty key"," ":"space key"}""").groups.flatMap { it.items }
+        assertEquals(setOf("[\"\"]", "[\" \"]"), roots.map { it.path.id }.toSet())
+        assertTrue(roots.all { it.label.isNotBlank() })
+        assertEquals(setOf(DisplayValue.Text("empty key"), DisplayValue.Text("space key")), roots.map { it.value }.toSet())
+    }
+
 }

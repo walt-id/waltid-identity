@@ -42,7 +42,6 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
                     it[userId] = userUuid
                     it[identifier] = newAccountIdentifier.toDataString()
                 }
-                Unit
             }
         }
 

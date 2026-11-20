@@ -1,6 +1,10 @@
 package id.walt.mdoc.objects
 
+import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -69,6 +73,21 @@ object MdocsCborSerializer {
      */
     fun lookupSerializer(namespace: String, elementIdentifier: String): KSerializer<*>? =
         serializerLookupMap[namespace]?.get(elementIdentifier)
+
+    /** Tries the registered serializer first, with generic conversion as a fallback. */
+    fun toJsonElement(namespace: String, elementIdentifier: String, value: Any?): JsonElement {
+        val serializer = lookupSerializer(namespace, elementIdentifier) ?: return value.toSerializedJsonElement()
+        return try {
+            // The heterogeneous registry erases the element type, just as in encode().
+            @Suppress("UNCHECKED_CAST")
+            Json.encodeToJsonElement(serializer as KSerializer<Any?>, value)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Exception) {
+            log.trace { "Unable to encode $namespace/$elementIdentifier with its registered JSON serializer" }
+            value.toSerializedJsonElement()
+        }
+    }
 
     /**
      * Dispatches to a registered encoder function for a specific element.

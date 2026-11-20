@@ -2,9 +2,17 @@
 
 package id.walt.wallet2.handlers
 
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+import id.walt.credentials.signatures.sdjwt.locatedDisclosures
+import id.walt.dcql.models.meta.SdJwtVcMeta
+import id.walt.wallet2.status.reviewGuard
+import kotlinx.coroutines.withContext
+import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
 import id.walt.wallet2.consent.*
 
+import id.waltid.openid4vp.wallet.DcApiRequestProtocol
 import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
 import kotlin.time.TimeSource
@@ -19,6 +27,8 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.DcqlMatchingContext
+import id.walt.sdjwt.metadata.type.ResolvedTypeMetadata
 import id.walt.dcql.RequiredCredentialUnavailableException
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
@@ -54,15 +64,18 @@ import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.HttpClient
 import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.jvm.JvmInline
+import kotlinx.coroutines.currentCoroutineContext
 
 private val log = KotlinLogging.logger {}
 
@@ -285,6 +298,10 @@ data class PresentationDisclosure(
     val name: String?,
     val value: JsonElement,
     val selectivelyDisclosable: Boolean,
+    /**
+     * True when the value is presented whatever the user selects: the query requires it, or the
+     * disclosures it needs are already presented for a required claim.
+     */
     val required: Boolean,
     val selectable: Boolean,
     /** False for unrequested clear-text data that the credential must also transmit. */
@@ -568,9 +585,6 @@ object WalletPresentationHandler {
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
         val isolatedCredentialsById = request.credentials.mapIndexed { idx, stored -> idx.toString() to stored }.toMap()
-        val rawCredentials = isolatedCredentialsById.map { (id, stored) ->
-            stored.credential.toRawDcqlCredential(id)
-        }
 
         val result = presentWithKeyMaterial(
             wallet = wallet,
@@ -578,7 +592,8 @@ object WalletPresentationHandler {
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
-                DcqlMatcher.match(query, rawCredentials).getOrThrow()
+                val candidates = isolatedCredentialsById.mapNotNull { (id, stored) -> stored.toDcqlCandidate(id, query) }
+                DcqlMatcher.match(query, candidates.map { it.credential }, candidates.matchingContext()).getOrThrow()
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
             runPolicies = null,
@@ -1024,6 +1039,35 @@ object WalletPresentationHandler {
         )
     }
 
+    /** Recomputes effective claims under the existing preview lease without signing or consuming it. */
+    suspend fun reviewPresentation(
+        wallet: Wallet,
+        request: SubmitPresentationRequest,
+    ): PreparedPresentationReview = previewedAuthorizationRequests.prepare(wallet.id, request.previewHandle.value) { preview ->
+        require(preview is PreviewedPresentation.Ready) { "Cannot review an invalid presentation" }
+        require(request.keyId == null || request.keyId == preview.keyId) { "The signing key must match the reviewed key" }
+        val authorization = preview.resolvedAuthorizationRequest.authorizationRequest
+        val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
+            request.selectedCredentialOptions, request.selectedDisclosureOptions)
+        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
+        preparePresentationReview(selected.matches)
+    }
+
+    /** Selection review for a wallet-bound Digital Credentials API request; does not consume it. */
+    suspend fun reviewDcApiPresentation(
+        wallet: Wallet,
+        request: SubmitDcApiPresentationRequest,
+    ): PreparedPresentationReview = previewedDcApiRequests.prepare(wallet.id, request.requestId) { preview ->
+        require(request.selectedCredentialOptions.all { it.credentialId in preview.allowedCredentialIds }) {
+            "A selected credential was not offered by the retained Digital Credentials preview"
+        }
+        val authorization = preview.request.authorizationRequest
+        val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
+            request.selectedCredentialOptions, request.selectedDisclosureOptions)
+        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
+        preparePresentationReview(selected.matches)
+    }
+
     /** Prepares metadata-driven consent under the retained URL preview's exclusive lease. */
     suspend fun preparePaymentConsent(
         wallet: Wallet,
@@ -1036,11 +1080,12 @@ object WalletPresentationHandler {
         val key = wallet.resolveKeyMaterial(preview.keyId, setOf(KeyUsage.SIGN)) ?: error("Reviewed signing key is unavailable")
         val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
             request.selectedCredentialOptions, request.selectedDisclosureOptions)
-        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.keys)
-        preview.paymentConsent.prepare(authorization, selected, request.selectedCredentialOptions,
+        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
+        preview.paymentConsent.prepare(authorization, selected.matches, request.selectedCredentialOptions,
             request.selectedDisclosureOptions, key, policy,
             holderDid = request.did ?: wallet.defaultDid(),
-            requiresUnsignedRequestWarning = preview.resolvedAuthorizationRequest !is ResolvedAuthorizationRequest.AuthenticatedRequestObject)
+            requiresUnsignedRequestWarning = preview.resolvedAuthorizationRequest !is ResolvedAuthorizationRequest.AuthenticatedRequestObject,
+            typeMetadataSnapshots = selected.typeMetadataSnapshots)
     }
 
     /** Prepares metadata-driven consent for an existing DC API preview without consuming it. */
@@ -1056,11 +1101,12 @@ object WalletPresentationHandler {
         val key = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)) ?: error("Signing key is unavailable")
         val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
             request.selectedCredentialOptions, request.selectedDisclosureOptions)
-        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.keys)
-        preview.paymentConsent.prepare(authorization, selected, request.selectedCredentialOptions,
+        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
+        preview.paymentConsent.prepare(authorization, selected.matches, request.selectedCredentialOptions,
             request.selectedDisclosureOptions, key, policy,
             holderDid = request.did ?: wallet.defaultDid(),
-            requiresUnsignedRequestWarning = preview.request.protocol == id.waltid.openid4vp.wallet.DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED)
+            requiresUnsignedRequestWarning = preview.request.protocol == DcApiRequestProtocol.OPENID4VP_V1_UNSIGNED,
+            typeMetadataSnapshots = selected.typeMetadataSnapshots)
     }
 
     /** Dismissal cancels any active DC API authorization and invalidates its consent. */
@@ -1073,17 +1119,17 @@ object WalletPresentationHandler {
         query: DcqlQuery,
         credentials: List<PresentationCredentialSelection>,
         disclosures: List<PresentationDisclosureSelection>?,
-    ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
+    ): CredentialSelection {
         credentials.requireValidPresentationCredentialSelection()
         val requirements = query.requiredCredentialRequirements()
         require(requirements.satisfiedBy(credentials.mapTo(mutableSetOf()) { it.queryId })) {
             "Selected credentials do not satisfy the presentation requirements"
         }
-        val selected = selectFromStores(wallet, query, useWalletCredentialIds = true,
-            eligibleCredentialIds = credentials.mapTo(mutableSetOf()) { it.credentialId })
-            .selectCredentialOptions(credentials, disclosures)
+        val selection = selectFromSnapshot(wallet, query, wallet.streamAllCredentials().toList(),
+            useWalletCredentialIds = true, eligibleCredentialIds = credentials.mapTo(mutableSetOf()) { it.credentialId })
+        val selected = selection.matches.selectCredentialOptions(credentials, disclosures)
         require(requirements.satisfiedBy(selected.keys)) { "Selected credentials no longer match the presentation requirements" }
-        return selected
+        return selection.copy(matches = selected)
     }
 
     suspend fun submitPresentation(
@@ -1099,6 +1145,27 @@ object WalletPresentationHandler {
         scaAuthorizer = null,
     )
 
+    suspend fun submitStatusReviewedPresentation(
+        wallet: Wallet, request: SubmitPresentationRequest,
+        reviewedStatus: Map<String, String>,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        scaAuthorizer: WalletScaPresentationAuthorizer? = null,
+        paymentConsentPolicy: PaymentConsentPolicy? = null,
+    ): WalletPresentResult {
+        val submission = request.copy(
+            selectedCredentialOptions = request.selectedCredentialOptions.toList(),
+            selectedDisclosureOptions = request.selectedDisclosureOptions?.toList(),
+        )
+        val revisions = reviewedStatus.toMap()
+        val guard = wallet.credentialStatuses().reviewGuard(
+            submission.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, revisions)
+        guard.check()
+        return withContext(guard) {
+            submitPresentation(wallet, submission, onEvent, transactionDataTypeRegistry, scaAuthorizer, paymentConsentPolicy)
+        }
+    }
+
     suspend fun submitPresentation(
         wallet: Wallet,
         request: SubmitPresentationRequest,
@@ -1108,11 +1175,13 @@ object WalletPresentationHandler {
         paymentConsentPolicy: PaymentConsentPolicy? = null,
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
-        return previewedAuthorizationRequests.useOnce(wallet.id, request.previewHandle.value, validate = { cached ->
-            require(cached is PreviewedPresentation.Ready) {
-                "Cannot submit an invalid presentation request; reject it or dismiss it locally"
-            }
-        }) { preview ->
+        val statusReviewed = currentCoroutineContext()[PresentationReviewGuard] != null
+        suspend fun execute(block: suspend (PreviewedPresentation) -> WalletPresentResult): WalletPresentResult =
+            if (statusReviewed) previewedAuthorizationRequests.useStatusReviewedOnce(wallet.id, request.previewHandle.value, block)
+            else previewedAuthorizationRequests.useOnce(wallet.id, request.previewHandle.value, validate = { cached ->
+                require(cached is PreviewedPresentation.Ready) { "Cannot submit an invalid presentation request; reject it or dismiss it locally" }
+            }, block = block)
+        return execute { preview ->
             val ready = preview as? PreviewedPresentation.Ready
                 ?: error("Unexpected presentation preview state")
             require(request.keyId == null || request.keyId == ready.keyId) { "The signing key must match the reviewed key" }
@@ -1133,7 +1202,7 @@ object WalletPresentationHandler {
                 request.selectedCredentialOptions, request.selectedDisclosureOptions)
             paymentConsentPolicy?.let { policy ->
                 ready.paymentConsent.confirm(request.paymentConsentRevision, resolvedAuthorizationRequest.authorizationRequest,
-                    selected, request.selectedCredentialOptions, request.selectedDisclosureOptions, keyMaterial, policy, holderDid = did)
+                    selected.matches, request.selectedCredentialOptions, request.selectedDisclosureOptions, keyMaterial, policy, holderDid = did)
             }
 
             val result = presentWithKeyMaterial(
@@ -1144,7 +1213,7 @@ object WalletPresentationHandler {
                 resolvedAuthorizationRequest = resolvedAuthorizationRequest,
                 selectCredentialsForQuery = {
                     onEvent(WalletSessionEvent.presentation_credentials_selected)
-                    selected
+                    selected.matches
                 },
                 runPolicies = request.runPolicies,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
@@ -1272,7 +1341,7 @@ object WalletPresentationHandler {
                 expectedRequestObjectAudience = expectedRequestObjectAudience,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 scaAuthorizer = scaAuthorizer?.let { authorizer ->
-                    ScaPresentationAuthorizer { authorizer.authorize(crypto2Key, it) }
+                    authorizer.forKey(crypto2Key)
                 },
                 credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(isolatedCredentialsById, scaAuthorizer),
             )
@@ -1308,7 +1377,7 @@ object WalletPresentationHandler {
                 ?: resolveHolderKey(credentialId, setOf(KeyUsage.SIGN))).keyMaterial.requireCrypto2SigningKey()
             CredentialPresentationKey(key, credential.subject,
                 scaAuthorizer?.let { authorizer ->
-                    ScaPresentationAuthorizer { authorizer.authorize(key, it) }
+                    authorizer.forKey(key)
                 })
         }
     }
@@ -1364,11 +1433,11 @@ object WalletPresentationHandler {
                 request.selectedCredentialOptions, request.selectedDisclosureOptions)
             paymentConsentPolicy?.let { policy ->
                 previewedRequest.paymentConsent.confirm(request.paymentConsentRevision, authorizationRequest,
-                    selected, request.selectedCredentialOptions, request.selectedDisclosureOptions, keyMaterial, policy, holderDid = did)
+                    selected.matches, request.selectedCredentialOptions, request.selectedDisclosureOptions, keyMaterial, policy, holderDid = did)
             }
             val selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>> = {
                 onEvent(WalletSessionEvent.presentation_credentials_selected)
-                selected
+                selected.matches
             }
 
             WalletPresentFunctionality2.walletPresentDcApiHandling(
@@ -1378,7 +1447,7 @@ object WalletPresentationHandler {
                 selectCredentialsForQuery = selectCredentialsForQuery,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 scaAuthorizer = scaAuthorizer?.let { authorizer ->
-                    ScaPresentationAuthorizer { authorizer.authorize(holderKey, it) }
+                    authorizer.forKey(holderKey)
                 },
                 credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
             ).getOrElse { error ->
@@ -1445,10 +1514,10 @@ object WalletPresentationHandler {
     suspend fun matchCredentials(request: MatchCredentialsRequest): MatchCredentialsResult {
         // Build index: rawCredential index → wallet credential id
         val idByIndex = request.credentials.withIndex().associate { (idx, stored) -> idx.toString() to stored.id }
-        val rawCredentials = request.credentials.mapIndexed { idx, stored ->
-            stored.credential.toRawDcqlCredential(idx.toString())
+        val candidates = request.credentials.mapIndexedNotNull { idx, stored ->
+            stored.toDcqlCandidate(idx.toString(), request.dcqlQuery)
         }
-        val matched = DcqlMatcher.findMatches(request.dcqlQuery, rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.findMatches(request.dcqlQuery, candidates.map { it.credential }, candidates.matchingContext()).getOrThrow()
         return buildMatchResult(matched, idByIndex)
     }
 
@@ -1537,6 +1606,31 @@ object WalletPresentationHandler {
                 unsignedRequestObjectPolicy,
             )
         },
+    ): BuildVpTokenResult = buildVpToken(
+        wallet, request, scaAuthorizer = null, transactionDataTypeRegistry,
+        clientIdTrustConfiguration, expectedRequestObjectAudience, unsignedRequestObjectPolicy,
+        resolveAuthorizationRequest,
+    )
+
+    /** Builds an isolated proof using trusted, application-owned SCA authorization. */
+    suspend fun buildVpToken(
+        wallet: Wallet,
+        request: BuildVpTokenRequest,
+        scaAuthorizer: WalletScaPresentationAuthorizer?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = { requestUrl ->
+            this@WalletPresentationHandler.resolveAuthorizationRequest(
+                { WalletPresentationFormatRegistry.defaultCapabilities() },
+                requestUrl,
+                clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
+                unsignedRequestObjectPolicy,
+            )
+        },
     ): BuildVpTokenResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -1599,8 +1693,8 @@ object WalletPresentationHandler {
                 holderKey = crypto2Key,
                 holderDid = did,
                 clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
-                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(),
-                scaAuthorizer = null,
+                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
+                scaAuthorizer = scaAuthorizer?.forKey(crypto2Key),
             )
         } else {
             WalletPresentFunctionality2.buildVpToken(
@@ -1613,7 +1707,7 @@ object WalletPresentationHandler {
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 holderCrypto2Key = null,
                 clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
-                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(),
+                credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
                 scaAuthorizer = null,
             )
         }
@@ -1682,13 +1776,15 @@ object WalletPresentationHandler {
         query: DcqlQuery,
         useWalletCredentialIds: Boolean = false,
         eligibleCredentialIds: Set<String>? = null,
+        metadataHttpClient: HttpClient? = null,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> = selectFromSnapshot(
         wallet = wallet,
         query = query,
         storedCredentials = wallet.streamAllCredentials().toList(),
         useWalletCredentialIds = useWalletCredentialIds,
         eligibleCredentialIds = eligibleCredentialIds,
-    )
+        metadataHttpClient = metadataHttpClient,
+    ).matches
 
     /**
      * Selects credentials for automatic presentation after excluding stored mdocs that cannot
@@ -1725,13 +1821,14 @@ object WalletPresentationHandler {
      * `multiple=false` query rematches the OS-selected credential instead of collapsing to the first
      * store match.
      */
-    private fun selectFromSnapshot(
+    private suspend fun selectFromSnapshot(
         wallet: Wallet,
         query: DcqlQuery,
         storedCredentials: List<StoredCredential>,
         useWalletCredentialIds: Boolean,
         eligibleCredentialIds: Set<String>? = null,
-    ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
+        metadataHttpClient: HttpClient? = null,
+    ): CredentialSelection {
         if (wallet.credentialStores.isEmpty()) {
             error("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
         }
@@ -1739,17 +1836,21 @@ object WalletPresentationHandler {
         val candidates = storedCredentials.filter { stored ->
             eligibleCredentialIds == null || stored.id in eligibleCredentialIds
         }
-        val rawCredentials = candidates.mapIndexed { idx, stored ->
+        val resolvedCandidates = candidates.mapIndexedNotNull { idx, stored ->
             log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
-            stored.credential.toRawDcqlCredential(
+            stored.toDcqlCandidate(
                 id = if (useWalletCredentialIds) stored.id else idx.toString(),
+                query = query,
+                metadataHttpClient = metadataHttpClient,
             )
         }
 
         log.debug { "DCQL matching against ${candidates.size} stored credential(s), queries=${query.credentials.map { it.id }}" }
-        val matched = DcqlMatcher.findMatches(query, rawCredentials).getOrThrow()
+        val matched = DcqlMatcher.findMatches(query, resolvedCandidates.map { it.credential }, resolvedCandidates.matchingContext()).getOrThrow()
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
-        return matched
+        return CredentialSelection(matched, resolvedCandidates.mapNotNull { candidate ->
+            candidate.metadata?.snapshot()?.let { candidate.credential.id to it }
+        }.toMap())
     }
 
     private suspend fun selectHolderKeyEligibleFromSnapshot(
@@ -1768,7 +1869,7 @@ object WalletPresentationHandler {
             storedCredentials = storedById.values.toList(),
             useWalletCredentialIds = true,
             eligibleCredentialIds = allowedCredentialIds,
-        ).mapValues { (queryId, results) ->
+        ).matches.mapValues { (queryId, results) ->
             val originalQuery = originalQueries.getValue(queryId)
             results.map { it.copy(originalQuery = originalQuery) }
         }
@@ -1983,31 +2084,31 @@ object WalletPresentationHandler {
         selectedPaths: Set<String>,
     ): DcqlMatcher.DcqlMatchResult {
         val plan = originalQuery.claimSelectionPlan()
-        val disclosures = availablePresentationDisclosures(plan) ?: run {
+        val claims = availablePresentationClaims(plan) ?: run {
             require(selectedPaths.isEmpty()) {
                 "Selected disclosure option does not match the presentation preview"
             }
             return this
         }
-        val selectivelyDisclosablePaths = disclosures
-            .filterValues { value -> value is DcqlDisclosure }
+        val selectivelyDisclosablePaths = claims
+            .filterValues { claim -> claim.selectivelyDisclosable }
             .keys
         val unknownPaths = selectedPaths - selectivelyDisclosablePaths
         require(unknownPaths.isEmpty()) {
             "Selected disclosure option does not match a selectively disclosable presentation claim"
         }
         val retainedPaths = plan.requiredPaths + selectedPaths
-        val retainedClaimPaths = retainedPaths + disclosures
-            .filterValues { value -> value !is DcqlDisclosure }
+        val retainedClaimPaths = retainedPaths + claims
+            .filterValues { claim -> !claim.selectivelyDisclosable }
             .keys
         require(plan.satisfiedBy(retainedClaimPaths)) {
             "Selected disclosure option(s) do not satisfy required presentation claim constraints"
         }
 
+        val retainedClaims = claims.filter { (path, claim) -> !claim.selectivelyDisclosable || path in retainedPaths }
         return copy(
-            selectedDisclosures = disclosures.filter { (path, value) ->
-                value !is DcqlDisclosure || path in retainedPaths
-            }
+            selectedDisclosures = retainedClaims.mapValues { (_, claim) -> claim.value },
+            disclosuresByPath = retainedClaims.mapValues { (_, claim) -> claim.disclosures },
         )
     }
 
@@ -2119,22 +2220,29 @@ object WalletPresentationHandler {
 
     internal fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
         val plan = originalQuery.claimSelectionPlan()
-        val requested = availablePresentationDisclosures(plan).orEmpty().map { (path, value) ->
+        val claims = availablePresentationClaims(plan).orEmpty()
+        // Disclosures presented whatever the user selects; an optional claim needing only these cannot be withheld
+        val requiredDisclosures = claims.filterKeys(plan::isRequired).values.flatMapTo(mutableSetOf()) { it.disclosures }
+        val requested = claims.map { (path, claim) ->
             val required = plan.isRequired(path)
-            val selectable = plan.isSelectable(path, value)
-            when (value) {
-                is DcqlDisclosure -> PresentationDisclosure(
+            val value = claim.value
+            when {
+                claim.selectivelyDisclosable -> {
+                    val presentedAnyway = required || claim.disclosures.all { it in requiredDisclosures }
+                    PresentationDisclosure(
+                        path = path,
+                        name = (value as? DcqlDisclosure)?.name ?: claimName(path) ?: path.substringAfterLast('.', path),
+                        value = disclosedValue(path, claim),
+                        selectivelyDisclosable = true,
+                        required = presentedAnyway,
+                        selectable = plan.isSelectable(path, claim) && !presentedAnyway,
+                    )
+                }
+                // Clear text, but its own children may be disclosures that are not presented
+                value is JsonElement -> PresentationDisclosure(
                     path = path,
-                    name = value.name,
-                    value = value.value,
-                    selectivelyDisclosable = true,
-                    required = required,
-                    selectable = selectable,
-                )
-                is JsonElement -> PresentationDisclosure(
-                    path = path,
-                    name = path.substringAfterLast('.', path),
-                    value = value,
+                    name = claimName(path) ?: path.substringAfterLast('.', path),
+                    value = disclosedValue(path, claim),
                     selectivelyDisclosable = false,
                     required = required,
                     selectable = false,
@@ -2142,7 +2250,7 @@ object WalletPresentationHandler {
                 else -> PresentationDisclosure(
                     path = path,
                     name = path.substringAfterLast('.', path),
-                    value = JsonPrimitive(value.toString()),
+                    value = (value as? DcqlDisclosure)?.value ?: JsonPrimitive(value.toString()),
                     selectivelyDisclosable = false,
                     required = required,
                     selectable = false,
@@ -2161,7 +2269,7 @@ object WalletPresentationHandler {
     private fun DcqlMatcher.DcqlMatchResult.alwaysIncludedPresentationClaims(): List<PresentationDisclosure> {
         if (credential.format == "mso_mdoc") return emptyList()
         val original = (credential as? RawDcqlCredential)?.originalCredential as? DigitalCredential
-        val selective = original as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
+        val selective = original as? SelectivelyDisclosableVerifiableCredential
         // Only the original signed payload proves which SD-JWT values are unconditionally visible.
         val payload = if (!credential.disclosures.isNullOrEmpty()) selective?.originalCredentialData
             ?: return emptyList() else selective?.originalCredentialData ?: credential.data
@@ -2185,36 +2293,95 @@ object WalletPresentationHandler {
         return claims
     }
 
-    private fun DcqlMatcher.DcqlMatchResult.availablePresentationDisclosures(
-        plan: ClaimSelectionPlan,
-    ): Map<String, Any>? {
-        val selected = selectedDisclosures ?: return null
-        if (plan.optionalPaths.isEmpty()) return selected
+    /**
+     * The last claim name in the requested path, e.g. `nationalities` for `["nationalities", 1]`.
+     * Array elements have no name of their own, so rows for them are labelled after their array.
+     */
+    private fun DcqlMatcher.DcqlMatchResult.claimName(path: String): String? =
+        originalQuery.claims.orEmpty().firstOrNull { it.pathKey() == path }?.path
+            ?.lastOrNull { segment -> segment is JsonPrimitive && segment.isString }
+            ?.jsonPrimitive?.content
 
-        val expanded = linkedMapOf<String, Any>()
+    /** A requested claim with the disclosures presenting it; none when it is visible without disclosures. */
+    private class PresentationClaim(val value: Any, val disclosures: List<DcqlDisclosure>) {
+        val selectivelyDisclosable: Boolean get() = disclosures.isNotEmpty()
+    }
+
+    private fun DcqlMatcher.DcqlMatchResult.availablePresentationClaims(
+        plan: ClaimSelectionPlan,
+    ): Map<String, PresentationClaim>? {
+        val selected = selectedDisclosures ?: return null
+        fun claim(path: String, value: Any) = PresentationClaim(value, disclosuresByPath[path] ?: listOfNotNull(value as? DcqlDisclosure))
+        if (plan.optionalPaths.isEmpty()) return selected.mapValues { (path, value) -> claim(path, value) }
+
+        val expanded = linkedMapOf<String, PresentationClaim>()
         val selectedByPath = selected.toMutableMap()
         originalQuery.claims.orEmpty().forEach { claim ->
             val path = claim.pathKey()
             val selectedValue = selectedByPath.remove(path)
             when {
-                selectedValue != null -> expanded[path] = selectedValue
-                path in plan.optionalPaths -> findMatchingDisclosure(claim)?.let { expanded[path] = it }
+                selectedValue != null -> expanded[path] = claim(path, selectedValue)
+                path in plan.optionalPaths -> matchOptionalClaim(claim)?.let { expanded[path] = it }
             }
         }
-        selectedByPath.forEach { (path, value) -> expanded[path] = value }
+        selectedByPath.forEach { (path, value) -> expanded[path] = claim(path, value) }
         return expanded
     }
 
-    private fun DcqlMatcher.DcqlMatchResult.findMatchingDisclosure(claim: ClaimsQuery): DcqlDisclosure? {
+    /** An optional claim outside the claim set the matcher chose, offered only if it can be withheld. */
+    private fun DcqlMatcher.DcqlMatchResult.matchOptionalClaim(claim: ClaimsQuery): PresentationClaim? {
+        DcqlMatcher.matchClaim(credential, claim).getOrNull()
+            ?.takeIf { match -> match.disclosures.isNotEmpty() }
+            ?.let { match -> return PresentationClaim(match.value ?: JsonArray(emptyList()), match.disclosures) }
+
+        // Disclosures without a location can only be found by claim name
         val claimName = claim.path
             .lastOrNull { pathPart -> pathPart is JsonPrimitive && pathPart.isString }
             ?.jsonPrimitive?.content
             ?: return null
         val allowedValues = claim.values.orEmpty()
-
         return credential.disclosures?.firstOrNull { disclosure ->
-            disclosure.name == claimName && (allowedValues.isEmpty() || disclosure.value in allowedValues)
+            disclosure.location == null && disclosure.name == claimName &&
+                (allowedValues.isEmpty() || disclosure.value in allowedValues)
+        }?.let { PresentationClaim(it, listOf(it)) }
+    }
+
+    /**
+     * What the verifier sees at [path] once [claim]'s disclosures are presented: claims and array elements
+     * with a disclosure of their own that is not presented are left out, so consent matches the presentation.
+     */
+    private fun DcqlMatcher.DcqlMatchResult.disclosedValue(path: String, claim: PresentationClaim): JsonElement {
+        val fallback = (claim.value as? DcqlDisclosure)?.value ?: claim.value as? JsonElement ?: JsonPrimitive(claim.value.toString())
+        val claimPath = originalQuery.claims.orEmpty().firstOrNull { it.pathKey() == path }?.path ?: return fallback
+        val presentedLocations = claim.disclosures.map { it.location ?: return fallback }.toSet()
+        val withheldLocations = credential.disclosures.orEmpty().mapNotNull { it.location }.filterNot { it in presentedLocations }.toSet()
+
+        fun isWithheld(location: List<JsonElement>) =
+            withheldLocations.any { it.size <= location.size && it == location.subList(0, it.size) }
+
+        // Only the selected claim's own subtree is walked; a leaf is returned as is
+        fun withoutWithheld(element: JsonElement, location: List<JsonElement>): JsonElement = when (element) {
+            is JsonObject -> JsonObject(element.mapNotNull { (key, value) ->
+                val child = location + JsonPrimitive(key)
+                if (child in withheldLocations) null else key to withoutWithheld(value, child)
+            }.toMap())
+            is JsonArray -> JsonArray(element.mapIndexedNotNull { index, value ->
+                val child = location + JsonPrimitive(index)
+                if (child in withheldLocations) null else withoutWithheld(value, child)
+            })
+            else -> element
         }
+
+        val root = (credential.data["vc"] as? JsonObject) ?: credential.data
+        val selectedValues = DcqlMatcher.processClaimsPath(root, claimPath).getOrElse { return fallback }
+            .mapNotNull { (location, value) ->
+                when {
+                    withheldLocations.isEmpty() -> value
+                    isWithheld(location) -> null
+                    else -> withoutWithheld(value, location)
+                }
+            }
+        return selectedValues.singleOrNull()?.takeIf { claimPath.lastOrNull() !is JsonNull } ?: JsonArray(selectedValues)
     }
 
     private data class ClaimSelectionPlan(
@@ -2225,7 +2392,7 @@ object WalletPresentationHandler {
     ) {
         fun isRequired(path: String): Boolean = path in requiredPaths
 
-        fun isSelectable(path: String, value: Any): Boolean = path in optionalPaths && value is DcqlDisclosure
+        fun isSelectable(path: String, claim: PresentationClaim): Boolean = path in optionalPaths && claim.selectivelyDisclosable
 
         fun satisfiedBy(selectedPathKeys: Set<String>): Boolean =
             claimSetOptions
@@ -2282,15 +2449,47 @@ object WalletPresentationHandler {
         }
     }
 
-    private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential {
-        val sdvc = this as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
-        return RawDcqlCredential(
+    private data class CredentialSelection(
+        val matches: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        val typeMetadataSnapshots: Map<String, JsonObject>,
+    )
+
+    private data class CredentialCandidate(val credential: RawDcqlCredential, val metadata: ResolvedTypeMetadata?)
+
+    private fun List<CredentialCandidate>.matchingContext() = DcqlMatchingContext(
+        associate { it.credential to it.metadata?.types.orEmpty() },
+    )
+
+    /** An unusable stored credential cannot fail matching for the other candidates. */
+    private suspend fun StoredCredential.toDcqlCandidate(
+        id: String, query: DcqlQuery? = null, metadataHttpClient: HttpClient? = null,
+    ): CredentialCandidate? {
+        val credential = this.credential
+        val sdvc = credential as? SelectivelyDisclosableVerifiableCredential
+        val disclosures = try {
+            sdvc?.locatedDisclosures()
+        } catch (e: IllegalArgumentException) {
+            log.warn { "Skipping credential $id: its disclosures cannot be located in the issuer-signed payload (${e.message})" }
+            return null
+        }
+        val resolved = try {
+            resolveTypeMetadata(httpClient = metadataHttpClient, fetchIfMissing = query?.credentials?.any { item ->
+                val meta = item.meta as? SdJwtVcMeta
+                meta != null && credential.credentialData["vct"]?.jsonPrimitive?.content !in meta.vctValues
+            } == true)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: IllegalArgumentException) {
+            log.warn { "Skipping credential $id: its type metadata is invalid" }
+            return null
+        }
+        return CredentialCandidate(RawDcqlCredential(
             id = id,
-            format = format,
-            data = credentialData,
-            originalCredential = this,
-            disclosures = sdvc?.disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
-        )
+            format = credential.format,
+            data = credential.credentialData,
+            originalCredential = credential,
+            disclosures = disclosures?.map { DcqlDisclosure(it.name, it.value, it.location) }
+        ), resolved)
     }
 }
 
@@ -2412,7 +2611,14 @@ data class BuildVpTokenRequest(
     val did: String? = null,
 ) : VpRequestSource
 
-internal fun BuildVpTokenRequest.resolveSelectedCredentialOptions(): List<PresentationCredentialSelection> {
+internal fun BuildVpTokenRequest.resolveSelectedCredentialOptions(): List<PresentationCredentialSelection> =
+    resolveSelectedCredentialOptions(selectedCredentialOptions, selectedCredentialIds)
+
+/** Shared selection precedence for construction, status review and usage accounting. */
+fun resolveSelectedCredentialOptions(
+    selectedCredentialOptions: List<PresentationCredentialSelection>,
+    selectedCredentialIds: Map<String, List<String>>,
+): List<PresentationCredentialSelection> {
     if (selectedCredentialOptions.isNotEmpty()) return selectedCredentialOptions
     return selectedCredentialIds.flatMap { (queryId, credentialIds) ->
         credentialIds.map { credentialId ->

@@ -12,10 +12,12 @@ protocol DemoProximityPresentationSession: Sendable {
     var states: AsyncStream<ProximityState> { get }
     func presentNfc() async
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult
+    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult
     func close() async
 }
 
 extension DemoProximityPresentationSession {
+    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult { try await dispatch(action) }
     var connectedRoute: ProximityConnectedRoute? { nil }
     var sharingPlan: ProximitySharingPlan? { nil }
 }
@@ -369,7 +371,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         actionErrorMessage = nil
     }
 
-    func approve() {
+    func approve(reviewedStatus: [String: String]? = nil) {
         do {
             guard canApprove, let review else { return }
             let documents = try review.documents.compactMap { document -> ProximityDocumentSubmission? in
@@ -386,14 +388,14 @@ final class ProximityPresentationViewModel: ObservableObject {
             let submission = try ProximitySubmission(documents: documents, continueAfterResponse: continueAfterResponse)
             if case .preparationRequired(let plan, _) = sessionState {
                 do {
-                    switch try plan.approve(submission) {
+                    switch try (reviewedStatus.map { try plan.approveStatusReviewed(submission, reviewedStatus: $0) } ?? plan.approve(submission)) {
                     case .prepared(let sharing):
                         guard let configuration = effectiveConfiguration else { return }
                         replaceSession(configuration.withApproval(.prepared(sharing)))
                     case .rejected(let error): actionErrorMessage = error.message
                     }
                 } catch { actionErrorMessage = Self.demoSessionFailureMessage }
-            } else { dispatch(.approve(reviewID: review.reviewID, submission: submission)) }
+            } else { dispatch(.approve(reviewID: review.reviewID, submission: submission), reviewedStatus: reviewedStatus) }
         } catch {
             actionErrorMessage = error.localizedDescription
         }
@@ -702,7 +704,7 @@ final class ProximityPresentationViewModel: ObservableObject {
         }
     }
 
-    private func dispatch(_ action: ProximityAction) {
+    private func dispatch(_ action: ProximityAction, reviewedStatus: [String: String]? = nil) {
         guard let session else { return }
         let reviewID: ProximityReviewID?
         switch action {
@@ -715,7 +717,9 @@ final class ProximityPresentationViewModel: ObservableObject {
         let generation = sessionGeneration
         Task { [weak self] in
             do {
-                let result = try await session.dispatch(action)
+                let result: ProximityActionResult
+                if let reviewedStatus { result = try await session.dispatchStatusReviewed(action, reviewedStatus: reviewedStatus) }
+                else { result = try await session.dispatch(action) }
                 guard let self, active, sessionGeneration == generation else { return }
                 guard reviewID == nil || review?.reviewID == reviewID else { return }
                 if case .rejected(let error) = result {

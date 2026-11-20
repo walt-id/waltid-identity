@@ -14,6 +14,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadataJwt
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
+import id.walt.openid4vci.responses.notification.NotificationResponseHttp
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -34,6 +35,7 @@ import io.ktor.server.request.receive
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
@@ -137,12 +139,12 @@ class OpenId4VciController(
 
             route.get(".well-known/vct/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
                 val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
-                call.respond(metadataService.getVctTypeMetadata(credentialType))
+                call.respondBytes(metadataService.getPublishedTypeMetadata(credentialType).bytes(), ContentType.Application.Json)
             }
 
             route.get("openid4vci/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
                 val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
-                call.respond(metadataService.getVctTypeMetadata(credentialType))
+                call.respondBytes(metadataService.getPublishedTypeMetadata(credentialType).bytes(), ContentType.Application.Json)
             }
         }
 
@@ -350,7 +352,37 @@ class OpenId4VciController(
                         }
                     call.respondCredentialResponse(response)
                 }.apply { install(credentialResponseCacheControl) }
+
+                post(Issuer2EndpointPaths.NOTIFICATION, OpenId4VciRoutesDocs.notification()) {
+                    val contentType = call.request.headers[HttpHeaders.ContentType]?.let {
+                        runCatching { ContentType.parse(it).withoutParameters() }.getOrNull()
+                    }
+                    if (contentType != ContentType.Application.Json) {
+                        call.respond(HttpStatusCode.UnsupportedMediaType)
+                        return@post
+                    }
+                    val authorizationHeaders = call.request.headers.getAll(HttpHeaders.Authorization).orEmpty()
+                    val dpopProofHeaderValues = call.request.headers.getAll(DPoPConstants.HEADER_NAME).orEmpty()
+                    val response = protocolService.processNotificationRequest(
+                        authorizationHeaders = authorizationHeaders,
+                        dpopProofHeaderValues = dpopProofHeaderValues,
+                        requestBody = call.receiveText(),
+                        requestId = requireNotNull(call.callId) { MISSING_CALL_ID_MESSAGE },
+                    )
+                    call.respondNotificationResponse(response)
+                }
             }
+        }
+    }
+
+    private suspend fun ApplicationCall.respondNotificationResponse(response: NotificationResponseHttp) {
+        response.headers.forEach { (name, value) -> this.response.headers.append(name, value) }
+        val status = HttpStatusCode.fromValue(response.status)
+        val payload = response.payload
+        if (payload == null) {
+            respond(status)
+        } else {
+            respond(status, payload)
         }
     }
 

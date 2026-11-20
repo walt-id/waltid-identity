@@ -12,6 +12,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.Direction
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
@@ -60,13 +61,33 @@ internal object WalletComposeE2EHelper {
 
     /** Uses the normal setup UI; the operator approves each native signing prompt. */
     fun launchAndCreateScaIdentity(context: Context, device: UiDevice) {
+        fun choose(text: String) {
+            val deadline = SystemClock.uptimeMillis() + UI_ELEMENT_TIMEOUT
+            while (SystemClock.uptimeMillis() < deadline) {
+                try {
+                    val node = device.findObject(By.text(text))
+                    if (node != null) {
+                        (node.clickableAncestorOrSelf() ?: node).click()
+                        device.waitForIdle()
+                        return
+                    }
+                } catch (_: StaleObjectException) {
+                    // Setup replaces its accessibility nodes as native approval completes.
+                }
+                Thread.sleep(200)
+            }
+            fail("SCA setup choice '$text' did not become available")
+        }
         launch(context, signingProtectionMode = "required")
+        println("SCA_OPERATOR: approve wallet biometric opt-in, then key setup and issuance prompts")
         unlock(device, initializeSigningIdentity = false)
+        assertNotNull("Operator-assisted setup did not reach signing-key configuration: ${foregroundWindowSnapshot(device)}",
+            waitForResource(device, "wallet.keySetupEdit.Storage", 180_000L))
         clickByTag(device, "wallet.keySetupEdit.Storage")
-        requireNotNull(device.wait(Until.findObject(By.text("Hardware required")), UI_ELEMENT_TIMEOUT)).click()
+        choose("Hardware required")
         clickByTag(device, "wallet.keySetupContinue")
         clickByTag(device, "wallet.keySetupEdit.Approval")
-        requireNotNull(device.wait(Until.findObject(By.text("Current biometrics only")), UI_ELEMENT_TIMEOUT)).click()
+        choose("Current biometrics only")
         clickByTag(device, "wallet.keySetupContinue")
         println("SCA_OPERATOR: approve native key setup prompts")
         clickByTag(device, "wallet.keySetupContinue")
@@ -80,8 +101,8 @@ internal object WalletComposeE2EHelper {
         requireNotNull(waitForResource(device, "wallet.offerAcceptButton", CREDENTIAL_OPERATION_TIMEOUT))
         println("SCA_OPERATOR: approve native issuance prompts")
         clickByTag(device, "wallet.offerAcceptButton")
-        assertTrue("App issuance failed: ${foregroundWindowSnapshot(device)}",
-            waitForStatus(device, 180_000L, { it.startsWith("Received") }, listOf("Receive failed")))
+        val saved = device.wait(Until.hasObject(By.res(Pattern.compile("wallet\\.credentialCard\\..*"))), 180_000L)
+        assertTrue("App issuance did not save a credential: ${foregroundWindowSnapshot(device)}", saved)
     }
 
     fun launchExpectingSetupAndUnlock(context: Context, device: UiDevice) {
@@ -535,10 +556,10 @@ internal object WalletComposeE2EHelper {
             } catch (_: StaleObjectException) { null }
         }
         val before = visibleContent()
-        val upper = bounds.top + bounds.height() * 15 / 100
-        val lower = bounds.bottom - bounds.height() * 15 / 100
-        swipe(bounds.centerX(), if (towardBottom) lower else upper,
-            bounds.centerX(), if (towardBottom) upper else lower, 40)
+        // A fast swipe can fling past a short fact row between observations. Scroll a
+        // bounded part of the viewport and settle before inspecting its new content.
+        viewport.setGestureMarginPercentage(0.2f)
+        viewport.scroll(if (towardBottom) Direction.DOWN else Direction.UP, 0.4f, maxOf(200, bounds.height() / 2))
         waitForIdle()
         // UiObject2.scroll reports false on this Compose/API 37 host even before the end.
         // Compare the actual visible content after a bounded gesture instead of trusting that event.

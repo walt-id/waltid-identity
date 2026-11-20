@@ -5,15 +5,23 @@ package id.walt.policies2.vc
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
+import id.walt.cose.toCoseSigner
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.formats.W3C11
+import id.walt.credentials.representations.X5CCertificateString
+import id.walt.credentials.representations.X5CList
+import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
+import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
@@ -23,6 +31,7 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.did.dids.DidService
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
@@ -86,6 +95,20 @@ class CredentialSignaturePolicyTest {
         val policy = CredentialSignaturePolicy(allowedJwsAlgorithms = setOf(JwsAlgorithm.RS256.identifier))
 
         assertTrue(policy.verify(credential).isFailure)
+    }
+
+    @Test
+    fun didIssuerKeyTakesPrecedenceOverX5c() = runTest {
+        val (didKey, did) = generateDidJwkKey()
+        val attackerKey = generateSigningKey()
+
+        assertTrue(CredentialSignaturePolicy().verify(createDidIssuerCredentialWithX5c(did, signer = didKey, x5cKey = attackerKey)).isSuccess)
+        assertTrue(CredentialSignaturePolicy().verify(createDidIssuerCredentialWithX5c(did, signer = attackerKey, x5cKey = attackerKey)).isFailure)
+    }
+
+    @Test
+    fun verifiesCoseW3cCredentialSignedWithX5cKey() = runTest {
+        assertTrue(CredentialSignaturePolicy().verify(createCoseW3cCredential()).isSuccess)
     }
 
     @Test
@@ -178,6 +201,64 @@ class CredentialSignaturePolicyTest {
                 signed = signed,
             )
         }
+    }
+
+    private suspend fun generateDidJwkKey(): Pair<Key, String> {
+        DidService.minimalInit()
+        val key = generateSigningKey()
+        val publicJwkJson = key.capabilities.publicKeyExporter!!.exportPublicKey()
+            .toPublicJwk(key.spec).data.toByteArray().decodeToString()
+        return key to "did:jwk:" + base64.encode(publicJwkJson.encodeToByteArray())
+    }
+
+    /** A JWT VC whose `iss` is [did], signed by [signer], that also carries an `x5c` header for [x5cKey]. */
+    private suspend fun createDidIssuerCredentialWithX5c(did: String, signer: Key, x5cKey: Key): DigitalCredential {
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(
+            x5cKey,
+            SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
+        ) { subjectDn = "CN=Credential issuer" }
+        val payload = buildJsonObject { put("iss", did) }
+        val signed = CompactJws.sign(
+            payload = Json.encodeToString(payload).encodeToByteArray(),
+            key = signer,
+            algorithm = JwsAlgorithm.ES256,
+            protectedHeader = buildJsonObject {
+                put("kid", "$did#0")
+                put("x5c", JsonArray(listOf(JsonPrimitive(Base64.encode(certificate.encodedDer.toByteArray())))))
+            },
+        )
+        return W3C11(
+            credentialData = payload,
+            signature = JwtCredentialSignature(signed, CompactJws.decodeUnverified(signed).protectedHeader),
+            signed = signed,
+        )
+    }
+
+    private suspend fun createCoseW3cCredential(): DigitalCredential {
+        val key = generateSigningKey()
+        val certificate = X509CertificateUtil.createSelfSignedCertificate(
+            key,
+            SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
+        ) { subjectDn = "CN=Credential issuer" }
+        val payload = buildJsonObject {
+            put("iss", "https://issuer.example")
+            put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential"))))
+        }
+        val coseSign1 = CoseSign1.createAndSign(
+            protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.ES256),
+            payload = Json.encodeToString(payload).encodeToByteArray(),
+            signer = key.toCoseSigner(Cose.Algorithm.ES256),
+        )
+        val publicJwk = key.capabilities.publicKeyExporter!!.exportPublicKey()
+            .toPublicJwk(key.spec).data.toByteArray().decodeToString()
+        return W3C11(
+            credentialData = payload,
+            signature = CoseCredentialSignature(
+                signerKey = DirectSerializedKey(JWKKey.importJWK(publicJwk).getOrThrow()),
+                x5cList = X5CList(listOf(X5CCertificateString(Base64.encode(certificate.encodedDer.toByteArray())))),
+            ),
+            signed = base64.encode(coseSign1.toTagged()),
+        )
     }
 
     private suspend fun generateSigningKey(): Key = runtime.generateSoftwareKey(

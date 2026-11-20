@@ -32,6 +32,15 @@ generated bridge symbols behind the package implementation.
 - Local binary dependency: `WalletCore.xcframework`
 - Current delivery mode: local package plus locally assembled XCFramework
 
+## Credential status
+
+Read `credentialStatusSnapshot()` or observe `credentialStatuses` without issuer networking.
+`refreshCredentialStatuses(ids:force:)` explicitly checks stored credentials; your app owns
+foreground/manual triggers and preferences. Cancel stream tasks with their UI owner and call
+`close()` to release the instance without deleting wallet data. See the
+[credential-status guide](Sources/WalletSDK/Documentation.docc/CheckingCredentialStatus.md) for semantics,
+reviewed sharing, persistence and lifecycle examples.
+
 ## Local Build
 
 Generate the KMP core XCFramework before building an iOS consumer:
@@ -575,6 +584,12 @@ missing issuer labels with a generic payment confirmation. Reprepare after a
 selection change, and discard abandoned previews. A failed URL submission requires
 a new preview and confirmation. The direct `present` shortcut cannot authorize
 these payments. See [supported scope and rollout](../../../docs/ts12-sca-payment-demo.md).
+
+Each field also exposes its payload-relative `path`. Use known semantic paths to select display
+types; localized labels and timestamp-looking identifiers must not determine parsing. The demos
+render `date_time`, `execution_date`, `recurrence.start_date` and `recurrence.end_date` using
+the same device-local timestamp components as credential instants. Keep `value` unchanged for
+technical inspection; localized output never replaces the transaction bytes used for signing.
 
 
 ### Client attestation challenges

@@ -94,7 +94,7 @@ class ConformanceReportWriterTest {
     }
 
     @Test
-    fun writeSkippedIfEmptyDoesNotOverwriteAnExistingReport() {
+    fun writeUnavailableIfEmptyDoesNotOverwriteAnExistingReport() {
         val reportRoot = Files.createTempDirectory("openid-conformance-skipped").toString()
         ConformanceReportWriter.writeTestPlanResults(
             role = ConformanceReportWriter.Role.VP_WALLET,
@@ -109,7 +109,7 @@ class ConformanceReportWriterTest {
             reportRoot = reportRoot,
             producer = "vp-wallet",
         )
-        ConformanceReportWriter.writeSkippedIfEmpty(
+        ConformanceReportWriter.writeUnavailableIfEmpty(
             role = ConformanceReportWriter.Role.VP_WALLET,
             reason = "suite down",
             reportRoot = reportRoot,
@@ -123,9 +123,9 @@ class ConformanceReportWriterTest {
     }
 
     @Test
-    fun writeSkippedIfEmptyPublishesPlaceholderWhenMissing() {
+    fun writeUnavailableIfEmptyPublishesPlaceholderWhenMissing() {
         val reportRoot = Files.createTempDirectory("openid-conformance-placeholder").toString()
-        ConformanceReportWriter.writeSkippedIfEmpty(
+        ConformanceReportWriter.writeUnavailableIfEmpty(
             role = ConformanceReportWriter.Role.VCI_WALLET,
             reason = "Conformance suite not available at localhost.emobix.co.uk:8443",
             reportRoot = reportRoot,

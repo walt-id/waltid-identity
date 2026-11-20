@@ -38,12 +38,58 @@ contains the complete collection. Both entry points share the same proof validat
 On the wire, one JWT keeps the released `{"proofJwt":"..."}` response; multiple JWTs use
 `{"proofs":{"jwt":["...","..."]}}`. The plural result decoder accepts either shape.
 
+Isolated `fetchCredentials` separates submitted proof count from expected credential keys. A JWT
+proof can contain a nested `key_attestation` covering several keys; shared or overlapping
+attestations contribute distinct public-key identities rather than multiplying credential copies.
+Batch metadata limits the submitted proof array, including repeated proofs.
+
+Wallet parsing establishes expected public-key evidence and does not authenticate the attestation.
+The issuer remains responsible for attestation trust, signatures, lifetime, algorithms and nonces.
+For storage, explicitly select available wallet-owned keys through `holderBindings` (or `keyId` for
+a single key). The selection must cover every expected proof key before the credential request is
+sent; missing keys or a same-size selection containing different keys are rejected without consuming
+issuance. Opaque proof kids are matched against the selected public keys. Evidence does not select
+or create wallet keys. Every returned proof-bound credential must match
+the submitted evidence and, when storing, a selected wallet binding before any writes or storage
+callbacks. Missing credentials for some expected keys are allowed, as is any response order.
+Subject DIDs and `cnf.kid` references in returned credentials are resolved only when that DID was
+already identified by a submitted proof's DID `kid`; issuer-selected DIDs cannot add network lookups.
+
+This wallet profile rejects repeated holder keys and limits proof-bound immediate responses to the
+distinct expected keys. These are wallet product rules: OpenID4VCI leaves credential count to the
+issuer ([section 14.6](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#section-14.6))
+and recommends issuing for each attested key ([Appendix F.1](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#appendix-F.1)).
+Proofless requests retain their existing response-array behavior. Deferred responses preserve the
+selected wallet bindings and existing polling behavior; this does not add deferred claim-time rules.
+
 ### Credential Presentation (OpenID4VP 1.0)
 
 - **DCQL matching** — Digital Credentials Query Language for credential selection
 - **Multiple response modes** — direct_post, direct_post.jwt
 - **Format-specific presenters** — JWT VP, SD-JWT KB, mdoc DeviceResponse
 - **Holder policies** — Configurable policies for presentation consent
+
+Retained previews support selection-aware claim review with `reviewPresentation` (URL requests) and
+`reviewDcApiPresentation` (Digital Credentials API). Both reuse the resolved, wallet-bound request,
+validate the chosen options, and prepare effective claims without signing, sending or consuming the
+preview. The returned contributions remain separate per query and credential; a partial array in one
+presentation must not be merged with another presentation by its received indexes. Typed source and
+received paths preserve original control and metadata identities after array compaction. Each node
+also identifies the SDK claim choices carrying it, or marks it as intrinsically carried. A clear
+sibling inside a disclosed parent is attributed to the selecting claim rather than labelled as
+always shared. These are presentation consequences, not additional per-leaf selection controls.
+
+Apps must invalidate a displayed review when selections change, block confirmation while preparation
+is pending or failed, and submit the same selection snapshot that was displayed. Claim review does
+not bind submission to a protocol revision. Request expiry, wallet ownership, cancellation and
+consumption follow the existing preview session. Prepare claim review and payment consent sequentially
+for the same choices; they share the preview's exclusive lease. Review never extends its lifetime.
+
+The mobile facade exposes string-based claim JSON and typed path JSON via `reviewPresentation` and
+`reviewDigitalCredentialPresentation`. Submit through the existing `submitPresentation` or
+`submitDigitalCredentialPresentation` methods. Payment consent retains its separate revision checks.
+The stateless HTTP preview contract is unchanged. A reliable projection must be available for the
+selected format; unsupported formats fail instead of guessing shared data.
 
 ### Wallet Architecture
 
@@ -215,6 +261,42 @@ data class StoredCredential(
 )
 ```
 
+## Credential status
+
+`readCredentialsWithStatus()` and `readCredentialWithStatus(id)` return composed reads without
+changing stored credential constructors. `credentialStatuses().snapshot()` and `.observe()` expose
+local, deadline-aware status-only state. Reads and observation perform no issuer requests.
+Explicit `.refresh(references, mode)` uses stored, store-scoped references and returns partial
+per-credential outcomes. Use `IF_DUE` for an app-owned foreground check and `FORCE` for manual
+revalidation. The service owns cancellation, coalescing and conditional snapshot commits, not scheduling.
+
+Managed stores persist minimal metadata under the signed-credential fingerprint and trust-policy
+identity. Custom stores can implement `CredentialStatusSnapshotStore` without changing the base store
+interface. Unknown or changed trust-policy identities restore historical evidence as stale.
+Configure `WalletCredentialStatusService` with explicit limits/reference/signer authorization and a
+stable `trustPolicyId`, then `attachCredentialStatusService` before first status access when embedding
+custom policy. Closing the service releases work; `closeCredentialStatusService()` does not initialize
+an unused service or delete wallet data.
+
+Long-lived services reconcile changed managed evidence on local reads and guard checks. Retained
+no-store observations keep their storage restriction after failed or conflicting refreshes; a new
+cacheable observation can replace that evidence. Request-scoped hosts can use `captureReviewState()`
+and `restoreReviewState()` with a stable, non-null `trustPolicyId` to retain detached evidence for an
+explicit bounded review. Bind that opaque, non-serializable state to the same authorized tenant,
+wallet lifecycle and store configuration. It contains no service, credential store or list body;
+restore checks signed-byte identity and reconciles current managed evidence without issuer I/O.
+This is transient host state, not a persistence format. The [HTTP adapter](../waltid-openid4vc-wallet-server/README.md#credential-status)
+provides bounded, expiring browser contexts instead of retaining an authorized service.
+
+Shared presentation semantics distinguish clear, adverse, stale, partial, unchecked, unsupported and
+unavailable. Domain reads derive presentation from evidence and evaluation time; HTTP responses use
+the separate presentation DTO and `WalletCredentialStatusSnapshotResponse`. Decoded transport values
+never override local service assessment. They do not replace verifier acceptance. Status-reviewed submission paths compare
+only the selected credentials' displayed semantic revisions before signing and delivery; existing
+public submission paths retain their behavior. Capture the request, selection and displayed revisions
+when starting a UI confirmation; do not rebuild an acknowledgement at its final button. See the [status module](../../credentials/waltid-credential-status/README.md)
+for supported profiles, trust, network bounds, no-store and batch-session rules.
+
 ## Session Events
 
 Both handlers emit events for progress tracking:
@@ -249,12 +331,14 @@ This library builds on top of several walt.id protocol libraries:
 
 ### Companion Libraries
 
-- **[waltid-openid4vc-wallet-persistence](../waltid-openid4vc-wallet-persistence)** — SQL-backed store implementations
+- **[waltid-openid4vc-wallet-persistence-mobile](../waltid-openid4vc-wallet-persistence-mobile)** — SQLDelight and SQLCipher-backed mobile stores
+- **[waltid-openid4vc-wallet-persistence-server](../waltid-openid4vc-wallet-persistence-server)** — Exposed-based server stores
 
 ### Implementations
 
 - **[waltid-openid4vc-wallet-server](../waltid-openid4vc-wallet-server)** — Ktor HTTP route handlers (Wallet API)
-- (Wallet SDK for mobile coming soon)
+- **[waltid-openid4vc-wallet-mobile](../waltid-openid4vc-wallet-mobile)** — Android/iOS wallet SDK facade
+- **[WalletSDK](../waltid-wallet-sdk-ios)** — Swift API for native iOS wallets
 
 ## Supported Platforms
 
@@ -262,6 +346,7 @@ This library builds on top of several walt.id protocol libraries:
 | Platform   | Support                              |
 | ---------- | ------------------------------------ |
 | JVM        | Full support                         |
+| Android    | Available when `enableAndroidBuild=true` |
 | JavaScript | Full support                         |
 | iOS        | Available when `enableIosBuild=true` |
 

@@ -8,6 +8,10 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetcherManager
+import id.walt.webdatafetching.config.url.UrlConfiguration
+import id.walt.webdatafetching.config.url.UrlProtocols
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
@@ -63,6 +67,12 @@ class WalletRequestIssuerTest {
             }
         }
         server.start()
+        val fetcherId = WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST.name
+        val previousConfig = WebDataFetcherManager.getConfigurationForId(fetcherId, null)
+        // Section 5.10 requires HTTPS. This loopback fixture is the documented development exception.
+        WebDataFetcherManager.appendConfiguration(fetcherId, previousConfig.copy(
+            url = UrlConfiguration(protocols = UrlProtocols(allowHttp = true)),
+        ))
         try {
             val url = URLBuilder("openid4vp://authorize").apply {
                 parameters.append("client_id", "verifier")
@@ -90,6 +100,7 @@ class WalletRequestIssuerTest {
                 assertEquals(listOf(audience, audience), advertisedIssuers.takeLast(2))
             }
         } finally {
+            WebDataFetcherManager.appendConfiguration(fetcherId, previousConfig)
             server.stop(0)
         }
     }

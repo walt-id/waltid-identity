@@ -1,7 +1,10 @@
 package id.walt.walletdemo.compose.ui
 
 import id.walt.walletdemo.compose.logic.*
+import id.walt.credentials.status.CredentialStatus
+import id.walt.credentials.status.presentation
 import kotlinx.serialization.json.*
+import kotlin.time.Instant
 
 /** The same synthetic specification is read by native SwiftUI tests. No wallet or network is created. */
 internal object WalletVisualFixtures {
@@ -9,6 +12,20 @@ internal object WalletVisualFixtures {
         Json.parseToJsonElement(SyntheticCredentialImageFiles.read("wallet-visual-data.json").decodeToString()).jsonObject
             .also { check(it.getValue("schemaVersion").jsonPrimitive.int == 1) }
     }
+    val statusData by lazy {
+        Json.parseToJsonElement(SyntheticCredentialImageFiles.read("credential-status.json").decodeToString())
+            .jsonObject.getValue("values").jsonObject
+    }
+    fun credentialStatus(name: String): WalletDemoCredentialStatus {
+        val value = statusData.getValue(name).jsonObject
+        val metadata = Json.decodeFromJsonElement<CredentialStatus>(value.getValue("status"))
+        return metadata.presentation(Instant.parse(value.getValue("evaluatedAt").jsonPrimitive.content)).toDemoStatus().copy(storeIndex = 0)
+    }
+
+    val noReferenceStatuses: WalletDemoCredentialStatuses get() = WalletDemoCredentialStatuses(
+        (listOf(credentialSummary.id) + WalletVisualProximityFixtures.details.keys + (sharingCredentials + informationCredentials + dateCredentials)
+            .map { it.credentialId }).associateWith { credentialStatus("not_provided") })
+
     private val issuer get() = data.getValue("issuer").jsonObject
     private val credential get() = data.getValue("credential").jsonObject
     private val offered get() = data.getValue("offer").jsonObject
@@ -107,6 +124,7 @@ internal object WalletVisualFixtures {
 
     val payment: WalletDemoPaymentConsent get() = payment("payment")
     val localizedPayment: WalletDemoPaymentConsent get() = payment("paymentLocalized")
+    fun paymentTerms(recurring: Boolean): WalletDemoPaymentConsent = payment(if (recurring) "paymentRecurring" else "paymentScheduled")
     private fun payment(key: String): WalletDemoPaymentConsent {
         val payment = data.getValue(key).jsonObject
         return WalletDemoPaymentConsent(
@@ -117,7 +135,8 @@ internal object WalletVisualFixtures {
             fields = payment.getValue("fields").jsonArray.map {
                 val field = it.jsonObject
                 WalletDemoPaymentField(field.text("name"), null, field.text("value"),
-                    WalletDemoPaymentFieldPlacement.valueOf(field.text("placement")))
+                    WalletDemoPaymentFieldPlacement.valueOf(field.text("placement")),
+                    path = field["path"]?.jsonArray?.map { it.jsonPrimitive.content } ?: emptyList())
             },
         )
     }
@@ -126,6 +145,8 @@ internal object WalletVisualFixtures {
         sharingCredentials("sharing")
 
     val informationCredentials: List<WalletDemoPresentationCredentialOption> get() = sharingCredentials("sharingInformation")
+
+    val dateCredentials: List<WalletDemoPresentationCredentialOption> get() = sharingCredentials("sharingDates")
 
     private fun sharingCredentials(key: String): List<WalletDemoPresentationCredentialOption> =
         data.getValue(key).jsonObject.getValue("credentials").jsonArray.map { item ->
@@ -142,7 +163,7 @@ internal object WalletVisualFixtures {
                 disclosures = credential.getValue("disclosures").jsonArray.map {
                     val claim = it.jsonObject
                     WalletDemoPresentationDisclosure(label = claim.text("label"), path = claim.text("path"),
-                        valueJson = JsonPrimitive(claim.text("value")).toString(), displayValue = claim.text("value"),
+                        valueJson = claim.getValue("value").toString(), displayValue = claim.getValue("value").jsonPrimitive.content,
                         selectivelyDisclosable = claim.getValue("selective").jsonPrimitive.boolean,
                         required = claim.getValue("required").jsonPrimitive.boolean,
                         selectable = claim.getValue("selectable").jsonPrimitive.boolean,

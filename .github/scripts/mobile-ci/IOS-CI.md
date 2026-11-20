@@ -5,30 +5,77 @@ consumers, Enterprise integration tests and SDK docs independently. A docs-only 
 Enterprise-only selection also runs the framework producer; simulator-only runs
 do not need it. Linux docs and Kotlin simulator tests can start independently.
 
-The iOS test jobs, shared framework producer and macOS SDK docs use Xcode 27.0
+The iOS test jobs, shared framework producer and macOS SDK docs use Xcode 27.2 (27B52)
 on GitHub's [`xcode-27` arm64 image](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md).
 The image currently uses macOS 27 and remains in public preview. Demo, bridge and
 Enterprise tests select the image's iPhone 17 simulator on iOS 27.0 explicitly;
-there is no fallback to an older runtime. `DEVELOPER_DIR` pins Xcode for the whole
-workflow, including framework verification. Composite actions inherit that pin
-and the supplied simulator configuration. Keep the producer and SDK-docs toolchain pins
-aligned because framework reuse requires an exact Xcode match.
+there is no fallback to an older runtime. `DEVELOPER_DIR` pins Xcode for the macOS
+workflow and for framework verification. Reusable workflows do not inherit the
+caller env, so `wallet-core-framework.yml` and `mobile-sdk-docs.yml` set the same
+pin themselves. Composite actions inherit the pin from the job that calls them.
+Keep the producer and SDK-docs toolchain pins aligned because framework reuse
+requires an exact Xcode match.
+
+The [image release](https://github.com/actions/runner-images/releases/tag/xcode-27-arm64/20261104.0337)
+includes Xcode 27.2 final. A [main-branch simulator job](https://github.com/walt-id/waltid-identity/actions/runs/42063244489/job/127396832815)
+received that image on 5 November 2026; allocations were still mixed during rollout.
+Older allocations may resolve `Xcode_27.2.app` to the release candidate. Visual
+comparisons require the final build, and framework reuse still requires an exact
+Xcode match between producer and consumer.
 
 ## Shared release framework
 
-One producer assembles the full release `WalletCore.xcframework`, including device
-and simulator arm64 slices. Its worker limit avoids concurrent native links on
-the small hosted runner. It records the four resolved repository revisions.
-Downstream consumers check out those exact revisions and restore the same-run
-artifact. The manifest verifies the Identity commit, Xcode version, release
-configuration, platform coverage and file hashes before the framework is used.
-The archive is retained for one day; rerun the producer if it has expired.
+One producer, `.github/workflows/wallet-core-framework.yml`, assembles the full
+release `WalletCore.xcframework`, including device and simulator arm64 slices.
+Its `--max-workers=1` limit avoids concurrent native links on the small hosted
+runner. It records the four resolved repository revisions. With no `checkout-refs`
+input it pins Identity to the caller head SHA and resolves the other repositories
+from the caller ref, which is the main CI path. A caller that already has exact
+revisions, such as the release tag job, passes those SHAs in instead.
+
+`gradle-macos.yml` calls the producer when a native, Compose, Enterprise,
+macOS docs, or SwiftUI visual lane is selected. `release-candidate.yml` calls it
+after the tag job and passes the producer's `checkout-refs` and `artifact-name`
+into `mobile-sdk-docs.yml`. That docs job restores the artifact and skips
+`assembleWalletCoreReleaseXCFramework`.
+`generate-docc.sh` then documents the Swift package, whose `WalletCore` binary
+target is the restored XCFramework path. Downstream consumers check out those
+exact revisions and restore the same-run artifact. The manifest verifies the
+Identity commit, Xcode version, release configuration, platform coverage and file
+hashes before the framework is used. The archive is retained for one day; rerun
+the producer if it has expired.
+
+If a caller does not pass an artifact, the docs action still assembles the
+framework itself, with `--max-workers=1` and a 75 minute step budget inside the
+docs job's 120 minute limit.
 
 Proximity bridge tests verify and reuse that release artifact, then build their
 isolated simulator fixture with one Gradle worker. They verify the release again
-afterwards to ensure the fixture build did not replace it. Consumers run in three
-independent jobs: native provider plus native demo, Compose provider plus Compose
-demo, and Swift bridge tests. Each provider stays with its demo to reuse the build.
+afterwards to ensure the fixture build did not replace it. Gradle builds the fixture
+on each runner; Swift tests and result collection always execute.
+
+## Shared app test products
+
+Two build jobs prepare the selected native and Compose Debug test targets with
+`build-for-testing`. Each job retains its app's document-provider signing,
+entitlement and embedding checks, then packages an `.xctestproducts` bundle.
+Compose's generated framework symlink is materialized inside the bundle so it
+does not depend on the producer's build directory. The manifest binds all four
+repository revisions, exact Xcode version, configuration, expected test targets,
+file hashes and modes. Consumers verify the archive and its contents before use.
+Artifacts are named for their producing job's attempt and retained for one day.
+Native and Compose publish separate artifact outputs so partial reruns can reuse
+the successful sibling's bundle from its original attempt.
+
+Native and Compose functional tests, Enterprise tests and SwiftUI visual comparisons
+use those bundles with `test-without-building`. Each suite keeps its own selectors,
+simulator, fixture lifetime and result checks. Local action/task callers without
+an app artifact retain their build path. The Compose test job needs only its
+self-contained app bundle; native visual and bridge consumers also restore the
+release framework. The app build jobs have a 45-minute limit;
+the existing consumer limits below remain unchanged.
+
+Functional consumers run in three jobs: native demo, Compose demo and Swift bridge.
 Bridge tests run whenever either native or Compose is selected. Matrix failures
 do not cancel siblings; every selected job must succeed for the reusable workflow
 and `ci-gate` to succeed. Reports and logs have distinct names for each consumer.
@@ -41,8 +88,11 @@ These limits bound failures; successful runs finish as soon as their suites comp
 
 The Enterprise task accepts `-Penterprise.ios.walletCoreArtifact=<directory>` to
 verify an already restored artifact. Without that property, it builds the release
-framework itself. In both paths, its fixture starts only after framework
-preparation succeeds and is stopped after XCTest.
+framework itself. CI also supplies `-Penterprise.ios.testProductsArtifacts=<directory>`
+with the `native/` and `compose/` artifact directories. The task verifies each
+selected app bundle before starting its fixture; without that property, it builds
+each app itself. In both paths, the fixture starts after build preparation succeeds
+and is stopped after XCTest.
 The task's `enterprise.ios.destination` property (or `IOS_SIMULATOR_DESTINATION`)
 must use `platform=iOS Simulator,name=<device type>,OS=<version>`, for example
 `platform=iOS Simulator,name=iPhone 17,OS=27.0`. It validates this format before
@@ -120,6 +170,7 @@ start/end/exit metadata; it propagates command failures and terminates the comma
 process group on cancellation. Failed or cancelled consumer executions retain raw
 result bundles and phase logs for seven days, including when a bundle cannot be
 converted to JUnit. Converted consumer reports are also retained on success.
+App producers and Enterprise retain phase logs and timings on success too.
 There is no periodic resource sampling or unconditional Gradle profiling.
 Missing required test reports fail the affected lane and the aggregate CI gate.
 

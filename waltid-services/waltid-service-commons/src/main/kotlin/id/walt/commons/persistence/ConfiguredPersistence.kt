@@ -14,7 +14,11 @@ class ConfiguredPersistence<V : Any>(
     defaultExpiration: Duration,
     val encoding: (V) -> String,
     val decoding: (String) -> V,
-) : Persistence<V>(discriminator, defaultExpiration) {
+) : Persistence<V>(discriminator, defaultExpiration), AutoCloseable {
+
+    /** A configured store without expiry, for records whose lifetime is not a session TTL. */
+    constructor(discriminator: String, encoding: (V) -> String, decoding: (String) -> V) :
+        this(discriminator, Duration.INFINITE, encoding, decoding)
 
     companion object {
         private val config =
@@ -35,10 +39,14 @@ class ConfiguredPersistence<V : Any>(
                 else -> JedisCluster(nodes, config.user, config.password)
             }
 
-            RedisPersistence(discriminator, defaultExpiration, encoding, decoding, jedis)
+            RedisPersistence(discriminator, defaultExpiration.takeUnless { it.isInfinite() }, encoding, decoding, jedis)
         }
 
         else -> throw IllegalArgumentException("Unknown persistence type ${config.type}")
+    }
+
+    override fun close() {
+        (underlyingPersistence as? RedisPersistence<*>)?.pool?.close()
     }
 
     override fun get(id: String): V? = underlyingPersistence[id]

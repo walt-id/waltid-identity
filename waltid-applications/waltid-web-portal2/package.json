@@ -5,9 +5,12 @@
     "dev": "nuxi dev",
     "build": "nuxi build",
     "generate": "nuxi generate",
-    "start": "node .output/server/index.mjs"
+    "start": "node .output/server/index.mjs",
+    "test": "node --test --experimental-strip-types utils/*.test.ts",
+    "test:proxy": "node --test tests/paymentProxy.test.mjs"
   },
   "dependencies": {
+    "lossless-json": "4.3.3",
     "qrcode.vue": "^3.6.0"
   },
   "devDependencies": {

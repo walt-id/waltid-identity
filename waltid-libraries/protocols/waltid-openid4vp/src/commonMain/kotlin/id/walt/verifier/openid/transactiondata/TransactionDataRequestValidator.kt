@@ -25,6 +25,7 @@ private fun validateTransactionDataInternal(
     credentialQueriesById: Map<String, CredentialQuery>?,
 ): List<DecodedTransactionData> {
     val decodedItems = decodeList(transactionData.orEmpty())
+    validateTs12PaymentEntries(decodedItems)
 
     decodedItems.forEach { decodedItem ->
         val item = decodedItem.transactionData

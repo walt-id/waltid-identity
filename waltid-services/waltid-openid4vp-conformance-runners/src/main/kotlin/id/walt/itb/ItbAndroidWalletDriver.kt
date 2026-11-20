@@ -37,7 +37,7 @@ internal class ItbAndroidWalletDriver private constructor(
             }.take(20)
             System.err.println("Native wallet failure locations: ${trace.joinToString()}")
             val code = result["code"]?.jsonPrimitive?.content
-            if (code != null && code.matches(Regex("[a-z_]{1,80}"))) throw ItbWalletRejection(code)
+            if (code != null && code.matches(Regex("[a-z0-9_]{1,80}"))) throw ItbWalletRejection(code)
             error("The native wallet operation failed")
         }
     }

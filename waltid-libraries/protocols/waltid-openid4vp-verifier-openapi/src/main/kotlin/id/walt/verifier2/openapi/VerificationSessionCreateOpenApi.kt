@@ -29,6 +29,8 @@ object VerificationSessionCreateOpenApi {
             - Supports multiple verification policies including signature, revocation, status list, and VICAL validation
             - DCQL query allows requesting specific claims from credentials using JSON path notation
             - Sessions expire after 10 minutes if unused and are retained for 10 years by default
+            - session_usage selects single_attempt (any outcome final), single_success (failures retry), or reusable
+            - session_usage overrides reattemptable; omitting it preserves existing behavior
             - Session status can be tracked via SSE events endpoint
             
             For more information, see: $DOCUMENTATION_URL_PLACEHOLDER
@@ -125,6 +127,12 @@ object VerificationSessionCreateOpenApi {
                 example("[openid4vp-dc_api][iso pid] signed & encrypted") { value = DcApiAnnexDFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_PID }
                 example("[openid4vp-dc_api][sd-jwt demo payment] urn:eudi:sca:payment:1") {
                     value = Verifier2OpenApiExamples.openid4vpDcApiSdJwtScaPayment
+                }
+                example("[openid4vp-dc_api][sd-jwt scheduled payment] urn:eudi:sca:payment:1") {
+                    value = Verifier2OpenApiExamples.openid4vpDcApiSdJwtScheduledScaPayment
+                }
+                example("[openid4vp-dc_api][sd-jwt recurring payment] urn:eudi:sca:payment:1") {
+                    value = Verifier2OpenApiExamples.openid4vpDcApiSdJwtRecurringScaPayment
                 }
                 example("[openid4vp-dc_api][sca + age] urn:eudi:sca:payment:1") {
                     value = Verifier2OpenApiExamples.openid4vpDcApiScaPaymentCardAndAgeVerificationScaPayment

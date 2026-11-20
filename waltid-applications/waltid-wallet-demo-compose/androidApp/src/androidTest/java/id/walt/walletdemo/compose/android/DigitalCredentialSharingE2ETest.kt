@@ -2,6 +2,10 @@
 
 package id.walt.walletdemo.compose.android
 
+import id.walt.wallet2.mobile.AndroidDigitalCredentialRegistry
+import id.walt.wallet2.mobile.MobileWalletCredentialRegistryField
+import id.walt.wallet2.mobile.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat
 import id.walt.mobile.test.DigitalCredentialProviderTest
 
 import android.content.Context
@@ -55,6 +59,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -81,6 +87,55 @@ import org.junit.runner.RunWith
 internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
     override val wallet: MobileWallet get() = provisionedWallet
     override val issuedCredentialIds: Set<String> get() = provisionedCredentialIds
+    /** Real platform matcher boundary: one entry indexed by two allowed VCTs remains one candidate. */
+    @Test
+    fun ancestorAndLeafIndexesShowOneCredentialManagerCandidate() = runBlocking {
+        val fixture = fixture()
+        val registry = AndroidDigitalCredentialRegistry(fixture.context)
+        val registryId = "inherited-type-index"
+        val leaf = "https://issuer.example/credentials/leaf"
+        val parent = "https://types.example/credentials/parent"
+        val title = "Inherited metadata fixture"
+        val record = MobileWalletCredentialRegistryRecord(
+            registryEntryId = "one-logical-credential", credentialId = "one-stored-credential",
+            format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+            type = leaf, fields = listOf(MobileWalletCredentialRegistryField(
+                path = listOf("given_name"), valueJson = "\"Ada\"", selectivelyDisclosable = false,
+            )), displayName = title,
+        )
+        val registration = registry.replace(registryId, listOf(record, record.copy(type = parent)))
+        assertTrue("Registry unavailable: ${registration.reason}", registration.available)
+        assertEquals(1, registration.registeredEntryCount)
+        val requestJson = buildJsonObject {
+            put("requests", buildJsonArray { add(buildJsonObject {
+                put("protocol", "openid4vp-v1-unsigned")
+                put("data", buildJsonObject {
+                    put("response_type", "vp_token"); put("response_mode", "dc_api"); put("nonce", "inherited-type-request")
+                    put("dcql_query", buildJsonObject { put("credentials", buildJsonArray { add(buildJsonObject {
+                        put("id", "identity"); put("format", "dc+sd-jwt")
+                        put("meta", buildJsonObject { put("vct_values", buildJsonArray { add(leaf); add(parent) }) })
+                        put("claims", buildJsonArray { add(buildJsonObject { put("path", buildJsonArray { add("given_name") }) }) })
+                    }) }) })
+                })
+            }) })
+        }.toString()
+        val request = fixture.startCredentialRequest(requestJson)
+        try {
+            assertNotNull("Inherited type candidate did not appear", fixture.device.wait(
+                Until.findObject(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).text(title)), UI_ELEMENT_TIMEOUT,
+            ))
+            assertEquals(1, fixture.device.findObjects(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).text(title)).size)
+        } finally {
+            // Close the owned picker before withdrawing its registry entries; otherwise GMS can
+            // switch the still-open request to its cross-device QR fallback during teardown.
+            fixture.device.findObject(By.pkg(CREDENTIAL_SELECTOR_PACKAGE).text("Cancel"))?.click()
+                ?: fixture.device.pressBack()
+            request.abandon()
+            withTimeout(10_000L) { request.awaitSettled() }
+            registry.replace(registryId, emptyList())
+        }
+    }
+
     /**
      * A small platform gate before the protocol assertions: registration has to be visible to the
      * platform and a real Digital Credentials request has to open Google's selector. The remaining
@@ -279,7 +334,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
                         assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
                     }
-                    listOf("Confirm this payment", "Payee", "Payee ID", "Currency", "Amount",
+                    listOf("Confirm this payment", "Payee", "Payee ID", "Amount",
                         "Check the payee and amount before confirming.", "Confirm payment", "Cancel payment").forEach { label ->
                         WalletComposeE2EHelper.assertTextVisibleAfterScrolling(fixture.device, listOf(label),
                             "Payment review is missing issuer instruction '$label'")
@@ -402,15 +457,8 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                         device = device,
                         path = "transactionData[0].details.payload.amount",
                         label = "Amount",
-                        expectedValues = listOf(SCA_AMOUNT_TEXT),
-                        message = "SCA payment amount missing from the wallet review",
-                    )
-                    assertClaimValueVisibleAfterScrolling(
-                        device = device,
-                        path = "transactionData[0].details.payload.currency",
-                        label = "Currency",
-                        expectedValues = listOf(DemoTestBackend.SCA_PAYMENT_CURRENCY),
-                        message = "SCA payment currency missing from the wallet review",
+                        expectedValues = listOf(SCA_AMOUNT_TEXT, DemoTestBackend.SCA_PAYMENT_CURRENCY),
+                        message = "SCA payment amount or currency missing from the wallet review",
                     )
                     // The review received both credentials, not just the one the prompt was built from.
                     // Check the exact age candidate and its disclosure directly in the consent review.

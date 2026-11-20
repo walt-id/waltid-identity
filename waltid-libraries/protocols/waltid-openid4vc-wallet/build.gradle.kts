@@ -8,6 +8,8 @@ group = "id.walt.protocols"
 
 kotlin {
     sourceSets {
+        commonTest.get().kotlin.srcDir("../../sdjwt/waltid-sdjwt/src/typeMetadataTestFixtures/kotlin")
+        commonTest.get().kotlin.srcDir("src/consentTestFixtures/kotlin")
         commonMain.dependencies {
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
@@ -54,6 +56,8 @@ kotlin {
             // DCQL
             api(project(":waltid-libraries:credentials:waltid-dcql"))
 
+            api(project(":waltid-libraries:credentials:waltid-credential-status"))
+
             // Holder-side policies
             api(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
@@ -80,7 +84,9 @@ kotlin {
             implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
         }
 
+        jvmTest { kotlin.srcDir("../../credentials/waltid-credential-status/src/jvmTestFixtures/kotlin") }
         jvmTest.dependencies {
+            implementation(project(":waltid-libraries:credentials:waltid-status-list"))
             implementation(kotlin("test-junit5"))
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.ktor.client.mock)

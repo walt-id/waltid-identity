@@ -1,5 +1,7 @@
 package id.walt.openid4vci.handlers.granttypes.preauthorizedcode
 
+import id.walt.openid4vci.clientauth.attestation.withClientAuthentication
+import id.walt.openid4vci.clientauth.attestation.clientAuthenticationClaims
 import id.walt.openid4vci.DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.DefaultClient
@@ -153,7 +155,10 @@ class PreAuthorizedCodeTokenEndpoint(
         } else {
             existingClient
         }
-        val clientRequest = updatedRequest.withClient(clientToUse)
+        val authenticatedSession = session.withClientAuthentication(
+            request.authenticatedClient, anonymousPreAuthorizedAccess = clientId.isBlank(),
+        )
+        val clientRequest = updatedRequest.withClient(clientToUse).withSession(authenticatedSession)
 
         val credentialAuthorization = options.credentialAuthorizationResolver?.invoke(clientRequest, null)
         val deadline = credentialAuthorization?.issuanceDeadline
@@ -178,6 +183,7 @@ class PreAuthorizedCodeTokenEndpoint(
                 clientId.takeIf { it.isNotBlank() }?.let { put("client_id", it) }
                 put("pre_authorized_code", code)
                 consumed.issuanceSessionId?.let { put("issuance_session_id", it) }
+                putAll(authenticatedSession.clientAuthenticationClaims())
                 putAll(clientRequest.dpopAccessTokenClaims())
             },
         )
@@ -189,7 +195,7 @@ class PreAuthorizedCodeTokenEndpoint(
                 request = clientRequest,
                 credentialAuthorization = credentialAuthorization,
                 accessToken = accessToken,
-                session = deadline?.let { session.withExpiresAt(TokenType.REFRESH_TOKEN, it).withExpiresAt(TokenType.ACCESS_TOKEN, expiresAt) } ?: session,
+                session = deadline?.let { authenticatedSession.withExpiresAt(TokenType.REFRESH_TOKEN, it).withExpiresAt(TokenType.ACCESS_TOKEN, expiresAt) } ?: authenticatedSession,
                 subject = subject,
                 issuer = issuer,
                 clientId = clientId.takeIf { it.isNotBlank() },

@@ -1,6 +1,6 @@
 # Operator-assisted Android ITB execution
 
-The ordinary JVM runner has a software holder key and cannot supply real TS12 authentication evidence. The optional Android fixture executes the same issuance and reviewed-presentation driver on a physical phone, using a disposable, hardware-backed P-256 key with per-use biometric authentication. The native SCA adapter supplies factors only for an eligible key; successful signing is still required before releasing a proof.
+The ordinary JVM runner has a software holder key and cannot supply real TS12 authentication evidence. The optional Android fixture executes the same issuance and reviewed-presentation driver on a physical phone, using a disposable, hardware-backed P-256 key. Per-use biometric authentication is the default; the optional timed mode retains a ten-second key and requests fresh biometrics for every payment proof. The native SCA adapter supplies factors only for an eligible key; successful signing is still required before releasing a proof.
 
 The desktop retains the portal login, organisation API key, case/session correlation, verdict collection and cleanup. Only wallet interactions and the configured reference CA cross the device bridge. Credential storage and private-key operations stay on the phone. The bridge never exposes a generic signing operation.
 
@@ -25,6 +25,11 @@ of Wallet Provider assurance or certification.
      id.walt.wallet2.mobile.test/androidx.test.runner.AndroidJUnitRunner
    ```
 
+   Add `-e wallet.itb.biometricPolicy timed` to exercise the ten-second key through
+   the production payment authorizer and signer. `per-use` remains the default.
+   Ordinary issuance uses the key's normal reuse behavior; each payment gets a
+   fresh biometric prompt after the driver's reviewed selection.
+
 4. Run the normal `itbWallet` task with its existing tenant credentials and these additional environment variables:
 
    | Variable | Value |
@@ -38,4 +43,86 @@ of Wallet Provider assurance or certification.
 
 The fixture binds only to device loopback and accepts the approved Aegean tenant origin. A fresh token authenticates the coordinator before key creation. Messages are size-bounded and strictly sequenced; disconnect cancels pending work and a broken channel is never retried. Keep the ADB transport restricted to the operator's machine. The token is a local test-channel credential, not an ITB organisation key.
 
-Reports distinguish `JVM_SOFTWARE` from `ANDROID_NATIVE` and include the operator-supplied APK digest. They still require wallet success and correlated terminal ITB `SUCCESS`. All issuer, JOSE, certificate, audience, nonce and verifier-result checks remain strict. A native prompt or successful signature alone is not a passing ITB case.
+Reports distinguish `JVM_SOFTWARE` from `ANDROID_NATIVE` and include the operator-supplied APK digest. They require wallet success and correlated terminal ITB `SUCCESS`. The fixture uses the production wallet's issuance, request-validation and proof-generation paths; verifier rejections remain failures. A native prompt or successful signature alone is not a passing ITB case.
+
+## SCA-User audience compatibility
+
+The referenced [SCA-User rulebook §§4.1 and 5.1](https://github.com/webuild-consortium/webuild-attestation-rulebooks-catalog/blob/f9b1812b19277e68f56ae64351783fa05c433cd5/rulebooks/rb-sca-user/README.md#41-mandatory-metadata)
+requires the issuer-signed credential's `aud` to contain the issuing bank's RP
+URL(s). [CS-02 §5](https://github.com/webuild-consortium/wp4-architecture/blob/b63c25a5ef5c0332d929146c5d38b76a10ca52e2/conformance-specs/cs-02-credential-presentation.md#L111)
+uses `x509_hash` to identify the request signer's certificate. These values have
+different meanings: comparing the credential audience directly with `client_id`,
+or issuing a certificate-hash audience to make them equal, does not implement the
+rulebook's URL audience requirement.
+
+This credential-level restriction conflicts with
+[ETSI TS 119 472-1 V1.2.1 §5.2.8.1](https://www.etsi.org/deliver/etsi_ts/119400_119499/11947201/01.02.01_60/ts_11947201v010201p.pdf#page=31):
+an SD-JWT VC EAA must not implement the EAA audience semantics of §4.2.9.2.
+The accompanying note points to Embedded Disclosure Policy (EDP) and RP
+registration restrictions. However, the referenced
+[CS-12 §§7.2(1) and 7.3(2)](https://github.com/webuild-consortium/wp4-architecture/blob/b63c25a5ef5c0332d929146c5d38b76a10ca52e2/conformance-specs/cs-12-sca-payments.md#72-attestation-provider-requirements-issuance)
+exclude EDP issuance and verification. The bank-URL audience requirement above
+describes the WE BUILD profile under discussion, not a settled EUDI requirement.
+
+[Architecture #381](https://github.com/webuild-consortium/wp4-architecture/issues/381)
+tracks the unresolved profile and RP-permission questions. A resolution needs to
+align issuer, wallet and verifier requirements, establish how an authenticated RP
+is authorized before disclosure, and define failure behavior and positive/negative
+tests. [CS-12 §6.1(3)](https://github.com/webuild-consortium/wp4-architecture/blob/b63c25a5ef5c0332d929146c5d38b76a10ca52e2/conformance-specs/cs-12-sca-payments.md#61-issuer-requested-flow)
+also applies the restriction to SCA-IBAN used for `login_risk_transaction`.
+Request authentication and a verifier's acceptance do not establish the wallet's
+RP-permission enforcement; this runner does not qualify that policy.
+
+The separate reference issuer/verifier interoperability failure in
+[ITB #58](https://github.com/webuild-consortium/wp4-interop-test-bed/issues/58)
+was resolved after an attended retest on 10 November 2026. Fresh `ts12_issue_02`,
+`ts12_pay_02` and `ts12_pay_dc_api_02` each achieved wallet success and correlated
+terminal ITB `SUCCESS`, using the Android fixture at
+[`9b9df335`](https://github.com/walt-id/waltid-identity/commit/9b9df335ad15c1ccd537b441bb14958fd7b314a4)
+with per-use biometric signing and synthetic key attestation. An issuance
+diagnostic observed an HTTPS credential audience; the deployed backend revision
+was not independently confirmed. This dated result establishes interoperability
+for those inputs, not resolution of #381 or full SCA conformance. Recheck changed
+deployments with fresh issuance and both payment cases.
+
+The credential audience is distinct from the KB-JWT audience, which binds the
+proof to the current verifier or DC API origin. Preserve KB-JWT audience
+validation and signed credential claims; this profile question is not a reason
+to strip claims or weaken request/proof bindings. Reports retain only allowlisted
+verifier error identifiers or a bounded HTTP status, never the response body.
+
+## Local timed-key controls
+
+The shared `exerciseTimedNativeSca` fixture uses the production mobile authorizer,
+proof builder and platform signing provider. Its timing controls delay or cancel
+an operation after native authentication; they do not replace signing or synthesize
+successful authentication. It checks two successive payments inside the first
+approval's reuse window, rejection after eleven seconds, biometric cancellation,
+discarded consent, cancellation after approval, and a fresh successful retry. The
+synthetic payment is EUR 12.50 to Synthetic shop. Every successful proof is verified.
+
+On Android, build the normal test APK and explicitly select the physical device:
+
+```sh
+adb -s <serial> shell am instrument -w -r \
+  -e class 'id.walt.wallet2.mobile.NativeScaDeviceTest#timedPaymentAuthorization' \
+  -e wallet.sca timed \
+  id.walt.wallet2.mobile.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+On iOS, build `assembleWalletCorePhysicalFixturesReleaseXCFramework` with
+`-PenableIosBuild=true -PenableWalletSdkPhysicalFixtures=true --max-workers=1`.
+Use the existing `waltid-wallet-sdk-ios/PhysicalTests/PhysicalTests.xcodeproj`,
+`ProximityPhysicalDeviceTests` scheme, and `ScaPhysicalDeviceTests` test plan on an
+entitled physical iPhone. Set `WALLET_SDK_PHYSICAL_FIXTURES=1` for package resolution,
+`WALLET_SCA_TIMED=1`, `PHYSICAL_TEAM_ID` and `PHYSICAL_HOST_BUNDLE_ID` for the run.
+The ordinary proximity test plan does not select the payment test. Simulator or
+missing operator opt-in skips are not physical evidence.
+
+Both hosts display an operator checkpoint before each stage. Approve both initial
+prompts; approve EXPIRY and wait without a second prompt; cancel the biometric
+prompt at CANCEL_BIOMETRIC; approve CANCEL_AFTER_APPROVAL and RETRY. CANCEL_REVIEW
+must not prompt. Keys are disposable and deleted in `finally`.
+
+These are protocol and native authorization checks, not production payment UI,
+browser/OS DC API delivery or formal PSD2 qualification. Live ITB remains Android-only.

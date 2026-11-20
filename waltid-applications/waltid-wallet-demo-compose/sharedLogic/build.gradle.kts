@@ -15,11 +15,19 @@ group = "id.walt.walletdemo.compose"
 val enableMobileWallet = enableAndroidBuild || enableIosBuild
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser {
                 testTask {
-                    useKarma { useChromeHeadless() }
+                    useKarma {
+                        // The pinned browser CI container runs as root.
+                        if (providers.environmentVariable("CI").isPresent) useChromeHeadlessNoSandbox()
+                        else useChromeHeadless()
+                    }
                 }
             }
         }
@@ -63,6 +71,7 @@ kotlin {
                 androidMain.dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-recovery-blockstore"))
                     implementation(identityLibs.ktor.client.android)
+                    implementation(identityLibs.ktor.client.okhttp)
                     implementation(identityLibs.androidx.fragment)
                     implementation(identityLibs.androidx.biometric)
                     implementation(identityLibs.cryptography.provider.jdk)
@@ -114,6 +123,7 @@ kotlin {
         }
 
         commonTest.dependencies {
+            implementation(identityLibs.ktor.client.mock)
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }

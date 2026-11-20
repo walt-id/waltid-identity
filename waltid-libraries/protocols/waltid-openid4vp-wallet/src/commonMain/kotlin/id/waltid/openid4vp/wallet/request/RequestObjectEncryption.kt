@@ -13,6 +13,7 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
 
 /** One request_uri POST exchange owns this key; it is never persisted or shared. */
@@ -37,7 +38,13 @@ internal class RequestObjectEncryption private constructor(private val key: Key)
     }.toString()
 
     suspend fun decrypt(requestObject: String): String {
-        val decrypted = CompactJwe.decrypt(requestObject, key, contentEncryptions)
+        val decrypted = try {
+            CompactJwe.decrypt(requestObject, key, contentEncryptions)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (exception: Exception) {
+            throw IllegalArgumentException("Could not decrypt encrypted Request Object", exception)
+        }
         val header = decrypted.protectedHeader
         val contentType = header["cty"] as? JsonPrimitive
         require(contentType?.isString == true &&

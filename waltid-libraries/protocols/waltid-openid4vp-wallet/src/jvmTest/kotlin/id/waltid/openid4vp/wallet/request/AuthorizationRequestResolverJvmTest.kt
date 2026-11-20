@@ -79,28 +79,22 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
-    fun `legacy resolver preserves unsigned JSON request uri POST behavior`() = runBlocking {
+    fun `POST rejects unsigned JSON even when legacy validation is requested`() = runBlocking {
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
             parameters.append("client_id", "legacy-verifier")
             parameters.append("request_uri", "https://verifier.example/request")
             parameters.append("request_uri_method", "post")
         }.build()
-
-        val resolved = AuthorizationRequestResolver.resolve(
-            requestUrl = requestUrl,
-            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
-            enforceFinalRequestObject = false,
-        ) { _, _ ->
-            AuthorizationRequestResolver.RequestUriFetchResponse(
-                status = io.ktor.http.HttpStatusCode.OK,
-                contentType = ContentType.Application.Json,
-                body = "{\"client_id\":\"legacy-verifier\",\"nonce\":\"legacy-nonce\"}",
-                walletNonce = null,
-            )
+        assertFailsWith<IllegalArgumentException> {
+            AuthorizationRequestResolver.resolve(requestUrl, enforceFinalRequestObject = false) { _, _ ->
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    status = HttpStatusCode.OK,
+                    contentType = ContentType.Application.Json,
+                    body = "{}",
+                    walletNonce = "sent-nonce",
+                )
+            }
         }
-
-        assertIs<ResolvedAuthorizationRequest.Plain>(resolved)
-        assertEquals("legacy-verifier", resolved.authorizationRequest.clientId)
     }
 
     @Test
@@ -341,7 +335,7 @@ class AuthorizationRequestResolverJvmTest {
             parameters.append("request_uri_method", "post")
         }.build()
 
-        val unsignedJsonError = assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+        val unsignedJsonError = assertFailsWith<IllegalArgumentException> {
             AuthorizationRequestResolver.resolve(
                 requestUrl = requestUrl,
                 unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
@@ -354,8 +348,7 @@ class AuthorizationRequestResolverJvmTest {
                 )
             }
         }
-        assertEquals(ClientIdError.PreRegisteredClientNotFound("verifier2"), unsignedJsonError.clientIdError)
-        assertEquals("invalid_client", unsignedJsonError.errorCode)
+        assertEquals("request_uri_method=post requires application/oauth-authz-req+jwt", unsignedJsonError.message)
 
         val nonceRequestUrl = URLBuilder("openid4vp://authorize").apply {
             parameters.append("client_id", "redirect_uri:https://verifier.example/callback")

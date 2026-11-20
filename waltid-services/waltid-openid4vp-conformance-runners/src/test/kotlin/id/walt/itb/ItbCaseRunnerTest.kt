@@ -15,7 +15,7 @@ import java.net.ServerSocket
 import kotlin.test.*
 
 class ItbCaseRunnerTest {
-    private val suite = ItbCatalogue.initialWalletCases().suites.first()
+    private val suite = ItbCatalogue.walletCases().suites.first()
     private val case = suite.cases.single { it.id == "tc_vci_006" }
     private val session = "00000000-0000-0000-0000-000000000001"
     private val report = javaClass.getResource("/itb/vci006-success.xml")!!.readText()
@@ -23,6 +23,7 @@ class ItbCaseRunnerTest {
         """{"sessions":[{"session":"$session","result":"$verdict","startTime":"2026-09-21T14:48:14Z"${if (complete) ",\"endTime\":\"2026-09-21T14:49:58Z\"" else ""}}]}"""
 
     private inner class Bridge : ItbInteractionBridge {
+        var interaction: ItbWalletInteraction = ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer=%7B%7D"))
         var reads = 0
         var completed = false
         var readFailure: Exception? = null
@@ -31,7 +32,7 @@ class ItbCaseRunnerTest {
         override suspend fun read(session: ItbSession): ItbWalletInteraction {
             reads++
             readFailure?.let { throw it }
-            return ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer=%7B%7D"))
+            return interaction
         }
         override suspend fun complete() { completed = true }
     }
@@ -55,6 +56,39 @@ class ItbCaseRunnerTest {
             assertEquals(1, walletCalls)
             assertTrue(bridge.completed)
             assertTrue(result.walletSucceeded && result.testBedCompleted)
+        }
+    }
+
+    @Test
+    fun invocationSchemeMustMatchBeforeWalletExecution() = runBlocking<Unit> {
+        for ((expected, scheme, valid) in listOf(
+            Triple("openid4vp", "openid4vp", true),
+            Triple("eu-eaap", "eu-eaap", true),
+            Triple("haip-vp", "haip-vp", true),
+            Triple("openid4vp", "eu-eaap", false),
+            Triple("openid4vp", "https", false),
+            Triple("openid4vp", null, false),
+        )) {
+            val bridge = Bridge().apply {
+                if (scheme != null) interaction = ItbWalletInteraction.Presentation(Url("$scheme://authorize?request_uri=https://verifier.example/request"))
+            }
+            var walletCalls = 0
+            var stopped = false
+            HttpClient(MockEngine { request ->
+                respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                    "status" -> status(bridge.completed)
+                    "stop" -> { stopped = true; "" }
+                    session -> report
+                    else -> error("Unexpected request")
+                }, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+            }).use { client ->
+                val result = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "secret"), bridge, { walletCalls++ })
+                    .run(suite, case.copy(invocationScheme = expected))
+                assertEquals(if (valid) ItbCaseResult.Outcome.PASSED else ItbCaseResult.Outcome.ERROR, result.outcome)
+                assertEquals(if (valid) 1 else 0, walletCalls)
+                assertEquals(!valid, stopped)
+                if (!valid) assertEquals(ItbCaseResult.Phase.INTERACTION, result.phase)
+            }
         }
     }
 

@@ -1,5 +1,7 @@
 package id.walt.issuer2
 
+import io.ktor.server.application.ApplicationStopped
+
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
@@ -57,6 +59,7 @@ fun Application.issuer2Module(
     }
 
     val module = Issuer2Module.load(credentialProofKeyAcceptance)
+    monitor.subscribe(ApplicationStopped) { module.close() }
     routing {
         staticResources("/static/credential-cards", "static/credential-cards")
         module.managementController.register(this)

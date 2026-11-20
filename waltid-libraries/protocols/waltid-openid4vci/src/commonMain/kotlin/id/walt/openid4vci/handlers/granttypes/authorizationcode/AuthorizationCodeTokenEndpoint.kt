@@ -1,5 +1,7 @@
 package id.walt.openid4vci.handlers.granttypes.authorizationcode
 
+import id.walt.openid4vci.clientauth.attestation.withClientAuthentication
+import id.walt.openid4vci.clientauth.attestation.clientAuthenticationClaims
 import id.walt.openid4vci.DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.GrantType
@@ -7,6 +9,8 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.pkce.PkceService
+import id.walt.openid4vci.pkce.PkceVerificationResult
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
@@ -39,6 +43,7 @@ class AuthorizationCodeTokenEndpoint(
     private val refreshTokenRepository: RefreshTokenRepository,
     private val refreshTokenIssuer: RefreshTokenIssuer,
     private val refreshTokenLifetimeSeconds: Long = DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS,
+    private val pkceService: PkceService = PkceService(),
 ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
@@ -68,7 +73,7 @@ class AuthorizationCodeTokenEndpoint(
         } catch (e: SerializationException) {
             return AccessTokenResponseResult.Failure(
                 unresolvedRequest,
-                OAuthError(OAuthErrorCodes.INVALID_REQUEST, e.message)
+                OAuthError(OAuthErrorCodes.INVALID_GRANT, "Authorization code record is invalid")
             )
         } catch (e: DuplicateCodeException) {
             return AccessTokenResponseResult.Failure(
@@ -83,7 +88,7 @@ class AuthorizationCodeTokenEndpoint(
         val resolvedRequest = unresolvedRequest.withSession(record.session.copy())
 
         return try {
-            val session = requireNotNull(resolvedRequest.session)
+            val session = requireNotNull(resolvedRequest.session).withClientAuthentication(request.authenticatedClient)
             val client = request.client
             if (client.id != record.clientId) {
                 return AccessTokenResponseResult.Failure(
@@ -103,7 +108,12 @@ class AuthorizationCodeTokenEndpoint(
                 }
             }
 
-            val updatedRequest = resolvedRequest
+            when (val pkce = pkceService.verifyTokenRequest(request.requestForm, record.pkceBinding)) {
+                is PkceVerificationResult.Failure -> return AccessTokenResponseResult.Failure(resolvedRequest, pkce.error)
+                PkceVerificationResult.Success -> Unit
+            }
+
+            val updatedRequest = resolvedRequest.withSession(session)
                 .grantScopes(record.grantedScopes)
                 .grantAudience(record.grantedAudience)
 
@@ -141,6 +151,7 @@ class AuthorizationCodeTokenEndpoint(
                     session.customAttributes["issuance_session_id"]?.let {
                         put("issuance_session_id", it)
                     }
+                    putAll(session.clientAuthenticationClaims())
                     putAll(scopedRequest.dpopAccessTokenClaims())
                 },
             )

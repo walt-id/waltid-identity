@@ -75,7 +75,11 @@ class StatusCwtPolicyTest {
         val didKey = JWKKey.generate(KeyType.Ed25519)
         did = DidService.registerByKey("key", didKey).did
         val didKeyId = DidService.resolveToCrypto2Keys(did).getOrThrow().single().id.value
-        val didHeaders = CoseHeaders(algorithm = Cose.Algorithm.EdDSA, kid = didKeyId.encodeToByteArray())
+        val didHeaders = CoseHeaders(
+            algorithm = Cose.Algorithm.EdDSA,
+            type = IetfStatusListTokens.statusListCwtType,
+            kid = didKeyId.encodeToByteArray(),
+        )
         val didSigner = didKey.toCoseSigner()
 
         val certificateKey = JWKKey.generate(KeyType.secp256r1)

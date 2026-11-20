@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.v2.runAndroidComposeUiTest
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,7 +26,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "en-rUS-w393dp-h852dp-notnight-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class, ExperimentalRoborazziApi::class)
 class WalletVisualAndroidTest {
     private lateinit var previousTimeZone: java.util.TimeZone
     @org.junit.Before fun pinTimeZone() {
@@ -34,6 +35,26 @@ class WalletVisualAndroidTest {
     }
     @org.junit.After fun restoreTimeZone() { java.util.TimeZone.setDefault(previousTimeZone) }
 
+    @Test fun credentialStatusHome() = scenario { credentialStatusHome() }
+    @Test fun credentialStatusMixedArtwork() = scenario { credentialStatusMixedArtwork() }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
+    fun credentialStatusMixedArtworkRtl() = scenario(fontScale = 1.5f) { credentialStatusMixedArtwork(rtl = true) }
+    @Test fun credentialStatusDetailsClear() = scenario { credentialStatusDetails() }
+    @Test fun credentialStatusDetailsAdverse() = scenario { credentialStatusDetails(adverse = true) }
+    @Test fun credentialStatusDetailsExpanded() = scenario { credentialStatusDetails(adverse = true, expanded = true) }
+    @Test fun credentialStatusKinds() = scenario { credentialStatusKinds() }
+    @Test fun credentialStatusSharing() = scenario(sheetHost = true) { credentialStatusSharing() }
+    @Test fun credentialStatusConfirmation() = scenario(sheetHost = true) { credentialStatusConfirmation() }
+    @Test fun credentialStatusPaymentConfirmation() = scenario(sheetHost = true) { credentialStatusConfirmation(payment = true) }
+    @Test fun credentialStatusPayment() = scenario(sheetHost = true) { credentialStatusPayment() }
+    @Test fun credentialStatusSettingsPartial() = scenario { credentialStatusSettings() }
+    @Test fun credentialStatusSettingsChecking() = scenario { credentialStatusSettings(checking = true) }
+    @Test fun credentialStatusSettingsHelp() = scenario { credentialStatusSettings(helpExpanded = true) }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
+    fun credentialStatusCompactRtl() = scenario(fontScale = 1.5f) { credentialStatusKinds(compactRtl = true) }
+
     @Test fun walletOpening() = scenario { walletOpening() }
     @Test fun walletOpeningFailure() = scenario { walletOpening(failure = true) }
     @Test fun pinStorageUnavailable() = scenario { pinStorageUnavailable() }
@@ -41,10 +62,14 @@ class WalletVisualAndroidTest {
 
     @Test fun controls() = scenario { controls() }
     @Test fun controlsRtl() = scenario { controls(rtl = true) }
+    @Test fun dateValues() = scenario { dateValues() }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-notnight-mdpi")
+    fun dateValuesCompactRtl() = scenario(fontScale = 1.5f) { dateValues(rtl = true) }
 
     @Test fun settingsReader() = scenario { settingsRoot("reader") }
     @Test fun settingsReaderRequired() = scenario { settingsRoot("reader_required") }
-    @Test fun readerTrustImport() = scenario { readerTrustImport() }
+    @Test fun readerTrustImport() = scenario(sheetHost = true) { readerTrustImport() }
     @Test fun settingsDcApiEnabled() = scenario { settingsRoot("dc_api") }
     @Test fun settingsDcApiDisabled() = scenario { settingsRoot("dc_api", reviewEnabled = false) }
     @Test fun settingsNearby() = scenario { settingsRoot("nearby") }
@@ -63,12 +88,20 @@ class WalletVisualAndroidTest {
     @Test fun externalUnavailableCallback() = scenario(sheetHost = true) { externalReceiving(unavailable = true) }
     @Test fun providerSharingReview() = scenario(sheetHost = true) { providerSharingReview() }
     @Test fun sharingInformationSelected() = scenario(sheetHost = true) { sharingInformation() }
+    @Test fun sharingInformationDates() = scenario(sheetHost = true) { sharingInformation(dates = true) }
     @Test fun sharingInformationAlternative() = scenario(sheetHost = true) { sharingInformation(alternative = true) }
     @Test fun sharingInformationMultiple() = scenario(sheetHost = true) { sharingInformation(multiple = true) }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
     fun compactProviderSharingReview() = scenario(fontScale = 1.5f, sheetHost = true) { providerSharingReview(compact = true) }
     @Test fun providerOfferReview() = scenario(sheetHost = true) { providerOfferReview() }
+    @Test fun scheduledPaymentTerms() = scenario(sheetHost = true) { paymentTerms(recurring = false) }
+    @Test fun scheduledPaymentTermsDetails() = scenario(sheetHost = true) { paymentTerms(recurring = false, details = true) }
+    @Test fun recurringPaymentTerms() = scenario(sheetHost = true) { paymentTerms(recurring = true) }
+    @Test fun recurringPaymentTermsDetails() = scenario(sheetHost = true) { paymentTerms(recurring = true, details = true) }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-notnight-mdpi", fontScale = 1.5f)
+    fun recurringPaymentTermsLargeText() = scenario(fontScale = 1.5f, sheetHost = true) { paymentTerms(recurring = true, compact = true) }
     @Test fun paymentLoading() = scenario { paymentState(blocked = false) }
     @Test fun paymentBlocked() = scenario { paymentState(blocked = true) }
     @Test
@@ -192,6 +225,6 @@ class WalletVisualAndroidTest {
             // These are settled-state screenshots; interaction feedback remains enabled in the app.
             CompositionLocalProvider(LocalRippleConfiguration provides null,
                 LocalDensity provides Density(LocalDensity.current.density, fontScale), content = content)
-        }).block()
+        }).execute(block)
     }
 }

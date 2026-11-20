@@ -1,5 +1,21 @@
 {
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
-  // The rules are shared by all walt.id repositories; see .github/renovate-preset.json5.
+  // Shared rules plus this repository's deferred Web3Login migration.
   extends: ['github>walt-id/waltid-identity//.github/renovate-preset.json5'],
+  packageRules: [
+    {
+      description: 'Restore the unmaintained standalone Web3Login build and wallet integration before migrating Kotlin.',
+      matchFileNames: ['gradle/libs.versions.toml'],
+      matchDepNames: ['org.jetbrains.kotlin.jvm', 'org.jetbrains.kotlin.plugin.serialization'],
+      matchCurrentVersion: '2.0.0',
+      allowedVersions: '2.0.0',
+    },
+    {
+      description: 'Restore the unmaintained standalone Web3Login build and wallet integration before migrating Ktor.',
+      matchFileNames: ['gradle/libs.versions.toml'],
+      matchDepNames: ['io.ktor.plugin'],
+      matchCurrentVersion: '3.3.3',
+      allowedVersions: '3.3.3',
+    },
+  ],
 }

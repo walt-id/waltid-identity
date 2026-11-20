@@ -1,5 +1,7 @@
 package id.walt.openid4vci.clientauth.attestation
 
+import id.walt.openid4vci.attestation.VerifiedAttestationLifetime
+import id.walt.openid4vci.attestation.*
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
@@ -46,6 +48,8 @@ class AttestationBasedClientAuthenticationMethod(
     private val clockSkewSeconds: Long = 60,
     private val popMaxAgeSeconds: Long = 300,
     private val challengeService: AttestationChallengeService? = null,
+    val statusPolicy: AttestationStatusPolicy = AttestationStatusPolicy(),
+    private val statusResolver: AttestationStatusResolver? = null,
 ) : ClientAuthenticationMethod {
     private val inlineJwkResolver = Crypto2JwtKeyResolver(allowInlineJwk = true)
 
@@ -83,6 +87,21 @@ class AttestationBasedClientAuthenticationMethod(
 
     override val name: String = ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH
 
+    /** Wrap the attestation verifier and keep the endpoint algorithm and clock settings. */
+    fun withAttestationVerifier(
+        transform: (ClientAttestationVerifier) -> ClientAttestationVerifier,
+    ): AttestationBasedClientAuthenticationMethod = AttestationBasedClientAuthenticationMethod(
+        attestationVerifier = transform(attestationVerifier),
+        acceptedAttestationSigningAlgorithms = acceptedAttestationSigningAlgorithms,
+        acceptedPopSigningAlgorithms = acceptedPopSigningAlgorithms,
+        clock = clock,
+        clockSkewSeconds = clockSkewSeconds,
+        popMaxAgeSeconds = popMaxAgeSeconds,
+        challengeService = challengeService,
+        statusPolicy = statusPolicy,
+        statusResolver = statusResolver,
+    )
+
     @Suppress("UNUSED_PARAMETER")
     override suspend fun authenticate(
         endpoint: ClientAuthenticationEndpoint,
@@ -116,13 +135,15 @@ class AttestationBasedClientAuthenticationMethod(
             return failure("client_id does not match client attestation subject")
         }
 
-        val verification = attestationVerifier.verifyAttestationJwt(
+        val verifiedSignerPublicJwk = when (val verification = attestationVerifier.verifyAttestationJwt(
             jwt = attestationJwt,
             header = attestation.header,
             payload = attestation.payload,
-        )
-        if (verification is ClientAttestationVerificationResult.Rejected) {
-            return failure(verification.reason ?: "Client attestation is not trusted")
+        )) {
+            ClientAttestationVerificationResult.Verified -> null
+            is ClientAttestationVerificationResult.VerifiedWithSigner -> verification.publicJwk
+            is ClientAttestationVerificationResult.Rejected ->
+                return failure(verification.reason ?: "Client attestation is not trusted")
         }
 
         val confirmationJwk = (attestation.payload[JwtPayloadClaims.CONFIRMATION] as? JsonObject)
@@ -210,6 +231,19 @@ class AttestationBasedClientAuthenticationMethod(
             }
         }
 
+        val status = try {
+            captureAttestationStatus(
+                attestation.payload, verifiedSignerPublicJwk,
+                statusPolicy, clock(),
+            )
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (cause: Exception) { return failure(cause.message ?: "Invalid client attestation status reference") }
+        val statusResult = AttestationStatusValidator(statusResolver, clock).validate(listOf(status))
+        statusResult.error()?.let { error ->
+            return if (statusResult.permanentlyDenied) failure(error.description.orEmpty())
+            else ClientAuthenticationResult.Failure(OAuthError(OAuthErrorCodes.TEMPORARILY_UNAVAILABLE, error.description))
+        }
+        validateAttestation(attestation, clock())?.let { return failure(it) }
         return ClientAuthenticationResult.Authenticated(
             AuthenticatedClient(
                 id = clientId,
@@ -217,6 +251,16 @@ class AttestationBasedClientAuthenticationMethod(
                 registered = false,
                 confirmationJwk = confirmationJwk,
                 claims = attestation.payload,
+                attestation = VerifiedClientAttestation(
+                    subject = clientId,
+                    confirmationJwk = confirmationJwk,
+                    lifetime = VerifiedAttestationLifetime(
+                        issuedAt = attestation.payload.longClaim(JwtPayloadClaims.ISSUED_AT),
+                        expiresAt = attestation.payload.longClaim(JwtPayloadClaims.EXPIRATION),
+                        clockSkewSeconds = clockSkewSeconds,
+                    ),
+                    status = status,
+                ),
             ),
         )
     }
@@ -236,11 +280,14 @@ class AttestationBasedClientAuthenticationMethod(
         }
         val exp = jwt.payload.longClaim(JwtPayloadClaims.EXPIRATION)
             ?: return "Client attestation ${JwtPayloadClaims.EXPIRATION} claim is required"
-        if (now.epochSeconds > exp + clockSkewSeconds) {
+        val lifetime = VerifiedAttestationLifetime(
+            expiresAt = exp, clockSkewSeconds = clockSkewSeconds,
+        )
+        if (!lifetime.clientAttestationValidAt(now)) {
             return "Client attestation is expired"
         }
         val iat = jwt.payload.longClaim(JwtPayloadClaims.ISSUED_AT)
-        if (iat != null && iat > now.epochSeconds + clockSkewSeconds) {
+        if (!lifetime.copy(issuedAt = iat).clientAttestationValidAt(now)) {
             return "Client attestation ${JwtPayloadClaims.ISSUED_AT} claim is in the future"
         }
         if (

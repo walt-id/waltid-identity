@@ -15,6 +15,7 @@ import id.walt.wallet2.handlers.CredentialIssuanceStage
 import id.waltid.openid4vci.wallet.credential.CredentialIssuanceTarget
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -50,6 +51,21 @@ class MobileWalletIssuanceMappingTest {
         assertTrue(failed.offerConsumed)
         assertEquals(1, failed.failedTargetCount)
         assertEquals(2, failed.notAttemptedTargetCount)
+    }
+
+    @Test
+    fun issuerRejectionPreservesTheOfferRetryDecision() {
+        val retryable = WalletIssuanceOutcome.Failed(
+            sessionId = "issuance-retryable",
+            error = WalletIssuanceError(WalletIssuanceErrorCode.ISSUER_RESPONSE, "Incorrect transaction code", canRetryOffer = true),
+        ).toDemoIssuanceOutcome() as WalletDemoIssuanceOutcome.Failed
+        val terminal = WalletIssuanceOutcome.Failed(
+            sessionId = "issuance-terminal",
+            error = WalletIssuanceError(WalletIssuanceErrorCode.ISSUER_RESPONSE, "Issuer rejected the offer", canRetryOffer = false),
+        ).toDemoIssuanceOutcome() as WalletDemoIssuanceOutcome.Failed
+
+        assertFalse(retryable.offerConsumed)
+        assertTrue(terminal.offerConsumed)
     }
 
     @Test

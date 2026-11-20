@@ -29,6 +29,7 @@ internal fun CredentialDetailsBody(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         CredentialOverviewSection(details)
+        CredentialStatusSection(details.summary.id)
         if (details.groups.isEmpty() && technicalGroups.isEmpty()) {
             Text("No credential details available")
         }

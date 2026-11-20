@@ -1,5 +1,10 @@
 package id.walt.issuer2.application.openid4vci
 
+import id.walt.openid4vci.attestation.*
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.RequestEngineConfiguration
 import id.walt.openid4vci.proofs.attestation.*
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto2.CryptoRuntime
@@ -19,6 +24,7 @@ import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.handlers.credential.MdocCredentialHandler
 import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
+import id.walt.openid4vci.handlers.credential.SdJwtVcMetadataResolver
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.openid4vci.clientauth.attestation.challenge.JwtAttestationChallengeService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
@@ -48,6 +54,7 @@ import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenVerifier
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
+import id.walt.openid4vci.pkce.PkceServiceConfig
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -62,15 +69,26 @@ data class OpenId4VciModule(
     val crypto2TokenSigningKey: Crypto2JwtSigningKey?,
     val keyAttestation: KeyAttestationVerificationOptions? = null,
     val attestationChallengeService: AttestationChallengeService? = null,
+    val pkceServiceConfig: PkceServiceConfig = PkceServiceConfig(),
 ) {
 
     companion object {
+        private val statusResolver = HttpAttestationStatusResolver(
+            WebDataFetcher(
+                WebDataFetcherId.OPENID4VCI_ATTESTATION_STATUS,
+                WebDataFetchingConfiguration(
+                    maxResponseBytes = HttpAttestationStatusResolver.MAXIMUM_RESPONSE_BYTES,
+                    engine = RequestEngineConfiguration(followRedirects = false),
+                ),
+            ),
+        )
         fun create(
             config: Issuer2ServiceConfig,
             authorizationCodeRepository: AuthorizationCodeRepository,
             preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
             parRepository: PARRepository,
             refreshTokenRepository: RefreshTokenRepository,
+            metadataResolver: SdJwtVcMetadataResolver,
             keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
         ): OpenId4VciModule = create(
             config = config,
@@ -80,6 +98,7 @@ data class OpenId4VciModule(
             refreshTokenRepository = refreshTokenRepository,
             keyAttestationKeyResolver = keyAttestationKeyResolver,
             credentialProofVerifier = DefaultCredentialProofVerifier(),
+            metadataResolver = metadataResolver,
         )
 
         internal fun create(
@@ -90,6 +109,7 @@ data class OpenId4VciModule(
             refreshTokenRepository: RefreshTokenRepository,
             keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver?,
             credentialProofVerifier: CredentialProofVerifier,
+            metadataResolver: SdJwtVcMetadataResolver,
         ): OpenId4VciModule {
             val crypto2TokenKey = resolveCrypto2TokenKey(config)
             val signingKeyResolver = JwtSigningKeyResolver {
@@ -150,16 +170,19 @@ data class OpenId4VciModule(
                     }
                 )
             } ?: JwtRefreshTokenVerifier(verificationKeyResolver)
+            val pkceServiceConfig = PkceServiceConfig(requirePkce = { config.requirePkce })
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
 
+                    attestationStatusResolver = statusResolver,
                     authorizationServerIssuer = config.openId4VciBaseUrl(),
+                    pkceServiceConfig = pkceServiceConfig,
                     authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
                     authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
                     tokenEndpointHandlers = TokenEndpointHandlers(),
                     credentialEndpointHandlers = CredentialEndpointHandlers().apply {
                         register(CredentialFormat.MSO_MDOC, MdocCredentialHandler(roundValidityToTwelveHours = true))
-                        register(CredentialFormat.SD_JWT_VC, SdJwtVcCredentialHandler(roundGeneratedTimeClaims = true))
+                        register(CredentialFormat.SD_JWT_VC, SdJwtVcCredentialHandler(roundGeneratedTimeClaims = true, metadataResolver = metadataResolver))
                     },
 
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
@@ -192,12 +215,13 @@ data class OpenId4VciModule(
 
             return OpenId4VciModule(
                 oauth2Provider = provider,
+                pkceServiceConfig = pkceServiceConfig,
                 preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
                 credentialNonceService = credentialNonceService,
                 crypto2TokenSigningKey = crypto2TokenKey,
                 attestationChallengeService = attestationChallengeService,
                 keyAttestation = runBlocking {
-                    config.keyAttestationConfig?.toVerificationOptions(keyAttestationKeyResolver).also {
+                    config.keyAttestationConfig?.toVerificationOptions(keyAttestationKeyResolver, statusResolver).also {
                         (config.keyAttestationConfig?.verificationMethod as? KeyAttestationVerificationMethod.KeyReference)?.let { method ->
                             require(requireNotNull(keyAttestationKeyResolver).resolve(method.reference).isNotEmpty()) {
                                 "Configured key attestation verification key is unavailable"
@@ -215,7 +239,7 @@ data class OpenId4VciModule(
             val clientAuthenticationConfig = config.clientAuthenticationConfig
                 ?: return ClientAuthenticationServiceConfig()
             return runBlocking {
-                clientAuthenticationConfig.toClientAuthenticationServiceConfig(challengeService = challengeService)
+                clientAuthenticationConfig.toClientAuthenticationServiceConfig(challengeService = challengeService, statusResolver = statusResolver)
             }
         }
 

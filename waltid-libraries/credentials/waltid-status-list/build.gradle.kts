@@ -7,6 +7,10 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     js {
         outputModuleName = "status-list"
     }
@@ -21,7 +25,7 @@ kotlin {
 
         commonMain.dependencies {
             implementation(identityLibs.kotlinx.coroutines.core)
-            implementation(identityLibs.kotlinx.serialization.json)
+            api(identityLibs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

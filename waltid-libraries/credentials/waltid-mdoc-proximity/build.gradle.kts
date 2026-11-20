@@ -7,6 +7,10 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))

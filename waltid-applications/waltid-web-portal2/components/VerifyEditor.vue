@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { assertPaymentTransactionFields, parsePaymentJson, stringifyPaymentJson } from "~/utils/ts12Payment";
+
 import type { useSwaggerExamples } from "~/composables/useSwaggerExamples";
 import {
   isDcApiFlowType,
@@ -14,16 +16,7 @@ import {
   parseTransactionFieldValue,
   stringifyTransactionFieldValue,
 } from "~/utils/transactionDataFields";
-import {
-  DEFAULT_CLIENT_ID_TYPE,
-  clientIdRequiresX5c,
-  clientIdTypeForSignedRequest,
-  isClientIdAllowedForSignedRequest,
-  prefixedCoreFlowClientId,
-  requiresClientIdValue,
-  signedRequestClientIdError,
-  type CoreFlowClientIdType,
-} from "~/utils/coreFlowClientId";
+import { applyVerificationPolicy } from "~/utils/verificationRouting";
 
 const props = defineProps<{
   swagger: ReturnType<typeof useSwaggerExamples>;
@@ -35,82 +28,17 @@ const selectedIndex = defineModel<number>("selectedIndex", { default: 0 });
 
 const config = useRuntimeConfig();
 
-type ClientIdType = CoreFlowClientIdType;
+const { wallet } = useSelectedWallet();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-function runtimeConfigValueToString(value: unknown): string {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean")
-    return String(value);
-  return JSON.stringify(value);
-}
-
-function wrapRawJwkPreset(value: unknown): unknown {
-  if (
-    isRecord(value) &&
-    value.type !== "jwk" &&
-    typeof value.kty === "string"
-  ) {
-    return { type: "jwk", jwk: value };
-  }
-
-  return value;
-}
-
-function formatJsonPreset(value: unknown): string {
-  const rawValue = runtimeConfigValueToString(value);
-  if (!rawValue.trim()) return "";
-
-  try {
-    return JSON.stringify(wrapRawJwkPreset(JSON.parse(rawValue)), null, 2);
-  } catch {
-    return rawValue;
-  }
-}
-
-function parseX5cPreset(value: unknown): string[] {
-  const trimmed = runtimeConfigValueToString(value).trim();
-  if (!trimmed) return [""];
-
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) {
-      const certificates = parsed
-        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-        .filter(Boolean);
-      return certificates.length > 0 ? certificates : [""];
-    }
-  } catch {
-    // Fall back to delimiter parsing for .env-friendly values.
-  }
-
-  const certificates = trimmed
-    .replace(/\\n/g, "\n")
-    .split(/[,\n]/)
-    .map((certificate) => certificate.trim())
-    .filter(Boolean);
-
-  return certificates.length > 0 ? certificates : [""];
-}
-
-const verifierKeyJwkPreset = config.public.verifierKeyJwk;
-const verifierX5cPreset = config.public.verifierX5c;
-
-const keyJson = ref(formatJsonPreset(verifierKeyJwkPreset));
-const x5cValues = ref(parseX5cPreset(verifierX5cPreset));
-const signedRequest = ref(false);
-const encryptedResponse = ref(false);
 const dcApiMediationRequired = ref(false);
 const dcApiSupport = ref<DcApiPresentationSupport>(
   getDcApiPresentationSupport(),
 );
 const optionsError = ref<string | null>(null);
-const clientIdType = ref<ClientIdType>(DEFAULT_CLIENT_ID_TYPE);
-const clientIdInput = ref("");
 const isWritingJson = ref(false);
 const transactionDataProfiles = useTransactionDataProfiles(
   config.public.verifierBase as string,
@@ -126,48 +54,12 @@ type TransactionDataEntry = {
   profileType: string;
   credentialIds: string[];
   fieldValues: Record<string, string>;
+  payloadError?: string;
 };
 
-const clientIdOptions = [
-  {
-    value: "redirect_uri",
-    label: "redirect_uri (blank = auto from response_uri)",
-    placeholder: "Leave blank to auto-generate from the session response_uri",
-  },
-  {
-    value: "x509_hash",
-    label: "x509_hash (auto from first x5c cert)",
-    placeholder: "",
-  },
-  {
-    value: "x509_san_dns",
-    label: "x509_san_dns",
-    placeholder: "verifier.example.com",
-  },
-  {
-    value: "decentralized_identifier",
-    label: "decentralized_identifier",
-    placeholder: "did:web:verifier.example.com",
-  },
-  {
-    value: "verifier_attestation",
-    label: "verifier_attestation",
-    placeholder: "Verifier attestation subject",
-  },
-  {
-    value: "pre_registered",
-    label: "Pre-registered client ID",
-    placeholder: "my-registered-verifier",
-  },
-] as const;
-
-const selectedClientIdOption = computed(() =>
-  clientIdOptions.find((option) => option.value === clientIdType.value)!,
-);
-const clientIdNeedsInput = computed(() => clientIdType.value !== "x509_hash");
 const parsedPayload = computed<Record<string, unknown> | null>(() => {
   try {
-    const parsed = JSON.parse(json.value || "{}");
+    const parsed = parsePaymentJson(json.value || "{}");
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return null;
     }
@@ -190,27 +82,12 @@ const dcqlCredentialIds = computed(() => {
 const canSubmit = computed(() => {
   if (!json.value.trim()) return false;
   try {
-    JSON.parse(json.value);
+    parsePaymentJson(json.value);
     return true;
   } catch {
     return false;
   }
 });
-const missingRequiredClientId = computed(
-  () =>
-    requiresClientIdValue(clientIdType.value) && !clientIdInput.value.trim(),
-);
-const signedRequestClientIdConflict = computed(
-  () => signedRequestClientIdError(clientIdType.value, signedRequest.value),
-);
-const missingX5cForClientId = computed(
-  () =>
-    clientIdRequiresX5c(clientIdType.value) &&
-    !x5cValues.value.some((value) => value.trim().length > 0),
-);
-const missingKeyForSignedRequest = computed(
-  () => signedRequest.value && !keyJson.value.trim(),
-);
 const transactionDataUnavailable = computed(
   () =>
     transactionDataEnabled.value &&
@@ -219,17 +96,13 @@ const transactionDataUnavailable = computed(
       transactionDataEntries.value.length === 0 ||
       transactionDataEntries.value.some(
         (entry) =>
-          !profileForEntry(entry) || entry.credentialIds.length === 0,
+          !profileForEntry(entry) || !!entry.payloadError || entry.credentialIds.length === 0,
       )),
 );
 const submitDisabled = computed(
   () =>
     !canSubmit.value ||
     !!optionsError.value ||
-    missingRequiredClientId.value ||
-    !!signedRequestClientIdConflict.value ||
-    missingKeyForSignedRequest.value ||
-    missingX5cForClientId.value ||
     transactionDataUnavailable.value ||
     props.session.loading.value ||
     (isDcApiPayload.value && !dcApiSupport.value.supported),
@@ -240,21 +113,6 @@ const submitBlockReason = computed(() => {
     return dcApiSupport.value.reason;
   }
   if (!canSubmit.value) return "Request body must be valid JSON.";
-  if (missingRequiredClientId.value) {
-    return `${selectedClientIdOption.value.label} requires a value.`;
-  }
-  if (signedRequestClientIdConflict.value) {
-    return signedRequestClientIdConflict.value;
-  }
-  if (missingKeyForSignedRequest.value && missingX5cForClientId.value) {
-    return "Signed requests require a request-signing key and an x5c certificate. Expand Request security options to add them.";
-  }
-  if (missingKeyForSignedRequest.value) {
-    return "Signed requests require a request-signing key. Expand Request security options to add it.";
-  }
-  if (missingX5cForClientId.value) {
-    return "An x5c certificate chain is required for this client ID. Expand Request security options to add it.";
-  }
   if (optionsError.value) return optionsError.value;
   if (transactionDataUnavailable.value) {
     if (transactionDataProfiles.loading.value) {
@@ -269,7 +127,7 @@ const submitBlockReason = computed(() => {
 });
 
 function readPayload(): Record<string, unknown> {
-  const parsed = JSON.parse(json.value || "{}");
+  const parsed = parsePaymentJson(json.value || "{}");
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("Request body must be a JSON object.");
   }
@@ -298,37 +156,6 @@ function getOpenIdObject(
 
   payload.openid = {};
   return payload.openid as Record<string, unknown>;
-}
-
-function addX5cInput() {
-  x5cValues.value.push("");
-}
-
-function removeX5cInput(index: number) {
-  x5cValues.value.splice(index, 1);
-  if (x5cValues.value.length === 0) x5cValues.value.push("");
-}
-
-async function buildClientId(x5c: string[]): Promise<string | null> {
-  if (clientIdType.value === "x509_hash") {
-    return x5c.length > 0 ? await computeX509HashClientId(x5c[0]!) : null;
-  }
-
-  return prefixedCoreFlowClientId(
-    clientIdType.value,
-    clientIdInput.value,
-    { signedRequest: signedRequest.value },
-  );
-}
-
-function applySignedRequestClientIdRule() {
-  const nextType = clientIdTypeForSignedRequest(
-    signedRequest.value,
-    clientIdType.value,
-  );
-  if (nextType === clientIdType.value) return;
-  clientIdType.value = nextType;
-  clientIdInput.value = "";
 }
 
 function getDcqlCredentialObjects(
@@ -462,6 +289,7 @@ function hydrateTransactionDataFromPayload(payload: Record<string, unknown>) {
   }
 
   const entries = transactionData.filter(isRecord).map((record) => {
+    assertPaymentTransactionFields(record);
     const profileType =
       typeof record.type === "string" && record.type.trim()
         ? record.type
@@ -500,18 +328,13 @@ function hydrateTransactionDataFromPayload(payload: Record<string, unknown>) {
 function hydrateControlsFromPayload() {
   isHydrating.value = true;
   try {
-    const payload = readPayload();
-    const coreFlow = getCoreFlowObject(payload);
-    signedRequest.value = coreFlow.signed_request === true;
-    encryptedResponse.value = coreFlow.encrypted_response === true;
-    applySignedRequestClientIdRule();
-    hydrateTransactionDataFromPayload(payload);
+    hydrateTransactionDataFromPayload(readPayload());
   } catch {
     // Invalid JSON — leave controls unchanged until the payload parses.
   } finally {
     nextTick(() => {
       isHydrating.value = false;
-      void applySecurityOverridesToJson();
+      updateRequestPayload();
     });
   }
 }
@@ -543,6 +366,7 @@ function applyTransactionDataOverrides(
   const boundCredentialIds = new Set<string>();
 
   for (const [index, entry] of transactionDataEntries.value.entries()) {
+    if (entry.payloadError) { optionsError.value = entry.payloadError; return false; }
     const selectedProfile = profileForEntry(entry);
     if (!selectedProfile) {
       optionsError.value = `Select a transaction data profile for payload ${index + 1}.`;
@@ -595,12 +419,14 @@ function applyTransactionDataOverrides(
   return true;
 }
 
-async function applySecurityOverridesToJson() {
+function updateRequestPayload() {
   optionsError.value = null;
 
   let payload: Record<string, unknown>;
   try {
-    payload = readPayload();
+    payload = applyVerificationPolicy(readPayload(), wallet.value);
+    const entries = isRecord(payload.openid) ? payload.openid.transactionData : undefined;
+    if (Array.isArray(entries)) entries.filter(isRecord).forEach(assertPaymentTransactionFields);
   } catch (e) {
     optionsError.value =
       e instanceof Error ? e.message : "Request body must be valid JSON.";
@@ -608,79 +434,26 @@ async function applySecurityOverridesToJson() {
   }
 
   const coreFlow = getCoreFlowObject(payload);
-  if (signedRequest.value) {
-    applySignedRequestClientIdRule();
-  }
-  coreFlow.signed_request = signedRequest.value;
-  coreFlow.encrypted_response = encryptedResponse.value;
-
-  if (keyJson.value.trim()) {
-    try {
-      coreFlow.key = parseJwkKey(keyJson.value);
-    } catch (e) {
-      optionsError.value =
-        e instanceof Error ? e.message : "Key must be valid JSON.";
-      return null;
-    }
-  } else {
-    delete coreFlow.key;
-  }
-
-  try {
-    const x5c = parseVerifierX5c(x5cValues.value);
-    if (clientIdRequiresX5c(clientIdType.value) && x5c.length === 0) {
-      optionsError.value =
-        "An x5c certificate chain is required when clientId uses the 'x509_san_dns:' or 'x509_hash:' prefix, but none was provided.";
-      return null;
-    }
-    if (x5c.length > 0) {
-      coreFlow.x5c = x5c;
-    } else {
-      delete coreFlow.x5c;
-    }
-    const clientId = await buildClientId(x5c);
-    if (clientId) {
-      coreFlow.clientId = clientId;
-    } else {
-      delete coreFlow.clientId;
-    }
-  } catch (e) {
-    optionsError.value =
-      e instanceof Error ? e.message : "Invalid x5c certificate or clientId.";
-    return null;
-  }
-
   if (!applyTransactionDataOverrides(payload, coreFlow)) {
     return null;
   }
 
-  isWritingJson.value = true;
-  json.value = JSON.stringify(payload, null, 2);
+  const updatedJson = stringifyPaymentJson(payload, 2);
+  if (updatedJson !== json.value) {
+    isWritingJson.value = true;
+    json.value = updatedJson;
+  }
   return payload;
 }
 
 watch(
-  [
-    keyJson,
-    x5cValues,
-    signedRequest,
-    encryptedResponse,
-    clientIdType,
-    clientIdInput,
-    transactionDataEnabled,
-    transactionDataEntries,
-  ],
+  [wallet, transactionDataEnabled, transactionDataEntries],
   () => {
     if (isHydrating.value) return;
-    void applySecurityOverridesToJson();
+    updateRequestPayload();
   },
   { deep: true },
 );
-
-watch(signedRequest, () => {
-  if (isHydrating.value) return;
-  applySignedRequestClientIdRule();
-});
 
 watch(selectedIndex, () =>
   nextTick(() => {
@@ -719,7 +492,7 @@ watch(isDcApiPayload, (enabled) => {
 });
 
 async function submit() {
-  const payload = await applySecurityOverridesToJson();
+  const payload = updateRequestPayload();
   if (!payload) return;
 
   if (isDcApiFlowType(payload)) {
@@ -890,7 +663,7 @@ async function submit() {
                 v-if="profileForEntry(entry)"
                 class="grid sm:grid-cols-2 gap-3"
               >
-                <label
+                <div
                   v-for="field in profileForEntry(entry)!.fields"
                   :key="field"
                   class="grid gap-1"
@@ -901,8 +674,13 @@ async function submit() {
                   <span class="form-label !mb-0">
                     {{ formatTransactionFieldLabel(field) }}
                   </span>
+                  <Ts12PaymentEditor
+                    v-if="field === 'payload' && entry.profileType === 'urn:eudi:sca:payment:1' && profileForEntry(entry)?.payloadSchema"
+                    v-model="entry.fieldValues[field]"
+                    @validity="entry.payloadError = $event"
+                  />
                   <textarea
-                    v-if="isNestedTransactionDataField(field)"
+                    v-else-if="isNestedTransactionDataField(field)"
                     v-model="entry.fieldValues[field]"
                     class="form-textarea min-h-[180px] font-mono text-xs"
                     :name="`transaction-${entry.id}-${field}`"
@@ -915,7 +693,7 @@ async function submit() {
                     :name="`transaction-${entry.id}-${field}`"
                   />
                   <p
-                    v-if="isNestedTransactionDataField(field)"
+                    v-if="isNestedTransactionDataField(field) && !profileForEntry(entry)?.payloadSchema"
                     class="text-xs text-[--color-text-muted]"
                   >
                     Nested JSON object (for example SCA
@@ -923,7 +701,7 @@ async function submit() {
                     <code>payload.amount</code>). Amount should be a JSON
                     number.
                   </p>
-                </label>
+                </div>
               </div>
             </div>
 
@@ -940,177 +718,24 @@ async function submit() {
       </div>
     </details>
 
-    <details class="group rounded-xl border border-[--color-border] bg-white">
-      <summary class="cursor-pointer list-none p-4">
-        <div class="flex items-center justify-between gap-4">
-          <div>
-            <span class="text-base font-semibold"
-              >Request security options</span
-            >
-            <span class="block text-sm text-[--color-text-muted] mt-1">
-              These controls override the selected request payload before the
-              verification session is created.
-            </span>
-          </div>
-          <div
-            class="inline-flex items-center gap-2 text-sm font-medium text-[--color-text-muted]"
-          >
-            <span class="group-open:hidden">Expand</span>
-            <span class="hidden group-open:inline">Collapse</span>
-            <svg
-              class="h-4 w-4 transition-transform group-open:rotate-180"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                clip-rule="evenodd"
-              />
-            </svg>
-          </div>
-        </div>
+    <p class="text-sm text-[--color-text-muted]">
+      {{ wallet.label }} uses {{ wallet.verification.signed ? "signed" : "unsigned" }} verification requests.
+    </p>
+
+    <details
+      v-if="isDcApiPayload"
+      class="rounded-xl border border-[--color-border] bg-white"
+    >
+      <summary class="cursor-pointer p-4 text-base font-semibold">
+        Digital Credentials API options
       </summary>
-
-      <div class="grid gap-4 px-4 pb-4">
-        <div
-          v-if="isDcApiPayload"
-          class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"
-        >
-          <p class="font-medium">Digital Credentials API flow</p>
-          <p class="mt-1">
-            May be required for iOS compatibility with 18013-7 flows
-          </p>
-          <label class="mt-3 inline-flex items-center gap-2 font-medium">
-            <input v-model="dcApiMediationRequired" type="checkbox" />
-            mediation: required
-          </label>
-          <div
-            v-if="!dcApiSupport.supported"
-            class="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900"
-          >
-            <p class="font-medium">
-              Digital Credentials API presentation is not available in this
-              browser.
-            </p>
-            <p class="mt-1">{{ dcApiSupport.reason }}</p>
-          </div>
-        </div>
-
-        <div class="grid gap-3">
-          <div>
-            <label class="form-label">Client ID type</label>
-            <select v-model="clientIdType" class="form-select">
-              <option
-                v-for="option in clientIdOptions"
-                :key="option.value"
-                :value="option.value"
-                :disabled="
-                  signedRequest &&
-                  !isClientIdAllowedForSignedRequest(option.value)
-                "
-              >
-                {{ option.label }}
-              </option>
-            </select>
-          </div>
-
-          <div v-if="clientIdNeedsInput">
-            <label class="form-label">Client ID value</label>
-            <input
-              v-model="clientIdInput"
-              class="form-input"
-              :placeholder="selectedClientIdOption.placeholder"
-            />
-            <p class="text-xs text-[--color-text-muted] mt-1">
-              <template v-if="clientIdType === 'redirect_uri'">
-                Leave blank to send
-                <code>core_flow.clientId</code> as
-                <code>redirect_uri</code> so the verifier binds it to this
-                session's <code>response_uri</code>. Signed requests cannot
-                use this prefix.
-              </template>
-              <template v-else>
-                The selected prefix will be added automatically in
-                <code>core_flow.clientId</code>.
-              </template>
-            </p>
-            <p
-              v-if="signedRequestClientIdConflict"
-              class="text-xs text-amber-800 mt-1"
-            >
-              {{ signedRequestClientIdConflict }}
-            </p>
-          </div>
-
-          <p v-else class="text-xs text-[--color-text-muted]">
-            The <code>x509_hash</code> client ID is generated automatically from
-            the first x5c certificate.
-          </p>
-          <p
-            v-if="missingX5cForClientId"
-            class="text-xs text-amber-800"
-          >
-            An x5c certificate chain is required when clientId uses the
-            x509_san_dns or x509_hash prefix.
-          </p>
-        </div>
-
-        <div class="flex flex-wrap gap-4">
-          <label class="inline-flex items-center gap-2 text-sm font-medium">
-            <input v-model="signedRequest" type="checkbox" />
-            signed_request
-          </label>
-          <label class="inline-flex items-center gap-2 text-sm font-medium">
-            <input v-model="encryptedResponse" type="checkbox" />
-            encrypted_response
-          </label>
-        </div>
-        <p class="text-xs text-[--color-text-muted] -mt-2">
-          Signed requests cannot use <code>redirect_uri</code> and switch to
-          <code>x509_hash</code> when needed. Unsigned examples and unchecking
-          <code>signed_request</code> switch back to
-          <code>redirect_uri</code>.
-        </p>
-
-        <div>
-          <label class="form-label">Key (JWK JSON)</label>
-          <textarea
-            v-model="keyJson"
-            class="form-textarea min-h-[180px]"
-            spellcheck="false"
-            placeholder='{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","x":"...","y":"...","d":"..."}}'
-          />
-        </div>
-
-        <div class="grid gap-2">
-          <label class="form-label">x5c certificates</label>
-          <div v-for="(_, index) in x5cValues" :key="index" class="flex gap-2">
-            <input
-              v-model="x5cValues[index]"
-              class="form-input"
-              :placeholder="`Certificate ${index + 1}`"
-            />
-            <button
-              type="button"
-              class="btn btn-secondary shrink-0"
-              :disabled="x5cValues.length === 1 && !x5cValues[0]"
-              @click="removeX5cInput(index)"
-            >
-              Remove
-            </button>
-          </div>
-          <button
-            type="button"
-            class="btn btn-secondary justify-self-start"
-            @click="addX5cInput"
-          >
-            Add certificate
-          </button>
-        </div>
-
-        <p v-if="optionsError" class="text-sm text-red-600">
-          {{ optionsError }}
+      <div class="grid gap-2 px-4 pb-4 text-sm">
+        <label class="inline-flex items-center gap-2 font-medium">
+          <input v-model="dcApiMediationRequired" type="checkbox" />
+          Require mediation
+        </label>
+        <p class="text-[--color-text-muted]">
+          Mediation may be required for 18013-7 flows on iOS.
         </p>
       </div>
     </details>

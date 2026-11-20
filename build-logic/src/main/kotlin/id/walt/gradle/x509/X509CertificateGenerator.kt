@@ -33,8 +33,12 @@ import java.util.Locale
 
 /** ISO/IEC 18013-5 Document Signer extended key usage. */
 internal const val DOCUMENT_SIGNER_EKU_OID = "1.0.18013.5.1.2"
+
+/** ISO/IEC 18013-5 mdoc reader authentication extended key usage. */
+internal const val MDOC_READER_AUTHENTICATION_EKU_OID = "1.0.18013.5.1.6"
 internal const val IACA_MAX_VALIDITY_DAYS = 20 * 365
 internal const val DOCUMENT_SIGNER_MAX_VALIDITY_DAYS = 457
+internal const val MDOC_READER_AUTHENTICATION_MAX_VALIDITY_DAYS = 1187
 
 internal enum class KeyAlgorithm(val id: String, val jwsAlgorithm: String) {
     P256("P-256", "ES256"),
@@ -157,7 +161,7 @@ internal object X509CertificateGenerator {
             }
         }
 
-        val isIso = request.profile == X509Profile.IACA || request.profile == X509Profile.DOCUMENT_SIGNER
+        val isIso = request.profile in setOf(X509Profile.IACA, X509Profile.DOCUMENT_SIGNER, X509Profile.MDOC_READER_AUTHENTICATION)
         if (isIso) validateIsoRequest(request, issuer, keyAlgorithm, subject, ::invalid)
 
         val keyPair = keyAlgorithm.generate(random)
@@ -197,6 +201,10 @@ internal object X509CertificateGenerator {
                 add(Extension.keyUsage, true, KeyUsage(KeyUsage.digitalSignature))
                 add(Extension.extendedKeyUsage, true, ExtendedKeyUsage(KeyPurposeId.getInstance(ASN1ObjectIdentifier(DOCUMENT_SIGNER_EKU_OID))))
             }
+            X509Profile.MDOC_READER_AUTHENTICATION -> {
+                add(Extension.keyUsage, true, KeyUsage(KeyUsage.digitalSignature))
+                add(Extension.extendedKeyUsage, true, ExtendedKeyUsage(KeyPurposeId.getInstance(ASN1ObjectIdentifier(MDOC_READER_AUTHENTICATION_EKU_OID))))
+            }
         }
         if (!isIso) {
             if (request.extendedKeyUsages.isNotEmpty()) {
@@ -211,7 +219,10 @@ internal object X509CertificateGenerator {
         return GeneratedCertificate(request, keyAlgorithm, keyPair, certificate, listOf(certificate) + issuer?.chain.orEmpty())
     }
 
-    /** Mirrors the ISO 18013-5 profile checks of waltid-x509's IACAValidator and DocumentSignerValidator. */
+    /**
+     * Mirrors the ISO 18013-5 profile checks of waltid-x509's IACAValidator, DocumentSignerValidator and
+     * IsoMdocReaderAuthenticationX509CertificateProfile.
+     */
     private fun validateIsoRequest(
         request: X509CertificateRequest,
         issuer: GeneratedCertificate?,
@@ -220,10 +231,17 @@ internal object X509CertificateGenerator {
         invalid: (String) -> Nothing,
     ) {
         val profile = request.profile
-        if (!keyAlgorithm.isEc) invalid("$profile certificates require an EC key (P-256, P-384 or P-521)")
-        val country = subject.attribute(BCStyle.C) ?: invalid("$profile subject must contain C (country)")
-        if (country !in isoCountries) invalid("'$country' is not an ISO 3166-1 alpha-2 country code")
-        if (subject.attribute(BCStyle.CN) == null) invalid("$profile subject must contain CN")
+        if (profile == X509Profile.MDOC_READER_AUTHENTICATION) {
+            if (!keyAlgorithm.isEc && keyAlgorithm != KeyAlgorithm.ED25519) {
+                invalid("$profile certificates require an EC (P-256, P-384, P-521) or Ed25519 key")
+            }
+            if (subject.getRDNs(BCStyle.CN).size != 1) invalid("$profile subject must contain exactly one CN")
+        } else {
+            if (!keyAlgorithm.isEc) invalid("$profile certificates require an EC key (P-256, P-384 or P-521)")
+            val country = subject.attribute(BCStyle.C) ?: invalid("$profile subject must contain C (country)")
+            if (country !in isoCountries) invalid("'$country' is not an ISO 3166-1 alpha-2 country code")
+            if (subject.attribute(BCStyle.CN) == null) invalid("$profile subject must contain CN")
+        }
         if (request.pathLength != null || request.keyUsages.isNotEmpty() || request.extendedKeyUsages.isNotEmpty() ||
             request.dnsNames.isNotEmpty() || request.ipAddresses.isNotEmpty() || request.uris.isNotEmpty() || request.emails.isNotEmpty()
         ) invalid("$profile extensions are fixed by ISO 18013-5; remove pathLength, keyUsages, extendedKeyUsages and SANs")
@@ -245,9 +263,20 @@ internal object X509CertificateGenerator {
                 if (request.crlDistributionPointUri == null) invalid("Document Signer needs crlDistributionPointUri")
                 if (request.validityDays > DOCUMENT_SIGNER_MAX_VALIDITY_DAYS) invalid("Document Signer validity must not exceed 457 days")
                 val iacaSubject = issuer.certificate.subject
-                if (country != iacaSubject.attribute(BCStyle.C)) invalid("country must match IACA '${issuer.request.name}'")
+                if (subject.attribute(BCStyle.C) != iacaSubject.attribute(BCStyle.C)) {
+                    invalid("country must match IACA '${issuer.request.name}'")
+                }
                 if (subject.attribute(BCStyle.ST) != iacaSubject.attribute(BCStyle.ST)) {
                     invalid("stateOrProvinceName (ST) must match IACA '${issuer.request.name}'")
+                }
+            }
+            X509Profile.MDOC_READER_AUTHENTICATION -> {
+                if (issuer == null) invalid("mdoc reader authentication certificates need an issuer (a reader CA or IACA)")
+                // The profile only allows ECDSA certificate signatures.
+                if (!issuer.keyAlgorithm.isEc) invalid("issuer '${issuer.request.name}' must have an EC key")
+                if (request.crlDistributionPointUri == null) invalid("mdoc reader authentication needs crlDistributionPointUri")
+                if (request.validityDays > MDOC_READER_AUTHENTICATION_MAX_VALIDITY_DAYS) {
+                    invalid("mdoc reader authentication validity must not exceed $MDOC_READER_AUTHENTICATION_MAX_VALIDITY_DAYS days")
                 }
             }
             else -> Unit

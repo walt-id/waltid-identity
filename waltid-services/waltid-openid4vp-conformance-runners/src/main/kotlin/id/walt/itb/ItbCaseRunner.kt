@@ -93,6 +93,11 @@ class ItbCaseRunner(
                 }
                 phase = ItbCaseResult.Phase.INTERACTION
                 val interaction = bridge.read(createdSession)
+                case.invocationScheme?.let { expected ->
+                    require((interaction as? ItbWalletInteraction.Presentation)?.url?.protocol?.name == expected) {
+                        "The ITB interaction does not use the case's invocation scheme"
+                    }
+                }
                 phase = ItbCaseResult.Phase.WALLET
                 adapterInvoked = true
                 executeWallet(interaction)
@@ -122,6 +127,7 @@ class ItbCaseRunner(
             failure = error::class.simpleName ?: "Exception"
             errorCode = when (error) {
                 is ItbWalletRejection -> error.code
+                is ItbVerifierRejection -> error.code
                 is ItbPortalStepTimeout -> error.step.name.lowercase()
                 is CredentialEndpointException -> "credential_endpoint_http_${error.statusCode}" +
                     (error.credentialError?.error?.takeIf(credentialEndpointErrorCodes::contains)?.let { "_$it" } ?: "")

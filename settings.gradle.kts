@@ -61,6 +61,7 @@ val modules = listOfNotNull(
         "waltid-dif-definitions-parser",
         "waltid-dcql",
         "waltid-status-list",
+        "waltid-credential-status",
         "waltid-verification-policies",
         "waltid-verification-policies2",
         "waltid-verification-policies2-vp",
@@ -71,7 +72,8 @@ val modules = listOfNotNull(
         "waltid-mdoc-reader-trust",
         "waltid-mdoc-proximity-mobile" whenEnabled enableAndroidBuild,
         "waltid-mdoc-proximity-mobile" whenEnabled enableIosBuild,
-        "waltid-trust-registry"
+        "waltid-trust-registry",
+        "waltid-trust-decision"
     ),
 
     * "$libraries:protocols".group(
@@ -148,7 +150,6 @@ val modules = listOfNotNull(
     // CLI
     "$applications:waltid-cli",
 
-    ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
     "$applications:waltid-wallet-demo-compose:sharedLogic" whenEnabled enableWalletDemoCompose,
     "$applications:waltid-wallet-demo-compose:sharedUI" whenEnabled enableWalletDemoCompose,
     "$applications:waltid-wallet-demo-compose:androidApp" whenEnabled enableAndroidBuild,

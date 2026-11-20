@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.crypto.utils
 
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -31,21 +33,9 @@ object JsonUtils {
                 is CborFloat -> JsonPrimitive(this.value)
                 is CborString -> JsonPrimitive(this.value)
                 is CborByteString -> JsonArray(JsonByteArray(this.toByteArray().copyOf()))
-                is CborArray -> integerValuesOrNull()
-                    ?.let { JsonArray(JsonLongArray(it)) }
+                is CborArray -> toIntegerJsonArrayOrNull()
                     ?: JsonArray(this.map { it.toJsonElement() })
-                is CborMap -> {
-                    // We must unwrap the CborElement key into a standard Kotlin String
-                    val jsonEntries = this.entries.associate { (cborKey, cborValue) ->
-                        val keyString = when (cborKey) {
-                            is CborString -> cborKey.value         // Extract "address" from CborString
-                            is CborInteger -> cborKey.long.toString() // e.g., if a map uses int keys
-                            else -> cborKey.toString()             // Fallback
-                        }
-                        keyString to cborValue.toJsonElement()
-                    }
-                    JsonObject(jsonEntries)
-                }
+                is CborMap -> JsonObject(entries.associate { (key, value) -> key.toJsonObjectKey() to value.toJsonElement() })
 
                 is CborUndefined -> JsonNull
             }
@@ -184,6 +174,17 @@ object JsonUtils {
         return JsonPrimitive(value)
     }
 }
+
+/** The JSON object member name corresponding to a CBOR map key. */
+fun CborElement.toJsonObjectKey(): String = when (this) {
+    is CborString -> value
+    is CborInteger -> long.toString()
+    else -> toString()
+}
+
+/** Use packed storage for genuine CBOR integer arrays. */
+fun CborArray.toIntegerJsonArrayOrNull(): JsonArray? =
+    integerValuesOrNull()?.let { JsonArray(JsonLongArray(it)) }
 
 // Preserve the existing signed-byte JSON representation without allocating a number and its
 // decimal string for every byte of a binary value. The private snapshot also keeps

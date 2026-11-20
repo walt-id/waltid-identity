@@ -4,6 +4,8 @@ import WalletSDK
 import WalletDemoIdentityDocumentSupport
 
 struct ProximityPresentationView: View {
+    @Environment(\.credentialStatusUI) private var statusUI
+    @StateObject private var submission = ReviewSubmissionGate<ReviewSubmissionBinding<NearbySubmissionKey>>()
     @ObservedObject var viewModel: ProximityPresentationViewModel
     @Binding var approvalMode: WalletDemoProximityApprovalMode
     var headerOwnsClose = false
@@ -22,7 +24,7 @@ struct ProximityPresentationView: View {
                     presentationBody
                 } actions: { actions }
             }
-        }
+        }.environment(\.credentialStatusUI, statusUI.readOnly)
     }
 
     private var presentationBody: some View {
@@ -32,6 +34,7 @@ struct ProximityPresentationView: View {
                     onConnectionOptions: onConnectionOptions)
             } else {
                 VStack(alignment: .leading, spacing: 16) {
+                    if viewModel.review != nil { ReviewChangedNotice(submission) }
                     if let onConnectionOptions {
                         WalletSection { WalletNavigationRow("Connection options", symbol: "network", action: onConnectionOptions)
                             .accessibilityIdentifier("proximity-connection-options") }
@@ -61,31 +64,55 @@ struct ProximityPresentationView: View {
             if let message = viewModel.actionErrorMessage {
                 StatusBannerView(message: message, isLoading: false, isError: true)
             }
-            if viewModel.preparingApproval {
-                let expired = viewModel.recentPlan?.isExpired == true
+            if viewModel.preparingApproval && viewModel.recentPlan?.isExpired == true {
                 WalletActions(
-                    primary: WalletAction(expired ? String(localized: "Get a new request") : String(localized: "Approve and get ready"),
-                        enabled: expired || viewModel.canApprove, identifier: WalletAccessibilityID.proximityApproveButton) {
-                            if expired { viewModel.restart() } else { viewModel.approve() }
-                        },
+                    primary: WalletAction(String(localized: "Get a new request"),
+                        identifier: WalletAccessibilityID.proximityApproveButton, perform: viewModel.restart),
                     secondary: headerOwnsClose ? nil : WalletAction(String(localized: "Cancel"), identifier: WalletAccessibilityID.proximityCancelButton,
                         perform: viewModel.requestClose)
                 )
             } else if viewModel.review != nil {
-                ReviewActions(
-                    selectionComplete: viewModel.canApprove,
-                    isLoading: viewModel.pendingReviewID != nil,
-                    onSubmit: { viewModel.approve() },
-                    onReject: viewModel.decline,
-                    onCancel: viewModel.requestClose,
-                    presentation: .proximity, showCancelWithReject: !headerOwnsClose
-                )
+                reviewActions
             } else if canCancel && !headerOwnsClose {
                 WalletActions(secondary: WalletAction("Cancel", identifier: WalletAccessibilityID.proximityCancelButton,
                     perform: viewModel.requestClose))
             } else if viewModel.isTerminal {
                 ProximityOutcomeActions(viewModel: viewModel)
             }
+    }
+
+    private var reviewActions: some View {
+        let key = NearbySubmissionKey(review: viewModel.review, selections: viewModel.selections,
+            continueAfterResponse: viewModel.continueAfterResponse, preparing: viewModel.preparingApproval)
+        let reject: (() -> Void)? = viewModel.preparingApproval ? nil : { viewModel.decline() }
+        return ReviewActions<NearbySubmissionKey>(
+                    gate: submission,
+                    selectionComplete: viewModel.canApprove,
+                    isLoading: viewModel.pendingReviewID != nil,
+                    reviewKey: key,
+                    credentialStatuses: selectedStatuses,
+                    onSubmit: { revisions in
+                        guard key == NearbySubmissionKey(review: viewModel.review, selections: viewModel.selections,
+                            continueAfterResponse: viewModel.continueAfterResponse, preparing: viewModel.preparingApproval) else { return }
+                        viewModel.approve(reviewedStatus: revisions)
+                    },
+                    onReject: reject,
+                    onCancel: viewModel.requestClose,
+                    presentation: .proximity, showCancelWithReject: !headerOwnsClose,
+                    showCancel: !viewModel.preparingApproval || !headerOwnsClose,
+                    submitTitleOverride: viewModel.preparingApproval ? String(localized: "Approve and get ready") : nil
+                )
+    }
+
+    private var selectedStatuses: [ReviewCredentialStatus] {
+        var seen = Set<String>()
+        return viewModel.selections.filter { seen.insert($0.credentialID).inserted }.map { selection in
+            let summary = credentialDetailsByID[selection.credentialID]?.cardSummary
+            let option = viewModel.review?.documents.flatMap(\.credentialOptions).first { $0.credentialID == selection.credentialID }
+            return ReviewCredentialStatus(credentialID: selection.credentialID,
+                title: summary?.title ?? option?.label ?? String(localized: "Credential"),
+                issuer: summary?.issuer ?? option?.issuer, context: statusUI)
+        }
     }
 
     private var pendingPreparedSharing: ProximityPreparedSharing? {
@@ -207,4 +234,11 @@ struct ProximityPresentationView: View {
         }
     }
 
+}
+
+private struct NearbySubmissionKey: Equatable {
+    let review: ProximityReview?
+    let selections: [ProximityDocumentSelection]
+    let continueAfterResponse: Bool
+    let preparing: Bool
 }

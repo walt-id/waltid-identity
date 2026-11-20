@@ -46,15 +46,17 @@ internal fun WalletFlowContent(
             PresentTab(
                 state = state,
                 onPreview = controller::previewPresentation,
+                onRetryClaimReview = controller::retryPresentationClaimReview,
                 onToggleCredential = controller::togglePresentationCredential,
                 onToggleDisclosure = controller::togglePresentationDisclosure,
-                onSubmit = {
+                onSubmit = { submission ->
                     val current = controller.state.value
                     if (current.presentationReview == state.presentationReview &&
                         current.paymentReview == state.paymentReview &&
+                        current.claimReview == state.claimReview &&
                         current.selectedPresentationCredentialOptions == state.selectedPresentationCredentialOptions &&
                         current.selectedPresentationDisclosureOptions == state.selectedPresentationDisclosureOptions) {
-                        controller.submitPresentation()
+                        controller.submitPresentation(submission)
                     }
                 },
                 onReject = controller::rejectPresentation,

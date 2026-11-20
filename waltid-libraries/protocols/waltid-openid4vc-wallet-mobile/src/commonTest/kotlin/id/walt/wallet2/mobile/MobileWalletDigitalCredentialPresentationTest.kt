@@ -51,6 +51,8 @@ import id.walt.wallet2.data.withImportedHolderKeyBinding
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
@@ -84,6 +86,40 @@ import kotlin.test.assertTrue
 class MobileWalletDigitalCredentialPresentationTest {
 
     @Test
+    fun statusReviewedSubmissionOwnsSelectionsBeforeItsFirstSuspendedRead() = runTest {
+        val fixture = walletFixture(sdJwtCredential())
+        try {
+            val preview = fixture.wallet.previewDigitalCredentialPresentation(dcApiRequest(data = sdJwtQuery()))
+            val option = preview.credentialOptions.single()
+            val selections = preview.credentialOptions.selections().toMutableList()
+            val disclosures = option.disclosures.filter { it.selectivelyDisclosable }.map {
+                MobileWalletPresentationDisclosureSelection(option.queryId, option.credentialId, it.path)
+            }.toMutableList()
+            assertTrue(disclosures.isNotEmpty())
+            val reviewed = fixture.wallet.credentialStatusSnapshot().credentials.associate {
+                it.reference.credentialId to it.presentation.advisoryRevision
+            }
+            val reading = CompletableDeferred<Unit>()
+            val resumeReading = CompletableDeferred<Unit>()
+            fixture.beforeNextCredentialRead {
+                reading.complete(Unit)
+                resumeReading.await()
+            }
+            val submitted = async {
+                fixture.wallet.submitStatusReviewedDigitalCredentialPresentation(preview.requestId, selections, disclosures, reviewed)
+            }
+            try {
+                reading.await()
+                selections.clear()
+                disclosures.clear()
+            } finally { resumeReading.complete(Unit) }
+            val data = Json.parseToJsonElement(submitted.await().dataJson).jsonObject
+            val presented = SDJwt.parse(fixture.presentationFor("pid", data))
+            assertTrue(presented.fullPayload.containsKey("family_name"))
+        } finally { fixture.wallet.close() }
+    }
+
+    @Test
     fun previewsAndSubmitsAnSdJwtVcRequestThroughTheDigitalCredentialsApi() = runTest {
         val fixture = walletFixture(sdJwtCredential())
 
@@ -105,6 +141,11 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertEquals(MobileWalletReaderAuthentication.NOT_APPLICABLE, preview.readerAuthentication)
         assertEquals(null, preview.readerTrust)
 
+        val review = fixture.wallet.reviewDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+        )
+        assertFalse(review.credentials.single().wholeCredential)
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
             selectedCredentialOptions = preview.credentialOptions.selections(),
@@ -118,6 +159,8 @@ class MobileWalletDigitalCredentialPresentationTest {
         // rather than replaying an earlier presentation.
         val presentation = fixture.presentationFor("pid", data)
         assertEquals(3, presentation.substringAfterLast('~').split('.').size, "missing KB-JWT: $presentation")
+        assertEquals(SDJwt.parse(presentation).fullPayload, Json.parseToJsonElement(review.credentials.single().claimsJson))
+        assertTrue(review.credentials.single().locations.isNotEmpty())
     }
 
     @Test
@@ -138,6 +181,11 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         assertEquals("mso_mdoc", preview.credentialOptions.single().format)
 
+        val review = fixture.wallet.reviewDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+        )
+        assertFalse(review.credentials.single().wholeCredential)
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
             selectedCredentialOptions = preview.credentialOptions.selections(),
@@ -145,10 +193,11 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         val data = Json.parseToJsonElement(response.dataJson).jsonObject
         assertEquals(setOf("vp_token"), data.keys)
-        assertTrue(
-            fixture.presentationFor("mdl", data).isNotBlank(),
-            "mdoc DeviceResponse missing from the vp_token: $data",
-        )
+        val document = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(
+            fixture.presentationFor("mdl", data).decodeFromBase64Url()).documents!!.single()
+        val expected = buildJsonObject { put(MDOC_NAMESPACE, buildJsonObject { put("given_name", "Inga") }) }
+        assertEquals(expected, document.issuerSigned.namespacesToJson())
+        assertEquals(expected, Json.parseToJsonElement(review.credentials.single().claimsJson))
     }
 
     @Test
@@ -174,6 +223,18 @@ class MobileWalletDigitalCredentialPresentationTest {
         val option = preview.credentialOptions.single()
         val disclosure = option.disclosures.single()
         assertTrue(disclosure.required)
+        val review = fixture.wallet.reviewDigitalCredentialPresentation(
+            requestId = preview.requestId,
+            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selectedDisclosureOptions = emptyList(),
+        ).credentials.single()
+        val attachment = Json.parseToJsonElement(review.claimsJson).jsonObject.getValue(MDOC_NAMESPACE)
+            .jsonObject.getValue("arbitrary_attachment").jsonPrimitive
+        assertContentEquals(IMAGE_BYTES, attachment.content.decodeFromBase64Url())
+        val location = review.locations.single { it.isBinary }
+        assertEquals("""["$MDOC_NAMESPACE","arbitrary_attachment"]""", location.sourcePathJson)
+        assertEquals(location.sourcePathJson, location.receivedPathJson)
+        assertEquals(3, review.locations.size)
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
             selectedCredentialOptions = preview.credentialOptions.selections(),
@@ -911,6 +972,8 @@ class MobileWalletDigitalCredentialPresentationTest {
             credentialStore.reads = 0
         }
 
+        fun beforeNextCredentialRead(block: suspend () -> Unit) { credentialStore.beforeNextRead = block }
+
         /**
          * The registry entry id the platform would have been handed for [credentialId], read back from
          * the published projection rather than recomputed, so no test can pass against an entry id the
@@ -1160,6 +1223,7 @@ class MobileWalletDigitalCredentialPresentationTest {
     private class RecordingCredentialStore : WalletCredentialStore {
         private val credentials = mutableMapOf<String, StoredCredential>()
         var reads: Int = 0
+        var beforeNextRead: (suspend () -> Unit)? = null
 
         override suspend fun getCredential(id: String): StoredCredential? {
             reads++
@@ -1168,6 +1232,7 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         override suspend fun listCredentials(): Flow<StoredCredential> {
             reads++
+            beforeNextRead?.also { beforeNextRead = null }?.invoke()
             return credentials.values.toList().asFlow()
         }
 

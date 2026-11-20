@@ -114,7 +114,7 @@ class SignUpTest {
         val hook = registered.single()
         assertEquals(accountId, hook.accountId)
         assertEquals("Bob", hook.details!!["displayName"]!!.jsonPrimitive.content)
-        assertNull(hook.details!!["password"], "the password is not a detail")
+        assertNull(hook.details["password"], "the password is not a detail")
     }
 
     @Test

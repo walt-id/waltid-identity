@@ -141,10 +141,13 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("attestation_legal_category", label: "Attestation legal category", displayOrder: 124),
         ClaimDescriptor("issuer", label: "Issuer", displayOrder: 130),
         ClaimDescriptor("vct", label: "Credential type", group: .technical, roles: [.credentialType], displayOrder: 200),
+        ClaimDescriptor("vct#integrity", label: "Type metadata integrity", group: .technical, displayOrder: 232),
         ClaimDescriptor("iss", label: "Issuer", group: .technical, displayOrder: 201),
         ClaimDescriptor("sub", label: "Subject", group: .technical, displayOrder: 202),
         ClaimDescriptor("iat", label: "Issued at", group: .technical, roles: [.temporal], displayOrder: 203),
         ClaimDescriptor("issued_at", roles: [.temporal], displayOrder: 204),
+        ClaimDescriptor("issue_date", roles: [.temporal], displayOrder: 205),
+        ClaimDescriptor("portrait_capture_date", roles: [.temporal], displayOrder: 217),
         ClaimDescriptor("issuance_date", roles: [.temporal], displayOrder: 205),
         ClaimDescriptor("valid_from", aliases: ["Valid from"], roles: [.temporal], displayOrder: 206),
         ClaimDescriptor("nbf", label: "Valid from", group: .technical, roles: [.temporal], displayOrder: 207),
@@ -159,7 +162,7 @@ public enum CredentialDisplayVocabulary {
         ClaimDescriptor("valid_to", aliases: ["Valid to"], roles: [.temporal, .expiryDate], displayOrder: 216),
         ClaimDescriptor("status", label: "Credential status", group: .technical, displayOrder: 220),
         ClaimDescriptor("credential_status", aliases: ["credentialStatus"], label: "Credential status", displayOrder: 221),
-        ClaimDescriptor("_sd", label: "Undisclosed claims", group: .technical, displayOrder: 230),
+        ClaimDescriptor("_sd", label: "Disclosure digests", group: .technical, displayOrder: 230),
         ClaimDescriptor("_sd_alg", label: "Selective disclosure algorithm", group: .technical, displayOrder: 231),
         ClaimDescriptor("cnf", label: "Confirmation key", group: .technical, displayOrder: 240),
         ClaimDescriptor("credential_type", aliases: ["Credential type", "credentialType"], roles: [.credentialType], displayOrder: 250)
@@ -283,8 +286,10 @@ public enum CredentialDisplayVocabulary {
         if lhsSegments.count < rhsSegments.count { return .orderedAscending }
         if lhsSegments.count > rhsSegments.count { return .orderedDescending }
 
-        let lhsPath = lhs.joined(separator: ".")
-        let rhsPath = rhs.joined(separator: ".")
+        // Compare canonical literal-key paths, matching Compose. Joining with a dot
+        // would erase the distinction between a dotted key and nested members.
+        let lhsPath = lhs.dropFirst().reduce(ClaimItemPath.topLevel(lhs.first ?? "")) { $0.child($1) }.id
+        let rhsPath = rhs.dropFirst().reduce(ClaimItemPath.topLevel(rhs.first ?? "")) { $0.child($1) }.id
         let caseInsensitiveComparison = lhsPath.compare(rhsPath, options: [.caseInsensitive])
         if caseInsensitiveComparison != .orderedSame {
             return caseInsensitiveComparison
@@ -295,6 +300,9 @@ public enum CredentialDisplayVocabulary {
     private static func roles(for claimPath: ClaimPath) -> Set<ClaimRole> {
         let leaf = claimPath.leaf
         var roles = descriptor(for: leaf)?.roles ?? []
+        if claimPath.components == ["proof", "created"] || claimPath.components == ["vc", "proof", "created"] {
+            roles.insert(.temporal)
+        }
         if isCredentialTypeClaimPath(claimPath) {
             roles.insert(.credentialType)
         }

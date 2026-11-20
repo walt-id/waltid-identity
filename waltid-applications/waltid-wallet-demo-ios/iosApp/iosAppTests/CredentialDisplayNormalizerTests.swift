@@ -4,19 +4,286 @@ import WalletSDK
 import XCTest
 
 final class CredentialDisplayNormalizerTests: XCTestCase {
-    func testSharingKeepsUnavoidableIdentifiersAndCustomClaimsAcrossFormats() throws {
+    func testEffectiveMdocReviewUsesTheBinaryMarkerForImagesAndOtherBytes() throws {
+        let namespace = "org.iso.18013.5.1"
+        let path = "\"\(namespace)\".\"portrait\""
+        let rawPortrait = "[" + Self.validPNGData.map { String(Int8(bitPattern: $0)) }.joined(separator: ",") + "]"
+        let encoded = Self.validPNGBase64.replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        let attachment = "SGVsbG8sIHdhbGxldA"
+        let option = PresentationCredentialOption(queryID: "mdl", credentialID: "one", format: "mso_mdoc",
+            issuer: nil, subject: nil, label: "Driving licence",
+            credentialDataJSON: "{\"\(namespace)\":{\"portrait\":\(rawPortrait)}}",
+            disclosures: [PresentationDisclosure(path: path, name: "Portrait", valueJSON: rawPortrait,
+                displayValue: nil, selectivelyDisclosable: true, required: true)])
+        func location(_ path: String, isBinary: Bool = false, sharedBy: [String] = []) -> PresentationClaimLocation {
+            .init(sourcePathJSON: path, receivedPathJSON: path, sharedBy: sharedBy, alwaysCarried: false, isBinary: isBinary)
+        }
+        let prepared = PreparedPresentationReview(credentials: [.init(queryID: option.queryID, credentialID: option.credentialID,
+            format: option.format,
+            claimsJSON: """
+                {"\(namespace)":{"portrait":"\(encoded)","attachment":"\(attachment)","text":"\(attachment)","blob":"\(encoded)","image":[137,80,78,71,4]}}
+                """,
+            wholeCredential: false, locations: [
+                location("[]"), location("[\"\(namespace)\"]"),
+                location("[\"\(namespace)\",\"portrait\"]", isBinary: true, sharedBy: [path]),
+                location("[\"\(namespace)\",\"attachment\"]", isBinary: true),
+                location("[\"\(namespace)\",\"text\"]"),
+                location("[\"\(namespace)\",\"blob\"]", isBinary: true),
+                location("[\"\(namespace)\",\"image\"]"),
+            ] + (0...4).map { location("[\"\(namespace)\",\"image\",\($0)]") })])
+        let review = try EffectivePresentationReview(prepared: prepared,
+            model: .init(request: .init(requester: nil), credentialOptions: [option]),
+            selection: .init(credentials: [option.selection], disclosures: []))
+        let nodes = try XCTUnwrap(review.contributions.first?.nodes.first?.children)
+        let photo = try XCTUnwrap(nodes.first { $0.label == "Portrait" })
+        XCTAssertEqual(photo.path, [.key(namespace), .key("portrait")])
+        XCTAssertEqual(photo.reason, "Required")
+        XCTAssertTrue(photo.children.isEmpty)
+        guard case .image(_, let data, let mimeType, _) = photo.value?.resolvedImage else {
+            return XCTFail("Expected the binary portrait to render as an image")
+        }
+        XCTAssertEqual(mimeType, "image/png")
+        XCTAssertEqual(data, Self.validPNGData)
+        XCTAssertEqual(nodes.first { $0.label == "Attachment" }?.value, .text("Binary data"))
+        XCTAssertEqual(nodes.first { $0.label == "Text" }?.value, .decodedText("Hello, wallet"))
+        XCTAssertEqual(nodes.first { $0.label == "Blob" }?.value, .text("Binary data"))
+        let numericImage = try XCTUnwrap(nodes.first { $0.label == "Image" })
+        XCTAssertEqual(numericImage.kind, .array)
+        XCTAssertEqual(numericImage.children.map(\.path), (0...4).map { [.key(namespace), .key("image"), .index($0)] })
+        XCTAssertEqual(numericImage.children.compactMap(\.value), ["137", "80", "78", "71", "4"].map(DisplayValue.number))
+    }
+
+    func testProjectedArraySelectorsRetainUniqueLabelsAndRestrictions() throws {
+        let fixture = try credentialInformationFixture()
+        let metadata = String(decoding: try JSONSerialization.data(withJSONObject: XCTUnwrap(fixture["projectedArrayClaims"])), as: UTF8.self)
+        let claims = StoredCredentialMetadataParser.claims(from: metadata, preferredLocales: ["en"])
+        XCTAssertEqual(claims.compactMap(\.name), try XCTUnwrap(fixture["projectedArrayLabels"] as? [String]))
+        XCTAssertEqual(claims.map(\.path), [[.key("accounts"), .integer("1"), .key("iban")], [.key("name")]])
+        XCTAssertEqual(claims.first?.mandatory, true)
+        let credential = Credential(id: "array-contract", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Account", addedAt: nil,
+            credentialDataJSON: String(decoding: try JSONSerialization.data(withJSONObject: XCTUnwrap(fixture["projectedArrayCredentialData"])), as: UTF8.self), metadataJSON: metadata)
+        let rows = CredentialDisplayNormalizer.details(for: credential, preferredLocales: ["en"]).groups.flatMap(\.items)
+        guard case .list(let accounts, _) = try XCTUnwrap(rows.first { $0.path.id == "accounts" }).value,
+              accounts.count == 2, case .object(let first) = accounts[0], case .object(let second) = accounts[1] else {
+            return XCTFail("Expected two structured accounts")
+        }
+        XCTAssertEqual(first.first?.label, "Iban")
+        XCTAssertNotEqual(first.first?.labelSource, .issuerMetadata)
+        XCTAssertEqual(second.first?.label, "Second IBAN")
+        XCTAssertEqual(second.first?.labelSource, .issuerMetadata)
+        XCTAssertEqual(rows.first { $0.path.id == "name" }?.label, "Full name")
+        let option = PresentationCredentialOption(queryID: "account", credentialID: credential.id, format: credential.format,
+            issuer: nil, subject: nil, label: "Account", credentialDataJSON: credential.credentialDataJSON,
+            disclosures: [PresentationDisclosure(path: #"["accounts",1,"iban"]"#, name: "Iban", valueJSON: #""DE456""#, displayValue: nil, selectivelyDisclosable: true)], metadataJSON: metadata)
+        let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true, preferredLocales: ["en"])
+        XCTAssertEqual(details.groups.first { $0.id == "requested" }?.items.first?.label, "Second IBAN")
+        let path = try XCTUnwrap(option.disclosures.first).path
+        let prepared = PreparedPresentationReview(credentials: [.init(queryID: option.queryID, credentialID: option.credentialID,
+            format: option.format, claimsJSON: #"{"accounts":[{"iban":"DE456"}]}"#, wholeCredential: false, locations: [
+                .init(sourcePathJSON: "[]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true),
+                .init(sourcePathJSON: #"["accounts"]"#, receivedPathJSON: #"["accounts"]"#, sharedBy: [], alwaysCarried: true),
+                .init(sourcePathJSON: #"["accounts",1]"#, receivedPathJSON: #"["accounts",0]"#, sharedBy: [], alwaysCarried: true),
+                .init(sourcePathJSON: path, receivedPathJSON: #"["accounts",0,"iban"]"#, sharedBy: [path], alwaysCarried: false),
+            ])])
+        let review = try EffectivePresentationReview(prepared: prepared,
+            model: .init(request: .init(requester: nil), credentialOptions: [option]),
+            selection: .init(credentials: [option.selection], disclosures: []), preferredLocales: ["en"])
+        let account = try XCTUnwrap(review.contributions.first?.nodes.first?.children.first)
+        XCTAssertEqual(account.path, [.key("accounts"), .index(1)])
+        XCTAssertEqual(account.children.first?.label, "Second IBAN")
+        XCTAssertEqual(account.children.first?.value, .text("DE456"))
+    }
+
+    func testTimestampOffsetsAndUninterpretedCalendarValues() {
+        let expected = WalletInstant(epochSeconds: 1793410200, nanoseconds: 123456789)
+        for source in ["2026-10-30T23:30:00.123456789-02:00", "2026-10-31T03:30:00.123456789+02:00", "2026-10-31t01:30:00.123456789z", "2026-10-31T01:30:00.123456789-00:00"] {
+            XCTAssertEqual(WalletInstant.parseTimestamp(source), expected, source)
+            XCTAssertEqual(disclosureValue("validUntil", "\"\(source)\""), .instant(expected))
+        }
+        for source in ["2026-10-30", "2026-10-30T01:30:00", "2026-02-30T00:00:00Z", "2026-10-30T24:00:00Z", "2026-10-30T00:00:60Z", "2026-10-30T00:00:00+25:00", "2026-10-30T00:00:00+18:01", "0000-01-01T00:00:00Z", "2026-10-30T00:00:00+02", "2026-10-30T00:00:00+02:00:30", "2026-10-30T00:00:00Zextra", "2026-10-30T00:00:00.1234567891Z", "2026-10-30T00:00:00Z[Europe/Budapest]"] {
+            XCTAssertNil(WalletInstant.parseTimestamp(source), source)
+        }
+    }
+
+    func testW3cTimestampsWithoutOffsetUseUtcOnlyInTheirDefinedScope() {
+        let source = "2026-10-30T23:30:00.125"
+        let expected = DisplayValue.instant(WalletInstant(epochSeconds: 1793403000, nanoseconds: 125000000))
+        for format in ["jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc", "dc+sd-jwt", "vc+sd-jwt", "mso_mdoc"] {
+            for name in ["validFrom", "validUntil", "vc.validUntil", "proof.created", "vc.proof.expires", "credentialSubject.validUntil", "expiry_date"] {
+                let value = disclosureValue(name, "\"\(source)\"", format: format)
+                let isW3cTimestamp = ["jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"].contains(format) &&
+                    ["validFrom", "validUntil", "vc.validUntil", "proof.created", "vc.proof.expires"].contains(name)
+                XCTAssertEqual(value, isW3cTimestamp ? expected : .text(source), "\(format) \(name)")
+            }
+        }
+        for source in ["2026-10-30", "2026-02-30T23:30:00", "2026-10-30T23:30:00+99:99"] {
+            XCTAssertEqual(disclosureValue("validUntil", "\"\(source)\"", format: "ldp_vc"), .text(source))
+        }
+    }
+
+    func testMdocDateAndTimestampClaimsRetainTheirDifferentMeaningsInDetailsAndConsent() {
+        for name in ["issue_date", "expiry_date", "portrait_capture_date"] {
+            for source in ["2026-10-30", "2026-10-30T02:00:00+02:00"] {
+                let credential = Credential(id: "one", format: "mso_mdoc", issuer: nil, subject: nil, label: "mDL", addedAt: nil,
+                    credentialDataJSON: "{\"org.iso.18013.5.1\":{\"\(name)\":\"\(source)\"}}")
+                let option = PresentationCredentialOption(queryID: "mdl", credentialID: "one", format: "mso_mdoc",
+                    issuer: nil, subject: nil, label: "mDL", credentialDataJSON: credential.credentialDataJSON, disclosures: [
+                        PresentationDisclosure(path: "org.iso.18013.5.1/\(name)", name: name,
+                            valueJSON: "\"\(source)\"", displayValue: source, selectivelyDisclosable: false)
+                    ])
+                let expected: DisplayValue = source.count == 10 ? .text(source)
+                    : .instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0))
+                let requested = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
+                let stored = CredentialDisplayNormalizer.details(for: credential)
+                for details in [requested, stored] {
+                    let items = details.groups.flatMap(\.items)
+                    XCTAssertEqual(items.map(\.value), [expected], "\(name) \(source)")
+                    XCTAssertEqual(items.first?.rawValue, "\"\(source)\"")
+                }
+            }
+        }
+    }
+
+    func testLocalConversionKeepsTheCalendarEraUnambiguous() throws {
+        let instant = try XCTUnwrap(WalletInstant.parseTimestamp("0001-01-01T00:00:00Z"))
+        let formatted = instant.formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "Etc/GMT+1")), locale: Locale(identifier: "en_GB"))
+        XCTAssertTrue(formatted.date.contains("31 Dec"), formatted.fullText)
+        XCTAssertTrue(formatted.date.contains("BC"), formatted.fullText)
+        XCTAssertTrue(formatted.time == "23:00", formatted.fullText)
+        XCTAssertTrue(formatted.timeZone == "UTC-01:00", formatted.fullText)
+    }
+
+    func testDateTimeDisplayUsesLocaleAndNamedZoneAtTheInstant() throws {
+        let cases = [
+            ("2026-03-29T00:30:00Z", "01:30", "Budapest, CET"),
+            ("2026-03-29T01:30:00Z", "03:30", "Budapest, CEST"),
+            ("2026-10-25T00:30:00Z", "02:30", "Budapest, CEST"),
+            ("2026-10-25T01:30:00Z", "02:30", "Budapest, CET")
+        ]
+        for (source, time, name) in cases {
+            let instant = try XCTUnwrap(WalletInstant.parseTimestamp(source))
+            let text = instant.formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "Europe/Budapest")), locale: Locale(identifier: "en_GB"))
+            XCTAssertEqual(text.time, time)
+            XCTAssertEqual(text.timeZone, name)
+            XCTAssertEqual(text.fullText, "\(text.date), \(time) \u{2068}(\(name))\u{2069}")
+        }
+        let boundary = try XCTUnwrap(WalletInstant.parseTimestamp("2026-01-01T00:00:00Z"))
+            .formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "America/Los_Angeles")), locale: Locale(identifier: "en_GB"))
+        XCTAssertTrue(boundary.date.contains("31 Dec 2025"), boundary.date)
+        XCTAssertEqual(boundary.time, "16:00")
+        XCTAssertTrue(boundary.timeZone.hasPrefix("Los Angeles, "), boundary.timeZone)
+        let nonHour = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-30T00:00:34Z"))
+            .formatted(timeZone: try XCTUnwrap(TimeZone(identifier: "Asia/Kathmandu")), locale: Locale(identifier: "en_GB"))
+        XCTAssertEqual(nonHour.time, "05:45:34")
+        XCTAssertTrue(nonHour.timeZone.hasPrefix("Kathmandu, "), nonHour.timeZone)
+        let utc = try XCTUnwrap(WalletInstant.parseTimestamp("2026-10-30T00:00:00Z"))
+            .formatted(timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0)), locale: Locale(identifier: "en_GB"))
+        XCTAssertEqual(utc.fullText, "\(utc.date), 00:00 \u{2068}(UTC)\u{2069}")
+        XCTAssertEqual(WalletInstant(Date(timeIntervalSince1970: 1793367000.123)),
+                       WalletInstant(epochSeconds: 1793367000, nanoseconds: 123000000))
+        let instant = WalletInstant(epochSeconds: 1793367000, nanoseconds: 123456789)
+        let zone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let british = instant.formatted(timeZone: zone, locale: Locale(identifier: "en_GB"))
+        let american = instant.formatted(timeZone: zone, locale: Locale(identifier: "en_US"))
+        let german = instant.formatted(timeZone: zone, locale: Locale(identifier: "de_DE"))
+        XCTAssertTrue(british.time.contains("13:30:00.123456789"), british.fullText)
+        XCTAssertTrue(american.time.contains("1:30:00.123456789") && american.time.contains("PM"), american.fullText)
+        XCTAssertTrue(german.time.contains("13:30:00,123456789"), german.fullText)
+    }
+
+    func testConsentPreservesNormalizedClaimsAcrossCredentialFormats() {
+        for format in ["dc+sd-jwt", "vc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc", "mso_mdoc"] {
+            let disclosures = [("iat", "1793318400"), ("exp", "1801094400"), ("nbf", "1793318400.25")]
+            let credential = Credential(id: "one", format: format, issuer: nil, subject: nil, label: "Identity", addedAt: nil,
+                credentialDataJSON: #"{"iat":1793318400,"exp":1801094400,"nbf":1793318400.25}"#)
+            let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: format,
+                issuer: nil, subject: nil, label: "Identity", credentialDataJSON: credential.credentialDataJSON,
+                disclosures: disclosures.map { name, value in
+                    PresentationDisclosure(path: name, name: name, valueJSON: value, displayValue: value,
+                        selectivelyDisclosable: false)
+                })
+            let requested = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true).groups.flatMap(\.items)
+            let expected = [WalletInstant(epochSeconds: 1793318400, nanoseconds: 0), WalletInstant(epochSeconds: 1801094400, nanoseconds: 0), WalletInstant(epochSeconds: 1793318400, nanoseconds: 250000000)]
+            XCTAssertEqual(requested.map(\.value), expected.map(DisplayValue.instant), format)
+            let stored = CredentialDisplayNormalizer.details(for: credential).groups.flatMap(\.items)
+            for (index, disclosure) in disclosures.enumerated() {
+                XCTAssertEqual(stored.first { $0.path.id == disclosure.0 }?.value, .instant(expected[index]), format)
+            }
+            XCTAssertEqual(requested.map(\.rawValue), disclosures.map { $0.1 })
+        }
+    }
+
+    func testTemporalFormattingPreservesSecondsAndRejectsUnitGuessing() {
+        let cases = [
+            ("-62135596800", WalletInstant(epochSeconds: -62135596800, nanoseconds: 0)),
+            ("0", WalletInstant(epochSeconds: 0, nanoseconds: 0)),
+            ("-1", WalletInstant(epochSeconds: -1, nanoseconds: 0)),
+            ("-0.25", WalletInstant(epochSeconds: -1, nanoseconds: 750000000)),
+            ("1.793318400125e9", WalletInstant(epochSeconds: 1793318400, nanoseconds: 125000000)),
+            ("1793318400.123456789", WalletInstant(epochSeconds: 1793318400, nanoseconds: 123456789)),
+            ("10000000000", WalletInstant(epochSeconds: 10000000000, nanoseconds: 0)),
+            ("253402300799", WalletInstant(epochSeconds: 253402300799, nanoseconds: 0)),
+        ]
+        for (raw, expected) in cases {
+            XCTAssertEqual(disclosureValue("iat", raw), .instant(expected), raw)
+            XCTAssertEqual(disclosureValue("validFrom", "\"\(raw)\""), .text(raw), raw)
+        }
+        for raw in ["1793318400000", "253402300800", "1e100", "1793318400.1234567891"] {
+            XCTAssertEqual(disclosureValue("exp", raw), .number(raw), raw)
+        }
+    }
+
+    func testTypedClaimFallbackDoesNotChangeSourceMeaning() {
+        XCTAssertEqual(disclosureValue("age_over_18", "true"), .bool(true))
+        XCTAssertEqual(disclosureValue("custom", #""true""#), .text("true"))
+        XCTAssertEqual(disclosureValue("custom", #""false""#), .text("false"))
+        XCTAssertEqual(disclosureValue("idx", "1793318400"), .number("1793318400"))
+        XCTAssertEqual(disclosureValue("document_number", #""00123""#), .text("00123"))
+        XCTAssertEqual(disclosureValue("custom", "null"), .null)
+        for date in ["1990-01-01", "2026-10-30T23:30:00", "2026-02-30T12:00:00Z", "2026-10-30T23:30:60Z", "2026-10-30T23:30:00.1234567891Z", "not a date", "SGVsbG8gd29ybGQ="] {
+            XCTAssertEqual(disclosureValue("expiry_date", "\"\(date)\""), .text(date))
+        }
+        XCTAssertEqual(disclosureValue("custom", "{"), .text("Fallback"))
+    }
+
+    func testNestedAndArrayTemporalValuesUseTheSameFormatting() {
+        let value = disclosureValue("history", #"[{"issued_at":1793318400,"flags":[true,"true"]}]"#)
+        guard case .list(let values, _) = value, case .object(let items) = values.first else {
+            return XCTFail("Expected the original list and object")
+        }
+        XCTAssertEqual(items.first?.value, .instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0)))
+        XCTAssertEqual(items.last?.value, .list([.bool(true), .text("true")]))
+        XCTAssertEqual(disclosureValue("exp", "[1793318400]"), .list([.instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0))]))
+    }
+
+    private func credentialInformationFixture() throws -> [String: Any] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
-        let data = try Data(contentsOf: root.appendingPathComponent("waltid-wallet-demo-test-fixtures/resources/files/credential-information.json"))
-        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let file = root.appendingPathComponent("waltid-wallet-demo-test-fixtures/resources/files/credential-information.json")
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+    }
+
+    private func disclosureValue(_ name: String, _ json: String, format: String = "dc+sd-jwt") -> DisplayValue? {
+        let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: format,
+            issuer: nil, subject: nil, label: "Identity", credentialDataJSON: "{}", disclosures: [
+                PresentationDisclosure(path: name, name: name, valueJSON: json, displayValue: "Fallback",
+                    selectivelyDisclosable: false)
+            ])
+        return CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true).groups.first?.items.first?.value
+    }
+
+    func testSharingKeepsUnavoidableIdentifiersAndCustomClaimsAcrossFormats() throws {
+        let fixture = try credentialInformationFixture()
         for row in try XCTUnwrap(fixture["sharingVisibility"] as? [[String: Any]]) {
-            let requested = row["requested"] as! Bool
-            let visible = row["visible"] as! Bool
-            let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: row["format"] as! String,
+            let requested = try XCTUnwrap(row["requested"] as? Bool)
+            let visible = try XCTUnwrap(row["visible"] as? Bool)
+            let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: try XCTUnwrap(row["format"] as? String),
                 issuer: "Issuer", subject: nil, label: "Identity", credentialDataJSON: "{}", disclosures: [
-                    .init(path: row["path"] as! String, name: "Field", valueJSON: #""Value""#, displayValue: "Value",
+                    .init(path: try XCTUnwrap(row["path"] as? String), name: "Field", valueJSON: #""Value""#, displayValue: "Value",
                         selectivelyDisclosable: false, required: false, selectable: false, requested: requested)])
-            let fields = informationFields(option: option, details: CredentialDisplayNormalizer.details(for: option), disclosures: [])
+            let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
+            let fields = informationFields(option: option, details: details, disclosures: [])
             XCTAssertEqual(!fields.isEmpty, visible, "\(row)")
             XCTAssertEqual(fields.contains { $0.alwaysIncluded }, visible && !requested, "\(row)")
             XCTAssertTrue(fields.allSatisfy { $0.included })
@@ -25,27 +292,38 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
 
     func testIssuerLabelsAndOrderMatchComposeForStoredAndRequestedInformation() throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
-        let data = try Data(contentsOf: root.appendingPathComponent("waltid-wallet-demo-test-fixtures/resources/files/credential-information.json"))
-        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        func strings(_ key: String) -> [String] { fixture[key] as! [String] }
-        func json(_ key: String) throws -> String { String(decoding: try JSONSerialization.data(withJSONObject: fixture[key]!), as: UTF8.self) }
+        let fixture = try credentialInformationFixture()
+        func strings(_ key: String) throws -> [String] {
+            try XCTUnwrap(fixture[key] as? [String])
+        }
+        func json(_ key: String) throws -> String {
+            String(decoding: try JSONSerialization.data(withJSONObject: XCTUnwrap(fixture[key])), as: UTF8.self)
+        }
         let metadata = try json("metadata")
-        let format = fixture["format"] as! String
+        let format = try XCTUnwrap(fixture["format"] as? String)
+        let locales = try strings("preferredLocales")
         let credential = Credential(id: "metadata-contract", format: format, issuer: nil, subject: nil, label: "Identity", addedAt: nil,
             credentialDataJSON: try json("credentialData"), metadataJSON: metadata)
-        let rows = CredentialDisplayNormalizer.details(for: credential, preferredLocales: strings("preferredLocales")).groups.flatMap(\.items)
-        XCTAssertEqual(Array(rows.prefix(4)).map(\.label), strings("expectedLabels"))
-        XCTAssertEqual(Array(rows.prefix(4)).map(\.value), strings("expectedValues").map(DisplayValue.text))
-        XCTAssertTrue(rows.prefix(4).allSatisfy { $0.labelSource == .issuerMetadata })
-        XCTAssertEqual(Set(rows.map(\.id)).count, rows.count)
-        XCTAssertEqual(rows.last?.value, .bool(false))
+        let rows = CredentialDisplayNormalizer.details(for: credential, preferredLocales: locales).groups.flatMap(\.items)
+        XCTAssertEqual(rows.map { $0.path.id }, try strings("expectedStoredRootPaths"))
+        XCTAssertEqual(Array(rows.prefix(2)).map(\.label), Array(try strings("expectedLabels").prefix(2)))
+        let all = allHierarchyItems(rows)
+        let paths = ["family_name", "given_name", #"["ns.with.dots"].given_name"#, "address.line_1"]
+        let labelled = try paths.map { path in try XCTUnwrap(all.first { $0.path.id == path }) }
+        XCTAssertEqual(labelled.map(\.label), try strings("expectedLabels"))
+        XCTAssertEqual(labelled.map(\.value), try strings("expectedValues").map(DisplayValue.text))
+        XCTAssertTrue(labelled.allSatisfy { $0.labelSource == .issuerMetadata })
+        XCTAssertEqual(Set(all.map(\.id)).count, all.count)
+        XCTAssertEqual(all.first { $0.path.id == "extra" }?.value, .bool(false))
+        for path in ["address", #"["ns.with.dots"]"#] {
+            guard case .object = rows.first(where: { $0.path.id == path })?.value else { return XCTFail("Parent must remain visible") }
+        }
         let option = PresentationCredentialOption(queryID: "identity", credentialID: credential.id, format: format,
             issuer: nil, subject: nil, label: "Identity", credentialDataJSON: credential.credentialDataJSON,
-            disclosures: strings("requestedPaths").map { PresentationDisclosure(path: $0, name: "Unhelpful fallback", valueJSON: "\"Ada\"", displayValue: nil, selectivelyDisclosable: false) }, metadataJSON: metadata)
-        let requested = try XCTUnwrap(CredentialDisplayNormalizer.details(for: option, preferredLocales: strings("preferredLocales")).groups.first { $0.id == "requested" }).items
-        XCTAssertEqual(requested.map(\.label), strings("requestedLabels"))
+            disclosures: try strings("requestedPaths").map { PresentationDisclosure(path: $0, name: "Unhelpful fallback", valueJSON: "\"Ada\"", displayValue: nil, selectivelyDisclosable: false) }, metadataJSON: metadata)
+        let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true, preferredLocales: locales)
+        let requested = try XCTUnwrap(details.groups.first { $0.id == "requested" }).items
+        XCTAssertEqual(requested.map(\.label), try strings("requestedLabels"))
         XCTAssertTrue(requested.allSatisfy { $0.labelSource == .issuerMetadata })
         XCTAssertEqual(requested.map(\.displayOrder), [1, 2])
     }
@@ -65,16 +343,230 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             [.key("object"), .key(specialKey)])
     }
 
+    private func allHierarchyItems(_ items: [ClaimItem]) -> [ClaimItem] {
+        items.flatMap { [$0] + hierarchyValueItems($0.value) }
+    }
+
+    private func hierarchyValueItems(_ value: DisplayValue) -> [ClaimItem] {
+        switch value {
+        case .object(let entries): return allHierarchyItems(entries)
+        case .list(let values, _): return values.flatMap(hierarchyValueItems)
+        default: return []
+        }
+    }
+
+    func testNestedProtocolLikeNamesRemainOrdinaryClaimObjects() throws {
+        let details = hierarchyDetails(#"{"profile":{"status":{"kind":"resident"},"cnf":{"key":"value"}}}"#)
+        let profile = try XCTUnwrap(details.groups.flatMap(\.items).first)
+        guard case .object(let fields) = profile.value else { return XCTFail("Expected profile") }
+        for field in fields {
+            guard case .object = field.value else { return XCTFail("Subject objects must not become protocol summaries") }
+        }
+    }
+
+    func testScalarArrayMetadataLabelsPreserveValuesAndConcreteIndexes() throws {
+        let details = hierarchyDetails(#"{"nationalities":["EX","YY"],"other_nationalities":["AA","BB"],"matrix":[[0,false],[0,false]]}"#,
+            metadata: #"{"credentialClaims":[{"path":["other_nationalities",null],"display":[{"name":"Nationality"}]},{"path":["nationalities",0],"display":[{"name":"Primary nationality"}]},{"path":["matrix",null,0],"display":[{"name":"First cell"}]}]}"#)
+        let roots = details.groups.flatMap(\.items)
+        guard case .list(let values, let labels) = roots.first(where: { $0.path.id == "nationalities" })?.value else { return XCTFail("Expected array") }
+        XCTAssertEqual(values, [.text("EX"), .text("YY")])
+        XCTAssertEqual(labels, [0: "Primary nationality"])
+        guard case .list(_, let otherLabels) = roots.first(where: { $0.path.id == "other_nationalities" })?.value else { return XCTFail("Expected second array") }
+        XCTAssertEqual(otherLabels, [0: "Nationality", 1: "Nationality"])
+        guard case .list(let rows, let rowLabels) = roots.first(where: { $0.path.id == "matrix" })?.value else { return XCTFail("Expected matrix") }
+        XCTAssertTrue(rowLabels.isEmpty)
+        for row in rows {
+            guard case .list(let values, let labels) = row else { return XCTFail("Expected row") }
+            XCTAssertEqual(values, [.number("0"), .bool(false)])
+            XCTAssertEqual(labels, [0: "First cell"])
+        }
+    }
+
+    func testBlankLiteralKeysKeepIdentityAndHaveVisibleFallbackLabels() {
+        let roots = hierarchyDetails(#"{"":"empty key"," ":"space key"}"#).groups.flatMap(\.items)
+        XCTAssertEqual(Set(roots.map { $0.path.id }), Set([#"[""]"#, #"[" "]"#]))
+        XCTAssertTrue(roots.allSatisfy { !$0.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        XCTAssertEqual(Set(roots.compactMap { item -> String? in if case .text(let value) = item.value { return value }; return nil }), Set(["empty key", "space key"]))
+    }
+
+    func testNestedDisclosureDigestsRemainTechnicalWithoutInventingClaims() throws {
+        let details = hierarchyDetails(#"{"profiles":[{"country":"EX","_sd":["decoy","unavailable"]}]}"#)
+        let all = allHierarchyItems(details.groups.flatMap(\.items))
+        let digests = try XCTUnwrap(all.first { $0.path.id == "profiles[0]._sd" })
+        XCTAssertEqual(digests.value, .text("2 disclosure digests"))
+        XCTAssertTrue(digests.roles.contains(.technical))
+        XCTAssertFalse(try XCTUnwrap(all.first { $0.path.id == "profiles[0].country" }).roles.contains(.technical))
+        let generic = hierarchyDetails(#"{"_sd":["ordinary"]}"#, format: "custom")
+        XCTAssertFalse(try XCTUnwrap(generic.groups.flatMap(\.items).first).roles.contains(.technical))
+    }
+
+    func testContradictoryStoredClaimPathsAbortMetadataProcessing() {
+        let invalid = [
+            #"{"credentialClaims":[{"path":["people",null,"name"]},{"path":["people",0,"age"]}]}"#,
+            #"{"credentialClaims":[{"path":["people",0,"name"]},{"path":["people","0","age"]}]}"#,
+            #"{"credentialClaims":[{"path":["people",null]},{"path":["people",null]}]}"#,
+            #"{"credentialClaims":[{"path":["people",-0]},{"path":["people",0]}]}"#,
+            #"{"credentialClaims":[{"path":["people",-1,"name"]}]}"#
+        ]
+        for source in invalid {
+            XCTAssertTrue(StoredCredentialMetadataParser.claims(from: source, format: "dc+sd-jwt").isEmpty, source)
+        }
+        let maps = #"{"credentialClaims":[{"path":["namespace","element",0]},{"path":["namespace","element","0"]}]}"#
+        XCTAssertEqual(StoredCredentialMetadataParser.claims(from: maps, format: "mso_mdoc").count, 2)
+        XCTAssertTrue(StoredCredentialMetadataParser.claims(from: maps, format: "dc+sd-jwt").isEmpty)
+    }
+
+    private func hierarchyDetails(_ json: String, format: String = "dc+sd-jwt", metadata: String? = nil) -> CredentialDetails {
+        CredentialDisplayNormalizer.details(for: Credential(id: "hierarchy", format: format, issuer: nil,
+            subject: nil, label: "Identity", addedAt: nil, credentialDataJSON: json, metadataJSON: metadata))
+    }
+
+    func testStoredObjectsKeepParentContextAndSiblingMetadataOrder() throws {
+        let details = hierarchyDetails(#"{"address":{"country":"NL","postal_code":"00123"},"place_of_birth":{"country":"DE"}}"#,
+            metadata: #"{"credentialClaims":[{"path":["address","postal_code"],"display":[{"name":"Postcode"}]},{"path":["place_of_birth","country"],"display":[{"name":"Birth country"}]},{"path":["address","country"],"display":[{"name":"Residence country"}]}]}"#)
+        let roots = details.groups.flatMap(\.items)
+        let address = try XCTUnwrap(roots.first { $0.path.id == "address" })
+        guard case .object(let fields) = address.value else { return XCTFail("Address must retain its container") }
+        XCTAssertEqual(fields.map(\.label), ["Postcode", "Residence country"])
+        XCTAssertEqual(fields.map(\.value), [.text("00123"), .text("NL")])
+        let birth = try XCTUnwrap(roots.first { $0.path.id == "place_of_birth" })
+        guard case .object(let children) = birth.value else { return XCTFail("Birthplace must retain its container") }
+        XCTAssertEqual(children.map(\.label), ["Birth country"])
+        XCTAssertEqual(children.map(\.value), [.text("DE")])
+    }
+
+    func testEmptyContainersAndMixedArrayValuesRemainDistinct() throws {
+        let details = hierarchyDetails(#"{"object":{},"array":[],"mix":[null,false,0,"",{},[]]}"#)
+        let roots = details.groups.flatMap(\.items)
+        XCTAssertEqual(roots.first { $0.path.id == "object" }?.value, .object([]))
+        XCTAssertEqual(roots.first { $0.path.id == "array" }?.value, .list([]))
+        XCTAssertEqual(roots.first { $0.path.id == "mix" }?.value, .list([.null, .bool(false), .number("0"), .text(""), .object([]), .list([])]))
+    }
+
+    func testContradictoryArrayMetadataUsesWalletFallbackWithoutReorderingEntries() throws {
+        let details = hierarchyDetails(#"{"people":[{"name":"A"},{"name":"A"}]}"#,
+            metadata: #"{"credentialClaims":[{"path":["people",null,"name"],"display":[{"name":"Person"}]},{"path":["people",0,"name"],"display":[{"name":"Primary person"}]}]}"#)
+        let people = try XCTUnwrap(details.groups.flatMap(\.items).first)
+        guard case .list(let entries, _) = people.value else { return XCTFail("Expected array") }
+        let fields = try entries.map { entry -> ClaimItem in
+            guard case .object(let fields) = entry else { throw NSError(domain: "Expected object", code: 1) }
+            return try XCTUnwrap(fields.first)
+        }
+        XCTAssertEqual(fields.map(\.label), ["Name", "Name"])
+        XCTAssertEqual(fields.map(\.value), [.text("A"), .text("A")])
+        XCTAssertEqual(fields.map { $0.path.id }, ["people[0].name", "people[1].name"])
+    }
+
+    func testTypedMetadataPreservesMixedDefinitionsAndMandatoryHints() {
+        let metadata = StoredCredentialMetadataParser.claims(from: #"""
+        {"credentialClaims":[
+            {"path":["given_name"],"display":[{"name":"Given name"}]},
+            {"path":["nationalities",null],"mandatory":true,"display":[{"name":"Nationality"}]},
+            {"path":["addresses",0,"city"],"mandatory":false,"display":[{"name":"Primary city"}]}
+        ]}
+        """#)
+        XCTAssertEqual(metadata.map(\.name), ["Given name", "Nationality", "Primary city"])
+        XCTAssertEqual(metadata.map(\.mandatory), [nil, true, false])
+    }
+
+    func testTypedMetadataFallbackOmitsPathSyntaxWhileKeepingTypedPaths() {
+        let metadata = StoredCredentialMetadataParser.claims(from: #"""
+        {"credentialClaims":[
+            {"path":["nationalities",null]}, {"path":["other_nationalities",0]},
+            {"path":["element",-7]}, {"path":["element",18446744073709551615]},
+            {"path":["element",-18446744073709551616]}, {"path":[""]},
+            {"path":[" "],"mandatory":"true"}
+        ]}
+        """#)
+        XCTAssertEqual(metadata.map { $0.displayLabel(format: "dc+sd-jwt") },
+            ["Nationalities", "Other nationalities", "Element", "Element", "Element", "Claim", "Claim"])
+        XCTAssertEqual(metadata.map(\.path), [
+            [.key("nationalities"), .wildcard], [.key("other_nationalities"), .integer("0")],
+            [.key("element"), .integer("-7")], [.key("element"), .integer("18446744073709551615")],
+            [.key("element"), .integer("-18446744073709551616")], [.key("")], [.key(" ")]
+        ])
+        XCTAssertNil(metadata.last?.mandatory)
+    }
+
+    func testTypedMetadataMatchesWholePathsWithoutAliasingKeysOrParents() {
+        let metadata = StoredCredentialMetadataParser.claims(from: #"""
+        {"credentialClaims":[
+            {"path":["people",null,"name"],"display":[{"name":"Person name"}]},
+            {"path":["address",0,"city"],"display":[{"name":"Primary city"}]},
+            {"path":["object_address","0","city"],"display":[{"name":"Object city"}]},
+            {"path":["a.b"],"display":[{"name":"Dotted key"}]},
+            {"path":[""],"display":[{"name":"Empty key"}]},
+            {"path":["*"],"display":[{"name":"Star key"}]}
+        ]}
+        """#)
+        let item = ClaimItem(path: .topLevel("claim"), label: "Fallback", value: .text("Value"), rawValue: #""Value""#)
+        for (path, expected) in [
+            ("people[0].name", "Person name"), ("people[2].name", "Person name"),
+            ("people[*].name", "Person name"), ("people[-1].name", "Fallback"),
+            ("people.name", "Fallback"), ("people[0]", "Fallback"),
+            (#"people["0"].name"#, "Fallback"), ("address[0].city", "Primary city"),
+            ("address[1].city", "Fallback"), (#"address["0"].city"#, "Fallback"),
+            (#"object_address["0"].city"#, "Object city"), ("object_address[0].city", "Fallback"),
+            (#"["a.b"]"#, "Dotted key"), ("a.b", "Fallback"),
+            (#"[""]"#, "Empty key"), (#"["*"]"#, "Star key"), ("[*]", "Fallback")
+        ] {
+            let actual = item.applyingClaimMetadata(metadata, format: "dc+sd-jwt", expression: .parse(path))
+            XCTAssertEqual(actual.label, expected, path)
+            XCTAssertEqual(actual.value, item.value, path)
+            XCTAssertEqual(actual.rawValue, item.rawValue, path)
+            XCTAssertEqual(actual.path, item.path, path)
+        }
+        let wrapped = StoredCredentialMetadataParser.claims(from: #"{"credentialClaims":[{"path":["given_name"],"display":[{"name":"First name"}]}]}"#)
+        XCTAssertEqual(item.applyingClaimMetadata(wrapped, format: "jwt_vc_json", expression: .parse("vc.given_name")).label, "First name")
+        let mdoc = StoredCredentialMetadataParser.claims(from: #"{"credentialClaims":[{"path":["ns","given_name"],"display":[{"name":"First name"}]}]}"#)
+        XCTAssertEqual(item.applyingClaimMetadata(mdoc, format: "mso_mdoc", expression: .parse("ns.given_name.elementValue")).label, "First name")
+    }
+
+    func testInvalidTypedMetadataAndExpressionsNeverDropSegments() {
+        for path in ["[]", "[true]", "[1.5]", "[1e2]", "[{}]", "[[]]"] {
+            XCTAssertTrue(StoredCredentialMetadataParser.claims(from: "{\"credentialClaims\":[{\"path\":\(path)}]}").isEmpty, path)
+        }
+        for token in ["true", "1.5", "1e2", "18446744073709551615", "{}", "[]"] {
+            XCTAssertEqual(ClaimPathExpression.parse("[\"people\",\(token),\"name\"]").segments, [], token)
+        }
+        let duplicate = #"{"credentialClaims":[{"path":["people",null]},{"path":["people",null]}]}"#
+        XCTAssertTrue(StoredCredentialMetadataParser.claims(from: duplicate).isEmpty)
+    }
+
+    func testTypedMetadataLabelsNestedStoredAndRequestedValuesWithoutChangingData() throws {
+        let metadata = #"{"credentialClaims":[{"path":["people",null,"name"],"display":[{"name":"Person name"}]}]}"#
+        let credential = Credential(id: "typed", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "People", addedAt: nil,
+            credentialDataJSON: #"{"people":[{"name":"Alice"},{"name":"Bob"}]}"#, metadataJSON: metadata)
+        let people = try XCTUnwrap(CredentialDisplayNormalizer.details(for: credential).groups.flatMap(\.items).first { $0.path.id == "people" })
+        guard case .list(let values, _) = people.value else { return XCTFail("Expected the original list") }
+        let rows = try values.map { value -> ClaimItem in
+            guard case .object(let items) = value else { throw NSError(domain: "Expected object", code: 1) }
+            return try XCTUnwrap(items.first)
+        }
+        XCTAssertEqual(rows.map(\.label), ["Person name", "Person name"])
+        XCTAssertEqual(rows.map(\.value), [.text("Alice"), .text("Bob")])
+        XCTAssertEqual(rows.map { $0.path.id }, ["people[0].name", "people[1].name"])
+        let option = PresentationCredentialOption(queryID: "people", credentialID: "typed", format: "dc+sd-jwt",
+            issuer: nil, subject: nil, label: "People", credentialDataJSON: credential.credentialDataJSON,
+            disclosures: [PresentationDisclosure(path: #"["people",0,"name"]"#, name: "Fallback",
+                valueJSON: #""Alice""#, displayValue: nil, selectivelyDisclosable: false)], metadataJSON: metadata)
+        let requested = try XCTUnwrap(CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true).groups.first { $0.id == "requested" })
+        XCTAssertEqual(requested.items.map(\.label), ["Person name"])
+        XCTAssertEqual(requested.items.map(\.value), [.text("Alice")])
+    }
+
     func testArrayIndexDoesNotMatchPropertyMetadata() {
         let metadata = #"{"credentialClaims":[{"path":["jobs","name"],"display":[{"name":"Company name"}]}]}"#
+        let credential = Credential(id: "job-card", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Job", addedAt: nil,
+            credentialDataJSON: #"{"jobs":[{"name":"Engineer"}]}"#, metadataJSON: metadata)
         let option = PresentationCredentialOption(queryID: "job", credentialID: "job-card", format: "dc+sd-jwt",
-            issuer: nil, subject: nil, label: "Job", credentialDataJSON: #"{"jobs":[{"name":"Engineer"}]}"#,
+            issuer: nil, subject: nil, label: "Job", credentialDataJSON: credential.credentialDataJSON,
             disclosures: [PresentationDisclosure(path: #"["jobs",0,"name"]"#, name: "Name",
                 valueJSON: #""Engineer""#, displayValue: nil, selectivelyDisclosable: false)], metadataJSON: metadata)
-        let details = CredentialDisplayNormalizer.details(for: option)
+        let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
         XCTAssertEqual(details.groups.first { $0.id == "requested" }?.items.first?.label, "Name")
-        let job = details.groups.filter { $0.id != "requested" }.flatMap(\.items).first
-        guard case .list(let values) = job?.value, case .object(let items) = values.first else {
+        let job = CredentialDisplayNormalizer.details(for: credential).groups.flatMap(\.items).first
+        guard case .list(let values, _) = job?.value, case .object(let items) = values.first else {
             return XCTFail("Expected the original list and object")
         }
         XCTAssertEqual(items.first?.label, "Name")
@@ -136,13 +628,13 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             credentialDataJSON: #"{"portrait":[137,80,78,71,13,10,26,10,0,0,0,13,999]}"#
         )
         guard case .deferredImage(let source) = details.groups.first?.items.first?.value,
-              case .list(let values) = source.resolve() else {
+              case .list(let values, _) = source.resolve() else {
             return XCTFail("Malformed image arrays must keep their list fallback")
         }
         XCTAssertEqual(values.last, .number("999"))
     }
 
-    func testFlattensNamespacedMdocObjectClaimsIntoDisplayRows() {
+    func testRetainsNamespacedMdocObjectsWithTheirSourcePaths() {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
             title: "mso_mdoc",
@@ -169,18 +661,17 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             credentialData?.items.map(\.path.id),
             [
                 "docType",
-                "[\"eu.europa.ec.eudi.pid.1\"].birth_place.locality",
-                "[\"eu.europa.ec.eudi.pid.1\"].birth_place.country",
+                "[\"eu.europa.ec.eudi.pid.1\"].birth_place",
                 "[\"eu.europa.ec.eudi.pid.1\"].resident_state"
             ]
         )
         XCTAssertEqual(credentialData?.items.contains { item in
             if case .object = item.value { return true }
             return false
-        }, false)
+        }, true)
     }
 
-    func testRendersMdocAgeAttestationsWithoutAbsentClaims() throws {
+    func testRetainsMdocNamespacesExplicitNullsAndTypedAgeValues() throws {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
             title: "Photo ID",
@@ -206,13 +697,19 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             """
         )
 
-        let age = try XCTUnwrap(details.groups.first { $0.title == "Age attestations" })
-        XCTAssertFalse(age.initiallyExpanded)
-        XCTAssertEqual(age.items.map(\.label), ["18 or older", "21 or older", "65 or older"])
-        XCTAssertEqual(age.items.map(\.value), [.bool(true), .text("Unsupported value"), .bool(false)])
-        XCTAssertFalse(details.groups.flatMap(\.items).contains { $0.path.id.contains("age_over_62") })
-        XCTAssertFalse(details.groups.contains { $0.title == "Travel document data" })
-        XCTAssertEqual(details.groups.first { $0.title == "Credential data" }?.initiallyExpanded, true)
+        let roots = details.groups.flatMap(\.items)
+        let person = try XCTUnwrap(roots.first { $0.path.id == #"["org.iso.23220.1"]"# })
+        guard case .object(let fields) = person.value else { return XCTFail("Expected namespace") }
+        let ages = Dictionary(uniqueKeysWithValues: fields.map { ($0.label, $0.value) })
+        XCTAssertEqual(ages["62 or older"], .null)
+        XCTAssertEqual(ages["65 or older"], .bool(false))
+        XCTAssertEqual(ages["18 or older"], .bool(true))
+        XCTAssertEqual(ages["21 or older"], .text("Unsupported value"))
+        let travel = try XCTUnwrap(roots.first { $0.path.id == #"["org.iso.23220.dtc.1"]"# })
+        guard case .object(let elements) = travel.value else { return XCTFail("Expected namespace") }
+        XCTAssertEqual(elements.count, 3)
+        XCTAssertTrue(elements.allSatisfy { $0.value == .null })
+        XCTAssertEqual(details.groups.first { $0.title == "Travel document data" }?.initiallyExpanded, false)
     }
 
     func testSummarizesProvidedMdocTravelDocumentData() throws {
@@ -319,9 +816,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 "given_name",
                 "family_name",
                 "birthdate",
-                "place_of_birth.locality",
-                "place_of_birth.country",
-                "place_of_birth.region",
+                "place_of_birth",
                 "nationalities",
                 "portrait"
             ]
@@ -377,6 +872,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
               "iat": 1736899200,
               "exp": 1894699800,
               "vct": "eu.europa.ec.eudi.pid.1",
+              "vct#integrity": "sha256-test",
               "_sd_alg": "sha-256",
               "cnf": {
                 "jwk": {
@@ -403,7 +899,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
         XCTAssertEqual(personal.items.first { $0.path.id == "given_name" }?.value, .text("Alice"))
         XCTAssertEqual(personal.items.first { $0.path.id == "birthdate" }?.label, "Date of birth")
-        XCTAssertEqual(personal.items.first { $0.path.id == "place_of_birth.locality" }?.label, "Locality")
+        XCTAssertEqual(allHierarchyItems(personal.items).first { $0.path.id == "place_of_birth.locality" }?.label, "Locality")
 
         let address = try XCTUnwrap(details.groups.first { $0.title == "Address" })
         XCTAssertEqual(address.items.first { $0.path.id == "resident_country" }?.label, "Resident country")
@@ -413,10 +909,11 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(credentialData.items.first { $0.path.id == "document_number" }?.label, "Document number")
 
         let technical = try XCTUnwrap(details.groups.first { $0.title == "Credential metadata" })
-        XCTAssertEqual(technical.items.first { $0.path.id == "_sd" }?.value, .text("2 undisclosed claim values"))
+        XCTAssertEqual(technical.items.first { $0.label == "Type metadata integrity" }?.value, .text("sha256-test"))
+        XCTAssertEqual(technical.items.first { $0.path.id == "_sd" }?.value, .text("2 disclosure digests"))
         XCTAssertEqual(technical.items.first { $0.path.id == "cnf" }?.value, .text("Key-bound credential - EC - P-256"))
-        XCTAssertEqual(technical.items.first { $0.path.id == "iat" }?.value, .text("2025-01-15"))
-        XCTAssertEqual(technical.items.first { $0.path.id == "exp" }?.value, .text("2030-01-15"))
+        XCTAssertEqual(technical.items.first { $0.path.id == "iat" }?.value, .instant(WalletInstant(epochSeconds: 1736899200, nanoseconds: 0)))
+        XCTAssertEqual(technical.items.first { $0.path.id == "exp" }?.value, .instant(WalletInstant(epochSeconds: 1894699800, nanoseconds: 0)))
         XCTAssertFalse(technical.items.contains { item in
             item.value == .text("very-long-x-coordinate") ||
                 item.value == .text("very-long-y-coordinate")
@@ -465,8 +962,8 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertFalse(details.groups.contains { $0.title == "Address" })
 
         let metadata = try XCTUnwrap(details.groups.first { $0.title == "Credential metadata" })
-        XCTAssertEqual(metadata.items.first { $0.path.id == "_sd" }?.label, "Undisclosed claims")
-        XCTAssertEqual(metadata.items.first { $0.path.id == "_sd" }?.value, .text("3 undisclosed claim values"))
+        XCTAssertEqual(metadata.items.first { $0.path.id == "_sd" }?.label, "Disclosure digests")
+        XCTAssertEqual(metadata.items.first { $0.path.id == "_sd" }?.value, .text("3 disclosure digests"))
         XCTAssertEqual(metadata.items.first { $0.path.id == "vct" }?.value, .text("Pid 1 (urn:eudi:pid:1)"))
         XCTAssertEqual(
             metadata.items.first { $0.path.id == "status" }?.value,
@@ -643,13 +1140,12 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 addedAt: nil,
                 credentialDataJSON: credential.credentialDataJSON
             )
-            let claims = details.groups.flatMap(\.items)
+            let claims = allHierarchyItems(details.groups.flatMap(\.items))
 
             XCTAssertTrue(claims.contains { $0.path.id == credential.expectedClaimPath }, credential.title)
-            XCTAssertFalse(claims.contains { item in
-                if case .object = item.value { return true }
-                return false
-            }, credential.title)
+            if ["jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"].contains(credential.format) {
+                XCTAssertFalse(details.groups.flatMap(\.items).contains { ["vc", "credentialSubject", "vc.credentialSubject"].contains($0.path.id) }, credential.title)
+            }
         }
     }
 
@@ -694,7 +1190,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertTrue(technical.items.contains { $0.path.id == "[\"@context\"]" })
         XCTAssertTrue(technical.items.contains { $0.path.id == "type" })
         XCTAssertTrue(technical.items.contains { $0.path.id == "issuer" })
-        XCTAssertTrue(technical.items.contains { $0.path.id == "proof.type" })
+        XCTAssertTrue(allHierarchyItems(technical.items).contains { $0.path.id == "proof.type" })
     }
 
     func testClassifiesJWTVCEnvelopeTechnicalContainersLikeUnwrappedW3CCredentials() throws {
@@ -787,7 +1283,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             """
         )
 
-        let claims = details.groups.flatMap(\.items)
+        let claims = allHierarchyItems(details.groups.flatMap(\.items))
         XCTAssertEqual(claims.first { $0.path.id == "json_note.purpose" }?.value, .text("age proof"))
         XCTAssertEqual(claims.first { $0.path.id == "plain_note" }?.value, .decodedText("Hello, wallet"))
         guard case .image(_, _, let mimeType, _) = claims.first(where: { $0.path.id == "portrait" })?.value.resolvedImage else {
@@ -797,7 +1293,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     }
 
     func testRendersArbitraryDataImageClaimsForSDJWTAndW3CCredentialsUsingDetectedMimeType() {
-        for format in ["vc+sd-jwt", "dc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"] {
+        for format in ["vc+sd-jwt", "dc+sd-jwt", "jwt_vc", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc"] {
             let details = CredentialDisplayNormalizer.details(
                 id: "cred-1",
                 title: format,
@@ -826,8 +1322,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             XCTAssertEqual(mimeType, "image/jpeg")
             XCTAssertEqual(data, Self.validJPEGData)
 
-            guard case .image(_, _, let nestedMimeType, _) = details.groups
-                .flatMap(\.items)
+            guard case .image(_, _, let nestedMimeType, _) = allHierarchyItems(details.groups.flatMap(\.items))
                 .first(where: { $0.path.id == "resident_address.visual_proof" })?.value.resolvedImage else {
                 XCTFail("Expected a nested data image claim to render for \(format)")
                 continue
@@ -860,7 +1355,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             """
         )
 
-        let claims = details.groups.flatMap(\.items)
+        let claims = allHierarchyItems(details.groups.flatMap(\.items))
         for path in ["given_name", "invalid_image", "unsupported_image", "non_image_data_url", "plain_base64"] {
             guard let value = claims.first(where: { $0.path.id == path })?.value else {
                 XCTFail("Missing claim at \(path)")
@@ -941,14 +1436,14 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             ]
         )
 
-        let value = CredentialDisplayNormalizer.details(for: option).groups.first?.items.first?.value
+        let value = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true).groups.first?.items.first?.value
         guard case .image(_, _, let mimeType, _) = value?.resolvedImage else {
             return XCTFail("Expected the requested data image disclosure to render")
         }
         XCTAssertEqual(mimeType, "image/png")
     }
 
-    func testPresentationCredentialOptionPrependsRequestedDisclosures() throws {
+    func testSharingReviewShowsReadableRequestedDisclosures() throws {
         let option = PresentationCredentialOption(
             queryID: "pid",
             credentialID: "credential-1",
@@ -984,7 +1479,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             ]
         )
 
-        let details = CredentialDisplayNormalizer.details(for: option)
+        let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
 
         let requested = try XCTUnwrap(details.groups.first)
         XCTAssertEqual(requested.title, "Requested disclosures")
@@ -997,12 +1492,11 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(mimeType, "image/png")
         XCTAssertEqual(byteCount, syntheticPNGData.count)
 
-        let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
-        XCTAssertEqual(personal.items.map(\.label), ["Given name", "Family name"])
+        XCTAssertEqual(details.groups.count, 1)
         XCTAssertEqual(details.id, option.selection.id)
     }
 
-    func testPresentationCredentialOptionOmitsRequestedDisclosuresWhenEmpty() {
+    func testSharingReviewShowsNoGroupsWhenThereAreNoPreviewDisclosures() {
         let option = PresentationCredentialOption(
             queryID: "pid",
             credentialID: "credential-1",
@@ -1018,10 +1512,9 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             disclosures: []
         )
 
-        let details = CredentialDisplayNormalizer.details(for: option)
+        let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
 
-        XCTAssertFalse(details.groups.contains { $0.title == "Requested disclosures" })
-        XCTAssertEqual(details.groups.first?.title, "Personal details")
+        XCTAssertTrue(details.groups.isEmpty)
     }
 
     func testPresentationCredentialOptionSurfacesStoredCardArt() {
@@ -1045,7 +1538,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             """
         )
 
-        let details = CredentialDisplayNormalizer.details(for: option)
+        let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: false)
 
         XCTAssertEqual(details.cardSummary.backgroundImageURI, "https://issuer.example/pid-bg.png")
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
@@ -1062,7 +1555,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             credentialDataJSON: #"{"given_name":"Ada"}"#
         )
 
-        let details = CredentialDisplayNormalizer.details(for: option)
+        let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: false)
         XCTAssertEqual(details.cardSummary.title, "Personal ID")
     }
 
@@ -1173,7 +1666,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             "Subject"
         ])
         XCTAssertEqual(systemInfo.items.map(\.value), [
-            .text("2026-07-09T12:00:00Z"),
+            .instant(WalletInstant(addedAt)),
             .text("cred-1"),
             .text("vc+sd-jwt"),
             .text("Example Issuer"),

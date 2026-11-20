@@ -24,9 +24,23 @@ Issuer API 2 is the modern walt.id issuer service for OpenID for Verifiable Cred
 
 Use this service for new issuer integrations that need OpenID4VCI 1.0 support. The original `waltid-issuer-api` remains available for draft-based and legacy flows, but is planned for deprecation.
 
+## Production deployment
+
+**Issuer API 2 does not authenticate or authorize management API callers.** The OpenID4VCI token and proof checks, and the external login configured in `authentication-service.conf`, apply to credential exchange. They do not protect `/issuer2/*`.
+
+Apply the [shared deployment controls](../README.md#production-deployment) and complete these issuer-specific steps:
+
+- **Separate management from credential exchange.** Keep `/issuer2/*` on a private ingress behind an authenticated backend or gateway. Authorize offer creation and deferred issuance operations separately from profile reads, session inspection, and event streams. On the wallet-facing HTTPS ingress, allow only the metadata and OpenID4VCI routes and methods needed for your flows. Keep their protocol checks intact. Set `baseUrl` in [`issuer-service.conf`](config/issuer-service.conf) to the wallet-reachable HTTPS URL.
+- **Control what gets issued.** Replace demo profiles, metadata, and sample claims. Use trusted sources for credential claims and check recipient eligibility before creating offers. Allow only approved profiles and runtime overrides, especially for claims and signing keys. For authorization code flows, replace the test identity provider and [require PKCE](#issuer2-pkce-requirement). For pre-authorized flows, deliver short-lived offers securely and send any transaction code through a separate channel.
+- **Replace and protect keys.** Provision your own credential signing keys and any keys or certificates used for token signing, credential encryption, and signed metadata. Store secrets outside source control, limit access, and plan rotation. Use a managed key backend where supported and required by your deployment.
+- **Plan for session continuity.** Sessions and grant state are in memory by default. For flows that must survive a restart or span replicas, enable Redis as described in [Persistence](#persistence) and protect access to it. Use the same securely provisioned token signing key and compatible configuration across replicas. Test in-flight issuance and SSE or webhook delivery across your actual routing and restart behavior.
+- **Own credential status and session data.** If your credentials use status lists, allocate entries, publish the lists, and operate revocation. Restrict webhook destinations to approved receivers and keep the [outbound fetch guard](config/network-fetch-guard.conf) restrictive. Limit retention of issuance data and keep offers, transaction codes, and claims out of routine logs.
+
+Before launch, verify that unauthenticated callers cannot create offers or read sessions, and that an authorized backend can issue a credential to a wallet through the public routes.
+
 ## Features
 
-- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, and credential endpoints
+- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, credential, and notification endpoints
 - **Credential profiles** — Configurable issuance profiles in `issuer2-profiles.conf`
 - **Metadata endpoints** — Credential issuer, authorization server, JWT VC issuer, JWKS, and VCT metadata
 - **Grant types** — Pre-authorized code and authorization code flows
@@ -57,9 +71,18 @@ Configuration files live in `config/`:
 | `credential-issuer-metadata.conf` | OpenID4VCI issuer and authorization server metadata |
 | `issuer2-profiles.conf` | Credential profiles exposed by the management API |
 | `persistence.conf` | In-memory or Redis-backed repository configuration |
-| `authentication-service.conf` | Optional external OAuth authentication configuration |
+| `authentication-service.conf` | External OAuth login for credential subjects in authorization code flows |
+
+Set `KEYCLOAK_CLIENT_SECRET` to the Keycloak client secret when using
+external OAuth authentication. The service and Docker Compose configuration files
+read `clientSecret` from this environment variable. Without it, the secret is
+empty and Keycloak authentication cannot complete. The issuer2 Kubernetes
+deployments read this variable from the `client-secret` key of the
+`issuer2-keycloak` Secret in their namespace.
 
 The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
+
+Issuer metadata always advertises `notification_endpoint`, and successful credential responses that contain credentials include `notification_id`. `POST /openid4vci/notification` accepts `credential_accepted`, `credential_failure`, and `credential_deleted` with the same access token. The session stores a notification ID and the latest wallet event for each issued credential.
 
 `ciTokenStoredKey` optionally carries an encoded crypto2 `StoredKey` sidecar for `ciTokenKey` and takes precedence at startup. The service validates that both values identify the same signing and verification key. If the sidecar is absent, a legacy JWK is migrated only in memory; the configuration file is never rewritten. A malformed or mismatched sidecar fails startup without falling back to `ciTokenKey`.
 
@@ -312,6 +335,7 @@ the first item's credential references index 94567 and the second item's credent
 | `POST` | `/openid4vci/token` | Token endpoint |
 | `POST` | `/openid4vci/nonce` | Nonce endpoint |
 | `POST` | `/openid4vci/credential` | Credential endpoint |
+| `POST` | `/openid4vci/notification` | Wallet notification endpoint |
 
 ## Issuance Lifecycle Events
 
@@ -332,6 +356,9 @@ Issuer sessions publish the same `KtorSessionUpdate` envelope to SSE and to an o
 | W3C VC credential request | `credential_request_w3c_vc_succeeded`, `credential_request_w3c_vc_failed` |
 | mdoc credential request | `credential_request_mso_mdoc_succeeded`, `credential_request_mso_mdoc_failed` |
 | Session lifecycle | `issuance_status_changed` |
+| Wallet result | `wallet_credential_accepted`, `wallet_credential_failure`, `wallet_credential_deleted` |
+
+A wallet notification is published on the offer webhook and the issuer SSE stream only when the stored event or description changes. It does not change the issuance status. `credential_request_*_succeeded` still means the issuer issued the credential.
 
 Kotlin enum constants are `SCREAMING_SNAKE_CASE`; webhook and SSE payloads use the lowercase `value` strings above.
 
@@ -454,7 +481,7 @@ The default persistence configuration is in-memory:
 type = "memory"
 ```
 
-Redis-backed repositories can be enabled in `persistence.conf`:
+To use Redis-backed repositories, enable `persistence` in [`_features.conf`](config/_features.conf) and set the backend in [`persistence.conf`](config/persistence.conf):
 
 ```hocon
 type = "redis"
@@ -566,6 +593,22 @@ separately. These examples do not assert full EUDI compliance for every credenti
 Restart OSS issuer2 after editing the metadata/profile configuration files. Existing offers
 should be replaced with offers selecting the intended profile after a policy change.
 
+## Issuer2 PKCE requirement
+
+In `issuer-service.conf`:
+
+```hocon
+requirePkce = false
+```
+
+The default permits authorization-code requests without PKCE. Set `requirePkce = true`
+to require S256 PKCE at `/authorize` and `/par`.
+Restart the service after changing its configuration. The provider rejects a missing
+challenge with `invalid_request` and verifies the matching `code_verifier` before issuing tokens.
+Supplied PKCE is always verified, including when the requirement is disabled.
+Codes issued without PKCE cannot be redeemed after the requirement is enabled.
+Pre-authorized-code and refresh-token requests are unaffected.
+
 ## Issuer2 pushed authorization requests
 
 In `issuer-service.conf`:
@@ -590,8 +633,12 @@ must also restart. Unaffected pre-authorized sessions remain usable.
 
 ## Client attestation challenges
 
+The shipped `issuer-service.conf` comments out `client-attestation`, so the public demo
+accepts authorization-code wallets without a client attestation. Uncomment that block to
+require `attest_jwt_client_auth`. Anonymous pre-authorized access stays enabled.
+
 Challenges are disabled in the shipped configurations. To enable them, add the following
-inside the `client-attestation` entry in `clientAuthenticationConfig.supportedMethods`
+inside the uncommented `client-attestation` entry in `clientAuthenticationConfig.supportedMethods`
 in `issuer-service.conf`, alongside `config`, and restart the issuer:
 
 ```hocon
@@ -684,6 +731,43 @@ Each transaction can be collected once. One offer can contain multiple transacti
 including a batch of holder proofs for a selected credential. Completing an offer
 before its first Credential Request allows immediate issuance from that request.
 
+
+Deferred collection uses the WIA and KAs accepted for that transaction. Their verified
+validity bounds, original clock skew, client identity, and holder-key associations are
+retained privately. The shared library checks those lifetimes before signing and before
+delivering a saved response, including after a restart. Original PoP, proof age, and
+nonce checks are not replayed.
+
+The provider captures WIA evidence from verified access-token authentication and
+snapshots it automatically in `acceptCredentialRequest()`, together with the verified
+KA evidence. Acceptance checks the captured lifetimes before returning: expired or
+missing required evidence returns `credential_request_denied` without creating a
+transaction. Issuers do not decode private token claims or infer WIA requirements.
+The provider uses its existing client-authentication configuration resolver when a
+legacy transaction has no recorded requirement; optional authentication methods do
+not make WIA mandatory. Originally anonymous pre-authorized grants retain that
+profile through refresh.
+
+If a required attestation has expired, or required evidence is missing, collection
+returns `credential_request_denied`. Denial is permanent for that transaction: one
+expired KA denies the entire holder-key batch. Other transactions and completed
+datasets retain their progress. This transaction denial does not change the offer's
+operator approval decision.
+
+An acceptance-time `credential_request_denied` emits one credential-request failure
+notification for that request.
+A transaction's first lifetime denial emits one credential-request failure notification;
+later polls return the persisted denial without another notification. Response-encryption
+errors retain the signed checkpoint so a later poll can retry delivery.
+
+Refreshing an access token preserves its original WIA evidence and never replaces a
+transaction's accepted evidence. Resubmitting a Credential Request also keeps the
+original acceptance. Transactions stored before evidence capture fail closed when
+their required profile cannot be enforced. Standalone KAs without `exp` retain the
+existing optional-expiration rule; JWT-header KAs still require `exp`. Fresh attestation
+replacement remains separate work. See [attestation status enforcement](docs/deferred-attestations.md)
+for status-policy configuration and retry behavior.
+
 Configure `issuer-service.conf` (Enterprise uses the same `deferredIssuance` object
 in the issuer service configuration):
 
@@ -704,3 +788,8 @@ Use Redis for persistence across OSS restarts. Atomic claims serialize collectio
 verified public holder bindings, allocated progress, and prepared credential responses
 are retained for recovery. A live worker renews its processing lease; an abandoned
 claim becomes recoverable after five minutes, without extending the offer deadline.
+
+### Deferred attestation status
+
+See [deferred attestation enforcement](docs/deferred-attestations.md) for WIA/KA status
+configuration, signer trust, checkpoint freshness, retries and legacy handling.

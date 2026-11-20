@@ -6,6 +6,12 @@ import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.credentials.status.CredentialStatusCoverage
+import id.walt.credentials.status.CredentialStatusFreshness
+import id.walt.credentials.status.CredentialStatusIssue
+import id.walt.credentials.status.CredentialStatusKind
+import id.walt.credentials.status.StatusMeaning
+import id.walt.credentials.status.StatusProtocol
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -20,6 +26,8 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.handlers.WalletIssuanceMetadataProvenance
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.status.CredentialStatusRefreshMode
+import id.walt.wallet2.status.CredentialStatusRefreshOutcome
 import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
@@ -59,6 +67,7 @@ import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -126,37 +135,27 @@ class MobileWalletIntegrationTest {
     @Test
     fun receiveEudiPidSdJwtFromEudi() = runBlocking {
         val client = createEudiWallet(
-            MobileWalletConfig(defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
+            walletConfig("eudi-pid-status")
         )
-        client.signingIdentity.initialize().activeIdentity()
+        try {
+            client.signingIdentity.initialize().activeIdentity()
 
-        val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
-        val session = client.startIssuance(
-            MobileWalletIssuanceRequest(
-                offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
+            val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
+            val session = client.startIssuance(
+                MobileWalletIssuanceRequest(
+                    offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
+                )
             )
-        )
-        assertTrue(session.offer.issuer.identifier.isNotBlank(), "Resolved issuer metadata should include its identifier")
-        assertTrue(session.offer.credentials.isNotEmpty(), "Offer should resolve credential metadata")
-        assertTrue(session.offer.credentials.all { it.configurationId.isNotBlank() && it.format.isNotBlank() })
-        assertNotNull(session.offer.transactionCode, "EUDI offer should require a transaction code")
-        val credentialIds = client.continuePreAuthorizedIssuance(session.id, offer.txCode).storedCredentialIds()
-        assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
-    }
-
-    @Test
-    fun receiveEudiPidSdJwtFromDemoIssuer2() = runBlocking {
-        receiveCredentialFromDemoIssuer2("eudi-pid-sdjwt")
-    }
-
-    @Test
-    fun receiveEudiPidMdocFromDemoIssuer2() = runBlocking {
-        receiveCredentialFromDemoIssuer2("eudi-pid-mdoc")
-    }
-
-    @Test
-    fun receiveIsoMdlFromDemoIssuer2() = runBlocking {
-        receiveCredentialFromDemoIssuer2("iso-mdl")
+            assertTrue(session.offer.issuer.identifier.isNotBlank(), "Resolved issuer metadata should include its identifier")
+            assertTrue(session.offer.credentials.isNotEmpty(), "Offer should resolve credential metadata")
+            assertTrue(session.offer.credentials.all { it.configurationId.isNotBlank() && it.format.isNotBlank() })
+            assertNotNull(session.offer.transactionCode, "EUDI offer should require a transaction code")
+            val credentialIds = client.continuePreAuthorizedIssuance(session.id, offer.txCode).storedCredentialIds()
+            assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
+            client.checkEudiPidStatus(credentialIds)
+        } finally {
+            client.close()
+        }
     }
 
     @Test
@@ -230,23 +229,18 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
-    fun receiveAndPresentEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        receiveAndPresentDemoCredential("eudi-pid-sdjwt")
+    fun publicDemoPidSdJwtSupportsDirectAndStepwisePresentation() = runBlocking {
+        exerciseDemoPresentations("eudi-pid-sdjwt", DemoPresentation.Direct, DemoPresentation.RecreatedStepwise)
     }
 
     @Test
-    fun receiveAndPresentEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        receiveAndPresentDemoCredential("eudi-pid-mdoc")
-    }
-
-    @Test
-    fun previewAndSubmitEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        previewAndSubmitDemoCredential("eudi-pid-sdjwt")
-    }
-
-    @Test
-    fun previewAndSubmitEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        previewAndSubmitDemoCredential("eudi-pid-mdoc")
+    fun publicDemoPidMdocPersistsAndSupportsDirectAndStepwisePresentation() = runBlocking {
+        assertEquals("eudi-pid-mdoc", DemoTestBackend.persistenceScenario.id)
+        // Reopen before any presentation can initialize state needed by the persistence path.
+        exerciseDemoPresentations(
+            DemoTestBackend.persistenceScenario.id,
+            DemoPresentation.RecreatedDirect, DemoPresentation.Direct, DemoPresentation.RecreatedStepwise,
+        )
     }
 
     @Test
@@ -436,7 +430,7 @@ class MobileWalletIntegrationTest {
 
     @Test
     fun receiveAndPresentIsoMdlAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        receiveAndPresentDemoCredential("iso-mdl")
+        exerciseDemoPresentations("iso-mdl", DemoPresentation.Direct)
     }
 
     @Test
@@ -444,42 +438,53 @@ class MobileWalletIntegrationTest {
         val walletConfig = walletConfig("eudi-pid-sd-jwt-persistence")
 
         val client1 = createEudiWallet(walletConfig)
-        client1.signingIdentity.initialize().activeIdentity()
-
-        val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
-        client1.receiveCredential(
-            offerUrl = offer.offerUrl,
-            transactionCode = offer.txCode,
-        )
-
+        val (ids, checkedAt) = try {
+            client1.signingIdentity.initialize().activeIdentity()
+            val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
+            val ids = client1.receiveCredential(offer.offerUrl, offer.txCode)
+            client1.checkEudiPidStatus(ids)
+            ids to client1.credentialStatusSnapshot().credentials.associate {
+                it.reference.credentialId to assertNotNull(it.presentation.lastCheckedAt)
+            }
+        } finally {
+            client1.close()
+        }
         val client2 = createEudiWallet(walletConfig)
-        val credentials = client2.credentials()
-        assertTrue(credentials.isNotEmpty(), "Credentials should persist across client recreation")
+        try {
+            val credentials = client2.credentials()
+            assertEquals(ids.toSet(), credentials.map { it.id }.toSet(), "The issued credentials must survive recreation")
+            val restored = client2.credentialStatusSnapshot().credentials
+            assertEquals(ids.toSet(), restored.map { it.reference.credentialId }.toSet())
+            restored.forEach {
+                assertEquals(checkedAt.getValue(it.reference.credentialId), it.presentation.lastCheckedAt)
+                assertEquals(CredentialStatusFreshness.STALE, it.presentation.freshness, "Restored evidence is historical until authenticated again")
+            }
+            client2.checkEudiPidStatus(ids)
+            client2.credentialStatusSnapshot().credentials.forEach {
+                assertTrue(assertNotNull(it.presentation.lastCheckedAt) > assertNotNull(checkedAt.getValue(it.reference.credentialId)))
+            }
+        } finally {
+            client2.close()
+        }
     }
 
-    @Test
-    fun demoCredentialPersistsAcrossWalletRecreation() = runBlocking {
-        val scenario = DemoTestBackend.persistenceScenario
-        val walletConfig = walletConfig("persist-${scenario.id}")
-
-        val client1 = MobileWalletFactory(context).create(walletConfig)
-        val bootstrapResult = client1.signingIdentity.initialize().activeIdentity()
-
-        val offer = DemoTestBackend.createOffer(scenario)
-        client1.receiveCredential(offer.offerUrl, offer.txCode)
-
-        val client2 = MobileWalletFactory(context).create(walletConfig)
-        val credentials = client2.credentials()
-        assertTrue(credentials.isNotEmpty(), "public demo credential should persist across client recreation")
-        assertStoredCredentialDisplayData(scenario = DemoTestBackend.persistenceScenario, credentials = credentials)
-
-        val session = DemoTestBackend.createVerifierSession(scenario)
-        val presentResult = client2.present(session.authorizationRequestUri, did = bootstrapResult.did)
-        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
-            presentResult,
-            "Should present persisted public demo credential for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
-        )
-        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
+    private suspend fun MobileWallet.checkEudiPidStatus(ids: List<String>) {
+        val results = refreshCredentialStatuses(ids, CredentialStatusRefreshMode.FORCE)
+        assertEquals(ids.toSet(), results.map { it.reference.credentialId }.toSet())
+        results.forEach { assertEquals(CredentialStatusRefreshOutcome.COMPLETED, it.outcome) }
+        val records = credentialStatusSnapshot().credentials.filter { it.reference.credentialId in ids }
+        assertEquals(ids.size, records.size)
+        records.forEach { record ->
+            val status = record.presentation
+            assertEquals(CredentialStatusKind.CHECKED, status.kind, "EUDI PID must have authenticated status, not merely a completed attempt")
+            assertEquals(CredentialStatusFreshness.FRESH, status.freshness)
+            assertEquals(CredentialStatusCoverage.COMPLETE, status.coverage)
+            assertEquals(CredentialStatusIssue.NONE, status.issue)
+            assertNull(status.failure)
+            assertNotNull(status.lastCheckedAt)
+            assertEquals(StatusProtocol.TOKEN_STATUS_LIST, status.references.single().protocol)
+            assertEquals(StatusMeaning.CLEAR, status.references.single().result)
+        }
     }
 
     private fun walletConfig(
@@ -521,20 +526,6 @@ class MobileWalletIntegrationTest {
     private suspend fun createEudiWallet(config: MobileWalletConfig) =
         MobileWalletFactory(context).create(config, eudiVerifierTrust)
             .attachKeyAttestationProviderResolver(DemoKeyAttestationProviders())
-
-    private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {
-        val scenario = demoScenario(scenarioId)
-        val client = MobileWalletFactory(context).create(walletConfig("receive-${scenario.id}"))
-        client.signingIdentity.initialize().activeIdentity()
-
-        val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
-        assertTrue(
-            credentialIds.isNotEmpty(),
-            "Should receive at least one ${scenario.displayName} credential from public demo issuer2",
-        )
-        assertStoredCredentialDisplayData(scenario = scenario, credentials = client.credentials())
-    }
 
     private suspend fun receiveAndPresentEudiCredential(credentialId: String) {
         val client = createEudiWallet(walletConfig("eudi-present-$credentialId"))
@@ -606,74 +597,50 @@ class MobileWalletIntegrationTest {
         EudiTestBackend.waitForVerifierSuccess(transaction.transactionId)
     }
 
-    private suspend fun receiveAndPresentDemoCredential(scenarioId: String) {
+    private enum class DemoPresentation { Direct, RecreatedDirect, RecreatedStepwise }
+
+    private suspend fun exerciseDemoPresentations(scenarioId: String, vararg modes: DemoPresentation) {
         val scenario = demoPresentationScenario(scenarioId)
-        val client = MobileWalletFactory(context).create(walletConfig("present-${scenario.id}"))
-        val bootstrapResult = client.signingIdentity.initialize().activeIdentity()
+        val config = walletConfig("present-${scenario.id}")
+        val issuingClient = MobileWalletFactory(context).create(config)
+        val bootstrapResult = issuingClient.signingIdentity.initialize().activeIdentity()
 
         val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
+        val credentialIds = issuingClient.receiveCredential(offer.offerUrl, offer.txCode)
         assertTrue(
             credentialIds.isNotEmpty(),
             "Should receive ${scenario.displayName} from public demo issuer2",
         )
 
-        val credentials = client.credentials()
-        assertTrue(credentials.isNotEmpty(), "Should have stored ${scenario.displayName} credentials")
-        assertStoredCredentialDisplayData(scenario = scenario, credentials = credentials)
+        for (mode in modes) {
+            val client = if (mode == DemoPresentation.Direct) issuingClient else MobileWalletFactory(context).create(config)
+            val credentials = client.credentials()
+            assertEquals(credentialIds.toSet(), credentials.map { it.id }.toSet(), "${scenario.id}/$mode stored credentials")
+            assertStoredCredentialDisplayData(scenario = scenario, credentials = credentials)
 
-        val session = DemoTestBackend.createVerifierSession(scenario)
-        val presentResult = client.present(session.authorizationRequestUri, did = bootstrapResult.did)
-        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
-            presentResult,
-            "public demo verifier2 presentation should succeed for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
-        )
-
-        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
-    }
-
-    private suspend fun previewAndSubmitDemoCredential(scenarioId: String) {
-        val scenario = demoPresentationScenario(scenarioId)
-        val client = MobileWalletFactory(context).create(walletConfig("preview-submit-${scenario.id}"))
-        val bootstrapResult = client.signingIdentity.initialize().activeIdentity()
-
-        val offer = DemoTestBackend.createOffer(scenario)
-        val credentialIds = client.receiveCredential(offer.offerUrl, offer.txCode)
-        assertTrue(
-            credentialIds.isNotEmpty(),
-            "Should receive ${scenario.displayName} from public demo issuer2",
-        )
-
-        val session = DemoTestBackend.createVerifierSession(scenario)
-        val preview = client.previewPresentation(session.authorizationRequestUri).requireReadyPreview()
-        assertTrue(
-            preview.credentialOptions.isNotEmpty(),
-            "Should preview at least one matching credential for ${scenario.displayName}: preview=$preview",
-        )
-        assertTrue(
-            preview.credentialOptions.all { it.credentialId in credentialIds },
-            "Preview should only offer credentials received in this test: received=$credentialIds, preview=$preview",
-        )
-
-        val result = client.submitPresentation(
-            previewHandle = preview.previewHandle,
-            selectedCredentialOptions = preview.credentialOptions.map { option ->
-                MobileWalletPresentationCredentialSelection(
-                    queryId = option.queryId,
-                    credentialId = option.credentialId,
+            val session = DemoTestBackend.createVerifierSession(scenario)
+            val result = if (mode == DemoPresentation.RecreatedStepwise) {
+                val preview = client.previewPresentation(session.authorizationRequestUri).requireReadyPreview()
+                assertTrue(preview.credentialOptions.isNotEmpty(), "${scenario.id}/$mode should offer matching credentials: $preview")
+                assertTrue(
+                    preview.credentialOptions.all { it.credentialId in credentialIds },
+                    "Preview should only offer credentials received in this test: received=$credentialIds, preview=$preview",
                 )
-            },
-            did = bootstrapResult.did,
-        )
-        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
-            result,
-            "public demo verifier2 stepwise presentation should succeed for ${scenario.displayName}: preview=$preview, result=$result",
-        )
-
-        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
+                client.submitPresentation(
+                    previewHandle = preview.previewHandle,
+                    selectedCredentialOptions = preview.credentialOptions.map { it.selection },
+                    did = bootstrapResult.did,
+                )
+            } else {
+                client.present(session.authorizationRequestUri, did = bootstrapResult.did)
+            }
+            assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
+                result,
+                "public demo verifier2 presentation should succeed for ${scenario.id}/$mode: credentials=$credentials, result=$result",
+            )
+            DemoTestBackend.waitForVerifierSuccess(session.sessionId)
+        }
     }
-
-    private fun demoScenario(id: String) = DemoTestBackend.scenarios.first { it.id == id }
 
     private fun demoPresentationScenario(id: String) = DemoTestBackend.presentationScenarios.first { it.id == id }
 

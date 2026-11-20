@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.issuer
 
+import id.walt.openid4vp.conformance.testplans.IssuerIssuanceMode
+import id.walt.openid4vp.conformance.testplans.IssuerDeferredEvidence
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
 import kotlinx.serialization.Serializable
@@ -25,12 +27,13 @@ data class IssuerVariant(
     val credentialEncryption: String,
     // Runner coverage dimension, not a conformance-suite variant parameter.
     val credentialProofType: String? = null,
+    val issuanceMode: IssuerIssuanceMode = IssuerIssuanceMode.IMMEDIATE,
 ) {
     val isHaip: Boolean
         get() = fapiProfile == "vci_haip"
 
     val conformanceTestPlanName: String
-        get() = if (isHaip) {
+        get() = if (isHaip && issuanceMode == IssuerIssuanceMode.IMMEDIATE) {
             "oid4vci-1_0-issuer-haip-test-plan"
         } else {
             "oid4vci-1_0-issuer-test-plan"
@@ -47,7 +50,7 @@ data class IssuerVariant(
             authorizationRequestType.toIdPart(),
             requestMethod.toIdPart(),
             credentialEncryption.toIdPart(),
-        ).joinToString("-") + (credentialProofType?.let { "-proof-$it" } ?: "")
+        ).joinToString("-") + (if (issuanceMode == IssuerIssuanceMode.DEFERRED) "-deferred" else "") + (credentialProofType?.let { "-proof-$it" } ?: "")
 
     val credentialOfferAuthMethod: CredentialOfferAuthMethod?
         get() = when {
@@ -89,16 +92,17 @@ data class IssuerVariant(
         put("vci_grant_type", grantType)
         put("vci_credential_encryption", credentialEncryption)
         credentialProofType?.let { put("credential_proof_type", it) }
+        if (issuanceMode == IssuerIssuanceMode.DEFERRED) put("issuance_mode", "deferred")
     }
 
     fun testPlanCreationVariant(): JsonObject =
-        if (isHaip) {
+        if (isHaip && issuanceMode == IssuerIssuanceMode.IMMEDIATE) {
             buildJsonObject {
                 put("vci_authorization_code_flow_variant", authorizationCodeFlowVariant)
                 put("credential_format", credentialFormat)
             }
         } else {
-            JsonObject(toJsonObject().filterKeys { it != "credential_proof_type" })
+            JsonObject(toJsonObject().filterKeys { it !in setOf("credential_proof_type", "issuance_mode") })
         }
 
     private fun String.toIdPart(): String = when (this) {
@@ -119,6 +123,11 @@ data class IssuerVariant(
 
 object IssuerVariantMatrix {
     fun all(): List<IssuerVariant> = base() + haip()
+
+    fun deferred(): List<IssuerVariant> = all().filter {
+        it.authorizationCodeFlowVariant == "issuer_initiated" && it.clientAuthType == "client_attestation" &&
+            it.senderConstrain == "dpop" && it.authorizationRequestType == "simple" && it.requestMethod == "unsigned"
+    }.map { it.copy(issuanceMode = IssuerIssuanceMode.DEFERRED) }
 
     fun base(): List<IssuerVariant> = combinations(
         fapiProfiles = listOf("vci"),
@@ -305,6 +314,7 @@ data class IssuerVariantModuleRunResult(
     val variant: JsonObject = JsonObject(emptyMap()),
     /** Safe for CI artifacts; excludes raw exception messages and request/response data. */
     val failureSummary: String? = null,
+    val deferredEvidence: IssuerDeferredEvidence? = null,
 )
 
 @Serializable
@@ -331,7 +341,8 @@ data class IssuerVariantRunResult(
             if (batchModules.isEmpty()) {
                 // VCIIssuerTestPlanHaip at db1080a offers batch only for plain responses.
                 // Revisit this narrow exception when updating the suite pin.
-                val notOffered = variant["fapi_profile"]?.jsonPrimitive?.content == "vci_haip" &&
+                val notOffered = variant["issuance_mode"]?.jsonPrimitive?.content != "deferred" &&
+                    variant["fapi_profile"]?.jsonPrimitive?.content == "vci_haip" &&
                     variant["vci_grant_type"]?.jsonPrimitive?.content == "authorization_code" &&
                     variant["vci_credential_encryption"]?.jsonPrimitive?.content == "encrypted"
                 return if (notOffered) {
@@ -420,7 +431,7 @@ object IssuerVariantReportWriter {
         appendLine("- Failed: ${results.count { it.status != IssuerVariantRunStatus.PASSED }}")
         appendLine("- ${batchCoverageSummary(results)}")
         appendLine()
-        appendLine("`not_offered_by_pinned_suite` means encrypted HAIP batch is absent from db1080a's plan; it is not batch coverage.")
+        appendLine("`not_offered_by_pinned_suite` means encrypted HAIP batch is absent from db1080a's dedicated HAIP plan; it is not batch coverage. Deferred uses the generic VCI plan.")
         appendLine()
         appendLine("<details>")
         appendLine("<summary>${ConformanceReportWriter.Role.VCI_ISSUER.title} results</summary>")

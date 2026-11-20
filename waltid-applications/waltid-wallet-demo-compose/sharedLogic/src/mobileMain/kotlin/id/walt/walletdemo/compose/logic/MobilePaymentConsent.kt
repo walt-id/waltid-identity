@@ -11,5 +11,5 @@ fun PreparedPaymentConsent.toDemoPaymentConsent() = WalletDemoPaymentConsent(
         PaymentFieldPlacement.MAIN -> WalletDemoPaymentFieldPlacement.Main
         PaymentFieldPlacement.DETAILS -> WalletDemoPaymentFieldPlacement.Details
         PaymentFieldPlacement.OMITTED -> WalletDemoPaymentFieldPlacement.Omitted
-    }) },
+    }, path = field.path) },
 )

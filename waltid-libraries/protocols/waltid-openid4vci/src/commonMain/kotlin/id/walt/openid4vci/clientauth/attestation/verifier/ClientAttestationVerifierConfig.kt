@@ -2,6 +2,9 @@
 
 package id.walt.openid4vci.clientauth.attestation.verifier
 
+import id.walt.openid4vci.attestation.AttestationStatusPolicy
+import id.walt.openid4vci.attestation.AttestationStatusResolver
+
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
 import kotlinx.serialization.SerialName
@@ -12,6 +15,7 @@ import kotlinx.serialization.json.buildJsonObject
 @Serializable
 data class ClientAttestationVerifierConfig(
     val verificationMethod: ClientAttestationVerificationMethod,
+    val statusPolicy: AttestationStatusPolicy = AttestationStatusPolicy(),
 )
 
 @Serializable
@@ -26,11 +30,18 @@ sealed class ClientAttestationVerificationMethod {
     @SerialName("x509-chain")
     data class X509Chain(
         val trustedRootCertificatesPem: List<String>,
+        /**
+         * Optional entity-type name. This library stores it and does not enforce it.
+         * A deployment that wraps the verifier, such as Enterprise Issuer2, may require
+         * a linked trust registry to trust the leaf and use this name as an extra filter.
+         */
+        val expectedEntityType: String? = null,
     ) : ClientAttestationVerificationMethod() {
         init {
             require(trustedRootCertificatesPem.isNotEmpty()) {
                 "x509-chain verification requires at least one trusted root certificate"
             }
+            expectedEntityType?.let { require(it.isNotBlank()) { "expectedEntityType must not be blank" } }
         }
     }
 
@@ -48,6 +59,7 @@ sealed class ClientAttestationVerificationMethod {
 suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
     keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
     crypto2KeyReferenceResolver: Crypto2ClientAttestationKeyReferenceResolver? = null,
+    statusResolver: AttestationStatusResolver? = null,
 ): ClientAttestationConfig =
     when (val source = verificationMethod) {
         is ClientAttestationVerificationMethod.StaticJwk -> {
@@ -59,12 +71,14 @@ suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
             ) { "static-jwk client attestation verification key is invalid" }
             ClientAttestationConfig(
                 attestationVerifier = Crypto2KeyBasedClientAttestationVerifier { _, _ -> listOf(trustedKey) },
+                statusPolicy = statusPolicy, statusResolver = statusResolver,
             )
         }
 
         is ClientAttestationVerificationMethod.X509Chain ->
             ClientAttestationConfig(
                 attestationVerifier = X509ChainClientAttestationVerifier(source.trustedRootCertificatesPem),
+                statusPolicy = statusPolicy, statusResolver = statusResolver,
             )
 
         is ClientAttestationVerificationMethod.KeyReference -> {
@@ -74,6 +88,7 @@ suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
                     crypto2Resolver = crypto2KeyReferenceResolver,
                     legacyResolver = keyReferenceResolver,
                 ),
+                statusPolicy = statusPolicy, statusResolver = statusResolver,
             )
         }
     }

@@ -25,10 +25,17 @@ data class ItbCatalogue(
         val name: String,
         val publishedVersion: String? = null,
         val cases: List<Case>,
+        val actor: String? = null,
     )
 
     @Serializable
-    data class Case(val id: String, val name: String)
+    data class Case(val id: String, val name: String, val invocationScheme: String? = null) {
+        init {
+            require(invocationScheme == null || invocationScheme in setOf("openid4vp", "eu-eaap", "haip-vp")) {
+                "Unsupported ITB invocation scheme"
+            }
+        }
+    }
 
     init {
         require(systemName.isNotBlank()) { "Missing ITB system name" }
@@ -36,6 +43,7 @@ data class ItbCatalogue(
         require(suites.map { it.id }.distinct().size == suites.size) { "Duplicate ITB suite IDs" }
         suites.forEach { suite ->
             require(suite.id.isNotBlank() && suite.name.isNotBlank() && suite.statement.isNotBlank() && suite.cases.isNotEmpty()) { "Empty ITB suite" }
+            require(suite.actor == null || suite.actor.isNotBlank()) { "Empty ITB actor label" }
             require(suite.cases.all { it.id.isNotBlank() && it.name.isNotBlank() }) { "Empty ITB case identity" }
             require(suite.cases.map { it.id }.distinct().size == suite.cases.size) {
                 "Duplicate ITB case IDs in ${suite.id}"
@@ -44,8 +52,8 @@ data class ItbCatalogue(
     }
 
     companion object {
-        fun initialWalletCases(): ItbCatalogue = requireNotNull(
-            ItbCatalogue::class.java.getResourceAsStream("/itb/wal-1423-catalogue.json")
+        fun walletCases(): ItbCatalogue = requireNotNull(
+            ItbCatalogue::class.java.getResourceAsStream("/itb/wallet-catalogue.json")
         ) { "The deployed ITB case catalogue is missing" }.bufferedReader().use {
             Json.decodeFromString<ItbCatalogue>(it.readText())
         }

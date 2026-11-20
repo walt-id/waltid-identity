@@ -1,3 +1,4 @@
+import { parsePaymentJson, stringifyPaymentJson } from "~/utils/ts12Payment";
 /** Field name used by EUDI TS-12 SCA payment (`urn:eudi:sca:payment:1`). */
 export const NESTED_TRANSACTION_DATA_FIELDS = new Set(["payload"]);
 
@@ -20,7 +21,7 @@ export function defaultTransactionFieldValue(
   profileType?: string,
 ): string {
   if (field === "payload") {
-    return JSON.stringify(DEFAULT_SCA_PAYMENT_PAYLOAD, null, 2);
+    return stringifyPaymentJson(DEFAULT_SCA_PAYMENT_PAYLOAD, 2);
   }
   return "";
 }
@@ -38,12 +39,12 @@ export function stringifyTransactionFieldValue(
   if (isNestedTransactionDataField(field)) {
     if (typeof value === "string") {
       try {
-        return JSON.stringify(JSON.parse(value), null, 2);
+        return stringifyPaymentJson(parsePaymentJson(value), 2);
       } catch {
         return value;
       }
     }
-    return JSON.stringify(value, null, 2);
+    return stringifyPaymentJson(value, 2);
   }
 
   return String(value);
@@ -68,7 +69,7 @@ export function parseTransactionFieldValue(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(trimmed);
+    parsed = parsePaymentJson(trimmed);
   } catch {
     throw new Error(
       `Transaction data field "${field}" must be valid JSON (got a flat string editor value that does not parse).`,

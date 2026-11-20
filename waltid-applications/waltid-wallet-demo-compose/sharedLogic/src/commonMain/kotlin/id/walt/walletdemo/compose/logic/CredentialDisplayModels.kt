@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlin.time.Instant
+
 data class CredentialDetails(
     val summary: CredentialSummary,
     val groups: List<ClaimGroup>,
@@ -102,11 +104,17 @@ data class ClaimItem(
 )
 
 sealed interface DisplayValue {
+    /** Keep the instant independent of the viewer's locale and time zone until rendering. */
+    data class InstantValue(val value: Instant) : DisplayValue
     data class Text(val value: String) : DisplayValue
     data class NumberValue(val value: String) : DisplayValue
     data class BooleanValue(val value: Boolean) : DisplayValue
     data class ObjectValue(val entries: List<ClaimItem>) : DisplayValue
-    data class ListValue(val values: List<DisplayValue>) : DisplayValue
+    data class ListValue(
+        val values: List<DisplayValue>,
+        /** Display-only metadata for concrete source indexes; never reorders the values. */
+        val labels: Map<Int, String> = emptyMap(),
+    ) : DisplayValue
     /** Encoded media stays unresolved until a visible claim requests it. */
     class DeferredImage internal constructor(val byteCount: Int? = null, private val decode: () -> DisplayValue) : DisplayValue {
         fun resolve(): DisplayValue = decode()

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { stringifyPaymentJson } from "~/utils/ts12Payment";
+
 import type { SwaggerExample } from '~/composables/useSwaggerExamples'
 
 const props = defineProps<{
@@ -24,7 +26,7 @@ function onSelectChange(e: Event) {
   const payload = props.mapExamplePayload
     ? props.mapExamplePayload(ex.payload)
     : ex.payload
-  json.value = JSON.stringify(payload, null, 2)
+  json.value = stringifyPaymentJson(payload, 2)
 }
 </script>
 

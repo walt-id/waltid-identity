@@ -178,6 +178,7 @@ public abstract interface class id/walt/crypto2/signum/SignumManagedKey : id/wal
 	public fun getOrigin ()Lid/walt/crypto2/keys/KeyOrigin;
 	public abstract fun getProtectionLevel ()Lid/walt/crypto2/keys/KeyProtectionLevel;
 	public fun getSecurityLevel ()Lid/walt/crypto2/keys/KeySecurityLevel;
+	public fun withFreshBiometricAuthorization (Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/crypto2/signum/SignumManagedKey$DefaultImpls {
@@ -187,6 +188,7 @@ public final class id/walt/crypto2/signum/SignumManagedKey$DefaultImpls {
 	public static fun getSecurityLevel (Lid/walt/crypto2/signum/SignumManagedKey;)Lid/walt/crypto2/keys/KeySecurityLevel;
 	public static fun getSpec (Lid/walt/crypto2/signum/SignumManagedKey;)Lid/walt/crypto2/keys/KeySpec;
 	public static fun getUsages (Lid/walt/crypto2/signum/SignumManagedKey;)Ljava/util/Set;
+	public static fun withFreshBiometricAuthorization (Lid/walt/crypto2/signum/SignumManagedKey;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/crypto2/signum/SignumManagedKeyProvider : id/walt/crypto2/providers/ManagedKeyProvider {
@@ -236,12 +238,14 @@ public abstract interface class id/walt/crypto2/signum/SignumPlatformKey {
 	public abstract fun getSpec ()Lid/walt/crypto2/keys/KeySpec;
 	public abstract fun sign ([BLid/walt/crypto2/algorithms/SignatureAlgorithm;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun verify ([B[BLid/walt/crypto2/algorithms/SignatureAlgorithm;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun withFreshBiometricAuthorization (Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/crypto2/signum/SignumPlatformKey$DefaultImpls {
 	public static fun getOrigin (Lid/walt/crypto2/signum/SignumPlatformKey;)Lid/walt/crypto2/keys/KeyOrigin;
 	public static fun getPrivateKeyExporter (Lid/walt/crypto2/signum/SignumPlatformKey;)Lid/walt/crypto2/keys/PrivateKeyExporter;
 	public static fun getSecurityLevel (Lid/walt/crypto2/signum/SignumPlatformKey;)Lid/walt/crypto2/keys/KeySecurityLevel;
+	public static fun withFreshBiometricAuthorization (Lid/walt/crypto2/signum/SignumPlatformKey;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class id/walt/crypto2/signum/SignumPrivateKeyImportBackend {

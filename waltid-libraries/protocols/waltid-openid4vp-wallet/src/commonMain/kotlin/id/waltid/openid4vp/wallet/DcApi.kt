@@ -1,5 +1,7 @@
 package id.waltid.openid4vp.wallet
 
+import kotlin.time.Clock
+
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -130,8 +132,16 @@ public object DcApiWallet {
         request: ResolvedDcApiRequest,
         vpToken: String,
         idToken: String? = null,
+    ): DcApiCredentialResponse = buildResponse(request, vpToken, idToken, Clock.System)
+
+    internal suspend fun buildResponse(
+        request: ResolvedDcApiRequest,
+        vpToken: String,
+        idToken: String?,
+        clock: Clock,
     ): DcApiCredentialResponse {
         val authorizationRequest = request.authorizationRequest
+        val requireCurrentPayment = paymentDeadlineCheck(authorizationRequest, clock)
         val members = buildJsonObject {
             put("vp_token", Json.parseToJsonElement(vpToken))
             idToken?.let { put("id_token", JsonPrimitive(it)) }
@@ -163,6 +173,7 @@ public object DcApiWallet {
                 "DC API response builder cannot handle response_mode=$responseMode",
             )
         }
+        requireCurrentPayment()
         return DcApiCredentialResponse(protocol = request.protocol.value, data = data)
     }
 

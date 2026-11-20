@@ -56,7 +56,11 @@ class IssuerConformanceTestRunner(
     private val requireKeyAttestationPass: Boolean = System.getenv("OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS")
         ?.toBooleanStrict() ?: false,
     private val proofModes: List<String> = parseIssuerProofModes(System.getenv("OPENID4VCI_CONFORMANCE_PROOF_MODES")),
+    private val issuanceMode: IssuerIssuanceMode = IssuerIssuanceMode.fromEnvironment(),
 ) {
+    private val effectiveStrictResults: Boolean
+        get() = issuanceMode == IssuerIssuanceMode.DEFERRED || variantSelection.strictResults
+
     suspend fun run(): List<TestPlanResult> {
         // Even failures before metadata is available must not leave an earlier run's passing reports.
         IssuerVariantReportWriter.prepareForRun(variantSelection.reportDir)
@@ -87,8 +91,15 @@ class IssuerConformanceTestRunner(
         metadata: JsonObject,
         conformance: ConformanceInterface,
     ): List<TestPlanResult> {
+        if (issuanceMode == IssuerIssuanceMode.DEFERRED) {
+            require(!variantSelection.discoveryOnly) { "Deferred coverage requires live execution" }
+            require(!metadata["deferred_credential_endpoint"]?.jsonPrimitive?.content.isNullOrBlank()) {
+                "Issuer must advertise deferred_credential_endpoint"
+            }
+            require(proofModes.isNotEmpty()) { "Deferred coverage requires explicit jwt and/or attestation proof modes" }
+        }
         val resolvedIds = resolveCredentialConfigurationIds(metadata)
-        val allVariants = IssuerVariantMatrix.all()
+        val allVariants = if (issuanceMode == IssuerIssuanceMode.DEFERRED) IssuerVariantMatrix.deferred() else IssuerVariantMatrix.all()
         val selectedVariants = variantSelection.select(expandIssuerProofModes(allVariants, proofModes))
         val protocolVariants = selectedVariants.map { it.copy(credentialProofType = null) }.distinct()
 
@@ -112,7 +123,7 @@ class IssuerConformanceTestRunner(
         val preflightResults = preflightIssuerConfigurations(metadata, selectedVariants) { variant ->
             credentialConfigurationIdFor(variant, resolvedIds)
         }
-        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, preflightResults, variantSelection.strictResults)
+        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, preflightResults, effectiveStrictResults)
         requireIssuerConfigurationPreflight(preflightResults)
 
         if (variantSelection.discoveryOnly) {
@@ -143,7 +154,7 @@ class IssuerConformanceTestRunner(
                         credentialTrustAnchorPem = credentialTrustAnchorPem,
                         statusListTrustAnchorPem = statusListTrustAnchorPem,
                     )
-                    IssuerTestPlanRunner(plan.config, conformance, issuerInterface).attempt(variant)
+                    IssuerTestPlanRunner(plan.config, conformance, issuerInterface, issuanceMode).attempt(variant)
                 }.getOrElse {
                     IssuerVariantRunResult(
                         variantId = variant.id,
@@ -157,7 +168,7 @@ class IssuerConformanceTestRunner(
             issuerInterface.close()
         }
 
-        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, results, variantSelection.strictResults)
+        IssuerVariantReportWriter.write(variantSelection.reportDir, selectedVariants, results, effectiveStrictResults)
         println("Wrote issuer conformance matrix artifacts to ${variantSelection.reportDir}")
         println(IssuerVariantReportWriter.batchCoverageSummary(results))
         results.filter { it.batchCoverage == IssuerBatchCoverageStatus.NOT_OFFERED_BY_PINNED_SUITE }.forEach {
@@ -176,10 +187,10 @@ class IssuerConformanceTestRunner(
         results.groupBy { it.variant["credential_proof_type"]?.jsonPrimitive?.content }.forEach { (mode, modeResults) ->
             println("Checking issuer coverage for proof mode ${mode ?: credentialProofTypeHint ?: "auto"}")
             if (requireBatchPass) requireExecutedBatchIssuance(modeResults)
-            if (requireKeyAttestationPass) requireExecutedKeyAttestation(modeResults)
+            if (requireKeyAttestationPass && issuanceMode == IssuerIssuanceMode.IMMEDIATE) requireExecutedKeyAttestation(modeResults)
         }
 
-        if (variantSelection.strictResults) {
+        if (effectiveStrictResults) {
             val failingResults = results.filter { it.status != IssuerVariantRunStatus.PASSED }
             require(failingResults.isEmpty()) {
                 "OpenID4VCI issuer matrix strict mode failed for ${failingResults.size} variants. " +

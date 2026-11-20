@@ -1,5 +1,6 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.config.Issuer2MetadataConfig
@@ -15,6 +16,7 @@ import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
@@ -60,7 +62,9 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -68,6 +72,12 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class Issuer2PARRouteTest {
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
+    @AfterEach
+    fun closeCatalogues() {
+        catalogues.forEach { it.close() }
+    }
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -477,16 +487,21 @@ class Issuer2PARRouteTest {
         )
         val sessionService = IssuanceSessionService(issuanceSessionRepository)
         val notificationService = IssuanceNotificationService()
+        val typeMetadata = IssuerTypeMetadataCatalogue(
+            serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
         val openId4VciModule = OpenId4VciModule.create(
             config = serviceConfig,
             authorizationCodeRepository = NoopAuthorizationCodeRepository,
             preAuthorizedCodeRepository = NoopPreAuthorizedCodeRepository,
             parRepository = parRepository,
             refreshTokenRepository = InMemoryRefreshTokenRepository(),
+            metadataResolver = typeMetadata,
         )
         val metadataService = MetadataService(
             serviceConfig = serviceConfig,
             metadataConfig = metadataConfig,
+            typeMetadata = typeMetadata,
             profileService = profileService,
             sessionService = sessionService,
             preAuthorizedGrantAnonymousAccessSupported =
@@ -509,6 +524,7 @@ class Issuer2PARRouteTest {
                 preAuthorizedCodeIssuer = openId4VciModule.preAuthorizedCodeIssuer,
                 config = serviceConfig,
                 notificationService = notificationService,
+                typeMetadata = typeMetadata,
             ),
             notificationService = notificationService,
         )
@@ -563,6 +579,9 @@ class Issuer2PARRouteTest {
 
     private class TestIssuanceSessionRepository(vararg initial: IssuanceSession) : IssuanceSessionRepository {
         private val sessions = initial.associateBy { it.sessionId }.toMutableMap()
+
+        override suspend fun compareAndSet(expected: IssuanceSession, replacement: IssuanceSession): Boolean =
+            sessions.replace(expected.sessionId, expected, replacement)
 
         override suspend fun save(session: IssuanceSession): IssuanceSession =
             session.also { sessions[it.sessionId] = it }
