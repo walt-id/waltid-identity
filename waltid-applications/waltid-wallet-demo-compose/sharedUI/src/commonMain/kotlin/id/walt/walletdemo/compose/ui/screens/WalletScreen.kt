@@ -31,6 +31,7 @@ import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.canDismissExternalFlow
 import id.walt.walletdemo.compose.ui.WalletReviewHost
 import id.walt.walletdemo.compose.logic.isStatusVisible
+import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.components.StatusCard
 import id.walt.walletdemo.compose.ui.components.WalletFooter
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
@@ -77,6 +78,15 @@ internal fun WalletScreen(
         }
     }
     val showingFlow = state.selectedTab != WalletDemoTab.Credentials && presentationContent == null
+    val openingStatusNotice = state.statusNotificationOpened && state.externalFlow == null &&
+        state.presentationReview == null && state.offerPreview == null && presentationContent == null && !state.isBusy
+    LaunchedEffect(openingStatusNotice) {
+        if (openingStatusNotice) {
+            showingSettings = false
+            showingScanner = false
+            controller.selectTab(WalletDemoTab.Credentials)
+        }
+    }
     LaunchedEffect(state.externalFlow) {
         if (state.externalFlow != null) showingSettings = false
     }
@@ -169,6 +179,13 @@ internal fun WalletScreen(
                 session = state.session,
                 onDeleteCredential = if (allowCredentialDelete) controller::deleteCredential else null,
                 onDetailsChromeChange = { detailsChrome = it },
+                onDetailsOpened = controller::checkCredentialStatusOnDetails,
+                statusNotices = state.credentialStatuses.pendingNotices.orEmpty()
+                    .takeIf { state.credentialStatuses.available && !showingScanner && !showingFlow &&
+                        presentationContent == null && !state.isBusy }.orEmpty(),
+                onAcknowledgeStatusNotice = controller::acknowledgeCredentialStatusNotice,
+                openStatusNoticeOnHome = openingStatusNotice && !showingFlow,
+                onStatusNoticeOpenedOnHome = controller::credentialStatusNotificationOpenedOnHome,
                 modifier = Modifier.weight(1f),
             )
         }

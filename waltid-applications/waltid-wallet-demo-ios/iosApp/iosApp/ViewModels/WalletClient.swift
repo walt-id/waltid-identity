@@ -15,6 +15,8 @@ protocol WalletClient {
     func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment?
     func invalidateCredentialStatusSnapshot() async throws
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult]
+    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice]?
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws
     func submitStatusReviewedPresentation(
         previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],
@@ -78,6 +80,8 @@ extension WalletClient {
     func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { AsyncThrowingStream { $0.finish() } }
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { nil }
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { [] }
+    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice]? { nil }
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {}
     func submitStatusReviewedPresentation(
         previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],
@@ -157,6 +161,12 @@ final class SDKWalletClient: WalletClient {
 
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { try await wallet().credentialStatusSnapshot() }
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { try await wallet().refreshCredentialStatuses(ids: ids, force: force) }
+    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice]? {
+        try await cachedWallet?.pendingCredentialStatusNotices()
+    }
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
+        try await cachedWallet?.acknowledgeCredentialStatusNotice(credentialID: credentialID, version: version)
+    }
     func submitStatusReviewedPresentation(
         previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],

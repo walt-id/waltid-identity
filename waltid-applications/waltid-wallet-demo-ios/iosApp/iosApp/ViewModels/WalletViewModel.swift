@@ -117,6 +117,9 @@ class WalletViewModel: ObservableObject {
     @Published private(set) var credentialStatusBatchError: String?
     @Published var credentialStatusError: String?
     @Published var credentialStatusNotice: String?
+    @Published private(set) var walletStatusNotices: [PendingCredentialStatusNotice] = []
+    @Published var statusNotificationOpened = false
+    private var usesWalletStatusNotices = false
     @Published var automaticCredentialStatusChecks = true {
         didSet {
             UserDefaults.standard.set(automaticCredentialStatusChecks, forKey: statusPreferenceKey)
@@ -192,7 +195,9 @@ class WalletViewModel: ObservableObject {
     @Published var externalFlow: WalletExternalFlow?
     @Published var incomingLinkNotice: String?
     @Published private(set) var flowIsCommitting = false
-    @Published var selectedTab: WalletTab = .credentials
+    @Published var selectedTab: WalletTab = .credentials {
+        didSet { if selectedTab != oldValue { scheduleCredentialStatusCheck() } }
+    }
     @Published var issuanceCopyCounts: [String: Int] = [:]
     @Published var offerPreview: IssuanceOfferPreview?
     @Published private(set) var authorizationRequestURL: URL?
@@ -423,8 +428,7 @@ class WalletViewModel: ObservableObject {
             cancelActiveWalletOperations()
             do {
                 await proximityPresentation.closeAndAwait()
-                try await retireBackgroundStatus()
-                try await walletClient.deleteLocalData()
+                try await deleteWalletAndReconcileBackground()
                 identityScreen = nil
                 access.reset()
                 clearWalletState()
@@ -517,11 +521,11 @@ class WalletViewModel: ObservableObject {
         backgroundStatusSchedulingAvailable = backgroundStatusScheduler?.canSchedule == true
     }
 
-    private func retireBackgroundStatus() async throws {
-        guard backgroundStatusScheduler != nil else { return }
+    private func deleteWalletAndReconcileBackground() async throws {
         await backgroundStatusTask?.value
-        _ = try await walletClient.setBackgroundStatusPreference(.off)
+        try await walletClient.deleteLocalData()
         publishBackgroundStatus(nil)
+        WalletDemoCredentialStatusNotifications.shared.clear()
     }
 
     func invalidateBackgroundStatusSnapshot() {
@@ -542,6 +546,16 @@ class WalletViewModel: ObservableObject {
                     for try await snapshot in try await client.credentialStatusUpdates() {
                         try Task.checkCancellation()
                         guard let self, credentialStatusGeneration == generation else { return }
+                        if let pending = try? await client.pendingCredentialStatusNotices() {
+                            try Task.checkCancellation()
+                            guard credentialStatusGeneration == generation, auth == .unlocked else { return }
+                            usesWalletStatusNotices = true
+                            credentialStatusNotice = nil
+                            walletStatusNotices = pending
+                            if pending.isEmpty, applicationForeground {
+                                WalletDemoCredentialStatusNotifications.shared.clear()
+                            }
+                        }
                         installCredentialStatuses(snapshot)
                         if initialRead {
                             initialRead = false
@@ -574,10 +588,35 @@ class WalletViewModel: ObservableObject {
         checkingCredentialStatuses = false; refreshingCredentialIDs = []
         if !preserveNotice { pendingCredentialStatusNotices.removeAll() }
         credentialStatusNotice = nil
+        walletStatusNotices = []
     }
 
     func checkCredentialStatuses(ids: [String]? = nil, force: Bool = true) {
         startCredentialStatusRefresh(ids: ids, force: force)
+    }
+
+    func checkCredentialStatusOnDetails(_ credentialID: String) async {
+        guard applicationForeground, automaticCredentialStatusChecks, isReady, auth == .unlocked,
+              selectedTab == .credentials, externalFlow == nil, !isLoading, !proximityPresentation.active else { return }
+        _ = try? await walletClient.refreshCredentialStatuses(ids: [credentialID], force: false)
+    }
+
+    func handleCredentialStatusNotification() {
+        statusNotificationOpened = true
+        invalidateBackgroundStatusSnapshot()
+    }
+
+    func acknowledgeCredentialStatusNotice(_ notice: PendingCredentialStatusNotice) {
+        let generation = credentialStatusGeneration
+        Task {
+            guard auth == .unlocked, generation == credentialStatusGeneration else { return }
+            do {
+                try await walletClient.acknowledgeCredentialStatusNotice(credentialID: notice.credentialID, version: notice.version)
+            } catch {
+                guard generation == credentialStatusGeneration else { return }
+                credentialStatusError = String(localized: "Could not dismiss the credential status notice.")
+            }
+        }
     }
 
     func checkPresentationCredentialStatus(_ credentialID: String, handle: PresentationPreviewHandle, navigationKey: Int) {
@@ -613,7 +652,8 @@ class WalletViewModel: ObservableObject {
         if let reviewOwner, !isCurrentStatusReview(reviewOwner) { return }
         let generation = credentialStatusGeneration
         let refreshID = UUID()
-        if !force && (!automaticCredentialStatusChecks || isLoading || presentationReview != nil || proximityPresentation.active) { return }
+        if !force && (!automaticCredentialStatusChecks || isLoading || selectedTab != .credentials || externalFlow != nil ||
+                      presentationReview != nil || proximityPresentation.active) { return }
         let settingsBatch = force && ids == nil
         if !force {
             lastAutomaticStatusCheckAt = statusNow()
@@ -665,6 +705,13 @@ class WalletViewModel: ObservableObject {
         if !credentialStatusAvailable { credentialStatusError = nil }
         credentialStatusStoreIndices = context.storeIndices
         credentialStatusReadState = .available
+        if usesWalletStatusNotices {
+            nextCredentialStatusRefreshAt = snapshot.nextRefreshAt
+            credentialStatuses = next
+            refreshingCredentialIDs = snapshot.refreshingCredentialIDs
+            scheduleCredentialStatusCheck()
+            return
+        }
         announcedCredentialStatuses = announcedCredentialStatuses.filter { next[$0.key]?.presentation.hasAdverseStatus == true }
         pendingCredentialStatusNotices = pendingCredentialStatusNotices.filter { next[$0]?.presentation.hasAdverseStatus == true }
         let changed = next.filter { id, value in
@@ -695,7 +742,8 @@ class WalletViewModel: ObservableObject {
         credentialStatusTimer?.cancel(); credentialStatusTimer = nil
         guard applicationForeground, automaticCredentialStatusChecks, isReady, auth == .unlocked,
               backgroundStatusScheduler == nil || credentialStatusReadState == .available,
-              !isLoading, !checkingCredentialStatuses, presentationReview == nil, !proximityPresentation.active else { return }
+              !isLoading, !checkingCredentialStatuses, selectedTab == .credentials, externalFlow == nil,
+              presentationReview == nil, !proximityPresentation.active else { return }
         let inventory = Set(credentials.map(\.id))
         let due = inventory != automaticallyCheckedInventory ? statusNow() : nextCredentialStatusRefreshAt
         guard let due else { return }
@@ -878,8 +926,7 @@ class WalletViewModel: ObservableObject {
             signingProtectionStore.save(target)
             selectedSigningProtection = target
             do {
-                try await retireBackgroundStatus()
-                try await walletClient.deleteLocalData()
+                try await deleteWalletAndReconcileBackground()
                 identityScreen = nil
                 clearWalletState()
                 setLoading(WalletStatusText.bootstrappingWallet)
@@ -982,6 +1029,7 @@ class WalletViewModel: ObservableObject {
         self.signingProtectionStore = resolvedStore
         self.walletClient = resolvedWalletClient
         self.backgroundStatusScheduler = backgroundStatusScheduler
+        applicationForeground = backgroundStatusScheduler == nil
         statusPreferenceKey = "wallet.\(walletID).status.automatic"
         automaticCredentialStatusChecks = UserDefaults.standard.object(forKey: statusPreferenceKey) == nil || UserDefaults.standard.bool(forKey: statusPreferenceKey)
         let readerTrustSettings = DemoReaderTrustSettingsController(

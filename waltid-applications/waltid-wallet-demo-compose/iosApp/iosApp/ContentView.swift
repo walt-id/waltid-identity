@@ -18,6 +18,7 @@ struct ContentView: UIViewControllerRepresentable {
     let onDigitalCredentialRegistryChanged: () -> Void
     let signingProtectionMode: String
     let onBackgroundStatusEnrollmentChanged: (String?) -> Void
+    let onCredentialStatusNoticesCleared: () -> Void
     let backgroundStatusSchedulingAvailable: () -> Bool
 
     func makeUIViewController(context: Context) -> UIViewController {
@@ -37,6 +38,7 @@ struct ContentView: UIViewControllerRepresentable {
             transactionDataProfilesUrl: transactionDataProfilesUrl,
             signingProtectionMode: signingProtectionMode,
             onBackgroundStatusEnrollmentChanged: onBackgroundStatusEnrollmentChanged,
+            onCredentialStatusNoticesCleared: onCredentialStatusNoticesCleared,
             backgroundStatusSchedulingAvailable: { KotlinBoolean(bool: backgroundStatusSchedulingAvailable()) }
         )
     }

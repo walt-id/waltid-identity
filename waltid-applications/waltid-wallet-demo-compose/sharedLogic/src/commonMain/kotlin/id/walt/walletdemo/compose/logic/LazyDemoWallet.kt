@@ -50,6 +50,8 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
         wallet().credentialStatusSnapshots().collect { emit(it) }
     }
     override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = wallet().credentialStatusSnapshot()
+    override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) =
+        wallet().acknowledgeCredentialStatusNotice(credentialId, version)
     override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary = wallet().refreshCredentialStatuses(ids, force)
     override suspend fun submitStatusReviewedPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,

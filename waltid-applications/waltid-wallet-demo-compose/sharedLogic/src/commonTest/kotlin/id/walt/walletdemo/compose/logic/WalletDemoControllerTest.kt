@@ -36,6 +36,41 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun aPresentationEntryDefersAutomaticChecksUntilWalletUseAndDetailsRespectTheSetting() = runTest {
+        val calls = mutableListOf<Set<String>?>()
+        val base = FakeDemoWallet(credentials = listOf(sampleCredential), presentationPreview = statusReviewPreview())
+        val wallet = object : DemoWallet by base {
+            override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                assertFalse(force)
+                calls += ids
+                return WalletDemoStatusRefreshSummary(0, 1, 0, 0)
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this, initialForeground = false)
+        controller.handleDeepLink("openid4vp://example")
+        controller.handleApplicationForegrounded()
+        runCurrent()
+        assertIs<WalletExternalFlow.Pending>(controller.state.value.externalFlow)
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertNotNull(controller.state.value.presentationReview)
+        assertTrue(calls.isEmpty())
+
+        assertTrue(controller.closeExternalFlow())
+        runCurrent()
+        assertEquals(listOf<Set<String>?>(null), calls)
+        val details = backgroundScope.launch { controller.checkCredentialStatusOnDetails(sampleCredential.id) }
+        runCurrent()
+        details.join()
+        assertEquals(listOf(null, setOf(sampleCredential.id)), calls)
+        controller.setAutomaticCredentialStatusChecks(false)
+        val disabledDetails = backgroundScope.launch { controller.checkCredentialStatusOnDetails(sampleCredential.id) }
+        runCurrent()
+        disabledDetails.join()
+        assertEquals(2, calls.size)
+    }
+
+    @Test
     fun explicitReviewCheckWaitsForItsRenderedResultAndPreservesTheSelection() = runTest {
         val finish = CompletableDeferred<Unit>()
         var forcedChecks = 0
@@ -1762,13 +1797,20 @@ class WalletDemoControllerTest {
     fun resetWalletDisablesTheSessionOnDeletionFailureAndAllowsRetry() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         wallet.deleteWalletError = IllegalStateException("HTTP 500")
-        val controller = unlockedControllerWith(wallet, this)
+        val schedules = mutableListOf<String?>()
+        val controller = unlockedControllerWith(object : DemoWallet by wallet {
+            override suspend fun setBackgroundStatusPreference(preference: DemoBackgroundStatusPreference): DemoBackgroundStatusEnrollment? {
+                error("Wallet deletion owns retiring the grant")
+            }
+        }, this, reconcileBackgroundStatusSchedule = { schedules += it })
         assertTrue(controller.state.value.session is WalletSessionState.Ready)
+        schedules.clear()
 
         controller.resetWallet()
         runCurrent()
 
         assertEquals(1, wallet.deleteWalletCalls)
+        assertTrue(schedules.isEmpty())
         assertEquals(listOf(sampleCredential), wallet.credentials)
         assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
         assertTrue(controller.state.value.session is WalletSessionState.Failed)
@@ -1783,6 +1825,7 @@ class WalletDemoControllerTest {
         controller.resetWallet()
         runCurrent()
         assertEquals(2, wallet.deleteWalletCalls)
+        assertEquals(listOf<String?>(null), schedules)
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
 
@@ -3994,6 +4037,8 @@ class WalletDemoControllerTest {
         signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
         signingProtectionStore: WalletDemoSigningProtectionStore = InMemoryWalletDemoSigningProtectionStore(),
         sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
+        initialForeground: Boolean = true,
+        reconcileBackgroundStatusSchedule: (suspend (String?) -> Unit)? = null,
     ): WalletDemoController =
         WalletDemoController(
             wallet = wallet,
@@ -4002,6 +4047,8 @@ class WalletDemoControllerTest {
             signingProtectionMode = signingProtectionMode,
             signingProtectionStore = signingProtectionStore,
             sharingSettings = sharingSettings,
+            initialForeground = initialForeground,
+            reconcileBackgroundStatusSchedule = reconcileBackgroundStatusSchedule,
             scope = scope.backgroundScope,
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )
@@ -4026,8 +4073,14 @@ class WalletDemoControllerTest {
         }
     }
 
-    private fun unlockedControllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController {
-        val controller = controllerWith(wallet, scope)
+    private fun unlockedControllerWith(
+        wallet: DemoWallet,
+        scope: TestScope,
+        initialForeground: Boolean = true,
+        reconcileBackgroundStatusSchedule: (suspend (String?) -> Unit)? = null,
+    ): WalletDemoController {
+        val controller = controllerWith(wallet, scope, initialForeground = initialForeground,
+            reconcileBackgroundStatusSchedule = reconcileBackgroundStatusSchedule)
         controller.updatePin("1234")
         controller.submitPin()
         controller.updatePinConfirmation("1234")

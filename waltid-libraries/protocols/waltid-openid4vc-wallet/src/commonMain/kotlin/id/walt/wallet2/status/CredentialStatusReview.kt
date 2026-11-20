@@ -10,7 +10,7 @@ fun WalletCredentialStatusService.reviewGuard(selectedIds: Set<String>, reviewed
     val selection = selectedIds.toSet()
     val revisions = reviewed.toMap()
     return PresentationReviewGuard {
-        val current = snapshot().credentials
+        val current = selectedStatuses(selection)
         if (selection.any { id ->
                 val records = current.filter { it.reference.credentialId == id }
                 records.size != 1 || records.single().presentation.advisoryRevision != revisions[id]

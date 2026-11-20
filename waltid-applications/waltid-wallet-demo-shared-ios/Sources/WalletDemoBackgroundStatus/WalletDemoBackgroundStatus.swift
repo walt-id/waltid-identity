@@ -7,6 +7,7 @@ import UIKit
 public final class WalletDemoBackgroundStatusScheduler {
     public enum Outcome: Sendable {
         case finished
+        case finishedWithNotice
         case deferred
         case ineligible
     }
@@ -55,6 +56,7 @@ public final class WalletDemoBackgroundStatusScheduler {
             running = nil
             cancelRequest(identifier)
         }
+        if binding != nil { WalletDemoCredentialStatusNotifications.shared.requestPermissionIfNeeded() }
         requestNext()
     }
 
@@ -85,17 +87,31 @@ public final class WalletDemoBackgroundStatusScheduler {
         }
         running = completion
         let cancel = start(binding) { [weak self] outcome in
-            let success = outcome != .deferred
-            guard let self, self.running === completion else {
+            let finish = {
+                let success = outcome != .deferred
+                guard let self, self.running === completion else {
+                    completion.finish(success: success)
+                    return
+                }
+                self.running = nil
+                if outcome == .ineligible, self.defaults.string(forKey: self.bindingKey) == binding {
+                    self.reconcile(binding: nil)
+                }
                 completion.finish(success: success)
-                return
+                onResult()
             }
-            self.running = nil
-            if outcome == .ineligible, self.defaults.string(forKey: self.bindingKey) == binding {
-                self.reconcile(binding: nil)
+            if outcome == .finishedWithNotice {
+                Task { @MainActor in
+                    await WalletDemoCredentialStatusNotifications.shared.postIfAllowed {
+                        guard let self else { return false }
+                        return self.running === completion && completion.isPending &&
+                            self.defaults.string(forKey: self.bindingKey) == binding
+                    }
+                    finish()
+                }
+            } else {
+                finish()
             }
-            completion.finish(success: success)
-            onResult()
         }
         completion.install(cancel: cancel)
     }

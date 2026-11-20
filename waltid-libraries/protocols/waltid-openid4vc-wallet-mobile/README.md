@@ -116,9 +116,10 @@ foreground/manual scheduling; the SDK installs no background worker. The snapsho
 `nextRefreshAt` supports an app-owned timer while active. Cancel it during lock, background and consent,
 and use bounded retry spacing for a past due time.
 
-Managed persistence retains only minimal last-known metadata. Default mobile snapshots restore as
-historical/stale evidence after reopen; a refresh re-establishes current evidence. No-store results
-are not persisted. Custom stores need the optional shared snapshot-store capability for durability.
+Managed persistence retains minimal last-known metadata. A matching built-in trust configuration
+can restore an unexpired observation as fresh after reopen. If equivalence is unavailable, it
+restores as dated historical evidence. No-store observations live only in the current session.
+Custom stores need the optional shared snapshot-store capability for durability.
 See [credential-status profiles, trust hooks, cache rules and lifecycle](../../credentials/waltid-credential-status/README.md)
 and the Swift [credential-status guide](../waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/CheckingCredentialStatus.md).
 
@@ -128,8 +129,9 @@ Use an open, authorized managed wallet to call
 `setCredentialStatusMaintenance(CredentialStatusMaintenancePreference.ENABLED)`. Keep its opaque
 binding only in app-private preferences. When the platform delivers eligible work, call
 `refreshDueStatusesForExistingWallet` with that binding and the original storage namespace.
-The bounded call updates due issuer evidence in existing SQLCipher storage and returns aggregate
-outcomes. Cancel it when the OS expires or stops the task.
+The bounded call pages signed credentials using a grant-scoped cursor in existing SQLCipher storage.
+It returns aggregate outcomes and a flag when it committed a new retainable notice. Cancel it when
+the OS expires or stops the task.
 
 Use `PAUSED` when the host turns off automatic checks and `OFF` for explicit opt-out. Both retire
 the current binding before the host cancels its request. An enabled binding from before a pause
@@ -138,8 +140,9 @@ credential stores use foreground refresh. The app owns the schedule and must get
 
 On unlock or resume, read local status first. After a same-process wake,
 `invalidateCredentialStatusSnapshot()` prompts the existing observer to reread the managed
-snapshot. With the default mobile trust policy, a cold reopen preserves dated history and
-evaluates it as stale until another authenticated check.
+snapshot. Read `pendingCredentialStatusNotices()` in the unlocked app and use
+`acknowledgeCredentialStatusNotice(credentialId, version)` for the displayed notice.
+The app owns OS permission, local alert delivery and navigation after unlock.
 
 ## Receiving credentials
 

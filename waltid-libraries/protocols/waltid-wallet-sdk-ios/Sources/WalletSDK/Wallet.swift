@@ -68,6 +68,16 @@ public actor Wallet {
         try await bridge.invalidateCredentialStatusSnapshot()
     }
 
+    /// Reads pending changes from the authorized local wallet.
+    public func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice] {
+        try await bridge.pendingCredentialStatusNotices()
+    }
+
+    /// Acknowledges the displayed version, even when another check is in flight.
+    public func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
+        try await bridge.acknowledgeCredentialStatusNotice(credentialID: credentialID, version: version)
+    }
+
     /// Runs one due-only pass against an enrolled existing wallet without creating a Wallet instance.
     /// Supply the original storage namespace and cancel this async operation when the host's execution window expires.
     /// - Parameters:

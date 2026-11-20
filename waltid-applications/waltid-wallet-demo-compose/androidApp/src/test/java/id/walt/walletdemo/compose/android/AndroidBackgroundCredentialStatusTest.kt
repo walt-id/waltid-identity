@@ -1,5 +1,8 @@
 package id.walt.walletdemo.compose.android
 
+import android.Manifest
+import android.app.Notification
+import android.app.NotificationManager
 import android.content.Context
 import androidx.work.Configuration
 import androidx.work.WorkInfo
@@ -14,6 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -67,6 +71,36 @@ class AndroidBackgroundCredentialStatusTest {
         scheduler.recordOutcome(context, work, null, CredentialStatusMaintenanceResult.Ineligible)
 
         assertEquals(WorkInfo.State.CANCELLED, state(work))
+    }
+
+    @Test
+    fun aCurrentRetainableChangePostsOnlyAGenericHomeNotificationWhenPermitted(): Unit = runBlocking {
+        val old = enqueue("old-grant")
+        val current = enqueue("current-grant")
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val notices = shadowOf(manager)
+        val changed = CredentialStatusMaintenanceResult.Finished(1, 0, 0, hasNewNotice = true)
+
+        scheduler.recordOutcome(context, current, "current-grant", changed)
+        assertTrue(notices.allNotifications.isEmpty(), "A denied alert must leave only the encrypted Home notice")
+        shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        scheduler.recordOutcome(context, old, "old-grant", changed)
+        assertTrue(notices.allNotifications.isEmpty(), "A superseded binding must not publish an alert")
+
+        scheduler.recordOutcome(context, current, "current-grant", changed)
+        val notice = notices.allNotifications.single()
+        val intent = shadowOf(notice.contentIntent).savedIntent
+        assertEquals("A credential needs your attention.", notice.extras.getCharSequence(Notification.EXTRA_TEXT))
+        assertEquals(R.drawable.ic_stat_credential_status, notice.smallIcon.resId)
+        assertEquals(AndroidCredentialStatusNotifications.OPEN_HOME, intent.action)
+        assertEquals(MainActivity::class.java.name, intent.component?.className)
+        assertNull(intent.data)
+        assertNull(intent.extras)
+
+        scheduler.recordOutcome(context, current, "current-grant", changed)
+        assertEquals(1, notices.allNotifications.size)
+        AndroidCredentialStatusNotifications.clear(context)
+        assertTrue(notices.allNotifications.isEmpty())
     }
 
     private suspend fun enqueue(binding: String): UUID {

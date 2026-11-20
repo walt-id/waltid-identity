@@ -220,6 +220,26 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         _ = try Self.successAnyValue(try await bridge.invalidateCredentialStatusSnapshot(), operation: "reload local credential status")
     }
 
+    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice] {
+        let result = try await bridge.pendingCredentialStatusNotices()
+        guard let notices = try Self.successAnyValue(result, operation: "read credential status notices") as? [WalletBridgeCredentialStatusNotice] else {
+            throw WalletError.internalFailure("Unexpected credential status notices result")
+        }
+        return try notices.map { notice in
+            guard let checkedAt = parseWalletISO8601Date(notice.checkedAt),
+                  let kind = CredentialStatusIssue(rawValue: notice.kind) else {
+                throw WalletError.internalFailure("Unexpected credential status notice")
+            }
+            return PendingCredentialStatusNotice(credentialID: notice.credentialId, version: notice.version,
+                kind: kind, checkedAt: checkedAt, historical: notice.historical)
+        }
+    }
+
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
+        _ = try Self.successAnyValue(try await bridge.acknowledgeCredentialStatusNotice(credentialId: credentialID, version: version),
+            operation: "acknowledge credential status notice")
+    }
+
     private static func maintenanceEnrollment(
         _ result: any WalletBridgeResult
     ) throws -> CredentialStatusMaintenanceEnrollment? {
@@ -242,7 +262,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         let value = try successValue(result, as: WalletBridgeStatusMaintenanceResult.self, operation: "background credential status check")
         switch value.outcome {
-        case "FINISHED": return .finished(checked: Int(value.checked), unchanged: Int(value.unchanged), remaining: Int(value.remaining))
+        case "FINISHED": return .finished(checked: Int(value.checked), unchanged: Int(value.unchanged),
+            remaining: Int(value.remaining), hasNewNotice: value.hasNewNotice)
         case "DEFERRED": return .deferred
         case "INELIGIBLE": return .ineligible
         default: throw WalletError.internalFailure("Unexpected credential status maintenance result")
