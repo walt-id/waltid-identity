@@ -1375,12 +1375,12 @@ class WalletViewModel: ObservableObject {
                 else { result.append(credential) }
             }
             lastReceivedCredentialIDs = storedIDs
-            if error.targetFailure != nil || !storedIDs.isEmpty || !pending.isEmpty ||
-                [.invalidSession, .remoteOutcomeUncertain, .storageOutcomeUncertain].contains(error.code) {
+            if !error.canRetryOffer {
                 issuanceReceipt = IssuanceReceipt(issuer: issuer, pendingIDs: Set(pending.map(\.id)), problem: error)
                 issuanceSession = nil
                 offerPreview = nil
                 authorizationRequestURL = nil
+                txCode = ""
             }
             if !storedIDs.isEmpty {
                 let refreshed = try await walletClient.credentials()

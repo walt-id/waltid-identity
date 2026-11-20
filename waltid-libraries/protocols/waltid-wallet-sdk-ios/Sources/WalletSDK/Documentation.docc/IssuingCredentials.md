@@ -140,8 +140,10 @@ granted by the issuer. Do not invent dataset identifiers or infer them from offe
 
 A failed operation can still contain stored credentials and accepted deferred targets.
 ``IssuanceFailure/targetFailure`` identifies the stopped target, processing stage and
-unattempted targets. A request-stage transport failure may leave remote processing
-unknown; do not blindly redeem the original single-use grant again.
+unattempted targets. Keep Accept available for the same offer only when
+``IssuanceFailure/canRetryOffer`` is true, for example when the user can correct a
+rejected transaction code. Losing the token response closes the offer and leaves
+the issuer's outcome unknown.
 
 ```swift
 switch result {
