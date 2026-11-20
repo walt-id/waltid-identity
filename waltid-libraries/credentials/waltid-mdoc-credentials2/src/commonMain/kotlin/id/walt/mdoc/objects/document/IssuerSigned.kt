@@ -10,6 +10,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.mdoc.encoding.validateMdocCbor
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
@@ -61,6 +62,7 @@ data class IssuerSigned private constructor(
      * @throws Exception if the payload cannot be decoded.
      */
     fun decodeMobileSecurityObject() = runCatching {
+        issuerAuth.payload?.let(::validateMdocCbor)
         issuerAuth.decodeIsoPayload<MobileSecurityObject>()
     }.getOrElse { ex ->
         log.trace(ex) { "Unable to parse MSO with decodeMobileSecurityObject(), MSO is: ${issuerAuth.payload?.toHexString()}" }

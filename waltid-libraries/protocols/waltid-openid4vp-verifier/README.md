@@ -199,6 +199,58 @@ The library provides `Verifier2Response` error types for common failures:
 - `PRESENTATION_VALIDATION_FAILED` - Presentation validation failed
 - `REQUIRED_CREDENTIALS_NOT_PROVIDED` - DCQL fulfillment check failed
 
+## mdoc verification configuration
+
+The default `mso_mdoc` presentation policies check issuer authentication, MSO validity,
+disclosed-item digests, device authentication, device-key authorization and transaction data.
+A custom `policies.vp_policies.mso_mdoc` list replaces that default. Keep
+`mso_mdoc/issuer_auth` and `mso_mdoc/mso` alongside the integrity and device checks.
+The generic credential `expiration` and `not-before` policies do not replace MSO validity checks.
+Keep the configured IACA/VICAL or trusted-list policy as well: signature verification alone does
+not establish issuer trust.
+
+Verification establishes the authenticity of returned values. Applications must also check the
+values needed for their decision. For example, a genuine `age_over_18: false` is a valid boolean,
+but does not satisfy an over-18 access rule. Configure the `schema` credential policy to enforce
+claim types for the document schemas you accept. Append an entry such as this to the existing
+`policies.vc_policies` list, retaining its trust and other checks:
+
+```json
+{
+  "policy": "schema",
+  "schema": {
+    "type": "object",
+    "required": ["org.iso.23220.1"],
+    "properties": {
+      "org.iso.23220.1": {
+        "type": "object",
+        "required": ["age_over_18"],
+        "properties": {"age_over_18": {"type": "boolean"}}
+      }
+    }
+  }
+}
+```
+
+For one-attempt transactions, set `core_flow.session_usage` to `single_attempt`. This consumes the
+session on the first admitted presentation or wallet error. `single_success` permits failed attempts
+until the first success; `reusable` permits further presentations until expiry. Request-URI fetches
+are not presentations and may be repeated while the session remains available.
+
+Set `core_flow.encrypted_response` to `true` when application-layer response encryption is required.
+Unencrypted `direct_post` is a supported OpenID4VP mode; transport security and intermediary body
+logging remain deployment concerns.
+
+An OpenID4VP mdoc presentation must contain one successful version-1.0 DeviceResponse with exactly
+one document. Multiple presentations use the DCQL query's `multiple` option. Missing requested
+claims and unrequested selectively disclosable mdoc elements are rejected. The same credential may
+carry claims requested under another selected query, as allowed by OpenID4VP 1.0 section 6.4.
+Device-key authorizations restrict `DeviceSigned` elements, not the issuer's own signed elements.
+
+External-reader proximity submissions enforce configured DCQL claim constraints, but the kiosk owns
+the DeviceRequest; OpenID4VP extra-disclosure restrictions do not apply to that flow. Both flows
+reject duplicate CBOR map keys before decoding.
+
 ## Related Libraries
 
 - **[waltid-openid4vp](../waltid-openid4vp/README.md)** - Core OpenID4VP models and types

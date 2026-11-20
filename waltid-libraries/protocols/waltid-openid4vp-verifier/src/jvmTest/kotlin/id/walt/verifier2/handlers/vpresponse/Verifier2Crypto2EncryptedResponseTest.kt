@@ -25,11 +25,13 @@ import id.walt.iso18013.annexc.AnnexCEncryptedResponseData
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.CleartextDirectPostResponse
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.DcApiJsonDirectPostResponse
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
@@ -60,6 +62,15 @@ class Verifier2Crypto2EncryptedResponseTest {
             urlPrefix = "https://verifier.example/session",
             urlHost = "openid4vp://authorize",
         )
+        assertEquals(OpenID4VPResponseMode.DIRECT_POST_JWT, session.authorizationRequest.responseMode)
+        assertFailsWith<IllegalArgumentException> {
+            Verifier2VPDirectPostHandler.parseResponseBody(
+                session.authorizationRequest.responseMode,
+                CleartextDirectPostResponse("{}", requireNotNull(session.authorizationRequest.state)),
+                session,
+                session.ephemeralDecryptionKey,
+            )
+        }
         assertNotNull(session.ephemeralDecryptionKey)
         assertNotNull(session.crypto2EphemeralDecryptionKey)
         val publicJwk = assertNotNull(session.authorizationRequest.clientMetadata?.jwks).keys.single()

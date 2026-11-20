@@ -18,7 +18,8 @@ import kotlinx.serialization.Serializable
  * This key is used to create the `DeviceAuth` signature or MAC.
  * @property keyAuthorizations An optional structure that restricts what the `deviceKey` is authorized
  * to sign. If present, the mdoc can only provide device-signed attestations for the namespaces
- * or specific data elements listed here. If absent, the key can sign any element.
+ * or specific data elements listed here. If absent, no device-signed data elements are authorized;
+ * the key still authenticates the session transcript.
  * @property keyInfo An optional map for proprietary or future extensions related to the key.
  * Per the specification, keys are positive integers for future use and negative for proprietary use.
  * NOTE: The spec allows values of `any` type, but this implementation uses `String` for simplicity.
