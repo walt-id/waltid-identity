@@ -177,6 +177,38 @@ test("non-PID credentials still default to every advertised claim", () => {
   ]);
 });
 
+test("SD-JWT PID requests the rulebook birthdate claim", () => {
+  const configuration = {
+    format: "dc+sd-jwt",
+    vct: "urn:eudi:pid:1",
+    credential_metadata: {
+      claims: [
+        { path: ["family_name"] },
+        { path: ["given_name"] },
+        { path: ["birth_date"] },
+        { path: ["nationality"] },
+      ],
+    },
+  };
+
+  assert.deepEqual(
+    defaultSelectedClaimIds(configuration, "urn:eudi:pid:1"),
+    ["family_name", "given_name", "birth_date"],
+  );
+  const query = dcqlFromIssuerMetadata(
+    "urn:eudi:pid:1",
+    configuration,
+    claimsFromIssuerMetadata(configuration).filter((claim) =>
+      ["family_name", "given_name", "birth_date"].includes(claim.id),
+    ),
+  );
+  assert.deepEqual(query.meta, { vct_values: ["urn:eudi:pid:1"] });
+  assert.deepEqual(
+    query.claims.map((claim) => claim.path),
+    [["family_name"], ["given_name"], ["birthdate"]],
+  );
+});
+
 test("sanitizes credential query ids to OpenID4VP identifier characters", () => {
   assert.equal(dcqlCredentialQueryId("urn:eudi:pid:1"), "urn-eudi-pid-1");
   assert.equal(
