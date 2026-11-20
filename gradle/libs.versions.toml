@@ -69,7 +69,7 @@ korlibs-krypto = "4.0.10"
 # JVM-only: wallet persistence
 exposed = "1.6.1"
 sqlite-jdbc = "3.54.1.0"
-postgresql = "42.7.11"
+postgresql = "42.7.12"
 mariadb = "3.5.11"
 hikaricp = "7.1.0"
 
