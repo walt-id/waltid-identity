@@ -221,24 +221,30 @@ private class DemoInteractions(
             Json.parseToJsonElement(credential.credentialDataJson).jsonObject["status"]
         })
         val observed = input.credentialIds.map { id ->
-            val card = "wallet.credentialCard.$id"
-            waitFor(card, code = "demo_status_card_missing")
-            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_card_not_clickable") {
-                // Invoke the intended card's accessibility action even when other cards overlap it.
-                val node = device.findObject(By.pkg(context.packageName).res(card))?.accessibilityNodeInfo
-                node?.isVisibleToUser == true && node.isEnabled && node.isClickable &&
-                    node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            openStatusDetails(id)
+            val headline = By.pkg(context.packageName).res("credential-status-headline-$id")
+            val disclosure = By.pkg(context.packageName).res("credential-status-details-$id")
+            // When status facts can expand, the accessible disclosure row can own the heading text.
+            fun displayedLabel(): String? = device.findObject(headline)?.text?.takeIf(String::isNotBlank)
+                ?: device.findObject(disclosure)?.text?.takeIf(String::isNotBlank)
+
+            val checkTag = "credential-status-check-$id"
+            val enabledCheck = By.pkg(context.packageName).res(checkTag).enabled(true)
+            val latest = By.pkg(context.packageName).res("credential-status-last-checked-$id")
+            waitFor(checkTag, code = "demo_status_check_control_missing")
+            var initial = "Other"
+            var previousCheck: String? = null
+            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_check_not_ready") {
+                val label = displayedLabel() ?: return@waitUntil false
+                if (!device.hasObject(enabledCheck)) return@waitUntil false
+                initial = label.takeIf { it in ItbStatusObservation.labels } ?: "Other"
+                previousCheck = device.findObject(latest)?.text
+                true
             }
-            val headline = "credential-status-headline-$id"
-            val initial = waitFor(headline, code = "demo_status_detail_not_open").text
-                .takeIf { it in ItbStatusObservation.labels } ?: "Other"
-            val latest = "credential-status-last-checked-$id"
-            val previousCheck = device.findObject(By.res(latest))?.text
-            clickByTag(device, "credential-status-check-$id")
+            click(checkTag, "demo_status_check_not_clickable")
             waitUntil(35_000, "demo_status_label_or_refresh_mismatch") {
-                val label = device.findObject(By.res(headline))?.text
-                val checked = device.findObject(By.res(latest))?.text
-                label == input.expected.label && checked != null && checked != previousCheck
+                val checked = device.findObject(latest)?.text
+                displayedLabel() == input.expected.label && checked != null && checked != previousCheck
             }
             when {
                 device.hasObject(By.res("wallet-detail-close")) -> clickByTag(device, "wallet-detail-close")
@@ -249,6 +255,31 @@ private class DemoInteractions(
             ItbStatusObservation(initial, input.expected.label)
         }
         return ItbWalletResult(statusObservations = observed)
+    }
+
+    private suspend fun openStatusDetails(id: String) {
+        val card = "wallet.credentialCard.$id"
+        val cardSelector = By.pkg(context.packageName).res(card)
+        val collection = By.pkg(context.packageName).res("wallet.scanButton")
+        val details = By.pkg(context.packageName).res("wallet.credentialDetailsScreen")
+
+        suspend fun activateCard() = waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_card_not_clickable") {
+            if (device.hasObject(details)) return@waitUntil true
+            if (!device.hasObject(collection)) return@waitUntil false
+            val node = device.findObject(cardSelector)?.accessibilityNodeInfo
+            // The exact card's accessibility action works even when the cards overlap.
+            node?.isVisibleToUser == true && node.isEnabled && node.isClickable &&
+                node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+        waitFor(card, code = "demo_status_card_missing")
+        activateCard()
+        // An accepted action can race with a collection redraw. Only retry from the collection.
+        if (!device.wait(Until.hasObject(details), 5_000) && device.hasObject(collection)) activateCard()
+        waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_detail_not_open") {
+            device.hasObject(details)
+        }
+        waitFor("wallet.credentialDetails.$id", code = "demo_status_expected_credential_detail_missing")
     }
 
     private suspend fun enterProviderReview(reviewTag: String) {
