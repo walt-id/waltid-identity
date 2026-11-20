@@ -2,7 +2,7 @@ import {encodeDisclosure} from "./disclosures.ts";
 import {useCurrentWallet} from "./accountWallet.ts";
 import {computed, type Ref, ref, watch} from "vue";
 import {decodeRequest} from "./siop-requests.ts";
-import {navigateTo} from "nuxt/app";
+import {navigateTo, useRuntimeConfig} from "nuxt/app";
 import {parseJwt} from "@waltid-web-wallet/utils/jwt.ts";
 
 type PresentationTransactionDataItem = {
@@ -100,14 +100,16 @@ export async function usePresentation(query: any) {
 
   const currentWallet = useCurrentWallet();
   const originalRequest = decodeRequest(query.request as string);
+  const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
 
   async function resolvePresentationRequest(request: string) {
     try {
       const response = await $fetch(
-        `/wallet-api/wallet/${currentWallet.value}/exchange/resolvePresentationRequest`,
+        `${apiBase}/wallet-api/wallet/${currentWallet.value}/exchange/resolvePresentationRequest`,
         {
           method: "POST",
           body: request,
+          credentials: 'include',
         },
       );
       return response;
@@ -139,7 +141,8 @@ export async function usePresentation(query: any) {
 
   const transactionDataProfiles = ref<TransactionDataProfile[]>([]);
   $fetch<TransactionDataProfile[]>(
-    `/wallet-api/transaction-data-profiles`,
+    `${apiBase}/wallet-api/transaction-data-profiles`,
+    { credentials: 'include' },
   ).then((data) => {
     transactionDataProfiles.value = data;
   }).catch(() => {});
@@ -168,6 +171,7 @@ export async function usePresentation(query: any) {
     ? (resolvedRequest as string)
     : originalRequest;
   const matchedCredentials = await fetchMatchedCredentials(
+    apiBase,
     currentWallet.value,
     requestForCredentialMatching,
     presentationRequestPayload,
@@ -246,11 +250,12 @@ export async function usePresentation(query: any) {
     };
 
     const response = await fetch(
-      `/wallet-api/wallet/${currentWallet.value}/exchange/usePresentationRequest`,
+      `${apiBase}/wallet-api/wallet/${currentWallet.value}/exchange/usePresentationRequest`,
       {
         method: "POST",
         body: JSON.stringify(req),
         redirect: "manual",
+        credentials: 'include',
         headers: {
           "Content-Type": "application/json",
         },
@@ -341,6 +346,7 @@ function parseRequestObjectPayload(
 }
 
 async function fetchMatchedCredentials(
+  apiBase: string,
   walletId: string,
   originalRequest: string,
   presentationRequestPayload: string,
@@ -352,10 +358,11 @@ async function fetchMatchedCredentials(
   const body = isOpenId4Vp ? originalRequest : presentationRequestPayload;
 
   return $fetch<Array<MatchedCredential>>(
-    `/wallet-api/wallet/${walletId}/exchange/${path}`,
+    `${apiBase}/wallet-api/wallet/${walletId}/exchange/${path}`,
     {
       method: "POST",
       body,
+      credentials: 'include',
     },
   );
 }

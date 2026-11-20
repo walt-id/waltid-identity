@@ -71,9 +71,16 @@ fun Application.configureSecurity() {
 
                 // cookie.httpOnly = true
                 cookie.httpOnly = false // FIXME
-                // TODO cookie.secure = true
                 cookie.maxAge = tokenLifetime.days
-                cookie.extensions["SameSite"] = "Strict"
+                // PTRID-753: web-wallet now calls wallet-api via an absolute cross-origin URL
+                // instead of through the same-origin nginx proxy (see nuxt.config.ts /
+                // NUXT_PUBLIC_WALLET_API_BASE_URL). A cross-site fetch never carries a
+                // SameSite=Strict (or Lax) cookie, so login would silently fail regardless of
+                // CORS. SameSite=None requires Secure -- browsers drop the cookie otherwise --
+                // and Secure requires HTTPS, which both AWS (ALB-terminated) and local dev
+                // (browsers trust http://localhost specifically) satisfy.
+                cookie.secure = true
+                cookie.extensions["SameSite"] = "None"
                 transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
             }
             cookie<OidcTokenSession>("oidc-login") {
@@ -81,9 +88,10 @@ fun Application.configureSecurity() {
 
                 // cookie.httpOnly = true
                 cookie.httpOnly = false // FIXME
-                // TODO cookie.secure = true
                 cookie.maxAge = tokenLifetime.days
-                cookie.extensions["SameSite"] = "Strict"
+                // PTRID-753: see "login" cookie above -- same cross-origin requirement.
+                cookie.secure = true
+                cookie.extensions["SameSite"] = "None"
                 transform(SessionTransportTransformerEncrypt(AuthKeys.encryptionKey, AuthKeys.signKey))
             }
         }

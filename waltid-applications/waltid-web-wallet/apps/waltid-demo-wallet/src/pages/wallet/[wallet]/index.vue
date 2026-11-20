@@ -85,6 +85,7 @@ import scannerSVG from "~/public/svg/scanner.svg";
 
 const route = useRoute();
 const walletId = route.params.wallet;
+const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
 
 const {
   data: credentials,
@@ -92,7 +93,8 @@ const {
   refresh,
   error,
 } = await useLazyFetch(
-  `/wallet-api/wallet/${walletId}/credentials?showDeleted=false&showPending=false`,
+  `${apiBase}/wallet-api/wallet/${walletId}/credentials?showDeleted=false&showPending=false`,
+  { credentials: 'include' },
 );
 refreshNuxtData();
 

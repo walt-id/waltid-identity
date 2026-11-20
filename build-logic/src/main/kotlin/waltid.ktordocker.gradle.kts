@@ -19,13 +19,20 @@ fun getDockerCredentials(rootDir: File): Pair<String, String> {
     )
 }
 
+// PTRID-753 local override: jibDockerBuild otherwise loads straight over the upstream
+// waltid/wallet-api:latest tag already used by docker-compose.yml elsewhere, silently
+// swapping in this patched build. Only takes effect when -PlocalImageNameOverride /
+// -PlocalImageTagOverride are passed; unset, behavior is identical to upstream.
+val localImageNameOverride = project.findProperty("localImageNameOverride") as String?
+val localImageTagOverride = project.findProperty("localImageTagOverride") as String?
+
 // 2. Configure Ktor Docker extension
 ktor {
     docker {
         jreVersion.set(JavaVersion.VERSION_21)
 
-        localImageName.set(project.name.replaceFirst("waltid-", "waltid/")) // waltid-verifier-api2 -> waltid/verifier-api2
-        imageTag.set("${project.version}")
+        localImageName.set(localImageNameOverride ?: project.name.replaceFirst("waltid-", "waltid/")) // waltid-verifier-api2 -> waltid/verifier-api2
+        imageTag.set(localImageTagOverride ?: "${project.version}")
 
         val (user, pass) = getDockerCredentials(rootDir)
 
@@ -58,8 +65,8 @@ configure<JibExtension> {
         }
     }
     to {
-        image = project.name.replaceFirst("waltid-", "waltid/") // waltid-verifier-api2 -> waltid/verifier-api2
-        tags = setOf("${project.version}", "latest")
+        image = localImageNameOverride ?: project.name.replaceFirst("waltid-", "waltid/") // waltid-verifier-api2 -> waltid/verifier-api2
+        tags = setOf(localImageTagOverride ?: "${project.version}") + (if (localImageNameOverride == null) setOf("latest") else emptySet())
         auth {
             username = user
             password = pass

@@ -1,4 +1,4 @@
-import {navigateTo, useFetch, useRoute, useState} from "nuxt/app";
+import {navigateTo, useFetch, useRoute, useRuntimeConfig, useState} from "nuxt/app";
 
 export type WalletListing = {
     id: string,
@@ -14,7 +14,10 @@ export type WalletListings = {
 }
 
 export async function listWallets() {
-    const { data, refresh } = useFetch<WalletListings>("/wallet-api/wallet/accounts/wallets");
+    const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
+    // PTRID-753: cross-origin now -- fetch/ofetch default to credentials:"same-origin", which
+    // would silently drop the wallet-api session cookie without this.
+    const { data, refresh } = useFetch<WalletListings>(`${apiBase}/wallet-api/wallet/accounts/wallets`, { credentials: 'include' });
     await refresh()
     return data;
 }
