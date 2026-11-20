@@ -27,16 +27,17 @@ ITB_CASES=ts12_pay_01,ts12_pay_02,ts12_pay_03,ts12_pay_dc_api_01,ts12_pay_dc_api
 ```
 
 Provide the usual [ITB environment](ITB-WALLET.md#hosted-cases). Use a fresh
-Preview installation. Select **Use PIN only** during the optional biometric
-unlock setup. The instrumented setup selects hardware-backed signing with timed approval.
-Follow the on-device prompts to create the key. For each payment,
-review the transaction and approve it on the phone. The selected payments pull in
-their issuance prerequisites, and every case reports its own exact ITB session.
+Preview installation and unlock the phone before starting. The driver dismisses
+the optional biometric unlock prompt and selects **Use PIN only**. It selects
+hardware-backed signing with timed approval. Follow the on-device prompts to
+create the key. Review each DC API or wallet-link payment in the wallet, then
+approve the native signing prompt. The selected payments pull in their issuance
+prerequisites, and every case reports its own ITB session.
 For a watched run of all 27 selected cases on the phone, leave `ITB_CASES` unset,
 set `ITB_SHOW_BROWSER=true` and open `android device hub --device <physical-serial>`.
 The desktop browser shows the portal. The mirror shows the wallet, Android Chrome
 and provider handoffs. The driver confirms the browser and Android sharing prompts
-for the configured ITB host. Complete payment consent and biometrics on the phone.
+for the configured ITB host.
 
 Reports identify the attended demo mode and both APK digests. The optional
 `ItbNativeWalletDeviceTest` SDK fixture is also available for protocol diagnostics

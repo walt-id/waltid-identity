@@ -134,6 +134,8 @@ private class DemoInteractions(
     private val attended: Boolean,
     private val itbHost: String,
 ) {
+    private val previewWalletLabel = context.applicationInfo.loadLabel(context.packageManager).toString()
+
     suspend fun execute(interaction: ItbWalletInteraction): ItbWalletResult = when (interaction) {
         is ItbWalletInteraction.Offer -> ui("offer") { receive(interaction) }
         is ItbWalletInteraction.CheckStatus -> ui("status") { status(interaction) }
@@ -319,7 +321,7 @@ private class DemoInteractions(
             if (device.hasObject(By.pkg(context.packageName).res(reviewTag))) true else {
                 val combinedHeading = device.hasObject(By.copy(picker).textStartsWith("Share info with"))
                 val shareSheet = combinedHeading || device.hasObject(By.copy(picker).text("Share info"))
-                val candidate = device.findObject(By.copy(picker).textContains("walt.id Wallet"))
+                val candidate = device.findObject(By.copy(picker).textContains(previewWalletLabel))
                 val confirm = if (shareSheet) {
                     val approvedOrigin = if (combinedHeading) {
                         device.hasObject(By.copy(picker).text(shareWithHost))
