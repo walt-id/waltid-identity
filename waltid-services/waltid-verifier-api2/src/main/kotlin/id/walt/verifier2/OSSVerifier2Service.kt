@@ -12,6 +12,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.fetchBinaryFile
 import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
+import id.walt.ktornotifications.WebhookNotifier
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.ktornotifications.WebhookDestinationNotAllowedException
@@ -150,7 +151,7 @@ object Verifier2Service {
             val publicSession = updated.publicView()
             Verifier2SessionUpdate(publicSession.id, event, publicSession)
                 .toKtorSessionUpdate()
-                .notifySessionUpdate(publicSession.id, notificationConfig)
+                .notifySessionUpdate(publicSession.id, notificationConfig, sessionOwner = publicSession.id)
         } catch (exception: WebhookDestinationNotAllowedException) {
             log.warn { "Could not deliver verification session notification for ${updated.id}: ${exception.message}" }
         } catch (exception: Exception) {
@@ -242,6 +243,7 @@ object Verifier2Service {
                         }
                     }) {
                         val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
+                        WebhookNotifier.eraseSession(sessionId)
                         if (!repository.delete(sessionId)) throw VerificationSessionNotFoundException(sessionId)
                         call.respond(HttpStatusCode.NoContent)
                     }
@@ -265,6 +267,7 @@ object Verifier2Service {
                         // session concurrently, and the purge must not resurrect the state it read.
                         val purged = current.session.copyForStorage().apply { deletePII() }
                         repository.compareAndSet(sessionId, current.version, purged)
+                        WebhookNotifier.eraseSession(sessionId)
                         call.respond(HttpStatusCode.NoContent)
                     }
 

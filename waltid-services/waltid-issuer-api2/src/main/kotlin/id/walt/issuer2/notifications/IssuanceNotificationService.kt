@@ -4,7 +4,6 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.models.toPublicJson
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
-import id.walt.ktornotifications.WebhookDestinationNotAllowedException
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -44,7 +43,7 @@ class IssuanceNotificationService {
             error = error,
             errorDescription = errorDescription,
         )
-        runCatching {
+        try {
             SseNotifier.notify(ISSUER_EVENT_STREAM_TARGET, update)
             session?.let {
                 update.notifySessionUpdate(
@@ -52,14 +51,11 @@ class IssuanceNotificationService {
                     sessionNotifications = it.notifications.toKtorSessionNotifications(),
                 )
             }
-        }.getOrElse { ex ->
-            if (ex is CancellationException) throw ex
-            val context = "requestId=$requestId, sessionId=${session?.sessionId}, event=$event"
-            if (ex is WebhookDestinationNotAllowedException) {
-                logger.warn { "Failed to send issuance notification ($context): ${ex.message}" }
-            } else {
-                logger.warn(ex) { "Failed to send issuance notification ($context)" }
-            }
+        } catch (ex: CancellationException) {
+            throw ex
+        } catch (ex: Exception) {
+            // Session state may already be committed. Preserve the protocol result and surface enqueue failures.
+            logger.error { "Failed to publish issuance event (requestId=$requestId, sessionId=${session?.sessionId}, event=$event, error=${ex::class.simpleName})" }
         }
     }
 
@@ -89,6 +85,8 @@ class IssuanceNotificationService {
             KtorSessionNotifications(
                 webhook = KtorSessionNotifications.VerificationSessionWebhookNotification(
                     url = Url(webhook.url),
+                    signingSecret = webhook.signingSecret,
+                    retryPolicy = webhook.retryPolicy,
                 ),
             )
         }
