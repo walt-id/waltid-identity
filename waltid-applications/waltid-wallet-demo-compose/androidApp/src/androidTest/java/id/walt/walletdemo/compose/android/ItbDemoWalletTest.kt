@@ -86,11 +86,13 @@ class ItbDemoWalletTest {
         KotlinLoggingConfiguration.logStartupMessage = false
         val device = UiDevice.getInstance(instrumentation)
         ServerSocket(port, 1, InetAddress.getByName("127.0.0.1")).use { server ->
-            server.soTimeout = 120_000
+            // The launcher owns this listener and stops instrumentation if host setup fails.
+            // A cold Gradle build or portal login can finish much later than an APK install.
             instrumentation.sendStatus(2, Bundle().apply { putString("itb_state", "listening") })
             withContext(Dispatchers.IO) { server.accept() }.use { socket ->
                 val init = withTimeout(10_000) { ItbDeviceWire.read(socket) }
                 ItbDeviceWire.authenticate(init, token)
+                instrumentation.sendStatus(2, Bundle().apply { putString("itb_state", "wallet_setup") })
                 val origin = ItbDeviceWire.approvedOrigin(init.getValue("origin").jsonPrimitive.content)
                 val wallet = createAndroidDemoMobileWallet(context, config).wallet
                 try {
@@ -110,6 +112,7 @@ class ItbDemoWalletTest {
                         put("ready", true)
                         put("provider", if (attended) "android-demo-attended" else "android-demo-unattended")
                     })
+                    instrumentation.sendStatus(2, Bundle().apply { putString("itb_state", "ready") })
                     val driver = DemoInteractions(context, device, wallet, attended, origin.host)
                     try {
                         ItbDeviceWire.serve(socket, driver::execute)
@@ -266,35 +269,37 @@ private class DemoInteractions(
                 device.hasObject(By.res("wallet.detailsBack")) -> clickByTag(device, "wallet.detailsBack")
                 else -> device.pressBack()
             }
-            waitFor("wallet.scanButton", code = "demo_status_home_not_restored")
+            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_home_not_restored") {
+                device.hasObject(collection) && !device.hasObject(statusDetails)
+            }
             ItbStatusObservation(initial, input.expected.label)
         }
         return ItbWalletResult(statusObservations = observed)
     }
 
+    private val collection = By.pkg(context.packageName).res("wallet.scanButton")
+    private val statusDetails = By.pkg(context.packageName).res("wallet.credentialDetailsScreen")
+
     private suspend fun openStatusDetails(id: String) {
         val card = "wallet.credentialCard.$id"
         val cardSelector = By.pkg(context.packageName).res(card)
-        val collection = By.pkg(context.packageName).res("wallet.scanButton")
-        val details = By.pkg(context.packageName).res("wallet.credentialDetailsScreen")
-
-        suspend fun activateCard() = waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_card_not_clickable") {
-            if (device.hasObject(details)) return@waitUntil true
-            if (!device.hasObject(collection)) return@waitUntil false
+        fun activateCard(): Boolean {
+            if (device.hasObject(statusDetails) || !device.hasObject(collection)) return false
             val node = device.findObject(cardSelector)?.accessibilityNodeInfo
             // The exact card's accessibility action works even when the cards overlap.
-            node?.isVisibleToUser == true && node.isEnabled && node.isClickable &&
+            return node?.isVisibleToUser == true && node.isEnabled && node.isClickable &&
                 node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         }
 
         waitFor(card, code = "demo_status_card_missing")
-        activateCard()
+        waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_card_not_clickable") { activateCard() }
         // An accepted action can race with a collection redraw. Only retry from the collection.
-        if (!device.wait(Until.hasObject(details), 5_000) && device.hasObject(collection)) activateCard()
-        waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_detail_not_open") {
-            device.hasObject(details)
+        if (!device.wait(Until.hasObject(statusDetails), 5_000)) {
+            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_detail_not_open") {
+                device.hasObject(statusDetails) || activateCard()
+            }
         }
-        waitFor("wallet.credentialDetails.$id", code = "demo_status_expected_credential_detail_missing")
+        // The caller scrolls to the Check status control keyed to this exact credential.
     }
 
     private suspend fun enterProviderReview(reviewTag: String) {

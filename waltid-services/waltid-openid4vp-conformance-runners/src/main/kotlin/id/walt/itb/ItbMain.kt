@@ -83,9 +83,12 @@ private suspend fun runItb(): Int {
     require(certificates.isNotEmpty()) { "The ITB trust anchor file has no certificates" }
     val trust = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(certificates))
 
+    val showPortal = !ci && System.getenv("ITB_SHOW_BROWSER") == "true"
     Playwright.create().use { playwright ->
-        playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(true).setArgs(listOf("--disable-http2"))).use { browser ->
-            browser.newContext(Browser.NewContextOptions().setViewportSize(1440, 1000)).use { context ->
+        playwright.chromium().launch(BrowserType.LaunchOptions().setHeadless(!showPortal).setArgs(listOf("--disable-http2"))).use { browser ->
+            val options = Browser.NewContextOptions()
+            if (showPortal) options.setViewportSize(null) else options.setViewportSize(1440, 1000)
+            browser.newContext(options).use { context ->
                 val page = context.newPage()
                 page.setDefaultTimeout(15_000.0)
                 ItbPortalLogin.login(page, catalogue.testBed, username, password)
