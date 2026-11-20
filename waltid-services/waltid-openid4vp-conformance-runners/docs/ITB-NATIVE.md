@@ -2,7 +2,8 @@
 
 The attended path drives the actual Compose Wallet Preview Debug app on a
 physical Android phone. The operator reviews the payee and amount in the app and
-confirms the transaction with hardware-backed, per-use authentication. The test
+confirms each transaction with fresh biometric authentication. The hardware-backed
+test keys allow 10-second biometric reuse for ordinary signing. The test
 uses the same browser and provider entry points as the unattended runs for DC API
 interactions. The desktop retains portal and organisation credentials, ITB session
 correlation and cleanup. The installed app retains its own keys and credentials.
@@ -26,8 +27,9 @@ ITB_CASES=ts12_pay_01,ts12_pay_02,ts12_pay_03,ts12_pay_dc_api_01,ts12_pay_dc_api
 ```
 
 Provide the usual [ITB environment](ITB-WALLET.md#hosted-cases). Use a fresh
-Preview installation. The instrumented setup opens the usual wallet key setup.
-Follow the on-device prompts to create the hardware-backed key. For each payment,
+Preview installation. Select **Use PIN only** during the optional biometric
+unlock setup. The instrumented setup selects hardware-backed signing with timed approval.
+Follow the on-device prompts to create the key. For each payment,
 review the transaction and approve it on the phone. The selected payments pull in
 their issuance prerequisites, and every case reports its own exact ITB session.
 
