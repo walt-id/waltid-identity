@@ -32,11 +32,19 @@ sealed class ClientAttestationVerificationMethod {
     @SerialName("x509-chain")
     data class X509Chain(
         val trustedRootCertificatesPem: List<String>,
+        /**
+         * Optional entity-type name. This library stores it and does not enforce it.
+         * A deployment that wraps the verifier, such as Enterprise Issuer2, may require
+         * a linked trust registry to trust the leaf and use this name as an extra filter.
+         */
+        @Deprecated("Use the x509-trust-registry verification method, which enforces entity types itself")
+        val expectedEntityType: String? = null,
     ) : ClientAttestationVerificationMethod() {
         init {
             require(trustedRootCertificatesPem.isNotEmpty()) {
                 "x509-chain verification requires at least one trusted root certificate"
             }
+            expectedEntityType?.let { require(it.isNotBlank()) { "expectedEntityType must not be blank" } }
         }
     }
 

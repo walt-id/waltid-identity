@@ -84,5 +84,5 @@ internal fun registryDecision(
     matchedEntity = TrustedEntity("wallet-provider", "wallet-provider-lote", entityType, "Wallet Provider"),
 )
 
-/** What `HttpTrustDecisionEvaluator` answers when the resolver cannot be reached. */
+/** What `HttpTrustDecisionEvaluator` answers when the resolver is unreachable or gives no decision. */
 internal val unavailableDecision = TrustDecision(TrustDecisionCode.UNKNOWN, warnings = listOf("Trust resolver is unavailable"))

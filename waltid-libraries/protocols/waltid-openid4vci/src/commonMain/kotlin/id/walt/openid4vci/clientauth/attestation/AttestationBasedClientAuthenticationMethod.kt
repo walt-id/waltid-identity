@@ -15,6 +15,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationServiceException
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationResult
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifier
 import id.walt.openid4vci.clientauth.attestation.verifier.KeyBasedClientAttestationVerifier
@@ -135,11 +136,16 @@ class AttestationBasedClientAuthenticationMethod(
             return failure("client_id does not match client attestation subject")
         }
 
-        val verifiedSignerPublicJwk = when (val verification = attestationVerifier.verifyAttestationJwt(
-            jwt = attestationJwt,
-            header = attestation.header,
-            payload = attestation.payload,
-        )) {
+        val verification = try {
+            attestationVerifier.verifyAttestationJwt(
+                jwt = attestationJwt,
+                header = attestation.header,
+                payload = attestation.payload,
+            )
+        } catch (e: ClientAttestationServiceException) {
+            return ClientAuthenticationResult.Failure(OAuthError(OAuthErrorCodes.SERVER_ERROR, e.message))
+        }
+        val verifiedSignerPublicJwk = when (verification) {
             ClientAttestationVerificationResult.Verified -> null
             is ClientAttestationVerificationResult.VerifiedWithSigner -> verification.publicJwk
             is ClientAttestationVerificationResult.Rejected ->

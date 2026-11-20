@@ -61,7 +61,7 @@ class X509TrustRegistryClientAttestationVerifierTest {
     }
 
     @Test
-    fun `registry denials, stale sources and unauthenticated sources are rejected`() = runTest {
+    fun `registry denials and stale or unauthenticated sources are rejected`() = runTest {
         val pki = TestAttesterPki.create()
         val jwt = attestation(pki)
         val denials = listOf(
@@ -119,18 +119,18 @@ class X509TrustRegistryClientAttestationVerifierTest {
     }
 
     @Test
-    fun `an unavailable source, a missing evaluator and evaluator failures are server errors`() = runTest {
+    fun `unavailable sources and missing or failing evaluators are server errors`() = runTest {
         val jwt = attestation(TestAttesterPki.create())
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<ClientAttestationServiceException> {
             verify(X509TrustRegistryClientAttestationVerifier({ unavailableDecision }, types), jwt)
         }
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<ClientAttestationServiceException> {
             verify(X509TrustRegistryClientAttestationVerifier(null, types), jwt)
         }
         val failure = RuntimeException("registry store failed")
-        assertSame(failure, assertFailsWith<RuntimeException> {
+        assertSame(failure, assertFailsWith<ClientAttestationServiceException> {
             verify(X509TrustRegistryClientAttestationVerifier({ throw failure }, types), jwt)
-        })
+        }.cause)
         assertFailsWith<CancellationException> {
             verify(X509TrustRegistryClientAttestationVerifier({ throw CancellationException("cancelled") }, types), jwt)
         }
@@ -163,7 +163,13 @@ class X509TrustRegistryClientAttestationVerifierTest {
         assertEquals(CLIENT_ID, authenticated.client.id)
         val denied = assertIs<ClientAuthenticationResult.Failure>(authenticate { TrustDecision(TrustDecisionCode.NOT_TRUSTED) })
         assertEquals("invalid_client", denied.error.error)
-        assertFailsWith<IllegalStateException> { authenticate { unavailableDecision } }
+        val outages = listOf(
+            TrustDecisionEvaluator { unavailableDecision },
+            TrustDecisionEvaluator { throw RuntimeException("registry store failed") },
+        )
+        for (outage in outages) {
+            assertEquals("server_error", assertIs<ClientAuthenticationResult.Failure>(authenticate(outage)).error.error)
+        }
     }
 
     @Test

@@ -5,12 +5,15 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.crypto2.keys.Key
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.CredentialProofValidationException
 import id.walt.openid4vci.proofs.attestation.KeyAttestationConfig
 import id.walt.openid4vci.proofs.attestation.KeyAttestationServiceException
+import id.walt.openid4vci.proofs.attestation.KeyAttestationTrustResolver
 import id.walt.openid4vci.proofs.attestation.KeyAttestationVerificationMethod
+import id.walt.openid4vci.proofs.attestation.KeyAttestationVerificationOptions
 import id.walt.openid4vci.proofs.attestation.KeyAttestationVerifier
 import id.walt.openid4vci.proofs.attestation.VerifiedKeyAttestation
 import id.walt.openid4vci.proofs.attestation.toVerificationOptions
@@ -53,7 +56,7 @@ class KeyAttestationTrustRegistryTest {
     }
 
     @Test
-    fun `registry denials, stale sources and unauthenticated sources are invalid proofs`() = runTest {
+    fun `registry denials and stale or unauthenticated sources are invalid proofs`() = runTest {
         val jwt = attestation(TestAttesterPki.create())
         val denials = listOf(
             false to TrustDecision(TrustDecisionCode.NOT_TRUSTED),
@@ -80,11 +83,38 @@ class KeyAttestationTrustRegistryTest {
     }
 
     @Test
-    fun `an unavailable source, a missing evaluator and evaluator failures are service errors`() = runTest {
+    fun `an invalid signature is an invalid proof before the registry is asked`() = runTest {
+        val forged = attestation(TestAttesterPki.create(), signer = generateTestP256Key("not-the-leaf"))
+        // Even an unavailable registry must not turn a forged attestation into a service error.
+        for (answer in listOf(registryDecision(), unavailableDecision)) {
+            val evaluator = RecordingTrustEvaluator { answer }
+            val error = assertFailsWith<CredentialProofValidationException> { verify(forged, method(), evaluator) }
+            assertEquals(CredentialErrorCodes.INVALID_PROOF, error.errorCode)
+            assertTrue(evaluator.requests.isEmpty())
+        }
+    }
+
+    @Test
+    fun `a wrapped registry resolver still asks the registry`() = runTest {
+        val evaluator = RecordingTrustEvaluator { TrustDecision(TrustDecisionCode.NOT_TRUSTED) }
+        val options = KeyAttestationConfig(method()).toVerificationOptions(trustEvaluator = evaluator)
+        val wrapped = options.copy(trustResolver = KeyAttestationTrustResolver { header, context, configuration ->
+            options.trustResolver.resolve(header, context, configuration)
+        })
+
+        assertFailsWith<CredentialProofValidationException> {
+            verify(attestation(TestAttesterPki.create()), wrapped)
+        }
+        assertEquals(1, evaluator.requests.size)
+    }
+
+    @Test
+    fun `unavailable sources and missing or failing evaluators are service errors`() = runTest {
         val jwt = attestation(TestAttesterPki.create())
         assertFailsWith<KeyAttestationServiceException> { verify(jwt, method()) { unavailableDecision } }
         // Options build without an evaluator: Enterprise links the registry after the issuer is created.
-        assertFailsWith<KeyAttestationServiceException> { verify(jwt, method(), evaluator = null) }
+        val missing = assertFailsWith<KeyAttestationServiceException> { verify(jwt, method(), evaluator = null) }
+        assertEquals("Key attestation trust registry is not configured", missing.message)
 
         val failure = RuntimeException("registry store failed")
         val wrapped = assertFailsWith<KeyAttestationServiceException> { verify(jwt, method()) { throw failure } }
@@ -116,15 +146,22 @@ class KeyAttestationTrustRegistryTest {
         jwt: String,
         method: KeyAttestationVerificationMethod,
         evaluator: TrustDecisionEvaluator?,
-    ): VerifiedKeyAttestation = KeyAttestationVerifier(now = { now }).verify(
-        jwt,
-        null,
-        CredentialProofValidationContext("https://issuer.example"),
-        CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "identity"),
-        KeyAttestationConfig(method).toVerificationOptions(trustEvaluator = evaluator),
-    )
+    ): VerifiedKeyAttestation = verify(jwt, KeyAttestationConfig(method).toVerificationOptions(trustEvaluator = evaluator))
 
-    private suspend fun attestation(pki: TestAttesterPki, x5c: JsonArray = pki.x5c): String {
+    private suspend fun verify(jwt: String, options: KeyAttestationVerificationOptions): VerifiedKeyAttestation =
+        KeyAttestationVerifier(now = { now }).verify(
+            jwt,
+            null,
+            CredentialProofValidationContext("https://issuer.example"),
+            CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "identity"),
+            options,
+        )
+
+    private suspend fun attestation(
+        pki: TestAttesterPki,
+        x5c: JsonArray = pki.x5c,
+        signer: Key = pki.leafKey,
+    ): String {
         val holder: Key = generateTestP256Key("holder")
         return CompactJws.sign(
             payload = buildJsonObject {
@@ -132,7 +169,7 @@ class KeyAttestationTrustRegistryTest {
                 put("exp", now.epochSeconds + 600)
                 put("attested_keys", JsonArray(listOf(holder.exportPublicJwkObject())))
             }.toString().encodeToByteArray(),
-            key = pki.leafKey,
+            key = signer,
             algorithm = JwsAlgorithm.ES256,
             protectedHeader = buildJsonObject {
                 put("typ", "key-attestation+jwt")

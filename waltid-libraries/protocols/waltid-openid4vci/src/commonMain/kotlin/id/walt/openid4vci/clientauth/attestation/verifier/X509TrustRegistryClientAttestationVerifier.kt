@@ -12,6 +12,7 @@ import id.walt.trust.decision.check
 import id.walt.trust.model.TrustDecisionCode
 import id.walt.trust.model.TrustedEntityType
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlin.io.encoding.Base64
 
@@ -20,10 +21,10 @@ import kotlin.io.encoding.Base64
  * [expectedEntityTypes], from an accepted source that is fresh ([TrustRequirement.RegistryFresh]).
  *
  * The x5c must be one leaf-first chain, and the signature is verified with the leaf key, before the
- * registry is asked, so a malformed or forged attestation never reaches it. A registry denial is [ClientAttestationVerificationResult.Rejected]. When the issuer
- * cannot decide, verification throws [IllegalStateException] instead, so the client is not blamed for a
- * server fault: no [evaluator] is configured, or the trust source is unavailable
- * ([TrustDecisionCode.UNKNOWN]). Evaluator exceptions propagate unchanged.
+ * registry is asked, so a malformed or forged attestation never reaches it. A registry denial is
+ * [ClientAttestationVerificationResult.Rejected]. When the issuer cannot decide, verification throws
+ * [ClientAttestationServiceException] instead, so the client is not blamed for a server fault: no [evaluator]
+ * is configured, the trust source is unavailable ([TrustDecisionCode.UNKNOWN]), or the evaluator fails.
  */
 class X509TrustRegistryClientAttestationVerifier(
     private val evaluator: TrustDecisionEvaluator?,
@@ -49,24 +50,31 @@ class X509TrustRegistryClientAttestationVerifier(
         if (verified is ClientAttestationVerificationResult.Rejected) return verified
 
         val evaluator = evaluator
-            ?: error("Client attestation trust registry is not configured for this issuer")
+            ?: throw ClientAttestationServiceException("Client attestation trust registry is not configured for this issuer")
         val request = TrustDecisionRequest(
             purpose = TrustPurpose.ISSUER_WUA_SIGNER,
             subject = TrustSubject.CertificateChain(certificateChain.map { Base64.encode(it.encodedDer.toByteArray()) }),
             expectedEntityTypes = expectedEntityTypes,
         )
-        return when (val check = evaluator.check(request, TrustRequirement.RegistryFresh(requireAuthenticatedSource))) {
+        val check = try {
+            evaluator.check(request, TrustRequirement.RegistryFresh(requireAuthenticatedSource))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw ClientAttestationServiceException("Client attestation trust evaluation failed", e)
+        }
+        return when (check) {
             is TrustCheck.Accepted -> verified
             is TrustCheck.Rejected -> {
                 if (check.decision?.decision == TrustDecisionCode.UNKNOWN) {
                     log.warn { "Client attestation trust source is unavailable: ${check.decision?.warnings}" }
-                    error("Client attestation trust source is unavailable")
+                    throw ClientAttestationServiceException("Client attestation trust source is unavailable")
                 }
                 log.info { "Client attestation signer is not trusted: ${check.reason}" }
                 ClientAttestationVerificationResult.Rejected("Client attestation signer is not trusted")
             }
 
-            TrustCheck.Skipped -> error("A registry trust requirement is never skipped")
+            TrustCheck.Skipped -> throw ClientAttestationServiceException("A registry trust requirement is never skipped")
         }
     }
 

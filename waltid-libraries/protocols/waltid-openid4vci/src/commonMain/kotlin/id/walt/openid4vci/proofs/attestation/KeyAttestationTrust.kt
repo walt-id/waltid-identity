@@ -43,6 +43,28 @@ fun interface KeyAttestationTrustResolver {
     ): List<Key>
 }
 
+/**
+ * A resolver whose trust decision needs a lookup. [KeyAttestationVerifier] takes the signer keys from the
+ * attestation, verifies the signature, and only then calls [authorizeSigner], so a forged attestation never
+ * reaches the trust source. [resolve] authorizes first, so a caller that wraps this resolver stays fail-closed.
+ */
+internal interface SignatureFirstKeyAttestationTrustResolver : KeyAttestationTrustResolver {
+    /** The signer keys the attestation itself names. Implies no trust and does no I/O. */
+    suspend fun candidateKeys(header: JsonObject): List<Key>
+
+    /** Throws unless the signer is trusted. Called only after a [candidateKeys] key verified the signature. */
+    suspend fun authorizeSigner(header: JsonObject)
+
+    override suspend fun resolve(
+        header: JsonObject,
+        context: CredentialProofValidationContext,
+        configuration: CredentialConfiguration,
+    ): List<Key> {
+        authorizeSigner(header)
+        return candidateKeys(header)
+    }
+}
+
 fun interface KeyAttestationKeyReferenceResolver {
     suspend fun resolve(reference: String): List<Key>
 }
@@ -120,7 +142,18 @@ internal suspend fun createKeyAttestationTrustResolver(
         }
     }
 
-    is KeyAttestationVerificationMethod.X509TrustRegistry -> KeyAttestationTrustResolver { header, _, _ ->
+    is KeyAttestationVerificationMethod.X509TrustRegistry -> X509TrustRegistryResolver(method, trustEvaluator)
+}
+
+private class X509TrustRegistryResolver(
+    private val method: KeyAttestationVerificationMethod.X509TrustRegistry,
+    private val trustEvaluator: TrustDecisionEvaluator?,
+) : SignatureFirstKeyAttestationTrustResolver {
+    override suspend fun candidateKeys(header: JsonObject): List<Key> = attestationInput {
+        listOf(leafFirstX5cChain(header).first().restoreSubjectPublicKey(CryptoRuntime(defaultSoftwareKeyProviders())))
+    }
+
+    override suspend fun authorizeSigner(header: JsonObject) {
         val chain = attestationInput { leafFirstX5cChain(header) }
         // Outside attestationInput: an issuer that cannot decide trust must not report an invalid proof.
         val evaluator = trustEvaluator
@@ -143,7 +176,6 @@ internal suspend fun createKeyAttestationTrustResolver(
 
             TrustCheck.Skipped -> throw KeyAttestationServiceException("A registry trust requirement is never skipped")
         }
-        attestationInput { listOf(chain.first().restoreSubjectPublicKey(CryptoRuntime(defaultSoftwareKeyProviders()))) }
     }
 }
 
