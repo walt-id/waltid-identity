@@ -497,6 +497,32 @@ class CredentialIssuerMetadataSerializationTest {
         }
     }
 
+    @Test
+    fun `decodes ldp_vc signing algorithms as linked data suite identifiers`() {
+        val ldp = json.decodeFromString<CredentialConfiguration>(
+            """
+            {
+              "format": "ldp_vc",
+              "credential_signing_alg_values_supported": ["eddsa-rdfc-2022", "Ed25519Signature2020"]
+            }
+            """.trimIndent(),
+        )
+        assertEquals(
+            setOf(SigningAlgId.LdSuite("eddsa-rdfc-2022"), SigningAlgId.LdSuite("Ed25519Signature2020")),
+            ldp.credentialSigningAlgValuesSupported,
+        )
+
+        val jwt = json.decodeFromString<CredentialConfiguration>(
+            """
+            {
+              "format": "jwt_vc_json",
+              "credential_signing_alg_values_supported": ["EdDSA"]
+            }
+            """.trimIndent(),
+        )
+        assertEquals(setOf(SigningAlgId.Jose("EdDSA")), jwt.credentialSigningAlgValuesSupported)
+    }
+
     // 8) null collections should be omitted
     @Test
     fun `omits null collections from json output`() {
