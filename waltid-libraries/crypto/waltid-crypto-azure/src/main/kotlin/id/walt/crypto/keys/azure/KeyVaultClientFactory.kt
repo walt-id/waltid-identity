@@ -18,7 +18,7 @@ internal object KeyVaultClientFactory {
 
     fun cryptoClient(vaultUrl: String, keyName: String): CryptographyAsyncClient =
         CryptographyClientBuilder()
-            .keyIdentifier("$vaultUrl/$keyName")
+            .keyIdentifier("${vaultUrl.trimEnd('/')}/keys/$keyName")
             .credential(DefaultAzureCredentialBuilder().build())
             .buildAsyncClient()
 }

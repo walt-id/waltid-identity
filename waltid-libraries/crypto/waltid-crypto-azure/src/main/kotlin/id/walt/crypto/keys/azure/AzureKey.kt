@@ -10,6 +10,7 @@ import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -85,6 +86,8 @@ class AzureKey(
             } else {
                 rawSignature
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: ResourceNotFoundException) {
             throw KeyNotFoundException(id, "Key not found in Azure Key Vault", e)
         } catch (e: com.azure.core.exception.HttpResponseException) {
@@ -132,7 +135,8 @@ class AzureKey(
             val digest = hashFunction(messageToVerify)
 
             val cryptoClient = KeyVaultClientFactory.cryptoClient(config.auth.keyVaultUrl, id)
-            val verifyResult = cryptoClient.verify(azureSignatureAlgorithm, digest, signed).awaitSingle()
+            val signature = if (keyType in KeyTypes.EC_KEYS) EccUtils.convertDERtoIEEEP1363(signed) else signed
+            val verifyResult = cryptoClient.verify(azureSignatureAlgorithm, digest, signature).awaitSingle()
 
             if (verifyResult.isValid) {
                 Result.success(messageToVerify)
