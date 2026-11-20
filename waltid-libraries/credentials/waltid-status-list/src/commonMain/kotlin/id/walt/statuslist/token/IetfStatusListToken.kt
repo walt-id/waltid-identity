@@ -22,12 +22,30 @@ class IetfStatusListToken private constructor(
     fun readStatus(index: Int): UInt = TokenStatusListCodec.readStatus(bytes, index, bits)
 
     /** Signed time claims. Freshness is evaluated again whenever the caller uses the list. */
-    class Validity internal constructor(
+    class Validity(
         val issuedAt: Double,
         val expiresAt: Double?,
         val notBefore: Double?,
         val ttl: Double?,
     ) {
+        init {
+            require(issuedAt.isFinite()) { "IETF status-list token iat is not a number" }
+            require(listOfNotNull(expiresAt, notBefore, ttl).all { it.isFinite() }) { "Status-list time must be finite" }
+            require(expiresAt == null || expiresAt > issuedAt) { "Status-list expiry must follow issuance" }
+            require(ttl == null || ttl > 0) { "Status-list TTL must be positive" }
+        }
+
+        companion object {
+            /** Shared structural/numeric parsing; does not authenticate the JWT or choose an age policy. */
+            fun fromJwt(payload: JsonObject, expectedUri: String): Validity {
+                require((payload["sub"] as? JsonPrimitive)?.takeIf { it.isString }?.content == expectedUri) {
+                    "IETF status-list token subject does not match referenced status-list URI"
+                }
+                return Validity(numericDate(payload, "iat", required = true)!!, numericDate(payload, "exp"),
+                    numericDate(payload, "nbf"), numericDate(payload, "ttl"))
+            }
+        }
+
         /**
          * [resolvedAt] is the time the signed list was retrieved, not its issuance time. A caller
          * can impose [maximumAgeSeconds] in addition to signed expiry and TTL. Fractional NumericDate
@@ -71,17 +89,7 @@ class IetfStatusListToken private constructor(
             require(type?.lowercase()?.removePrefix("application/") == "statuslist+jwt") {
                 "Invalid status-list JWT type"
             }
-            require((payload["sub"] as? JsonPrimitive)?.takeIf { it.isString }?.content == expectedUri) {
-                "Status-list subject mismatch"
-            }
-            val validity = Validity(
-                issuedAt = numericDate(payload, "iat", required = true)!!,
-                expiresAt = numericDate(payload, "exp"),
-                notBefore = numericDate(payload, "nbf"),
-                ttl = numericDate(payload, "ttl"),
-            )
-            require(validity.expiresAt == null || validity.expiresAt > validity.issuedAt) { "Status-list expiry must follow issuance" }
-            require(validity.ttl == null || validity.ttl > 0) { "Status-list TTL must be positive" }
+            val validity = Validity.fromJwt(payload, expectedUri)
             val list = payload["status_list"] as? JsonObject ?: throw IllegalArgumentException("Status list is missing")
             val bits = (list["bits"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
             require(bits in setOf(1, 2, 4, 8)) { "Unsupported status bit width" }
@@ -94,9 +102,9 @@ class IetfStatusListToken private constructor(
         }
 
         private fun numericDate(payload: JsonObject, name: String, required: Boolean = false): Double? {
-            val value = payload[name] ?: return if (required) throw IllegalArgumentException("Status-list $name is required") else null
+            val value = payload[name] ?: return if (required) throw IllegalArgumentException("IETF status-list token has no $name") else null
             return (value as? JsonPrimitive)?.takeUnless { it.isString }?.doubleOrNull?.takeIf { it.isFinite() }
-                ?: throw IllegalArgumentException("Status-list $name must be a finite JSON number")
+                ?: throw IllegalArgumentException("IETF status-list token $name is not a number")
         }
     }
 }

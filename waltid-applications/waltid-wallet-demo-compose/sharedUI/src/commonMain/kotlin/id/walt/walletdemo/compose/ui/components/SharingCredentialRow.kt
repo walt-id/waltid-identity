@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.*
@@ -19,6 +20,7 @@ internal fun SharingCredentialRow(
     val option = information.option
     val summary = information.summary
     val extra = information.additionalInformationLabels
+    Column {
     ReviewCredentialChoice(
         selected = option.selection in selectedCredentialOptions,
         multiple = option.multiple || !hasAlternatives,
@@ -34,5 +36,7 @@ internal fun SharingCredentialRow(
     ) {
         CredentialSummaryRow(summary.toCardArt(), summary.issuer,
             Modifier.testTag(WalletUiTestTags.presentationCredential(option.selection.id)))
+    }
+    CredentialStatusSection(option.credentialId, compact = true)
     }
 }

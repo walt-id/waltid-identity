@@ -1489,6 +1489,10 @@ public interface ProximitySession {
     /** Dispatches one state-bound action. Illegal or stale actions are rejected without side effects. */
     public suspend fun dispatch(action: ProximityAction): ProximityActionResult
 
+    /** Opt-in host review of selected cached credential-status warnings; performs no status requests. */
+    public suspend fun dispatchStatusReviewed(action: ProximityAction, reviewedStatus: Map<String, String>): ProximityActionResult =
+        throw UnsupportedOperationException("Status-reviewed proximity dispatch is unavailable")
+
     /** Idempotently cancels an active session and releases all session-owned resources. */
     public suspend fun close()
 }
