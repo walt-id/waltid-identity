@@ -1,13 +1,20 @@
 package id.walt.wallet2.persistence.stores
 
+import co.touchlab.sqliter.DatabaseFileContext
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
+import kotlinx.cinterop.ExperimentalForeignApi
+import platform.Foundation.NSFileManager
+import platform.posix.S_IRWXU
+import platform.posix.chmod
 import kotlin.test.Test
-import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
 class IosEncryptedDriverTest {
@@ -20,6 +27,8 @@ class IosEncryptedDriverTest {
         fun open() = factory.openExistingEncryptedDriver(name, location, key, name)
         try {
             assertNull(open())
+            val databasePath = DatabaseFileContext.databasePath("$name.db", null)
+            assertFalse(NSFileManager.defaultManager.fileExistsAtPath(databasePath))
             val foreground = factory.createEncryptedDriver(name, key)
             try {
                 val foregroundQueries = WalletPersistenceDatabase(foreground).walletPersistenceQueries
@@ -47,6 +56,36 @@ class IosEncryptedDriverTest {
         assertNull(open())
     }
 
+    @OptIn(ExperimentalForeignApi::class)
+    @Test
+    fun maintenanceDefersWhenTheDatabaseParentIsInaccessible() {
+        val name = "ios_inaccessible_wallet_${Uuid.random()}"
+        val factory = DriverFactory()
+        val key = DatabaseEncryptionKey(name, ByteArray(32) { it.toByte() })
+        val databasePath = DatabaseFileContext.databasePath("$name.db", null)
+        val isolatedDirectory = "$databasePath-directory"
+        val isolatedDatabase = "$isolatedDirectory/wallet.db"
+        val files = NSFileManager.defaultManager
+        fun open() = factory.openExistingEncryptedDriver(name, factory.existingLocation(), key, name)
+
+        try {
+            factory.createEncryptedDriver(name, key).close()
+            assertTrue(files.createDirectoryAtPath(isolatedDirectory, false, null, null))
+            assertTrue(files.moveItemAtPath(databasePath, isolatedDatabase, null))
+            // Keep the permission change confined to this test's database.
+            assertTrue(files.createSymbolicLinkAtPath(databasePath, isolatedDatabase, null))
+            try {
+                assertEquals(0, chmod(isolatedDirectory, 0u))
+                assertFailsWith<StatusMaintenanceStorageException> { open() }
+            } finally {
+                assertEquals(0, chmod(isolatedDirectory, S_IRWXU.toUShort()))
+            }
+            assertNotNull(open()).close()
+        } finally {
+            factory.deleteDatabase(name)
+            files.removeItemAtPath(isolatedDirectory, null)
+        }
+    }
 
     @Test
     fun encryptedIosDatabaseRejectsWrongKeyWithTypedError() {

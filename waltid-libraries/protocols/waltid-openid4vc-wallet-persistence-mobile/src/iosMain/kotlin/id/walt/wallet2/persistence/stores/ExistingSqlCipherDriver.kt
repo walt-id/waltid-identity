@@ -14,6 +14,9 @@ import co.touchlab.sqliter.sqlite3.*
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import kotlinx.cinterop.*
 import platform.Foundation.NSRecursiveLock
+import platform.posix.ENOENT
+import platform.posix.posix_errno
+import platform.posix.stat
 
 /**
  * One serialized SQLCipher handle for generated SQLDelight queries. SQLiter's native manager
@@ -144,6 +147,10 @@ internal class ExistingSqlCipherDriver private constructor(private val database:
             val handle = output.value
             if (result != SQLITE_OK) {
                 sqlite3_close(handle)
+                // Confirm absence of the database itself since SQLite can fail on auxiliary files.
+                if (result == SQLITE_CANTOPEN && stat(path, alloc<stat>().ptr) != 0 && posix_errno() == ENOENT) {
+                    return@memScoped null
+                }
                 throw StatusMaintenanceStorageException(result)
             }
             val driver = ExistingSqlCipherDriver(checkNotNull(handle))
