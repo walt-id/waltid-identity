@@ -263,13 +263,13 @@ data class CrossDeviceFlowSetup(
 
 /**
  * Same-Device (Redirecting to Wallet on the same device, e.g. phone)
- * Requires a specific redirect URI for the Wallet to return the user to.
+ * Uses direct_post or direct_post.jwt, then returns the user through the configured redirects.
  */
 @Serializable
 @SerialName("same_device")
 data class SameDeviceFlowSetup(
-    override val core: GeneralFlowConfig,
-    override val urlConfig: UrlConfig,
+    @SerialName("core_flow") override val core: GeneralFlowConfig,
+    @SerialName("url_config") override val urlConfig: UrlConfig = UrlConfig(),
     override val openid: OpenId4VPConfig? = null,
 
     // Property unique to this flow
