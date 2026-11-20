@@ -44,6 +44,7 @@ import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleInForegroundWindow
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
@@ -331,6 +332,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 val expectedFailure = "TS12 authentication evidence is unavailable:"
                 val outcome = if (showPreview) {
                     fixture.enterProviderReview(request, scenario.credentialConfigurationId)
+                    assertResourceVisibleAfterScrolling(fixture.device, "payment-consent", "Payment review did not render")
                     listOf(DemoTestBackend.SCA_PAYMENT_PAYEE_NAME, "merchant-001", "EUR", SCA_AMOUNT_TEXT).forEach { value ->
                         assertTextContainingVisibleAfterScrolling(fixture.device, value, "Payment review is missing '$value'")
                     }
