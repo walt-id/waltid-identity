@@ -8,7 +8,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
-import io.ktor.http.content.TextContent
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -403,7 +403,7 @@ class WebhookDeliveryQueueTest {
             assertEquals("2", request.headers[WEBHOOK_ATTEMPT_HEADER])
             assertEquals(delivery.contentDigest, request.headers[CONTENT_DIGEST_HEADER])
             assertNull(request.headers[WEBHOOK_SIGNATURE_HEADER])
-            assertEquals(payload, (request.body as TextContent).text)
+            assertEquals(payload, request.body.toByteArray().decodeToString())
             assertEquals("application/json", request.body.contentType?.withoutParameters().toString())
             respond(
                 content = "",
@@ -438,7 +438,7 @@ class WebhookDeliveryQueueTest {
             assertEquals("v1=BxDWiSo/4VW6835pqxCMkbLoSmLa4VaJvDCKe54vXCA=", signature)
             assertEquals("Bearer receiver-token", request.headers[HttpHeaders.Authorization])
             assertTrue(WebhookSignature.verify(
-                signature, secret, delivery.url, delivery.deliveryId, 123, 2, expectedDigest((request.body as TextContent).text)
+                signature, secret, delivery.url, delivery.deliveryId, 123, 2, expectedDigest(request.body.toByteArray().decodeToString())
             ))
             assertFalse(WebhookSignature.verify(
                 signature.removePrefix("v1="), secret, delivery.url, delivery.deliveryId, 123, 2, delivery.contentDigest
@@ -476,6 +476,38 @@ class WebhookDeliveryQueueTest {
 
         assertEquals(secret, FileWebhookDeliveryStore(root).pending(signedId)?.signingSecret)
         assertNull(store.pending(unsignedId)?.signingSecret)
+    }
+
+    @Test
+    fun `erasure covers pending leased and failed callbacks for only the owning session`() = runTest {
+        val store = FileWebhookDeliveryStore(temporaryDirectory())
+        val queue = queue(store, RecordingTransport(WebhookAttemptResult(statusCode = 400))) { 1_000L }
+        val failed = queue.enqueue(update(), webhook(), sessionOwner = "verifier-a.session")
+        queue.processDue()
+        val pending = queue.enqueue(update(), webhook(), sessionOwner = "verifier-a.session")
+        val stale = store.claimDue(1_000L, 2_000L).single()
+        val other = queue.enqueue(update(), webhook(), sessionOwner = "verifier-b.session")
+
+        queue.eraseSession("verifier-a.session")
+        assertNull(store.pending(pending))
+        assertFalse(store.moveToDeadLetter(stale, stale.delivery.copy(failedAtEpochMilliseconds = 1_000, lastError = "late")))
+        assertTrue(store.deadLetters().isEmpty())
+        assertFalse(queue.redrive(failed))
+        assertNotNull(store.pending(other))
+    }
+
+    @Test
+    fun `non-persisted results retry transient failure and discard the body on exhaustion`() = runTest {
+        val store = FileWebhookDeliveryStore(temporaryDirectory())
+        val unavailable = WebhookAttemptResult(statusCode = 503)
+        val queue = queue(store, RecordingTransport(unavailable, unavailable)) { 1_000L }
+        val id = queue.enqueue(update(), webhook(maxAttempts = 2), "verifier.session", retainOnFailure = false)
+        queue.processDue()
+        assertEquals(1, assertNotNull(store.pending(id)).attemptCount)
+        queue.processDue()
+        assertNull(store.pending(id))
+        assertTrue(queue.deadLetters().isEmpty())
+        assertFalse(queue.redrive(id))
     }
 
     private fun temporaryDirectory(): Path =

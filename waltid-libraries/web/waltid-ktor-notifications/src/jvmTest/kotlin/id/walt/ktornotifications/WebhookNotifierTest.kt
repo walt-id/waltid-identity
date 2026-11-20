@@ -9,6 +9,9 @@ import io.ktor.http.Url
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import java.net.InetSocketAddress
 import java.nio.file.Files
@@ -166,6 +169,28 @@ class WebhookNotifierTest {
             val id = WebhookNotifier.enqueue(update, webhook("http://localhost:${server.address.port}/hook"))
             awaitDelivered(id)
             assertEquals(1, hits.get())
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun `one attempt sends exactly one POST with the published nullable fields`() = runBlocking {
+        guard(allowLoopback = true)
+        val hits = AtomicInteger()
+        val body = kotlinx.coroutines.CompletableDeferred<String>()
+        val server = localServer(hits) { exchange ->
+            body.complete(exchange.requestBody.use { it.readBytes().decodeToString() })
+            exchange.responseHeaders.add("Retry-After", "0")
+            exchange.sendResponseHeaders(503, -1)
+            exchange.close()
+        }
+        try {
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook", WebhookRetryPolicy(maxAttempts = 1)))
+            assertEquals(1, awaitDeadLetter(id).attemptCount)
+            assertEquals(1, hits.get())
+            val received = Json.parseToJsonElement(body.await()).jsonObject
+            for (field in listOf("requestId", "error", "error_description")) assertEquals(JsonNull, received.getValue(field))
         } finally {
             server.stop(0)
         }

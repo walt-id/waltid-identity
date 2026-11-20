@@ -1,6 +1,10 @@
 package id.walt.verifier2
 
 import id.walt.commons.web.plugins.configureStatusPages
+import id.walt.ktornotifications.WebhookDelivery
+import id.walt.ktornotifications.WebhookNotifier
+import id.walt.ktornotifications.core.KtorSessionNotifications.WebhookRetryPolicy
+import java.nio.file.Files
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationVerificationUnavailableException
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse
@@ -301,6 +305,42 @@ class VerificationSessionRepositoryTest {
         assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/deletable").status)
         assertNull(repository.get("deletable"), "the session should be gone")
         assertEquals(HttpStatusCode.NotFound, client.delete("/verification-session/deletable").status)
+    }
+
+    @Test
+    fun `erasure routes remove a callback waiting for retry across restart`() = testApplication {
+        val root = Files.createTempDirectory("verifier-erasure")
+        val repository = InMemoryVerificationSessionRepository()
+        val pending = Files.createDirectories(root.resolve("pending"))
+        for (id in listOf("purged", "deleted")) {
+            repository.create(session(id))
+            val delivery = WebhookDelivery(
+                deliveryId = id, url = "https://receiver.example", payload = """{"session":{"presentedRawData":"private"}}""",
+                contentDigest = "digest", target = id, event = "credential_policy_results_available", requestId = null,
+                basicAuthUser = null, basicAuthPass = null, bearerToken = null, retryPolicy = WebhookRetryPolicy(),
+                enqueueOrder = 1, attemptCount = 1, createdAtEpochMilliseconds = 0,
+                nextAttemptAtEpochMilliseconds = Long.MAX_VALUE, sessionOwner = id,
+            )
+            Files.writeString(pending.resolve("$id.json"), Json.encodeToString(delivery))
+        }
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+        WebhookNotifier.stop()
+        try {
+            WebhookNotifier.start(root)
+            assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/purged/pii").status)
+            assertEquals(false, Files.exists(pending.resolve("purged.json")))
+            assertEquals(true, Files.exists(pending.resolve("deleted.json")))
+            assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/deleted").status)
+            assertEquals(false, Files.exists(pending.resolve("deleted.json")))
+        } finally {
+            WebhookNotifier.stop()
+            root.toFile().deleteRecursively()
+        }
     }
 
     @Test

@@ -22,6 +22,7 @@ private val storeLog = io.github.oshai.kotlinlogging.KotlinLogging.logger { }
 /** Durable outbox storage. Implementations must claim due deliveries atomically across all workers. */
 interface WebhookDeliveryStore {
     suspend fun enqueue(delivery: WebhookDelivery)
+    suspend fun eraseSession(sessionOwner: String)
     suspend fun pending(deliveryId: String): WebhookDelivery?
     suspend fun claimDue(
         nowEpochMilliseconds: Long,
@@ -70,6 +71,15 @@ internal class FileWebhookDeliveryStore(
             "Webhook delivery ${delivery.deliveryId} already exists"
         }
         writeAtomically(path, delivery)
+    }
+
+    override suspend fun eraseSession(sessionOwner: String) = mutex.withLock {
+        // Remove pending first so a shadow left by an interrupted redrive cannot become visible.
+        for (directory in listOf(pendingDirectory, deadLetterDirectory)) {
+            for (path in listDeliveryFiles(directory)) {
+                if (readOrQuarantine(path)?.sessionOwner == sessionOwner) Files.deleteIfExists(path)
+            }
+        }
     }
 
     override suspend fun pending(deliveryId: String): WebhookDelivery? = mutex.withLock {
