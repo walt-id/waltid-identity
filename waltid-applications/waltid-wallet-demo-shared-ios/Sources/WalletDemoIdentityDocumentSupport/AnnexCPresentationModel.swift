@@ -119,7 +119,7 @@ public final class AnnexCPresentationModel: ObservableObject {
     }
 
     /// Runs stage 1: parses the request, opens the shared wallet, and builds the consent preview.
-    public func prepare() async {
+    public func prepare(reviewStatus: Bool = true) async {
         guard phase == .idle else { return }
         phase = .preparing
         do {
@@ -136,24 +136,7 @@ public final class AnnexCPresentationModel: ObservableObject {
                 return
             }
             self.wallet = wallet
-            do {
-                if let snapshot = try await wallet.cachedCredentialStatuses() { installStatuses(snapshot) }
-                else { credentialStatusReadState = .unavailable }
-            } catch is CancellationError { throw CancellationError() }
-            catch {
-                credentialStatusReadState = .unavailable
-                statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
-            }
-            statusObservation = Task { [weak self] in
-                do { for try await snapshot in try await wallet.cachedCredentialStatusUpdates() {
-                    try Task.checkCancellation(); self?.installStatuses(snapshot)
-                }
-                    if !Task.isCancelled, self?.credentialStatusReadState == .loading { self?.credentialStatusReadState = .unavailable }
-                } catch is CancellationError {} catch {
-                    self?.credentialStatusReadState = .unavailable
-                    self?.statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
-                }
-            }
+            if reviewStatus { try await startStatusReview(wallet) }
             let prepared = try await wallet.previewAnnexCPresentation(
                 parsedRequest: parsed,
                 // The platform-asserted origin is passed through verbatim: it is what the wallet must
@@ -179,6 +162,29 @@ public final class AnnexCPresentationModel: ObservableObject {
             log.error("Annex C preview failed: \(error.localizedDescription, privacy: .public)")
             failure = error.localizedDescription
             phase = .reviewing
+        }
+    }
+
+    private func startStatusReview(_ wallet: any AnnexCPresentationWallet) async throws {
+        do {
+            if let snapshot = try await wallet.cachedCredentialStatuses() { installStatuses(snapshot) }
+            else { credentialStatusReadState = .unavailable }
+        } catch is CancellationError { throw CancellationError() }
+        catch {
+            credentialStatusReadState = .unavailable
+            statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
+        }
+        statusObservation = Task { [weak self] in
+            do {
+                for try await snapshot in try await wallet.cachedCredentialStatusUpdates() {
+                    try Task.checkCancellation()
+                    self?.installStatuses(snapshot)
+                }
+                if !Task.isCancelled, self?.credentialStatusReadState == .loading { self?.credentialStatusReadState = .unavailable }
+            } catch is CancellationError {} catch {
+                self?.credentialStatusReadState = .unavailable
+                self?.statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
+            }
         }
     }
 

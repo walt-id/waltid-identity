@@ -78,7 +78,7 @@ public struct AnnexCReviewView: View {
         }
         .environment(\.credentialStatusUI, model.credentialStatusUIContext)
         .task {
-            await model.prepare()
+            await model.prepare(reviewStatus: showDcApiPresentationPreview)
             if !showDcApiPresentationPreview, model.failure == nil {
                 await model.submit()
             }
