@@ -11,7 +11,12 @@ protocol WalletClient {
     ) async throws -> PreparedPresentationReview
     func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error>
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot?
+    func backgroundStatusEnrollment() async throws -> CredentialStatusMaintenanceEnrollment?
+    func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment?
+    func invalidateCredentialStatusSnapshot() async throws
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult]
+    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice]?
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws
     func submitStatusReviewedPresentation(
         previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],
@@ -59,6 +64,10 @@ protocol WalletClient {
 }
 
 extension WalletClient {
+    func backgroundStatusEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func invalidateCredentialStatusSnapshot() async throws {}
+
     var supportsClaimReview: Bool { false }
     func reviewPresentation(
         previewHandle: PresentationPreviewHandle,
@@ -71,6 +80,8 @@ extension WalletClient {
     func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { AsyncThrowingStream { $0.finish() } }
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { nil }
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { [] }
+    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice]? { nil }
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {}
     func submitStatusReviewedPresentation(
         previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],
@@ -135,8 +146,27 @@ final class SDKWalletClient: WalletClient {
     }
 
     func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { try await wallet().credentialStatuses }
+
+    func backgroundStatusEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await cachedWallet?.credentialStatusMaintenanceEnrollment()
+    }
+
+    func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await cachedWallet?.setCredentialStatusMaintenance(preference)
+    }
+
+    func invalidateCredentialStatusSnapshot() async throws {
+        try await cachedWallet?.invalidateCredentialStatusSnapshot()
+    }
+
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { try await wallet().credentialStatusSnapshot() }
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { try await wallet().refreshCredentialStatuses(ids: ids, force: force) }
+    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice]? {
+        try await cachedWallet?.pendingCredentialStatusNotices()
+    }
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
+        try await cachedWallet?.acknowledgeCredentialStatusNotice(credentialID: credentialID, version: version)
+    }
     func submitStatusReviewedPresentation(
         previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],

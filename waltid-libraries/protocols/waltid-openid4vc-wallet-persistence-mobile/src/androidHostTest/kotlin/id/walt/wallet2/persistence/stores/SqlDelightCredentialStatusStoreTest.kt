@@ -2,7 +2,6 @@ package id.walt.wallet2.persistence.stores
 
 import kotlinx.serialization.json.Json
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.status.CredentialStatus
 import id.walt.wallet2.data.StoredCredential
@@ -28,15 +27,26 @@ class SqlDelightCredentialStatusStoreTest {
             val raw = MdocsExamples.mdocsExampleBase64Url
             driver.execute(null, "INSERT INTO credentials (id, serialized_credential, format, added_at) VALUES ('resident', ?, 'mso_mdoc', 1000)", 1) { bindString(0, raw) }
             WalletPersistenceDatabase.Schema.migrate(driver, 1, 2)
-            val database = WalletPersistenceDatabase(driver)
-            val store = SqlDelightCredentialStore(database.walletPersistenceQueries)
-            val credential = assertNotNull(store.getCredential("resident"))
+            val legacyStore = SqlDelightCredentialStore(WalletPersistenceDatabase(driver).walletPersistenceQueries)
+            val credential = assertNotNull(legacyStore.getCredential("resident"))
             assertEquals(raw, credential.credential.signed)
             val at = Instant.fromEpochSeconds(1_800_000_000)
             val snapshot = PersistedCredentialStatus(credentialFingerprint = credential.statusFingerprint(), trustPolicyId = "test-v1",
                 metadata = Json.decodeFromString(CredentialStatus.serializer(), """{"type":"references","entries":[{"type":"mso","referenceId":"ref","check":{"type":"observed","observation":{"value":"REVOKED","checkedAt":"$at","freshUntil":"$at"}}}]}"""))
-            assertTrue(store.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("first", snapshot)))
             val original = CredentialStatusStoredRecord("first", snapshot)
+            driver.execute(null, "INSERT INTO credential_status_snapshots (credential_id, snapshot) VALUES ('resident', ?)", 1) {
+                bindString(0, Json.encodeToString(CredentialStatusStoredRecord.serializer(), original))
+            }
+            WalletPersistenceDatabase.Schema.migrate(driver, 2, 3)
+            driver.execute(null, "INSERT INTO credential_status_maintenance (wallet_id, grant_id) VALUES ('existing', 'grant')", 0)
+            WalletPersistenceDatabase.Schema.migrate(driver, 3, WalletPersistenceDatabase.Schema.version)
+            val database = WalletPersistenceDatabase(driver)
+            val store = SqlDelightCredentialStore(database.walletPersistenceQueries)
+            val enrolment = assertNotNull(database.walletPersistenceQueries.selectCredentialStatusMaintenance("existing").executeAsOneOrNull())
+            assertEquals("grant", enrolment.grant_id)
+            assertNull(enrolment.cursor_id)
+            assertEquals(original, store.readCredentialStatusRecord("resident"))
+            assertTrue(store.statusNotices().isEmpty())
             val cleared = CredentialStatusStoredRecord("cleared", null)
             assertFalse(store.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("stale", snapshot)))
             assertTrue(store.compareAndSetCredentialStatus(credential, original, cleared))

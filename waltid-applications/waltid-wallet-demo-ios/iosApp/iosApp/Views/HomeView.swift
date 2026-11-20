@@ -1,5 +1,6 @@
 import SwiftUI
 import WalletDemoSharingUI
+import WalletSDK
 
 struct HomeView: View {
     @ObservedObject var viewModel: WalletViewModel
@@ -92,8 +93,39 @@ struct HomeView: View {
         .onReceive(viewModel.proximityPresentation.$active) { active in
             if !active { Task { @MainActor in viewModel.presentDeferredCredentialStatusNotice() } }
         }
+        .task(id: selectedCredentialDetailsID) {
+            if let id = selectedCredentialDetailsID { await viewModel.checkCredentialStatusOnDetails(id) }
+        }
+        .task(id: canOpenStatusNotification) {
+            if canOpenStatusNotification {
+                viewModel.statusNotificationOpened = false
+                selectedCredentialDetailsID = nil
+                showingSettings = false
+                showingScanner = false
+                viewModel.selectedTab = .credentials
+            }
+        }
         .overlay(alignment: .bottom) {
-            if let notice = viewModel.credentialStatusNotice, viewModel.presentationReview == nil {
+            if let notice = viewModel.walletStatusNotices.first(where: { notice in
+                    viewModel.credentials.contains { $0.id == notice.credentialID }
+               }),
+               let credential = viewModel.credentials.first(where: { $0.id == notice.credentialID }),
+               canShowStatusNotice {
+                let name = CredentialDisplayNormalizer.details(for: credential).cardSummary.title
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(statusNoticeMessage(notice, name: name)).font(.footnote)
+                    HStack {
+                        Button("View credential") {
+                            viewModel.acknowledgeCredentialStatusNotice(notice)
+                            selectedCredentialDetailsID = notice.credentialID
+                        }
+                        Spacer()
+                        Button("Dismiss") { viewModel.acknowledgeCredentialStatusNotice(notice) }
+                    }
+                }
+                .padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
+                .accessibilityIdentifier("credential-status-notice")
+            } else if let notice = viewModel.credentialStatusNotice, canShowStatusNotice {
                 HStack {
                     Text(notice).font(.footnote)
                     Button(String(localized: "Dismiss")) { viewModel.credentialStatusNotice = nil }
@@ -105,6 +137,31 @@ struct HomeView: View {
                     }
             }
         }
+    }
+
+    private var canOpenStatusNotification: Bool {
+        viewModel.statusNotificationOpened && viewModel.isReady && viewModel.auth == .unlocked &&
+            !viewModel.isLoading && viewModel.externalFlow == nil && viewModel.presentationReview == nil &&
+            viewModel.offerPreview == nil && !proximity.active && !nearbySheet.keepsHomeVisible
+    }
+
+    private var canShowStatusNotice: Bool {
+        viewModel.isReady && viewModel.auth == .unlocked && !viewModel.isLoading &&
+            viewModel.selectedTab == .credentials && viewModel.presentationReview == nil &&
+            !showingSettings && !showingTaskSheet && !nearbySheet.keepsHomeVisible && selectedCredentialDetailsID == nil
+    }
+
+    private func statusNoticeMessage(_ notice: PendingCredentialStatusNotice, name: String) -> String {
+        let kind: String
+        switch notice.kind {
+        case .revoked: kind = String(localized: "Revoked")
+        case .suspended: kind = String(localized: "Suspended")
+        default: kind = String(localized: "Invalid")
+        }
+        let time = notice.checkedAt.formatted(date: .abbreviated, time: .shortened)
+        return notice.historical
+            ? String(localized: "\(name) · Last reported \(kind) on \(time)")
+            : String(localized: "\(name) · \(kind). Checked \(time)")
     }
 
     private func openSettings() {

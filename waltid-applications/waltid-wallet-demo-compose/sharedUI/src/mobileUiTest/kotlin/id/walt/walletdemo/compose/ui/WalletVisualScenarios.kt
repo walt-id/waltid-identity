@@ -616,7 +616,7 @@ internal class WalletVisualScenarios(
             "dc_api" -> {
                 onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).performClick()
                 val toggle = onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview)
-                if (reviewEnabled) toggle.assertIsOn() else toggle.assertIsOff()
+                if (reviewEnabled) toggle.assertIsOff() else toggle.assertIsOn()
             }
             "nearby", "connection", "reader", "reader_required" -> {
                 onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performClick()

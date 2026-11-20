@@ -1,6 +1,8 @@
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.CredentialStatusMaintenanceEnrollment
+import id.walt.wallet2.mobile.CredentialStatusMaintenancePreference
 import id.walt.wallet2.mobile.identity.*
 import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
 import id.walt.wallet2.mobile.MobileWalletAnnexCRequest
@@ -86,6 +88,30 @@ public class WalletSdkBridge private constructor(
     public suspend fun credentialReads(): WalletBridgeResult<List<WalletBridgeCredentialRead>> = walletBridgeCall {
         operations.credentialReads().map { it.toStatusBridgeRead() }
     }
+
+    /** Reads the current opt-in on the foreground wallet. */
+    public suspend fun credentialStatusMaintenanceEnrollment(): WalletBridgeResult<WalletBridgeStatusMaintenanceEnrollment> =
+        walletBridgeCall { operations.credentialStatusMaintenanceEnrollment().toMaintenanceBridgeEnrollment() }
+
+    /** Changes the managed foreground wallet's maintenance authorization. */
+    public suspend fun setCredentialStatusMaintenance(preference: String): WalletBridgeResult<WalletBridgeStatusMaintenanceEnrollment> =
+        walletBridgeCall {
+            operations.setCredentialStatusMaintenance(CredentialStatusMaintenancePreference.valueOf(preference)).toMaintenanceBridgeEnrollment()
+        }
+
+    /** Announces another handle's committed local status. */
+    public suspend fun invalidateCredentialStatusSnapshot(): WalletBridgeResult<Unit> =
+        walletBridgeCall { operations.invalidateCredentialStatusSnapshot() }
+
+    /** Local, versioned notices for the authenticated wallet. */
+    public suspend fun pendingCredentialStatusNotices(): WalletBridgeResult<List<WalletBridgeCredentialStatusNotice>> =
+        walletBridgeCall { operations.pendingCredentialStatusNotices().map {
+            WalletBridgeCredentialStatusNotice(it.reference.credentialId, it.version, it.kind.name, it.checkedAt.toString(), it.historical)
+        } }
+
+    /** Acknowledges the exact notice that was displayed. */
+    public suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String): WalletBridgeResult<Unit> =
+        walletBridgeCall { operations.acknowledgeCredentialStatusNotice(credentialId, version) }
 
     /** Explicit wallet-scoped status check, preserving typed partial outcomes. */
     public suspend fun refreshCredentialStatuses(credentialIds: List<String>? = null, force: Boolean = false): WalletBridgeResult<String> = walletBridgeCall {
@@ -418,6 +444,12 @@ public class WalletSdkBridge private constructor(
 }
 
 internal interface WalletSdkBridgeOperations {
+    suspend fun credentialStatusMaintenanceEnrollment(): CredentialStatusMaintenanceEnrollment? = null
+    suspend fun setCredentialStatusMaintenance(preference: CredentialStatusMaintenancePreference): CredentialStatusMaintenanceEnrollment? = null
+    suspend fun invalidateCredentialStatusSnapshot() {}
+    suspend fun pendingCredentialStatusNotices(): List<id.walt.wallet2.status.PendingCredentialStatusNotice> = emptyList()
+    suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) {}
+
     suspend fun attachKeyAttestationProviderResolver(resolver: WalletBridgeKeyAttestationProviderResolver): Unit =
         error("Key attestation resolution is not implemented by this test bridge")
 
@@ -546,6 +578,14 @@ internal interface WalletSdkBridgeOperations {
 internal class MobileWalletSdkBridgeOperations(
     private val wallet: MobileWallet,
 ) : WalletSdkBridgeOperations {
+    override suspend fun credentialStatusMaintenanceEnrollment() = wallet.credentialStatusMaintenanceEnrollment()
+    override suspend fun setCredentialStatusMaintenance(preference: CredentialStatusMaintenancePreference) =
+        wallet.setCredentialStatusMaintenance(preference)
+    override suspend fun invalidateCredentialStatusSnapshot() = wallet.invalidateCredentialStatusSnapshot()
+    override suspend fun pendingCredentialStatusNotices() = wallet.pendingCredentialStatusNotices()
+    override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) =
+        wallet.acknowledgeCredentialStatusNotice(credentialId, version)
+
     override suspend fun attachKeyAttestationProviderResolver(resolver: WalletBridgeKeyAttestationProviderResolver) {
         wallet.attachKeyAttestationProviderResolver(resolver.toKeyAttestationProviderResolver())
     }

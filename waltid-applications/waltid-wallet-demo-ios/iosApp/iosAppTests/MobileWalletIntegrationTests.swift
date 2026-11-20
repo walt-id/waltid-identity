@@ -581,7 +581,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
         let checked = try await checkEudiPidStatus(wallet1, ids: credentialIDs)
-        let checkedAt = try Dictionary(uniqueKeysWithValues: checked.map { ($0.credentialID, try XCTUnwrap($0.value.presentation.lastCheckedAt)) })
+        let checkedByID = Dictionary(uniqueKeysWithValues: checked.map { ($0.credentialID, $0.value.presentation) })
         try await wallet1.close()
         let wallet2 = try await makeEudiWallet(walletId: walletId)
         addTeardownBlock { try await wallet2.close() }
@@ -592,13 +592,18 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let restored = try await wallet2.credentialStatusSnapshot()
         XCTAssertEqual(Set(restored.credentials.map(\.credentialID)), Set(credentialIDs))
         for record in restored.credentials {
-            XCTAssertEqual(record.value.presentation.lastCheckedAt, checkedAt[record.credentialID])
-            XCTAssertEqual(record.value.presentation.freshness, .stale, "Restored evidence is historical until authenticated again")
+            let previous = try XCTUnwrap(checkedByID[record.credentialID])
+            let freshUntil = try XCTUnwrap(previous.references.first?.freshUntil)
+            XCTAssertEqual(record.value.presentation.lastCheckedAt, previous.lastCheckedAt)
+            XCTAssertEqual(record.value.presentation.references.first?.freshUntil, freshUntil)
+            XCTAssertEqual(record.value.presentation.freshness, restored.evaluatedAt < freshUntil ? .fresh : .stale,
+                           "Restored evidence must honor its original freshness deadline")
         }
         let refreshed = try await checkEudiPidStatus(wallet2, ids: credentialIDs)
         for record in refreshed {
+            let previousCheck = try XCTUnwrap(checkedByID[record.credentialID]?.lastCheckedAt)
             XCTAssertGreaterThan(try XCTUnwrap(record.value.presentation.lastCheckedAt),
-                                 try XCTUnwrap(checkedAt[record.credentialID]))
+                                 previousCheck)
         }
     }
 

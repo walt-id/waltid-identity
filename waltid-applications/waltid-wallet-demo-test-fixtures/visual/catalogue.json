@@ -895,7 +895,7 @@
     {
       "id": "settings.dc_api.enabled",
       "requirements": [
-        "Enabled digital credential API setting"
+        "One-tap DC API is off and the wallet shows its review and status checks"
       ],
       "composeTest": "settingsDcApiEnabled",
       "swiftTest": "testSettingsDcApiEnabled"
@@ -903,7 +903,7 @@
     {
       "id": "settings.dc_api.disabled",
       "requirements": [
-        "Disabled digital credential API setting"
+        "One-tap DC API is on and the wallet skips its review and advisory status checks"
       ],
       "composeTest": "settingsDcApiDisabled",
       "swiftTest": "testSettingsDcApiDisabled"

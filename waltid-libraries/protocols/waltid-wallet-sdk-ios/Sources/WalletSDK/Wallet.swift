@@ -52,6 +52,57 @@ public actor Wallet {
     /// Reads local status without rebuilding credential artwork or requesting issuer data.
     public func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot { try await bridge.credentialStatusSnapshot() }
 
+    /// Loads the foreground opt-in for an existing managed wallet. Unsupported stores return nil.
+    public func credentialStatusMaintenanceEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await bridge.credentialStatusMaintenanceEnrollment()
+    }
+
+    /// Changes the opt-in after foreground authorization. Store the returned binding only in app-private state.
+    /// - Parameter preference: The new maintenance preference to commit to the managed wallet.
+    public func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await bridge.setCredentialStatusMaintenance(preference)
+    }
+
+    /// Asks active readers to reconcile observations another handle committed. This is a local read.
+    public func invalidateCredentialStatusSnapshot() async throws {
+        try await bridge.invalidateCredentialStatusSnapshot()
+    }
+
+    /// Reads pending changes from the authorized local wallet.
+    public func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice] {
+        try await bridge.pendingCredentialStatusNotices()
+    }
+
+    /// Acknowledges the displayed version, even when another check is in flight.
+    public func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
+        try await bridge.acknowledgeCredentialStatusNotice(credentialID: credentialID, version: version)
+    }
+
+    /// Runs one due-only pass against an enrolled existing wallet without creating a Wallet instance.
+    /// Supply the original storage namespace and cancel this async operation when the host's execution window expires.
+    /// - Parameters:
+    ///   - binding: The opaque grant returned when the managed wallet was enrolled.
+    ///   - crossProcessAccess: The App Group and Keychain access group used to create the wallet, if configured.
+    ///   - maxItems: The maximum number of credentials to process in this pass.
+    ///   - budget: The execution budget for the maintenance pass, in seconds.
+    public static func refreshDueStatusesForExistingWallet(
+        binding: String, crossProcessAccess: WalletCrossProcessAccess? = nil,
+        maxItems: Int = 25, budget: TimeInterval = 20
+    ) async throws -> CredentialStatusMaintenanceResult {
+        guard (1...1000).contains(maxItems), let milliseconds = Int64(exactly: (budget * 1000).rounded(.down)), milliseconds > 0 else {
+            throw WalletError.invalidInput("Invalid background status work limit")
+        }
+        #if canImport(WalletCore) && os(iOS)
+        return try await KMPWalletCoreBridge.refreshDueStatusesForExistingWallet(
+            binding: binding, crossProcessAccess: crossProcessAccess, maxItems: Int32(maxItems),
+            timeoutMilliseconds: milliseconds
+        )
+        #else
+        return .ineligible
+        #endif
+    }
+
+
     /// Explicitly checks wallet-owned credentials; omitted IDs select all stored credentials.
     ///
     /// Force bypasses freshness reuse for eligible checks; validity, backoff and execution limits still apply.

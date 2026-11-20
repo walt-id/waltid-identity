@@ -35,7 +35,7 @@ struct SettingsView: View {
                     destination = .nearby
                 }
                 SettingsDestinationRow("Digital Credentials API", systemImage: "person.text.rectangle",
-                    summary: viewModel.showDcApiPresentationPreview ? String(localized: "Wallet review on") : String(localized: "Wallet review off"),
+                    summary: viewModel.showDcApiPresentationPreview ? String(localized: "Review and status checks on") : String(localized: "One-tap sharing"),
                     identifier: "wallet.settingsDigitalCredentialsApi") {
                     destination = .digitalCredentials
                 }
@@ -192,9 +192,35 @@ struct CredentialStatusSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Automatic checks", isOn: $viewModel.automaticCredentialStatusChecks)
-                    .accessibilityIdentifier("settings-credential-status-automatic")
-            } footer: { Text("While this wallet is open and unlocked.\nChecks contact the issuer’s status service.") }
+                Toggle("Automatic checks", isOn: Binding(
+                    get: { viewModel.automaticCredentialStatusChecks }, set: viewModel.setAutomaticCredentialStatusChecks
+                ))
+                .disabled(viewModel.savingBackgroundStatus)
+                .accessibilityIdentifier("settings-credential-status-automatic")
+                if viewModel.backgroundStatusScheduler != nil {
+                    Toggle("Background status checks", isOn: Binding(
+                        get: { viewModel.automaticCredentialStatusChecks && viewModel.backgroundStatusChecks == true },
+                        set: viewModel.setBackgroundCredentialStatusChecks
+                    ))
+                    .disabled(!viewModel.automaticCredentialStatusChecks || viewModel.backgroundStatusChecks == nil ||
+                              (!viewModel.backgroundStatusSchedulingAvailable && viewModel.backgroundStatusChecks != true) || viewModel.savingBackgroundStatus)
+                    .accessibilityIdentifier("settings-credential-status-background")
+                    if viewModel.backgroundStatusSaveFailed {
+                        Text("Could not update background status checks.").font(.footnote).foregroundStyle(.red)
+                    }
+                }
+            } footer: {
+                Text("While this wallet is open and unlocked.\nChecks contact the issuer’s status service.")
+                if viewModel.backgroundStatusScheduler != nil {
+                    if !viewModel.backgroundStatusSchedulingAvailable {
+                        Text("Background refresh is unavailable in system settings.")
+                    } else if viewModel.backgroundStatusChecks == nil && !viewModel.savingBackgroundStatus {
+                        Text("Background checks are unavailable for this wallet.")
+                    } else {
+                        Text("Allow issuer status checks while the app is closed when the system allows.")
+                    }
+                }
+            }
             Section {
                 Button { viewModel.checkCredentialStatuses() } label: {
                     HStack {

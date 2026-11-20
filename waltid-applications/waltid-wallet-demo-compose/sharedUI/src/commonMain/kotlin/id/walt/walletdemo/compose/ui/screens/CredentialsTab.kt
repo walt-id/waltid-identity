@@ -18,6 +18,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,10 +45,12 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
 import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatusNotice
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
+import id.walt.walletdemo.compose.ui.LocalWalletTimeFormatter
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
@@ -56,10 +62,13 @@ import id.walt.walletdemo.compose.ui.components.WalletMotion
 import id.walt.walletdemo.compose.ui.components.WalletCredentialContentMaxWidth
 import id.walt.walletdemo.compose.ui.components.walletNavigationBackground
 import id.walt.walletdemo.compose.ui.plainTextClipEntry
+import id.walt.walletdemo.compose.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Instant
 
 @Composable
 internal fun CredentialsTab(
@@ -67,6 +76,11 @@ internal fun CredentialsTab(
     modifier: Modifier = Modifier,
     onDeleteCredential: ((String) -> Unit)? = null,
     onDetailsChromeChange: (CredentialDetailsChrome?) -> Unit = {},
+    onDetailsOpened: suspend (String) -> Unit = {},
+    statusNotices: List<WalletDemoCredentialStatusNotice> = emptyList(),
+    onAcknowledgeStatusNotice: (WalletDemoCredentialStatusNotice) -> Unit = {},
+    openStatusNoticeOnHome: Boolean = false,
+    onStatusNoticeOpenedOnHome: () -> Unit = {},
 ) {
     val credentials = (session as? WalletSessionState.Ready)?.credentials.orEmpty()
     val cards by produceState<List<CredentialCardDisplayData>>(emptyList(), credentials) {
@@ -94,6 +108,37 @@ internal fun CredentialsTab(
 
     fun requestClose() { technicalOpen = false; expandedId = null }
     fun toggleCard(id: String) { expandedId = id.takeUnless { it == expandedId } }
+
+    LaunchedEffect(selectedCredential?.id) {
+        selectedCredential?.id?.let { onDetailsOpened(it) }
+    }
+    LaunchedEffect(openStatusNoticeOnHome) {
+        if (openStatusNoticeOnHome) {
+            requestClose()
+            onStatusNoticeOpenedOnHome()
+        }
+    }
+    val statusSnackbar = remember { SnackbarHostState() }
+    val notice = statusNotices.firstOrNull { entry -> cards.any { it.id == entry.credentialId } }
+        ?.takeUnless { showingDetails || confirmDelete }
+    if (notice != null) {
+        val title = cards.first { it.id == notice.credentialId }.title
+        val kind = stringResource(when (notice.kind) {
+            "REVOKED" -> Res.string.credential_status_revoked
+            "SUSPENDED" -> Res.string.credential_status_suspended
+            else -> Res.string.credential_status_invalid
+        })
+        val checkedAt = LocalWalletTimeFormatter.current(Instant.parse(notice.checkedAt)).fullText
+        val message = stringResource(if (notice.historical) Res.string.credential_status_notice_historical
+            else Res.string.credential_status_notice_current, title, kind, checkedAt)
+        val viewCredential = stringResource(Res.string.credential_status_notice_view)
+        LaunchedEffect(notice.version, message) {
+            val result = statusSnackbar.showSnackbar(message, viewCredential, withDismissAction = true,
+                duration = SnackbarDuration.Indefinite)
+            onAcknowledgeStatusNotice(notice)
+            if (result == SnackbarResult.ActionPerformed) expandedId = notice.credentialId
+        }
+    }
 
     LaunchedEffect(expandedId) { technicalOpen = false }
     LaunchedEffect(showingDetails, technicalOpen, rawCredential, onDeleteCredential, clipboard) {
@@ -183,6 +228,7 @@ internal fun CredentialsTab(
                 }
             }
         }
+        if (notice != null) SnackbarHost(statusSnackbar, Modifier.align(Alignment.BottomCenter).padding(12.dp))
     }
 
     if (confirmDelete) {

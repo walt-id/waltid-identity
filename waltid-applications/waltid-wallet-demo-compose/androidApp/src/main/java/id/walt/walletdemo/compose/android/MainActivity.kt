@@ -5,8 +5,12 @@ import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.fragment.app.FragmentActivity
@@ -15,7 +19,9 @@ import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
+import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.ui.MobileWalletDemoApp
+import kotlinx.coroutines.launch
 
 const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
     "id.walt.walletdemo.compose.android.WALLET_SIGNING_PROTECTION_MODE"
@@ -26,6 +32,7 @@ class MainActivity : FragmentActivity() {
     private lateinit var proximityController: WalletDemoProximityController
     private lateinit var readerTrustSettingsController: DemoReaderTrustSettingsController
     private lateinit var walletConfig: DemoWalletConfig
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val onCredentialStoreChanged: () -> Unit = {
         if (::controller.isInitialized) {
             controller.refreshCredentialsFromStore()
@@ -58,6 +65,16 @@ class MainActivity : FragmentActivity() {
         readerTrustSettingsController = activityModel.readerTrustSettingsController
         WalletDemoCredentialStoreNotifier.addListener(onCredentialStoreChanged)
         if (createdSession) handleIntent(intent)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                controller.state.collect { state ->
+                    if (state.auth == WalletAuthState.Unlocked && state.backgroundStatusChecks == true &&
+                        state.externalFlow == null && state.presentationReview == null) {
+                        AndroidCredentialStatusNotifications.requestPermissionOnce(this@MainActivity) { notificationPermission.launch(it) }
+                    }
+                }
+            }
+        }
 
         setContent {
             MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
@@ -91,6 +108,10 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        if (intent?.action == AndroidCredentialStatusNotifications.OPEN_HOME) {
+            controller.handleCredentialStatusNotification()
+            return
+        }
         val uri = intent?.data ?: return
         if (DigitalCredentialCreateAuthHandoff.deliver(this, uri) != DigitalCredentialCreateAuthHandoff.Delivery.Unmatched) {
             activityModel.drainOrphanCreateAuthorization()

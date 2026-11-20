@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -44,7 +46,13 @@ class WalletDemoController(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val statusNow: () -> Instant = { Clock.System.now() },
+    private val reconcileBackgroundStatusSchedule: (suspend (String?) -> Unit)? = null,
+    initialForeground: Boolean = true,
+    private val clearStatusNotification: () -> Unit = {},
 ) {
+    private val backgroundStatusMutex = Mutex()
+    val supportsBackgroundStatusChecks: Boolean get() = reconcileBackgroundStatusSchedule != null
+
     private var credentialStatusRefreshJob: Job? = null
     private var credentialStatusRefreshSequence = 0L
     private var credentialStatusRefreshToken: Any? = null
@@ -53,7 +61,7 @@ class WalletDemoController(
             state.presentationNavigationResetKey == navigationKey && state.auth == WalletAuthState.Unlocked
     }
     private var statusReviewOwner: StatusReviewOwner? = null
-    private val applicationForeground = MutableStateFlow(true)
+    private val applicationForeground = MutableStateFlow(initialForeground)
     private val externalStatusReview = MutableStateFlow(false)
     private data class AutomaticStatusCheck(val at: Instant, val inventory: Set<String>)
     private val automaticStatusCheck = MutableStateFlow<AutomaticStatusCheck?>(null)
@@ -102,10 +110,20 @@ class WalletDemoController(
                         _state.update { it.copy(credentialStatuses = it.credentialStatuses.copy(readState = it.credentialStatuses.readState.awaitingRead)) }
                         return@collectLatest
                     }
-                    if (_state.value.automaticCredentialStatusChecks) checkCredentialStatuses(force = false)
+                    refreshBackgroundStatusEnrollment()
+                    if (!supportsBackgroundStatusChecks && _state.value.automaticCredentialStatusChecks) {
+                        checkCredentialStatuses(force = false)
+                    }
+                    var initialRead = supportsBackgroundStatusChecks
                     while (currentCoroutineContext().isActive) {
                         try {
-                            wallet.credentialStatusSnapshots().collect { snapshot -> installCredentialStatuses(snapshot) }
+                            wallet.credentialStatusSnapshots().collect { snapshot ->
+                                installCredentialStatuses(snapshot)
+                                if (initialRead) {
+                                    initialRead = false
+                                    if (_state.value.automaticCredentialStatusChecks) checkCredentialStatuses(force = false)
+                                }
+                            }
                             _state.update { if (it.credentialStatuses.readState == WalletDemoStatusReadState.Loading)
                                 it.copy(credentialStatuses = it.credentialStatuses.copy(readState = WalletDemoStatusReadState.Unavailable)) else it }
                             break
@@ -132,7 +150,9 @@ class WalletDemoController(
             combine(state, applicationForeground, externalStatusReview, automaticStatusCheck) { ui, foreground, externalReview, automatic ->
                 val ready = ui.session as? WalletSessionState.Ready
                 if (!foreground || externalReview || !ui.automaticCredentialStatusChecks ||
-                    ui.auth != WalletAuthState.Unlocked || ready == null || ui.presentationReview != null ||
+                    (supportsBackgroundStatusChecks && ui.credentialStatuses.readState != WalletDemoStatusReadState.Available) ||
+                    ui.auth != WalletAuthState.Unlocked || ready == null || ui.selectedTab != WalletDemoTab.Credentials ||
+                    ui.externalFlow != null || ui.presentationReview != null ||
                     ui.isBusy || ui.checkingCredentialStatuses) return@combine null
                 val inventory = ready.credentials.mapTo(mutableSetOf()) { it.id }
                 val due = if (inventory != automatic?.inventory) automatic?.at ?: statusNow()
@@ -200,7 +220,10 @@ class WalletDemoController(
         foregroundSequence += 1
         refreshBiometricSigningAvailability(foregroundSequence)
         refreshDigitalCredentialRegistration()
-        if (_state.value.automaticCredentialStatusChecks) checkCredentialStatuses(force = false)
+        if (supportsBackgroundStatusChecks) {
+            refreshBackgroundStatusEnrollment()
+            invalidateBackgroundStatusSnapshot()
+        } else if (_state.value.automaticCredentialStatusChecks) checkCredentialStatuses(force = false)
         if (_state.value.auth == WalletAuthState.Unlocked && _state.value.session is WalletSessionState.IdentitySetup) {
             refreshIdentityChoices()
         }
@@ -216,15 +239,163 @@ class WalletDemoController(
         externalStatusReview.value = active
     }
 
+    fun invalidateBackgroundStatusSnapshot() {
+        if (applicationForeground.value && _state.value.auth == WalletAuthState.Unlocked) {
+            scope.launch(dispatcher) { wallet.invalidateCredentialStatusSnapshot() }
+        }
+    }
+
+    fun setBackgroundStatusSchedulingAvailable(available: Boolean) {
+        _state.update { it.copy(backgroundStatusSchedulingAvailable = available) }
+    }
+
+    fun setBackgroundCredentialStatusChecks(enabled: Boolean) {
+        if (!supportsBackgroundStatusChecks || !_state.value.automaticCredentialStatusChecks ||
+            _state.value.backgroundStatusChecks == null || (enabled && !_state.value.backgroundStatusSchedulingAvailable)) return
+        changeBackgroundStatus {
+            val preference = if (enabled) DemoBackgroundStatusPreference.ENABLED else DemoBackgroundStatusPreference.OFF
+            publishBackgroundStatus(wallet.setBackgroundStatusPreference(preference))
+        }
+    }
+
+    private fun changeBackgroundStatus(update: suspend () -> Unit) {
+        while (true) {
+            val current = _state.value
+            if (current.savingBackgroundStatus || current.auth != WalletAuthState.Unlocked ||
+                current.session !is WalletSessionState.Ready || walletResetJob?.isActive == true) return
+            if (_state.compareAndSet(current, current.copy(savingBackgroundStatus = true, backgroundStatusSaveFailed = false))) break
+        }
+        scope.launch(dispatcher) {
+            try {
+                backgroundStatusMutex.withLock {
+                    if (walletResetJob?.isActive != true && !_state.value.isChangingSigningProtection &&
+                        _state.value.auth == WalletAuthState.Unlocked && _state.value.session is WalletSessionState.Ready) update()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(backgroundStatusSaveFailed = true) }
+            } finally {
+                _state.update { it.copy(savingBackgroundStatus = false) }
+            }
+        }
+    }
+
+    private fun refreshBackgroundStatusEnrollment() {
+        if (!supportsBackgroundStatusChecks) return
+        scope.launch(dispatcher) {
+            try {
+                backgroundStatusMutex.withLock {
+                    val current = _state.value
+                    if (current.auth != WalletAuthState.Unlocked || current.session !is WalletSessionState.Ready ||
+                        walletResetJob?.isActive == true || current.isChangingSigningProtection) return@withLock
+                    val enrollment = wallet.backgroundStatusEnrollment()
+                    publishBackgroundStatus(when {
+                        enrollment == null -> null
+                        current.automaticCredentialStatusChecks && enrollment.preference == DemoBackgroundStatusPreference.PAUSED -> {
+                            // A pause committed before app preference persistence must stay paused after restart.
+                            applyAutomaticCredentialStatusChecks(false)
+                            enrollment
+                        }
+                        !current.automaticCredentialStatusChecks && enrollment.preference == DemoBackgroundStatusPreference.ENABLED ->
+                            wallet.setBackgroundStatusPreference(DemoBackgroundStatusPreference.PAUSED)
+                        else -> enrollment
+                    })
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(backgroundStatusSaveFailed = true) }
+            }
+        }
+    }
+
+    private suspend fun publishBackgroundStatus(enrollment: DemoBackgroundStatusEnrollment?) {
+        reconcileBackgroundStatusSchedule?.invoke(enrollment?.binding)
+        _state.update { it.copy(backgroundStatusChecks = enrollment?.let { it.preference != DemoBackgroundStatusPreference.OFF }) }
+    }
+
+    private suspend fun deleteWalletAndReconcileBackground() {
+        backgroundStatusMutex.withLock {
+            wallet.deleteWallet()
+            clearStatusNotification()
+            if (supportsBackgroundStatusChecks) {
+                try {
+                    publishBackgroundStatus(null)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // The SDK has already retired the grant. A delivered worker will reconcile it.
+                    _state.update { it.copy(backgroundStatusChecks = null, backgroundStatusSaveFailed = true) }
+                }
+            }
+        }
+    }
+
     fun setAutomaticCredentialStatusChecks(enabled: Boolean) {
-        try {
-            sharingSettings.setAutomaticCredentialStatusChecks(enabled)
-            _state.update { it.copy(automaticCredentialStatusChecks = enabled, credentialStatusError = null) }
-            if (enabled) checkCredentialStatuses(force = false) else credentialStatusRefreshJob?.cancel()
-        } catch (_: Exception) { _state.update { it.copy(credentialStatusError = "Could not save the credential status preference.") } }
+        if (supportsBackgroundStatusChecks) {
+            changeBackgroundStatus {
+                val current = wallet.backgroundStatusEnrollment()
+                val paused = if (!enabled) wallet.setBackgroundStatusPreference(DemoBackgroundStatusPreference.PAUSED) else current
+                if (!enabled) publishBackgroundStatus(paused)
+                applyAutomaticCredentialStatusChecks(enabled)
+                if (enabled) {
+                    publishBackgroundStatus(if (current?.preference == DemoBackgroundStatusPreference.PAUSED) {
+                        wallet.setBackgroundStatusPreference(DemoBackgroundStatusPreference.ENABLED)
+                    } else current)
+                }
+            }
+        } else {
+            try {
+                applyAutomaticCredentialStatusChecks(enabled)
+            } catch (_: Exception) {
+                _state.update { it.copy(credentialStatusError = "Could not save the credential status preference.") }
+            }
+        }
+    }
+
+    private fun applyAutomaticCredentialStatusChecks(enabled: Boolean) {
+        sharingSettings.setAutomaticCredentialStatusChecks(enabled)
+        _state.update { it.copy(automaticCredentialStatusChecks = enabled, credentialStatusError = null) }
+        if (enabled) checkCredentialStatuses(force = false) else credentialStatusRefreshJob?.cancel()
     }
 
     fun dismissCredentialStatusNotice() { _state.update { it.copy(credentialStatusNotice = null) } }
+
+    fun handleCredentialStatusNotification() {
+        _state.update { it.copy(statusNotificationOpened = true) }
+        invalidateBackgroundStatusSnapshot()
+    }
+
+    fun credentialStatusNotificationOpenedOnHome() {
+        _state.update { it.copy(statusNotificationOpened = false) }
+    }
+
+    fun acknowledgeCredentialStatusNotice(notice: WalletDemoCredentialStatusNotice) {
+        val generation = loadingGeneration.value
+        scope.launch(dispatcher) {
+            if (loadingGeneration.value != generation || state.value.auth != WalletAuthState.Unlocked) return@launch
+            try {
+                wallet.acknowledgeCredentialStatusNotice(notice.credentialId, notice.version)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(credentialStatusError = "Could not dismiss the credential status notice.") }
+            }
+        }
+    }
+
+    /** A detail check joins the same SDK flights as wallet-wide work. Closing the screen releases its owner. */
+    suspend fun checkCredentialStatusOnDetails(credentialId: String) = withContext(dispatcher) {
+        val current = state.value
+        if (!applicationForeground.value || !current.automaticCredentialStatusChecks || current.auth != WalletAuthState.Unlocked ||
+            current.selectedTab != WalletDemoTab.Credentials || current.externalFlow != null || externalStatusReview.value ||
+            current.isBusy || current.credentialStatuses.legacySubmission) return@withContext
+        try {
+            wallet.refreshCredentialStatuses(setOf(credentialId), force = false)
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { /* The local observation remains visible, with manual retry available. */ }
+    }
 
     fun checkCredentialStatuses(ids: Set<String>? = null, force: Boolean = true) {
         startCredentialStatusRefresh(ids, force)
@@ -271,7 +442,8 @@ class WalletDemoController(
                 current.checkingCredentialStatuses || current.presentationStatusRefresh != null || credentialStatusRefreshJob?.isActive == true) return
             if (reviewOwner != null && !reviewOwner.matches(current)) return
             if (!force && current.credentialStatuses.legacySubmission) return
-            if (!force && (!current.automaticCredentialStatusChecks || externalStatusReview.value || current.presentationReview != null || current.isBusy)) return
+            if (!force && (!current.automaticCredentialStatusChecks || externalStatusReview.value || current.presentationReview != null ||
+                    current.externalFlow != null || current.selectedTab != WalletDemoTab.Credentials || current.isBusy)) return
             if (_state.compareAndSet(current, current.copy(checkingCredentialStatuses = true, presentationStatusRefresh = reviewRefresh,
                 credentialStatusSummary = if (settingsBatch) null else current.credentialStatusSummary,
                 credentialStatusBatchError = if (settingsBatch) null else current.credentialStatusBatchError,
@@ -317,6 +489,14 @@ class WalletDemoController(
     }
 
     private fun installCredentialStatuses(snapshot: WalletDemoCredentialStatuses) {
+        if (snapshot.pendingNotices != null) {
+            _state.update { it.copy(credentialStatuses = snapshot, credentialStatusNotice = null,
+                credentialStatusError = if (!it.credentialStatuses.available) null else it.credentialStatusError) }
+            if (snapshot.pendingNotices.isEmpty() && applicationForeground.value && state.value.auth == WalletAuthState.Unlocked) {
+                clearStatusNotification()
+            }
+            return
+        }
         val previous = _state.value.credentialStatuses.credentials
         announcedCredentialStatuses.keys.removeAll { snapshot.credentials[it]?.adverse != true }
         pendingCredentialStatusNotices.removeAll { snapshot.credentials[it]?.adverse != true }
@@ -495,7 +675,7 @@ class WalletDemoController(
                 cancelActiveWalletWork()
                 cancelLoading().join()
                 replacementStarted = true
-                wallet.deleteWallet()
+                deleteWalletAndReconcileBackground()
                 val result = wallet.bootstrap(target)
                 check(result.signingProtection == target) {
                     "Reprovisioned wallet did not apply the selected signing protection"
@@ -643,7 +823,7 @@ class WalletDemoController(
                 setOperationError(WalletDisplayText.ResetWalletFailed, error, _state.value.selectedTab)
                 return@launch
             }
-            val deleted = runCatching { wallet.deleteWallet() }
+            val deleted = runCatching { deleteWalletAndReconcileBackground() }
             deleted.exceptionOrNull()?.let { error ->
                 val message = WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, error)
                 _state.update { state ->
@@ -660,7 +840,10 @@ class WalletDemoController(
             }
             val pinCleared = runCatching { pinStore.clear() }
             statusHideJob?.cancel()
-            _state.value = initialState().copy(credentialStatusContext = loadingGeneration.value)
+            val schedulingAvailable = _state.value.backgroundStatusSchedulingAvailable
+            _state.value = initialState().copy(
+                credentialStatusContext = loadingGeneration.value, backgroundStatusSchedulingAvailable = schedulingAvailable,
+            )
             refreshBiometricSigningAvailability()
             pinCleared.exceptionOrNull()?.let { error ->
                 val message = WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, error)

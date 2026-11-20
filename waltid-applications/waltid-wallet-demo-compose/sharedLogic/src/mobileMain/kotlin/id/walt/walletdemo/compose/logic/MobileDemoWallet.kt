@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
 import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.CredentialStatusMaintenanceEnrollment
+import id.walt.wallet2.mobile.CredentialStatusMaintenancePreference
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.SHA256
 import id.walt.wallet2.mobile.identity.*
@@ -229,10 +231,28 @@ internal class MobileDemoWallet(
         }
     }
 
-    override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> =
-        flow { mobileWallet.credentialStatuses.collect { emit(it.toDemoStatuses()) } }
+    override suspend fun backgroundStatusEnrollment() = mobileWallet.credentialStatusMaintenanceEnrollment()?.toDemoEnrollment()
+    override suspend fun setBackgroundStatusPreference(preference: DemoBackgroundStatusPreference) =
+        mobileWallet.setCredentialStatusMaintenance(CredentialStatusMaintenancePreference.valueOf(preference.name))?.toDemoEnrollment()
 
-    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = mobileWallet.credentialStatusSnapshot().toDemoStatuses()
+    private fun CredentialStatusMaintenanceEnrollment.toDemoEnrollment() =
+        DemoBackgroundStatusEnrollment(DemoBackgroundStatusPreference.valueOf(preference.name), binding)
+
+    override suspend fun invalidateCredentialStatusSnapshot() = mobileWallet.invalidateCredentialStatusSnapshot()
+
+    override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> =
+        flow { mobileWallet.credentialStatuses.collect { emit(it.toDemoStatuses().withStatusNotices()) } }
+
+    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses =
+        mobileWallet.credentialStatusSnapshot().toDemoStatuses().withStatusNotices()
+
+    private suspend fun WalletDemoCredentialStatuses.withStatusNotices(): WalletDemoCredentialStatuses =
+        copy(pendingNotices = mobileWallet.pendingCredentialStatusNotices().map {
+            WalletDemoCredentialStatusNotice(it.reference.credentialId, it.version, it.kind.name, it.checkedAt.toString(), it.historical)
+        })
+
+    override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) =
+        mobileWallet.acknowledgeCredentialStatusNotice(credentialId, version)
 
     override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary =
         mobileWallet.refreshCredentialStatuses(ids?.toList(),
