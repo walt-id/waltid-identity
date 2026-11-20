@@ -94,6 +94,7 @@ jobs:
       - name: Run selected deployed cases in the Android demo app
         id: cases
         env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
           ITB_ORGANISATION_KEY: ${{ secrets.ITB_ORGANISATION_KEY }}
           ITB_USERNAME: ${{ secrets.ITB_USERNAME }}
           ITB_PASSWORD: ${{ secrets.ITB_PASSWORD }}

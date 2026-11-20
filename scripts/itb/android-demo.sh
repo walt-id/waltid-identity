@@ -75,6 +75,10 @@ done
 
 status=0
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet --max-workers=2 --console=plain || status=$?
+if [[ "$status" != 0 ]]; then
+  # The raw instrumentation log may contain wallet data. Print only known bridge stages.
+  grep -E '^INSTRUMENTATION_STATUS: itb_state=(listening|wallet_setup|ready)[[:space:]]*$' "$instrumentation_output" >&2 || true
+fi
 if [[ "$status" == 0 ]]; then
   wait "$instrumentation_pid"
   if ! grep -q '^OK (1 test)' "$instrumentation_output"; then

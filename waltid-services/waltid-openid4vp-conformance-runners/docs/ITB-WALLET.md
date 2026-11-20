@@ -260,6 +260,12 @@ passing sessions. Check the statement's coverage and keep the source SHA and
 session IDs from the runner reports with it. The portal statement aggregates
 tenant history. See the [WE BUILD submission guide](https://github.com/webuild-consortium/wp4-interop-test-bed/blob/d7f5df119c3bf9860e28d892d3fb2eaf0be03c93/docs/conformance-overview.md).
 
+For one PDF covering all wallet statements, select the `walt.id` system in
+**My conformance statements** and use **Download report** above the statement
+list. This [conformance overview](https://www.itb.ec.europa.eu/docs/itb-oa/latest/manageConformanceStatements/index.html#conformance-overview-report)
+includes the latest portal result for each case, including cases outside the
+runner's selection. Hosted and attended executions can contribute on different days.
+
 ### Verified portal and REST boundary
 
 Interactive portal startup is required by the deployed DC API cases: REST
