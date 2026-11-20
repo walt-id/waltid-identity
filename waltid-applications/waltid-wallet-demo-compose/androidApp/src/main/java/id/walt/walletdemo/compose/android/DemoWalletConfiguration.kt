@@ -38,10 +38,8 @@ internal fun DemoWalletConfig.selectedSigningProtection(context: Context): Walle
             -> signingProtectionMode.defaultSelection
         }
 
-
-// Reference issuer public signature key published at /rfc-issuer/.well-known/jwks.json.
-// The attended test trusts the independently published key, never a proof header supplied by the counterpart.
+// TS-12 credential signing key from the reference issuer's x509EC/client_certificate.crt.
 private val itbPaymentCredentialIssuerKeys = mapOf(
     "https://dev-i4mlab.aegean.gr/rfc-issuer" to
-        """{"kty":"EC","crv":"P-256","x":"ijVgOGHvwHSeV1Z2iLF9pQLQAw7KcHF3VIjThhvVtBQ","y":"SfFShWAUGEnNx24V2b5G1jrhJNHmMwtgROBOi9OKJLc"}""",
+        """{"kty":"EC","crv":"P-256","x":"dMLtMHM-bYdiJRHJmfA7ypihS8JDAmci4q3FOeLy6mA","y":"8ZXh3dOsLoJFT1Y6F--HgR6uBjsOifnTIiiVnQfgoWs"}""",
 )

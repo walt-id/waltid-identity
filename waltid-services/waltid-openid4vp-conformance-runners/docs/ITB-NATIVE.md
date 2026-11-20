@@ -11,8 +11,8 @@ correlation and cleanup. The installed app retains its own keys and credentials.
 Use a dedicated test phone with a screen lock and enrolled strong biometrics.
 Initialize Chrome and select it as the browser. Build Preview Debug and its
 instrumentation APK from the same checkout as the coordinator. The Preview Debug
-trust flag pins the reference payment issuer's public signing key from
-[its published JWKS](https://dev-i4mlab.aegean.gr/rfc-issuer/.well-known/jwks.json).
+trust flag pins the TS-12 credential signing key from the reference issuer's
+[published ECC certificate](https://github.com/EWC-consortium/ewc-wallet-conformance-backend/blob/c53f009711c605c0df5ab0d8eb46b922b3a7501a/x509EC/client_certificate.crt).
 The app still verifies the issued credential and resolves its payment display
 metadata. The reference issuer accepts the [synthetic key attestation](ITB-WALLET.md)
 used for interoperability tests.
