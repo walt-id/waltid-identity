@@ -28,8 +28,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * private-network guard applies: a resolver on a loopback or private address must be allowed through
  * `PrivateNetworkGuardSettings`.
  *
- * Failures never throw: an unreachable resolver, a timeout or a non-2xx answer is
- * [TrustDecisionCode.UNKNOWN]; an answer that is not a trust decision is [TrustDecisionCode.PROCESSING_ERROR].
+ * Failures never throw: an unreachable resolver, a timeout, a non-2xx answer or an answer that is not a
+ * trust decision is [TrustDecisionCode.UNKNOWN], because the resolver supplied no decision about the subject.
  *
  * @param headers extra request headers, read before every request (for example a fresh bearer token).
  */
@@ -83,7 +83,7 @@ class HttpTrustDecisionEvaluator internal constructor(
         }
         return runCatching { json.decodeFromString<TrustDecision>(text) }.getOrElse {
             log.warn { "Trust resolver $url answered with something that is not a trust decision" }
-            TrustDecision(TrustDecisionCode.PROCESSING_ERROR, warnings = listOf("Trust resolver response is not a trust decision"))
+            unknown("Trust resolver response is not a trust decision")
         }
     }
 
