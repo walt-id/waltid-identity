@@ -1,5 +1,6 @@
 package id.walt.issuer2.service
 
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mdocNamespaceMapping
 import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.sdjwt.metadata.type.validateIssuanceInput
 
@@ -14,6 +15,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
+import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
@@ -104,6 +106,13 @@ class CredentialOfferService(
         }
         for ((_, issuance, _) in resolvedCredentials) {
             val configuration = typeMetadata.credentialConfigurations[issuance.credentialConfigurationId] ?: continue
+            if (configuration.format == CredentialFormat.MSO_MDOC) {
+                try {
+                    issuance.mapping?.mdocNamespaceMapping(issuance.credentialData)
+                } catch (e: IllegalArgumentException) {
+                    throw BadRequestException(e.message ?: "Invalid mdoc mapping", e)
+                }
+            }
             typeMetadata.resolve(configuration)?.use { context ->
                 context.resolved.validateIssuanceInput(
                     issuance.credentialData, issuance.selectiveDisclosure,
