@@ -107,7 +107,7 @@ Notes:
 Webhook events use at-least-once delivery. Calling `notifySessionUpdate` first writes the exact serialized JSON
 payload to a local durable outbox and then returns; a background worker performs the HTTP request. Pending records
 are resumed when the service starts again. Exhausted and permanently rejected deliveries are retained under the
-outbox's `dead-letter` directory. Embedded callers can use `WebhookNotifier.enqueue(update, config)` to obtain the stable delivery ID.
+outbox's `dead-letter` directory. Verifier2 removes queued and dead-letter records on explicit session erasure. Enterprise Verifier2 with `persistSessionResult = false` discards failed callbacks once delivery attempts end. Embedded callers can use `WebhookNotifier.enqueue(update, config)` to obtain the stable delivery ID.
 The library exposes `WebhookNotifier.deadLetters()` and
 `WebhookNotifier.redrive(deliveryId)` as programmatic hooks for integration into authenticated operator tooling;
 it does not expose an HTTP management endpoint.
