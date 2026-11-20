@@ -3,6 +3,8 @@
 package id.walt.verifier2.verification2
 
 import kotlin.time.TimeSource
+import kotlin.uuid.Uuid
+import kotlinx.coroutines.CancellationException
 import id.walt.cose.protectedAlgorithm
 import id.walt.cose.Cose
 import id.walt.cose.acceptsCoseAlgorithm
@@ -286,6 +288,7 @@ object PresentationVerificationEngine {
      * Parses every presentation with the format of the Credential Query it was returned for.
      *
      * @throws IllegalArgumentException if the vp_token does not have the shape [vpTokenStructureViolation] checks.
+     * @throws UnparseablePresentationException if a presentation cannot be parsed in its query's format.
      */
     suspend fun parseAllPresentations(
         vpTokenContents: ParsedVpToken,
@@ -300,9 +303,32 @@ object PresentationVerificationEngine {
         }
 
         return presentationsToUse.associateWith { (presentationString, credentialQuery) ->
-            parsePresentation(presentationString, credentialQuery.format)
+            try {
+                parsePresentation(presentationString, credentialQuery.format)
+            } catch (cause: CancellationException) {
+                throw cause
+            } catch (cause: Exception) {
+                // A dependency failure is not the wallet's fault: leave it to the caller's 503 handling.
+                if (cause.isInfrastructureFailure()) throw cause
+                throw UnparseablePresentationException(credentialQuery.id, credentialQuery.format, cause)
+            }
         }
     }
+
+    /**
+     * A presentation could not be parsed in the format of the Credential Query it was returned for: the
+     * wallet's input, so a 400. The message names only the query and format; the parser's own message stays
+     * in [cause], because it can come from any library the parser uses.
+     */
+    class UnparseablePresentationException(queryId: String, format: CredentialFormat, cause: Throwable) :
+        IllegalArgumentException(
+            if (cause is UnsupportedOperationException) {
+                "Presentation for '$queryId': format ${format.id.first()} is not supported"
+            } else {
+                "Presentation for '$queryId' could not be parsed as ${format.id.first()}"
+            },
+            cause,
+        )
 
     /**
      * Why the vp_token does not have the shape OpenID4VP 1.0 §8.1 defines, or null if it does: every key is the
@@ -452,8 +478,9 @@ object PresentationVerificationEngine {
         // [PresentationRejectionException] (which carries its own session state update)
         // is:
         //   1. Logged with context
-        //   2. Stored on the session as a [SessionFailure.PresentationValidation] with
-        //      the exception message so the error is visible via the session's failure field
+        //   2. Stored on the session as a [SessionFailure.PresentationValidation] with a
+        //      generic reason and an errorId that points to the log line; the exception's own
+        //      message is never stored, because the session is shown to clients
         //   3. Marked FAILED via failSessionCallback
         //   4. Rethrown as a [PresentationRejectionException] so the HTTP handler can
         //      return 400 to the wallet instead of 500 (the wallet misbehaving or sending
@@ -469,7 +496,14 @@ object PresentationVerificationEngine {
             // missing: the guard stores the reason on the session, and for an oversized session that write fails
             // too, so the failure could not even be recorded. Checked here, the wallet gets a 400 naming the
             // sizes, the session records why, and none of the verification work is done first.
-            checkPresentationIsStorable(vpTokenContents)
+            presentationTooLargeToStore(vpTokenContents)?.let { reason ->
+                log.warn { "Rejecting vp_token for session ${session.id}: $reason" }
+                session.updateSession(SessionEvent.presentation_validation_available) {
+                    failure = SessionFailure.PresentationValidation(reason = reason, failedPolicies = emptyMap())
+                }
+                session.failSession(SessionEvent.presentation_validation_failed)
+                throw PresentationRejectionException(reason)
+            }
 
             vpTokenStructureViolation(vpTokenContents, session.authorizationRequest.dcqlQuery)?.let { reason ->
                 log.warn { "Rejecting vp_token for session ${session.id}: $reason" }
@@ -484,7 +518,17 @@ object PresentationVerificationEngine {
             // presentation while an isolated mdoc verification is 1.4ms, so most of it is elsewhere in
             // these phases and this is what says where.
             val phaseStart = TimeSource.Monotonic.markNow()
-            val parsedPresentations = parseAllPresentations(vpTokenContents, session)
+            val parsedPresentations = try {
+                parseAllPresentations(vpTokenContents, session)
+            } catch (e: UnparseablePresentationException) {
+                val reason = e.message!!
+                log.warn(e) { "Rejecting vp_token for session ${session.id}: $reason" }
+                session.updateSession(SessionEvent.presentation_validation_available) {
+                    failure = SessionFailure.PresentationValidation(reason = reason, failedPolicies = emptyMap())
+                }
+                session.failSession(SessionEvent.presentation_validation_failed)
+                throw PresentationRejectionException(reason, cause = e)
+            }
             val afterParse = phaseStart.elapsedNow()
 
             session.updateSession(SessionEvent.parsed_presentation_available) {
@@ -723,18 +767,38 @@ object PresentationVerificationEngine {
             // Unexpected exception — policy threw instead of returning Result.failure,
             // network error during status check, parse error, etc.
             // Mark the session FAILED so it doesn't stay stuck in PROCESSING_FLOW forever.
+            //
+            // The exception's class and message stay in this log line only: they can carry store
+            // hosts, ports, connection strings or driver internals, and everything stored on the
+            // session or thrown from here reaches the wallet, /info and webhooks. The errorId lets
+            // support find this log line from what a client was shown.
+            val errorId = Uuid.random().toString()
             log.error(e) {
-                "Unexpected exception during verification of session ${session.id} — " +
+                "Unexpected exception during verification of session ${session.id} (errorId=$errorId) — " +
                         "marking session FAILED to prevent it from being stuck in PROCESSING_FLOW. " +
                         "Exception: ${e::class.simpleName}: ${e.message}"
             }
-            session.updateSession(SessionEvent.presentation_validation_available) {
-                failure = SessionFailure.PresentationValidation(
-                    reason = "Internal verification error: ${e::class.simpleName}: ${e.message}",
-                    failedPolicies = emptyMap(),
-                )
+            // Recording the failure writes to the session store, which is often what just failed. A
+            // second failure here must not escape: it would skip the classification below and reach
+            // the client as an unclassified 500 instead of a 503.
+            val recordingFailure = try {
+                session.updateSession(SessionEvent.presentation_validation_available) {
+                    failure = SessionFailure.PresentationValidation(
+                        reason = "Internal verification error (errorId=$errorId)",
+                        failedPolicies = emptyMap(),
+                    )
+                }
+                session.failSession(SessionEvent.presentation_validation_failed)
+                null
+            } catch (writeFailure: CancellationException) {
+                throw writeFailure
+            } catch (writeFailure: Exception) {
+                log.error(writeFailure) {
+                    "Could not record the failure of session ${session.id} (errorId=$errorId): " +
+                            "${writeFailure::class.simpleName}: ${writeFailure.message}"
+                }
+                writeFailure
             }
-            session.failSession(SessionEvent.presentation_validation_failed)
 
             // An infrastructure failure is not the wallet's fault and the wallet cannot fix it by
             // changing its request, so it must not be reported as invalid_request. A load test at
@@ -746,14 +810,14 @@ object PresentationVerificationEngine {
             // Classification is by cause chain rather than by type because this is commonMain and
             // the store drivers are not visible here. Typed store exceptions would be better and
             // are worth doing when the session store interface is next touched.
-            if (e.isInfrastructureFailure()) {
+            if (e.isInfrastructureFailure() || recordingFailure?.isInfrastructureFailure() == true) {
                 throw PresentationVerificationUnavailableException(
-                    "Verification could not be completed because a dependency was unavailable: ${e.message}",
+                    "Verification temporarily unavailable (errorId=$errorId)",
                     cause = e
                 )
             }
             throw PresentationRejectionException(
-                "Verification failed due to an internal error: ${e.message}",
+                "Verification failed due to an internal error (errorId=$errorId)",
                 cause = e
             )
         }
@@ -814,21 +878,20 @@ internal val maxStorablePresentationBytes =
     (STORE_DOCUMENT_LIMIT_BYTES * 9 / 10) / PRESENTATION_RETENTION_FACTOR
 
 /**
- * Fails fast when a `vp_token` is too large for a session to be stored.
+ * Why a `vp_token` is too large for a session to be stored, or null if it fits.
  *
  * Deliberately a rejection of the presentation rather than a storage error: the wallet sent something this
  * deployment cannot process, which is a 400, and the message has to carry the numbers because the alternative is
- * an operator reading a driver exception about a document size with no idea which credential caused it.
+ * an operator reading a driver exception about a document size with no idea which credential caused it. The
+ * reason is built from sizes and limits only, so it is safe to return to the wallet.
  */
-internal fun checkPresentationIsStorable(vpTokenContents: ParsedVpToken) {
+internal fun presentationTooLargeToStore(vpTokenContents: ParsedVpToken): String? {
     val presentedBytes = vpTokenContents.values.sumOf { presentations -> presentations.sumOf { it.length.toLong() } }
-    if (presentedBytes > maxStorablePresentationBytes) {
-        error(
+    return if (presentedBytes <= maxStorablePresentationBytes) null else (
             "Presentation of $presentedBytes bytes is too large to store: a session retains it about " +
                     "${PRESENTATION_RETENTION_FACTOR}x and the store's document limit is " +
                     "$STORE_DOCUMENT_LIMIT_BYTES bytes, so at most $maxStorablePresentationBytes bytes can be " +
                     "presented. A large binary claim such as a portrait is the usual cause; request fewer claims, " +
                     "or a smaller image."
-        )
-    }
+            )
 }

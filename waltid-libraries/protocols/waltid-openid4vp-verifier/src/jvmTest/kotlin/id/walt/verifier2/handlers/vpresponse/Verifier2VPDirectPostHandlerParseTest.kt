@@ -30,6 +30,7 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -292,6 +293,70 @@ class Verifier2VPDirectPostHandlerParseTest {
         assertEquals(setOf(presentationId), events.map { it.second }.toSet())
         assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
     }
+
+    @Test
+    fun `ID token validation failure keeps the validator's reason`() = runTest {
+        // The nonce is checked before the signature, so a well-formed but unsigned token reaches it.
+        val session = idTokenSession(nonce = "nonce", clientId = "client")
+        val idToken = unsignedIdToken(nonce = "wrong-nonce", audience = "client")
+
+        val rejection = assertFailsWith<Verifier2VPDirectPostHandler.PresentationRejectionException> {
+            session.directPostWithIdToken(idToken)
+        }
+
+        val expected = "Self-Issued ID Token validation failed: id_token 'nonce' does not match the request nonce"
+        assertEquals(expected, rejection.message)
+        assertEquals(expected, session.failure!!.reason)
+    }
+
+    @Test
+    fun `an unexpected failure during ID token validation is reported without its detail`() = runTest {
+        // No request nonce: the handler fails before the validator runs, with an exception that is
+        // not the validator's own, so its message must not reach the wallet.
+        val session = idTokenSession(nonce = null, clientId = "client")
+        val idToken = unsignedIdToken(nonce = "nonce", audience = "client")
+
+        val rejection = assertFailsWith<Verifier2VPDirectPostHandler.PresentationRejectionException> {
+            session.directPostWithIdToken(idToken)
+        }
+
+        assertEquals("Self-Issued ID Token validation failed", rejection.message)
+        assertEquals("Self-Issued ID Token validation failed", session.failure!!.reason)
+        assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
+    }
+
+    private fun idTokenSession(nonce: String?, clientId: String): Verification2Session {
+        val original = directPostSession("expected-state")
+        return original.copy(authorizationRequest = original.authorizationRequest.copy(
+            responseType = OpenID4VPResponseType.VP_TOKEN_ID_TOKEN,
+            scope = "openid",
+            idTokenType = "subject_signed",
+            nonce = nonce,
+            clientId = clientId,
+        ))
+    }
+
+    private fun unsignedIdToken(nonce: String, audience: String): String {
+        val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+        fun encode(json: String) = base64Url.encode(json.encodeToByteArray())
+        val subject = "urn:ietf:params:oauth:jwk-thumbprint:sha-256:unused"
+        val exp = kotlin.time.Clock.System.now().epochSeconds + 300
+        val header = encode("""{"alg":"ES256"}""")
+        val payload = encode(
+            """{"iss":"$subject","sub":"$subject","aud":"$audience","nonce":"$nonce","exp":$exp}"""
+        )
+        // An ES256 signature of the right length (64 bytes) that is never verified.
+        return "$header.$payload.${base64Url.encode(ByteArray(64))}"
+    }
+
+    private suspend fun Verification2Session.directPostWithIdToken(idToken: String) = handleDirectPost(
+        verificationSession = this,
+        responseData = CleartextDirectPostResponse("{}", "expected-state", idToken = idToken),
+        updateSessionCallback = { current, _, block -> current.block() },
+        failSessionCallback = { current, event, update ->
+            update(current, event) { status = Verification2Session.VerificationSessionStatus.FAILED }
+        },
+    )
 
     private fun directPostSession(
         expectedState: String,

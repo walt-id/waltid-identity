@@ -1,15 +1,11 @@
 package id.walt.verifier2.verification2
 
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.*
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 
 /**
  * A DCQL query with `multiple: true` answered with two presentations (WAL-1582 / WAL-1588): every
@@ -17,72 +13,17 @@ import kotlin.time.Duration.Companion.days
  */
 class MultiplePresentationsTest {
 
-    private val nonce = "nonce-1582"
-    private val clientId = "redirect_uri:https://verifier.example/response"
+    private val fixture = JwtVcPresentationFixture(nonce = "nonce-1582", multiple = true)
 
-    private fun session() = Json.decodeFromString<Verification2Session>(
-        // language=JSON
-        """
-        {
-          "id": "session-1582",
-          "setup": {"flow_type": "cross_device", "core_flow": {"dcql_query": {"credentials": [
-            {"id": "ids", "format": "jwt_vc_json", "multiple": true, "meta": {"type_values": [["VerifiedID"]]}}
-          ]}}},
-          "creationDate": "2026-10-19T08:00:00Z",
-          "status": "IN_USE",
-          "authorizationRequestUrl": "openid4vp://authorize",
-          "requestMode": "REQUEST_URI_SIGNED",
-          "authorizationRequest": {
-            "response_type": "vp_token", "client_id": "$clientId", "response_mode": "direct_post",
-            "response_uri": "https://verifier.example/response", "nonce": "$nonce",
-            "client_metadata": {"vp_formats_supported": {"jwt_vc_json": {}}},
-            "dcql_query": {"credentials": [
-              {"id": "ids", "format": "jwt_vc_json", "multiple": true, "meta": {"type_values": [["VerifiedID"]]}}
-            ]}
-          },
-          "policies": {
-            "vp_policies": {"jwt_vc_json": ["jwt_vc_json/audience-check", "jwt_vc_json/nonce-check"]},
-            "vc_policies": [{"policy": "expiration"}]
-          }
-        }
-        """.trimIndent()
-    )
-
-    private lateinit var issuer: JWKKey
-    private lateinit var holder: JWKKey
+    private fun session() = fixture.session()
 
     @BeforeTest
-    fun generateKeys() = runTest {
-        issuer = JWKKey.generate(KeyType.secp256r1)
-        holder = JWKKey.generate(KeyType.secp256r1)
-    }
+    fun generateKeys() = runTest { fixture.generateKeys() }
 
-    private suspend fun credential(name: String, expiresInDays: Int): String = issuer.signJws(
-        buildJsonObject {
-            put("iss", "did:example:issuer"); put("sub", "did:example:holder"); put("jti", "urn:uuid:$name")
-            put("nbf", Clock.System.now().minus(10.days).epochSeconds)
-            put("exp", Clock.System.now().plus(expiresInDays.days).epochSeconds)
-            putJsonObject("vc") {
-                putJsonArray("@context") { add("https://www.w3.org/2018/credentials/v1") }
-                putJsonArray("type") { add("VerifiableCredential"); add("VerifiedID") }
-                put("expirationDate", Clock.System.now().plus(expiresInDays.days).toString())
-                putJsonObject("credentialSubject") { put("id", "did:example:holder"); put("name", name) }
-            }
-        }.toString().encodeToByteArray(),
-        mapOf("typ" to JsonPrimitive("JWT")),
-    )
+    private suspend fun credential(name: String, expiresInDays: Int) = fixture.credential(name, expiresInDays)
 
-    private suspend fun presentation(credential: String, presentationNonce: String = nonce): String = holder.signJws(
-        buildJsonObject {
-            put("iss", "did:example:holder"); put("aud", clientId); put("nonce", presentationNonce)
-            putJsonObject("vp") {
-                putJsonArray("@context") { add("https://www.w3.org/2018/credentials/v1") }
-                putJsonArray("type") { add("VerifiablePresentation") }
-                putJsonArray("verifiableCredential") { add(credential) }
-            }
-        }.toString().encodeToByteArray(),
-        mapOf("typ" to JsonPrimitive("JWT")),
-    )
+    private suspend fun presentation(credential: String, presentationNonce: String? = null) =
+        if (presentationNonce == null) fixture.presentation(credential) else fixture.presentation(credential, presentationNonce)
 
     private suspend fun verify(vararg presentations: String): Verification2Session {
         val session = session()

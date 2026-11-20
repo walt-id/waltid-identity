@@ -46,7 +46,7 @@ object SelfIssuedIdTokenValidator {
     /**
      * Validates the Self-Issued ID Token.
      *
-     * @throws IllegalArgumentException if any validation check fails
+     * @throws SelfIssuedIdTokenValidationException if any validation check fails
      */
     suspend fun validate(
         idToken: String,
@@ -60,62 +60,71 @@ object SelfIssuedIdTokenValidator {
         allowedAlgorithms: Set<JwsAlgorithm> = JwsAlgorithm.entries.toSet(),
     ) {
         val decoded = runCatching { CompactJws.decodeUnverified(idToken) }.getOrElse {
-            throw IllegalArgumentException("id_token is not a valid JWS: ${it.message}")
+            throw SelfIssuedIdTokenValidationException("id_token is not a valid JWS: ${it.message}")
         }
         val payload = runCatching {
             Json.parseToJsonElement(decoded.payload.decodeToString(throwOnInvalidSequence = true)) as? JsonObject
-                ?: throw IllegalArgumentException("id_token payload must be a JSON object")
-        }.getOrElse { throw IllegalArgumentException("id_token has an invalid JSON payload: ${it.message}") }
-        require(decoded.algorithm in allowedAlgorithms) {
+                ?: throw SelfIssuedIdTokenValidationException("id_token payload must be a JSON object")
+        }.getOrElse { throw SelfIssuedIdTokenValidationException("id_token has an invalid JSON payload: ${it.message}") }
+        ensure(decoded.algorithm in allowedAlgorithms) {
             "id_token algorithm is not allowed: ${decoded.algorithm.identifier}"
         }
 
         val iss = payload["iss"]?.jsonPrimitive?.contentOrNull
-            ?: throw IllegalArgumentException("id_token missing 'iss' claim")
+            ?: throw SelfIssuedIdTokenValidationException("id_token missing 'iss' claim")
         val sub = payload["sub"]?.jsonPrimitive?.contentOrNull
-            ?: throw IllegalArgumentException("id_token missing 'sub' claim")
+            ?: throw SelfIssuedIdTokenValidationException("id_token missing 'sub' claim")
         val aud = payload["aud"]?.jsonPrimitive?.contentOrNull
-            ?: throw IllegalArgumentException("id_token missing 'aud' claim")
+            ?: throw SelfIssuedIdTokenValidationException("id_token missing 'aud' claim")
         val nonce = payload["nonce"]?.jsonPrimitive?.contentOrNull
-            ?: throw IllegalArgumentException("id_token missing 'nonce' claim")
+            ?: throw SelfIssuedIdTokenValidationException("id_token missing 'nonce' claim")
         val expSeconds = payload["exp"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
-            ?: throw IllegalArgumentException("id_token missing 'exp' claim")
+            ?: throw SelfIssuedIdTokenValidationException("id_token missing 'exp' claim")
 
         // 1. Self-issued check: iss MUST equal sub
-        require(iss == sub) {
+        ensure(iss == sub) {
             "id_token 'iss' ($iss) must equal 'sub' ($sub) for a Self-Issued ID Token (SIOPv2 §7)"
         }
 
         // 2. Audience check
-        require(aud == expectedAudience) {
+        ensure(aud == expectedAudience) {
             "id_token 'aud' ($aud) does not match expected audience ($expectedAudience)"
         }
 
         // 3. Nonce check
-        require(nonce == expectedNonce) {
+        ensure(nonce == expectedNonce) {
             "id_token 'nonce' does not match the request nonce"
         }
 
         // 4. Expiry check (with clock skew)
         val now = clock.now()
         val exp = Instant.fromEpochSeconds(expSeconds)
-        require(now <= exp.plus(clockSkewSeconds.seconds)) {
+        ensure(now <= exp.plus(clockSkewSeconds.seconds)) {
             "id_token is expired: exp=$expSeconds, now=${now.epochSeconds}"
         }
 
         // 5. Signature verification - determine Subject Syntax Type from `sub`
         when {
             sub.startsWith("did:") -> {
-                val keys = didKeyResolver.resolveToKeys(sub)
+                // The resolver can fail for reasons inside the verifier (network, configuration), so its
+                // message is logged rather than passed on to the wallet.
+                val keys = try {
+                    didKeyResolver.resolveToKeys(sub)
+                } catch (cause: CancellationException) {
+                    throw cause
+                } catch (cause: Throwable) {
+                    log.warn(cause) { "Could not resolve the id_token subject DID $sub" }
+                    throw SelfIssuedIdTokenValidationException("id_token subject DID could not be resolved", cause)
+                }
                 val kid = decoded.protectedHeader["kid"]?.jsonPrimitive?.contentOrNull
                 val verificationKey = when {
                     kid != null -> keys.singleOrNull { it.id.value == kid }
-                        ?: throw IllegalArgumentException("id_token kid does not identify a DID verification method: $kid")
+                        ?: throw SelfIssuedIdTokenValidationException("id_token kid does not identify a DID verification method: $kid")
 
                     keys.size == 1 -> keys.single()
-                    else -> throw IllegalArgumentException("id_token with multiple DID keys must include kid")
+                    else -> throw SelfIssuedIdTokenValidationException("id_token with multiple DID keys must include kid")
                 }
-                require(kid == null || kid == sub || kid.startsWith("$sub#")) {
+                ensure(kid == null || kid == sub || kid.startsWith("$sub#")) {
                     "id_token kid is not controlled by the subject DID"
                 }
                 try {
@@ -123,7 +132,7 @@ object SelfIssuedIdTokenValidator {
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (cause: Throwable) {
-                    throw IllegalArgumentException("id_token DID signature verification failed: ${cause.message}", cause)
+                    throw SelfIssuedIdTokenValidationException("id_token DID signature verification failed: ${cause.message}", cause)
                 }
                 log.trace { "Self-Issued ID Token DID signature verified: sub=$sub, kid=$kid" }
             }
@@ -131,7 +140,7 @@ object SelfIssuedIdTokenValidator {
             sub.startsWith(JWK_THUMBPRINT_PREFIX) -> {
                 // JWK Thumbprint Subject Syntax Type - verify with sub_jwk
                 val subJwkElement = payload["sub_jwk"] as? JsonObject
-                    ?: throw IllegalArgumentException(
+                    ?: throw SelfIssuedIdTokenValidationException(
                         "id_token with JWK Thumbprint subject must include 'sub_jwk' claim (SIOPv2 §6)"
                     )
 
@@ -143,15 +152,15 @@ object SelfIssuedIdTokenValidator {
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (cause: Throwable) {
-                    throw IllegalArgumentException("id_token 'sub_jwk' is not a valid JWK: ${cause.message}", cause)
+                    throw SelfIssuedIdTokenValidationException("id_token 'sub_jwk' is not a valid JWK: ${cause.message}", cause)
                 }
                 val encodedJwk = stored.material as EncodedKey.Jwk
-                require(!encodedJwk.privateMaterial) { "id_token 'sub_jwk' must not contain private key material" }
+                ensure(!encodedJwk.privateMaterial) { "id_token 'sub_jwk' must not contain private key material" }
                 val subJwkKey = runtime.restore(stored)
 
                 // Verify that sub equals the thumbprint of sub_jwk
                 val expectedSub = "$JWK_THUMBPRINT_PREFIX:sha-256:${Jwk.sha256Thumbprint(encodedJwk)}"
-                require(sub == expectedSub) {
+                ensure(sub == expectedSub) {
                     "id_token 'sub' ($sub) does not match JWK thumbprint of 'sub_jwk' ($expectedSub)"
                 }
 
@@ -161,18 +170,32 @@ object SelfIssuedIdTokenValidator {
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (cause: Throwable) {
-                    throw IllegalArgumentException("id_token signature verification failed: ${cause.message}", cause)
+                    throw SelfIssuedIdTokenValidationException("id_token signature verification failed: ${cause.message}", cause)
                 }
 
                 log.trace { "Self-Issued ID Token JWK Thumbprint signature verified: sub=$sub" }
             }
 
             else -> {
-                throw IllegalArgumentException(
+                throw SelfIssuedIdTokenValidationException(
                     "id_token 'sub' ($sub) uses an unrecognized Subject Syntax Type. " +
                             "Expected 'did:...' or '$JWK_THUMBPRINT_PREFIX:...' (SIOPv2 §4.1)"
                 )
             }
         }
     }
+}
+
+/**
+ * A Self-Issued ID Token failed validation. Its message is written by [SelfIssuedIdTokenValidator]
+ * and describes only the token the wallet sent, so it is safe to return to the wallet.
+ *
+ * Extends [IllegalArgumentException] so callers that caught that type keep working.
+ */
+class SelfIssuedIdTokenValidationException(message: String, cause: Throwable? = null) :
+    IllegalArgumentException(message, cause)
+
+/** [require] that throws [SelfIssuedIdTokenValidationException]. */
+private inline fun ensure(condition: Boolean, message: () -> String) {
+    if (!condition) throw SelfIssuedIdTokenValidationException(message())
 }

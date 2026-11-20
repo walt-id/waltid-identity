@@ -27,6 +27,7 @@ import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.FAI
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.SUCCESSFUL
 import id.walt.verifier2.utils.JsonUtils.parseAsJsonObject
 import id.walt.verifier2.verification2.PresentationVerificationEngine
+import id.walt.verifier2.verification2.SelfIssuedIdTokenValidationException
 import id.walt.verifier2.verification2.SelfIssuedIdTokenValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
@@ -355,16 +356,33 @@ object Verifier2VPDirectPostHandler {
             // 503 tells the wallet the same request is worth retrying. Reporting this as 400
             // invalid_request, as this handler previously did for every internal failure, blames the
             // wallet for the verifier's outage and forecloses the retry.
-            log.error(e) { "Verification unavailable, responding 503: ${e.message}" }
-            val errorBody = buildMap {
-                put("error", "temporarily_unavailable")
-                put("error_description", e.message ?: "Verification temporarily unavailable")
-                verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
-            }
-            beforeRespond(true)
-            call.respond(HttpStatusCode.ServiceUnavailable, errorBody)
+            // The engine already logged the cause with its stack trace under the errorId in e.message.
+            log.warn { "Verification unavailable, responding 503: ${e.message}" }
+            call.respondTemporarilyUnavailable(verificationSession, beforeRespond)
         }
+        // Any other exception is deliberately left to the caller. Enterprise relies on it escaping to roll the
+        // session back and release the usage reservation, and the application's StatusPages answers it with a
+        // generic 500. Classifying it here as a 503 would also misread a client's dropped connection
+        // (an IOException while reading the body) as a verifier outage.
     }
+
+    private suspend fun RoutingCall.respondTemporarilyUnavailable(
+        verificationSession: Verification2Session,
+        beforeRespond: suspend (rejected: Boolean) -> Unit,
+    ) {
+        val errorBody = buildMap {
+            put("error", "temporarily_unavailable")
+            // Constant on purpose: the cause is logged, and a dependency failure's message can name
+            // hosts, ports or connection strings that must not reach the wallet.
+            put("error_description", VERIFICATION_TEMPORARILY_UNAVAILABLE)
+            verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
+        }
+        beforeRespond(true)
+        respond(HttpStatusCode.ServiceUnavailable, errorBody)
+    }
+
+    /** `error_description` of every 503 `temporarily_unavailable` response. */
+    const val VERIFICATION_TEMPORARILY_UNAVAILABLE = "Verification temporarily unavailable"
 
     /** Thrown by [handleDirectPost] when the verifier rejects the presentation. */
     class PresentationRejectionException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -489,7 +507,19 @@ object Verifier2VPDirectPostHandler {
             } catch (cause: CancellationException) {
                 throw cause
             } catch (cause: Throwable) {
-                val reason = "Self-Issued ID Token validation failed: ${cause.message}"
+                // Only messages the verifier wrote are shown to the wallet: rejections raised above, and
+                // the validator's own checks (nonce, audience, algorithm, signature). Matched by type, not
+                // by IllegalArgumentException, which libraries also throw. Anything else may be an
+                // internal failure whose message names hosts or driver state.
+                val reason = when (cause) {
+                    is PresentationRejectionException, is SelfIssuedIdTokenValidationException ->
+                        "Self-Issued ID Token validation failed: ${cause.message}"
+
+                    else -> {
+                        log.error(cause) { "Unexpected exception validating the Self-Issued ID Token of session ${session.id}" }
+                        "Self-Issued ID Token validation failed"
+                    }
+                }
                 session.updateSession(SessionEvent.presentation_validation_available) {
                     failure = SessionFailure.PresentationValidation(reason, emptyMap())
                 }

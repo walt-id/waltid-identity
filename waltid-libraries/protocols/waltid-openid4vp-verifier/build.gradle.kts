@@ -69,6 +69,8 @@ kotlin {
             implementation(identityLibs.nimbus.jose.jwt)
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.ktor.server.test.host)
+            implementation(identityLibs.ktor.server.content.negotiation)
+            implementation(identityLibs.ktor.serialization.kotlinx.json)
             implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
