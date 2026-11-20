@@ -121,9 +121,7 @@ public actual class DriverFactory {
                 .firstOrNull() as? String ?: return null
             "$support/databases"
         }
-        val path = "$directory/$databaseName.db"
-        if (!NSFileManager.defaultManager.fileExistsAtPath(path)) return null
-        return ExistingSqlCipherDriver.open(path, encryptionKey.material.toSqlCipherPassphrase())
+        return ExistingSqlCipherDriver.open("$directory/$databaseName.db", encryptionKey.material.toSqlCipherPassphrase())
     }
 
     /**
