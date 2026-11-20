@@ -1,5 +1,6 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mdocNamespaceMapping
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
@@ -20,6 +21,7 @@ import id.walt.issuer2.testsupport.listSessions
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.issuer2.testsupport.mdocValidityInfo
+import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.openid4vci.mdoc.MsoData
@@ -152,6 +154,38 @@ class Issuer2MsoDataWalletFlowTest {
         assertEquals(HttpStatusCode.BadRequest, response.status, body)
         assertTrue(body.contains("msoData.validFrom"), body)
         assertTrue(client.listSessions().isEmpty())
+    }
+
+    @Test
+    fun authorizedMdocOfferAllowsANamespaceSuppliedByExternalIdentityClaims() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val scenario = Issuer2CredentialScenarios.isoMdl
+        val mapping = buildJsonObject {
+            putJsonObject(ISO_MDL_NAMESPACE) { put("issuing_authority", "<issuerId>") }
+        }
+        val offer = client.createWalletFlowCredentialOffer(
+            scenario = scenario,
+            authenticationMethod = AuthenticationMethod.AUTHORIZED,
+            issuerStateMode = IssuerStateMode.INCLUDE,
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                credentialData = buildJsonObject { put(ISO_MDL_NAMESPACE, "pending") },
+                mapping = mapping,
+                idTokenClaimsMapping = mapOf("$.mdl" to "$.['$ISO_MDL_NAMESPACE']"),
+            ),
+        )
+
+        val issuance = client.getSession(offer.offerId).issuanceRequests.single()
+        val claims = buildJsonObject {
+            putJsonObject("mdl") { put("given_name", "Jane") }
+        }
+        val populatedData = JsonObjectPathMapper.fromSourceToDestinationJsonPathsMap(
+            source = claims,
+            destination = issuance.credentialData,
+            jsonPathMapConfig = assertNotNull(issuance.idTokenClaimsMapping),
+        )
+        assertEquals(claims.getValue("mdl"), populatedData.getValue(ISO_MDL_NAMESPACE))
+        assertEquals(mapping, assertNotNull(issuance.mapping).mdocNamespaceMapping(populatedData))
     }
 
     @Test
