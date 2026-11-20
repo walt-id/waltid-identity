@@ -29,6 +29,7 @@ object VerificationSessionCreateOpenApi {
             - Returns both bootstrap and full authorization request URLs for wallet interaction
             - Supports multiple verification policies including signature, revocation, status list, and VICAL validation
             - DCQL query allows requesting specific claims from credentials using JSON path notation
+            - The optional `verifier_info` array accepts attestations in `jwt` and `registration_cert` formats
             - Sessions expire after 10 minutes if unused and are retained for 10 years by default
             - Session status can be tracked via SSE events endpoint
             
