@@ -31,7 +31,7 @@ RUN chmod +x ./gradlew \
     && grep -q "__WALLET_API_FLAVOR__" /out/index.html
 
 # RUN
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginx:1.31.9-trixie
 
 COPY --from=build /out/ /usr/share/nginx/html/
 COPY waltid-applications/waltid-wallet-demo-compose/webApp/nginx.conf /etc/nginx/conf.d/default.conf
@@ -40,6 +40,7 @@ COPY waltid-applications/waltid-wallet-demo-compose/webApp/docker-entrypoint.d/9
 
 USER root
 RUN chmod +x /docker-entrypoint.d/98-wallet-branding.sh /docker-entrypoint.d/99-wallet-api2-url.sh \
+    && sed -i 's#^pid .*#pid /tmp/nginx.pid;#' /etc/nginx/nginx.conf \
     && chown -R 10001:0 /usr/share/nginx/html /var/cache/nginx /etc/nginx
 
 USER 10001
