@@ -14,6 +14,7 @@ kotlin {
     }
 
     sourceSets {
+        commonMain { kotlin.srcDir("../../../waltid-applications/mobile-e2e-fixtures/kotlin") }
         commonMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
             implementation(project(":waltid-libraries:crypto:waltid-jose"))
