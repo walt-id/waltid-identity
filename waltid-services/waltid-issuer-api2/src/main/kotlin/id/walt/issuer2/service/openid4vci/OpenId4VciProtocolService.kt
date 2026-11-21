@@ -36,6 +36,7 @@ import id.walt.openid4vci.errors.NotificationError
 import id.walt.openid4vci.errors.NotificationErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.errors.clientErrorDescription
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
@@ -1055,7 +1056,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            val error = OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message)
+            val error = OAuthError(OAuthErrorCodes.INVALID_TOKEN, clientErrorDescription(e, "Access token could not be decoded"))
             val response = oauth2Provider.writeCredentialError(credentialRequest, error)
             notificationService.notify(
                 requestId = requestId,
@@ -1084,6 +1085,19 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            if (e !is NotFoundException) {
+                // The session store failed, not the wallet's token: reporting invalid_token would tell the wallet
+                // to discard a valid token, and the store's message can name its host. The error handler logs
+                // the exception under an errorId and answers with a generic 500.
+                notificationService.notify(
+                    requestId = requestId,
+                    session = null,
+                    event = IssuanceSessionEvent.CREDENTIAL_REQUEST_FAILED,
+                    error = OAuthErrorCodes.SERVER_ERROR,
+                    errorDescription = "Issuance session could not be loaded",
+                )
+                throw e
+            }
             val error = OAuthError(OAuthErrorCodes.INVALID_TOKEN, e.message)
             val response = oauth2Provider.writeCredentialError(
                 credentialRequest.withSession(DefaultSession(subject = sessionId)),
@@ -1248,7 +1262,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     requestId,
                     CredentialError(
                         CredentialErrorCodes.INVALID_PROOF,
-                        e.message ?: "Credential proof is invalid",
+                        clientErrorDescription(e, "Credential proof could not be verified"),
                     ),
                 )
             }

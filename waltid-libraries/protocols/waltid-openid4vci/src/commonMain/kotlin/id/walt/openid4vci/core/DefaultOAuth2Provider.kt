@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.errors.clientErrorDescription
 import id.walt.openid4vci.attestation.*
 import id.walt.openid4vci.clientauth.attestation.verifiedClientAttestation
 import id.walt.openid4vci.clientauth.attestation.verifiedClientAuthentication
@@ -437,7 +438,7 @@ class DefaultOAuth2Provider(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            invalidDPoPTokenRequest(e.message ?: "Invalid DPoP proof")
+            invalidDPoPTokenRequest(clientErrorDescription(e, "DPoP proof could not be verified"))
         }
     }
 
@@ -716,7 +717,10 @@ class DefaultOAuth2Provider(
             throw e
         } catch (e: Exception) {
             return CredentialResponseResult.Failure(
-                CredentialError(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, e.message ?: "Credential response encryption failed"),
+                CredentialError(
+                    CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS,
+                    clientErrorDescription(e, "Credential response encryption failed"),
+                ),
             )
         }
         // Encryption may await a remote key provider; validity is checked before returning success.
@@ -805,7 +809,7 @@ class DefaultOAuth2Provider(
             return CredentialRequestResult.Failure(
                 CredentialError(
                     CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
-                    e.message
+                    clientErrorDescription(e, "Credential request could not be decrypted"),
                 )
             )
         }
@@ -972,7 +976,10 @@ class DefaultOAuth2Provider(
         } catch (e: Exception) {
             return writeCredentialError(
                 request,
-                CredentialError(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, e.message ?: "Credential response encryption failed"),
+                CredentialError(
+                    CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS,
+                    clientErrorDescription(e, "Credential response encryption failed"),
+                ),
             )
         }
         return CredentialResponseHttp(status = if (response.isDeferred) 202 else 200, body = body, retryable = response.isDeferred)
@@ -1066,7 +1073,7 @@ class DefaultOAuth2Provider(
             throw e
         } catch (e: Exception) {
             AccessTokenVerification.Failure(
-                invalidAccessToken(e.message ?: "Access token is invalid"),
+                invalidAccessToken(clientErrorDescription(e, "Access token could not be verified")),
             )
         }
     }
@@ -1234,7 +1241,7 @@ class DefaultOAuth2Provider(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            return invalidDPoPProof(e.message ?: "Invalid DPoP proof")
+            return invalidDPoPProof(clientErrorDescription(e, "DPoP proof could not be verified"))
         }
 
         return if (verified.jwkThumbprint == boundJwkThumbprint) {
