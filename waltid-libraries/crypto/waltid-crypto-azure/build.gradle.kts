@@ -14,11 +14,13 @@ kotlin {
 dependencies {
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.junit.jupiter.api)
+    testImplementation(identityLibs.mockk)
 
     testImplementation(identityLibs.kotlinx.coroutines.test)
 
     // walt.id
     api(project(":waltid-libraries:crypto:waltid-crypto"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
 
     // JSON
     implementation(identityLibs.kotlinx.serialization.json)
@@ -58,13 +60,10 @@ configurations.all {
     )
 }
 
-tasks.withType<Test> {
-    enabled = false
-}
-
-
 tasks.test {
     useJUnitPlatform()
+    // This manual smoke test uses a placeholder vault. Live Azure tests run in Enterprise CI.
+    filter { excludeTestsMatching("AzureSDKKeyTest") }
 }
 mavenPublishing {
     pom {
