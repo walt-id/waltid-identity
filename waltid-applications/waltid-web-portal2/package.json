@@ -10,7 +10,7 @@
     "test:proxy": "node --test tests/paymentProxy.test.mjs"
   },
   "dependencies": {
-    "lossless-json": "4.3.3",
+    "lossless-json": "4.3.4",
     "qrcode.vue": "^3.6.0"
   },
   "devDependencies": {
