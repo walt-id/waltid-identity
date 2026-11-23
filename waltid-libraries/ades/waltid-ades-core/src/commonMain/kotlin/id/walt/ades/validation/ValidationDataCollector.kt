@@ -41,7 +41,7 @@ class ValidationDataCollector(
                 if (!isRoot || includeRoot) required.add(c)
                 pool.add(c)
             }
-            if (!chain.last().isSelfIssued && !resolver.isTrustAnchor(chain.last())) missing += "issuer of ${chain.last().subject} not found"
+            if (!resolver.isTrustAnchor(chain.last())) missing += "issuer of ${chain.last().subject} not found"
 
             for (i in 0 until chain.size - 1) {
                 val c = chain[i]

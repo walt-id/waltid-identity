@@ -103,7 +103,7 @@ class PadesValidator(
     }
 
     private fun validationPool(inspection: PdfInspection, field: PdfSignatureField?): ValidationData {
-        val pool = inspection.dss.toValidationData()
+        val pool = inspection.dss.toValidationData().also { it.addAll(policy.additionalValidationData) }
         field?.cms?.let { cms ->
             cms.certificates.forEach(pool::add)
             cms.crls.forEach(pool::add)

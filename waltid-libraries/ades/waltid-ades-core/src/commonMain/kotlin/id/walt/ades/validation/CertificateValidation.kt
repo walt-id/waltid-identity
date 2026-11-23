@@ -5,16 +5,12 @@ import id.walt.ades.transport.AdesTransport
 import id.walt.ades.tsp.TimeStampToken
 import id.walt.ades.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
-import id.walt.certificate.x509.X509Certificate as SharedCertificate
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
-import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.X509CertificateChainValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateAuthorityKeyIdValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateBasicConstraintsValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateCaHasKeyCertSignKeyUsageValidator
 import id.walt.certificate.x509.validation.validator.X509CertificateSignatureValidator
-import id.walt.certificate.x509.validation.validator.X509CertificateValidator
-import id.walt.certificate.x509.validation.validator.X509CertificateValidityValidator
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
@@ -50,6 +46,8 @@ data class ChainValidationResult(
     val chain: List<X509Certificate>,
     val signingCertificateStatus: RevocationStatus?,
     val message: String,
+    /** Status of each non-anchor certificate, including failures hidden by a leaf-level failure. */
+    val certificateStatuses: Map<X509Certificate, RevocationStatus> = emptyMap(),
 ) {
     val passed get() = indication == Indication.PASSED
 }
@@ -63,17 +61,10 @@ class CertificateChainValidator(
     private suspend fun validatePath(chain: List<X509Certificate>, time: Instant): String? {
         val sharedChain = chain.map { it.sharedCertificate }
         val anchors = policy.trustAnchors.map { it.sharedCertificate }
-        val validity = X509CertificateValidityValidator(clock = object : Clock {
-            override fun now() = time
-        })
-        val caValidity = object : X509CertificateValidator by validity {
-            // Shell model: the leaf validity is classified below, while the trust anchor is a policy input.
-            override suspend fun accepts(context: ValidationContext, x509Certificate: SharedCertificate) =
-                !context.isLeaf && context.certificateIndex != 0
-        }
+        // Shell-model validity is classified separately below so trusted historical time can recover expiry.
         val validators = listOf(
             X509CertificateBasicConstraintsValidator(), X509CertificateCaHasKeyCertSignKeyUsageValidator(),
-            X509CertificateAuthorityKeyIdValidator(), X509CertificateSignatureValidator(X509CertificateUtil.Default.services.signatureValidator), caValidity,
+            X509CertificateAuthorityKeyIdValidator(), X509CertificateSignatureValidator(X509CertificateUtil.Default.services.signatureValidator),
         )
         val result = X509CertificateChainValidator(validators, InMemoryTrustStore(anchors))
             .validate(X509CertificateUtil.Default.services.cryptoRuntime, sharedChain)
@@ -82,7 +73,8 @@ class CertificateChainValidator(
 
     fun freshAt(time: Instant): (RevocationStatus) -> Boolean = { status ->
         when (status) {
-            is RevocationStatus.Good -> status.issuedAt >= time - policy.revocationFreshness || (status.nextUpdate != null && status.nextUpdate >= time && status.issuedAt <= time)
+            is RevocationStatus.Good -> status.issuedAt <= time &&
+                (status.nextUpdate?.let { it >= time } ?: (status.issuedAt >= time - policy.revocationFreshness))
             is RevocationStatus.Revoked -> true
             is RevocationStatus.Unknown -> false
         }
@@ -117,41 +109,39 @@ class CertificateChainValidator(
             }
 
             // Revocation checking for every certificate except the anchor and ocsp-nocheck responders
-            var signingStatus: RevocationStatus? = null
+            val statuses = linkedMapOf<X509Certificate, RevocationStatus>()
             for (i in 0 until chain.size - 1) {
                 val cert = chain[i]
                 if (cert.hasOcspNoCheck && Oids.EKU_OCSP_SIGNING in cert.extendedKeyUsage) continue
-                val status = resolver.revocationStatus(cert, chain[i + 1], time, fresh)
-                if (i == 0) signingStatus = status
-                when {
-                    status is RevocationStatus.Revoked && status.revocationTime <= time -> {
-                        if (i == 0) {
-                            return ChainValidationResult(Indication.INDETERMINATE, SubIndication.REVOKED_NO_POE, chain, status,
-                                "signing certificate revoked at ${status.revocationTime} (${status.reason})")
-                        }
-                        last = ChainValidationResult(Indication.INDETERMINATE, SubIndication.REVOKED_CA_NO_POE, chain, signingStatus,
-                            "CA certificate ${cert.subject} revoked at ${status.revocationTime}")
-                        continue@chainLoop
-                    }
-
-                    status is RevocationStatus.Unknown || !fresh(status) -> {
-                        last = ChainValidationResult(Indication.INDETERMINATE, SubIndication.TRY_LATER, chain, signingStatus,
-                            "no fresh revocation information for ${cert.subject}" + ((status as? RevocationStatus.Unknown)?.let { ": ${it.reason}" } ?: ""))
-                        continue@chainLoop
-                    }
-                }
+                statuses[cert] = resolver.revocationStatus(cert, chain[i + 1], time, fresh)
+            }
+            val signingStatus = statuses[certificate]
+            val revoked = statuses.entries.firstOrNull { (_, status) -> status is RevocationStatus.Revoked && status.revocationTime <= time }
+            if (revoked != null) {
+                val status = revoked.value as RevocationStatus.Revoked
+                last = ChainValidationResult(Indication.INDETERMINATE,
+                    if (revoked.key == certificate) SubIndication.REVOKED_NO_POE else SubIndication.REVOKED_CA_NO_POE,
+                    chain, signingStatus, "certificate ${revoked.key.subject} revoked at ${status.revocationTime}", statuses)
+                continue@chainLoop
             }
 
-            // Step 7: validity of the signing certificate at validation time
-            if (!certificate.isValidAt(time)) {
-                val notRevoked = signingStatus is RevocationStatus.Good && signingStatus.issuedAt > certificate.notAfter
-                return ChainValidationResult(
-                    Indication.INDETERMINATE,
+            // Step 7: validity of the signing certificate and every CA at the control time.
+            val expired = chain.dropLast(1).firstOrNull { !it.isValidAt(time) }
+            if (expired != null) {
+                val status = statuses[expired]
+                val notRevoked = status is RevocationStatus.Good && status.issuedAt > expired.notAfter
+                last = ChainValidationResult(Indication.INDETERMINATE,
                     if (notRevoked) SubIndication.OUT_OF_BOUNDS_NOT_REVOKED else SubIndication.OUT_OF_BOUNDS_NO_POE,
-                    chain, signingStatus, "signing certificate validity ${certificate.notBefore}..${certificate.notAfter} does not include $time",
-                )
+                    chain, signingStatus, "certificate ${expired.subject} validity ${expired.notBefore}..${expired.notAfter} does not include $time", statuses)
+                continue@chainLoop
             }
-            return ChainValidationResult(Indication.PASSED, null, chain, signingStatus, "chain of ${chain.size} certificate(s) to ${chain.last().subject}")
+            val missing = statuses.entries.firstOrNull { (_, status) -> status is RevocationStatus.Unknown || !fresh(status) }
+            if (missing != null) {
+                last = ChainValidationResult(Indication.INDETERMINATE, SubIndication.TRY_LATER, chain, signingStatus,
+                    "no fresh revocation information for ${missing.key.subject}" + ((missing.value as? RevocationStatus.Unknown)?.let { ": ${it.reason}" } ?: ""), statuses)
+                continue@chainLoop
+            }
+            return ChainValidationResult(Indication.PASSED, null, chain, signingStatus, "chain of ${chain.size} certificate(s) to ${chain.last().subject}", statuses)
         }
         return last
     }

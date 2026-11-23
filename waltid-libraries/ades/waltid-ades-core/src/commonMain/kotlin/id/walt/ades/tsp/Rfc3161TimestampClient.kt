@@ -29,10 +29,11 @@ class Rfc3161TimestampClient(
         val response = transport.post(url, "application/timestamp-query", request, headers)
         val token = parseResponse(response)
         val tst = TimeStampToken(token)
-        if (!tst.tstInfo.messageImprint.contentEquals(digest)) throw TimestampException("TSA returned a token for a different imprint")
-        if (nonce != null && tst.tstInfo.nonce != null && !tst.tstInfo.nonce.dropWhile { it == 0.toByte() }.toByteArray()
-                .contentEquals(nonce.dropWhile { it == 0.toByte() }.toByteArray())
-        ) throw TimestampException("TSA nonce mismatch")
+        val info = tst.tstInfo
+        if (info.messageImprintAlgorithm != algorithm || !info.messageImprint.contentEquals(digest)) throw TimestampException("TSA returned a token for a different imprint or algorithm")
+        if (policyOid != null && info.policy != policyOid) throw TimestampException("TSA policy mismatch")
+        if (nonce != null && (info.nonce == null || !info.nonce.dropWhile { it == 0.toByte() }.toByteArray()
+                .contentEquals(nonce.dropWhile { it == 0.toByte() }.toByteArray()))) throw TimestampException("TSA nonce missing or mismatched")
         return token
     }
 

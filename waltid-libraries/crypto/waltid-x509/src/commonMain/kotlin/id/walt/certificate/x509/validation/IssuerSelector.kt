@@ -95,9 +95,10 @@ class IssuerSelector(
         if (certificate.data.subjectDn == certificate.data.issuerDn) {
             val fingerprint = certificate.fingerprintSha256
             val samePinned = candidates.filter { it.fingerprintSha256 == fingerprint }
-            return when (samePinned.size) {
-                0 -> IssuerSelection.NoMatch(candidates)
-                else -> IssuerSelection.Selected(samePinned.first())
+            if (samePinned.isNotEmpty()) return IssuerSelection.Selected(samePinned.first())
+            // A same-name certificate signed by a different trusted key is a rollover link, not a self-signature.
+            if (candidates.any { it.data.subjectPublicKeyInfo.keyId == certificate.data.subjectPublicKeyInfo.keyId }) {
+                return IssuerSelection.NoMatch(candidates)
             }
         }
 

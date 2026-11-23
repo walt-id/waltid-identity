@@ -54,6 +54,23 @@ class X509Crl(encoded: ByteArray) {
     val authorityKeyIdentifier: ByteArray? = extensions.firstOrNull { it.child(0).asOid() == Oids.EXT_AUTHORITY_KEY_ID }
         ?.let { Der.parse(it.children.last().asOctetString()).contextChild(0)?.content }
 
+    /** RFC 5280 6.3.3: a scoped CRL cannot establish good standing outside its covered certificate class/reasons. */
+    fun covers(certificate: X509Certificate): Boolean {
+        val known = setOf(Oids.EXT_CRL_NUMBER, Oids.EXT_AUTHORITY_KEY_ID, "2.5.29.28")
+        if (extensions.any { it.children.size == 3 && it.child(1).asBoolean() && it.child(0).asOid() !in known }) return false
+        val scope = extensions.firstOrNull { it.child(0).asOid() == "2.5.29.28" }
+            ?.let { Der.parse(it.children.last().asOctetString()).expectSequence() } ?: return true
+        // Distribution-point names, partial reasons, indirect and attribute-certificate CRLs need additional processing.
+        if (scope.children.any { !it.isContext(1) && !it.isContext(2) }) return false
+        fun flag(index: Int): Boolean = scope.contextChild(index)?.let {
+            require(it.content.size == 1 && it.content[0] in listOf(0.toByte(), 0xff.toByte())) { "Malformed issuing-distribution-point flag" }
+            it.content[0] != 0.toByte()
+        } ?: false
+        val users = flag(1)
+        val cas = flag(2)
+        return !(users && cas) && (!users || !certificate.isCa) && (!cas || certificate.isCa)
+    }
+
     fun entryFor(certificate: X509Certificate): RevokedEntry? =
         revoked.firstOrNull { it.serialNumber.contentEquals(certificate.serialNumber) }
 

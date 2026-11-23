@@ -19,6 +19,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":waltid-libraries:waltid-json-canonicalization"))
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
 
@@ -48,12 +49,6 @@ kotlin {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
-        val jvmAndroidMain = getByName("jvmAndroidMain") {
-            dependencies {
-                // Json canonicalization
-                implementation(identityLibs.java.json.canonicalization)
-            }
-        }
         jvmMain.dependencies {
             // Ktor client
             implementation(identityLibs.ktor.client.java)
@@ -76,7 +71,6 @@ kotlin {
         jsMain.dependencies {
             implementation(identityLibs.ktor.client.js)
 
-            implementation(npm("canonicalize", identityLibs.versions.canonicalize.npm.get()))
             implementation(npm("uuid", identityLibs.versions.uuid.npm.get()))
         }
     }

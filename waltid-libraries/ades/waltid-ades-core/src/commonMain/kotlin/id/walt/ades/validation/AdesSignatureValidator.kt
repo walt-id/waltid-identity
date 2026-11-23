@@ -142,20 +142,26 @@ class AdesSignatureValidator(private val policy: AdesValidationPolicy) {
         // Expired signing/CA certificates protected by POE: past certificate validation at best-signature-time (5.6.2.1)
         if (x509.subIndication in setOf(SubIndication.OUT_OF_BOUNDS_NO_POE, SubIndication.OUT_OF_BOUNDS_NOT_REVOKED, SubIndication.CERTIFICATE_CHAIN_GENERAL_FAILURE) && best < now) {
             val past = chainValidator.validate(signer, best, fresh = { it !is RevocationStatus.Unknown })
-            if (past.passed) {
-                checks += ValidationCheck("x509:past-validation", CheckStatus.PASSED, "chain valid at best-signature-time $best", "EN 319 102-1 5.6.2.1")
-                x509 = past
-            }
+            if (!past.passed) return result(past.indication.toTotal(), past.subIndication, past.chain, best)
+            checks += ValidationCheck("x509:past-validation", CheckStatus.PASSED, "chain valid at best-signature-time $best", "EN 319 102-1 5.6.2.1")
+            x509 = past
+        }
+
+        if (!x509.passed && x509.subIndication in setOf(SubIndication.OUT_OF_BOUNDS_NO_POE, SubIndication.OUT_OF_BOUNDS_NOT_REVOKED)) {
+            if (best < signer.notBefore) return result(Indication.TOTAL_FAILED, SubIndication.NOT_YET_VALID, x509.chain, best)
+            return result(Indication.INDETERMINATE, x509.subIndication, x509.chain, best)
         }
 
         // 5.5.4 step 4: comparing times
         when (x509.subIndication) {
             SubIndication.REVOKED_NO_POE, SubIndication.REVOKED_CA_NO_POE -> {
-                val revocationTime = (x509.signingCertificateStatus as? RevocationStatus.Revoked)?.revocationTime
-                if (revocationTime == null || revocationTime <= best) return result(Indication.INDETERMINATE, x509.subIndication, x509.chain, best)
-                if (best < signer.notBefore) return result(Indication.TOTAL_FAILED, SubIndication.NOT_YET_VALID, x509.chain, best)
-                if (best > signer.notAfter) return result(Indication.INDETERMINATE, SubIndication.OUT_OF_BOUNDS_NOT_REVOKED, x509.chain, best)
-                checks += ValidationCheck("x509:revocation-poe", CheckStatus.PASSED, "signature existed at $best, before revocation at $revocationTime", "EN 319 102-1 5.5.4")
+                // A timestamp cannot clear one certificate's revocation without establishing the rest of the path.
+                if (best >= now) return result(Indication.INDETERMINATE, x509.subIndication, x509.chain, best)
+                val past = chainValidator.validate(signer, best, fresh = { it !is RevocationStatus.Unknown })
+                if (!past.passed) return result(past.indication.toTotal(), past.subIndication, past.chain, best)
+                checks += ValidationCheck("x509:revocation-poe", CheckStatus.PASSED,
+                    "entire certificate path valid at best-signature-time $best", "EN 319 102-1 5.5.4")
+                x509 = past
             }
 
             null, SubIndication.OUT_OF_BOUNDS_NO_POE -> {

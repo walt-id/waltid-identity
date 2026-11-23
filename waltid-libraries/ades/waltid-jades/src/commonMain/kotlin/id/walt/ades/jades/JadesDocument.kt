@@ -90,7 +90,7 @@ class JadesSignature(
 
 /**
  * A parsed JWS / JAdES document. [payloadSegment] is the JWS Payload as it appears in the serialization (base64url
- * encoded, or the raw payload when b64=false); null or empty when detached.
+ * encoded, or the raw payload when b64=false); null when detached in JSON, or empty in ambiguous compact serialization.
  */
 class JadesDocument(
     val payloadSegment: String?,
@@ -102,7 +102,7 @@ class JadesDocument(
         require(serialization == JadesSerialization.JSON_GENERAL || signatures.size == 1) { "$serialization carries exactly one signature" }
     }
 
-    val isDetached: Boolean get() = payloadSegment.isNullOrEmpty()
+    val isDetached: Boolean get() = payloadSegment == null || (serialization == JadesSerialization.COMPACT && payloadSegment.isEmpty())
 
     fun withSignature(index: Int, signature: JadesSignature) =
         JadesDocument(payloadSegment, signatures.toMutableList().also { it[index] = signature }, serialization)

@@ -19,9 +19,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import org.apache.pdfbox.Loader
+import org.apache.pdfbox.cos.COSArray
+import org.apache.pdfbox.cos.COSObject
 import org.apache.pdfbox.cos.COSDictionary
 import org.apache.pdfbox.cos.COSName
 import org.apache.pdfbox.cos.COSStream
+import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.pdmodel.PDPage
 import org.apache.pdfbox.pdmodel.PDPageContentStream
 import org.apache.pdfbox.pdmodel.PDResources
 import org.apache.pdfbox.pdmodel.common.PDRectangle
@@ -246,6 +250,27 @@ class PadesModificationTest {
                 PadesSigner(broken).sign(samplePdf(), pki.credentials(), PadesSignatureParameters(level = AdesLevel.B_T, timestampMode = mode))
             }
         }
+    }
+
+    @Test
+    fun indirectPageTreeKidsCannotBeReordered() = runTest {
+        val pdf = PDDocument().use { doc ->
+            doc.addPage(PDPage()); doc.addPage(PDPage())
+            val pages = doc.pages.cosObject
+            pages.setItem(COSName.KIDS, COSObject(pages.getDictionaryObject(COSName.KIDS)))
+            ByteArrayOutputStream().also { doc.save(it) }.toByteArray()
+        }
+        val signed = signer.sign(pdf, pki.credentials())
+        assertEquals(Indication.TOTAL_PASSED, validator.validate(signed).indication)
+        val reordered = Loader.loadPDF(signed).use { doc ->
+            assertTrue(doc.pages.cosObject.getItem(COSName.KIDS) is COSObject)
+            val kids = doc.pages.cosObject.getDictionaryObject(COSName.KIDS) as COSArray
+            val first = kids.get(0)
+            kids.set(0, kids.get(1)); kids.set(1, first)
+            kids.isNeedToBeUpdated = true
+            ByteArrayOutputStream().also { doc.saveIncremental(it) }.toByteArray()
+        }
+        assertEquals(Indication.TOTAL_FAILED, validator.validate(reordered).indication)
     }
 
     private fun rewriteContents(pdf: ByteArray, mutate: (ByteArray) -> ByteArray): ByteArray {

@@ -130,6 +130,7 @@ val modules = listOfNotNull(
     "$libraries:waltid-did",
     "$libraries:waltid-java-compat",
     "$libraries:waltid-library-commons",
+    "$libraries:waltid-json-canonicalization",
     "$libraries:waltid-usage-examples",
 
     // Service commons

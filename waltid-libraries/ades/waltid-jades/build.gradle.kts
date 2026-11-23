@@ -12,6 +12,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":waltid-libraries:waltid-json-canonicalization"))
             api(project(":waltid-libraries:ades:waltid-ades-core"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.oshai.kotlinlogging)

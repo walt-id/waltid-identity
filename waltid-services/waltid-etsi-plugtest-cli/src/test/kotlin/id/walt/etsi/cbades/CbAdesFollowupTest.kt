@@ -1,6 +1,7 @@
 package id.walt.etsi.cbades
 
 import com.github.ajalt.clikt.core.parse
+import id.walt.ades.asn1.Der
 import id.walt.ades.cbades.CbAdesComponents
 import id.walt.ades.cbades.CbAdesLabels
 import id.walt.ades.cbades.CbAdesSignatureParameters
@@ -115,6 +116,10 @@ class CbAdesFollowupTest {
     fun portalDataUsesCorrectedPolicyOid() = runTest {
         val data = CbAdesPlugtestGenerator.loadData(File("testcases/cbades/Data"))
         assertEquals("urn:oid:0.4.0.19102.1.1.1", data.signaturePolicyId)
+        // Independently pinned published ETSI policy, retrieved 2026-11-23, not recomputed from a second fixture.
+        assertEquals("d67ca4ff97234fa7dc1396d874afa9cb77cc030f77f95329501eece09076faab",
+            AdesDigestAlgorithm.SHA256.digest(data.signaturePolicy).toHexString())
+        assertEquals(data.signaturePolicyId.removePrefix("urn:oid:"), Der.parse(data.signaturePolicy).child(1).child(0).child(0).child(0).asOid())
         val dir = Files.createTempDirectory("cbades-policy-test").toFile()
         try {
             val pki = LocalPlugtestPki(dir, "TEST")

@@ -82,7 +82,7 @@ class ValidationDataResolver(
 
     suspend fun issuersOf(cert: X509Certificate): List<X509Certificate> {
         val local = (pool.certificates + trustAnchors).distinct().filter { it != cert || cert.isSelfIssued }.filter { cert.isIssuedBy(it) }
-        if (local.isNotEmpty() || cert.isSelfIssued || !fetchOnline) return local
+        if (local.isNotEmpty() || !fetchOnline) return local
         for (url in cert.caIssuersUrls.filter { it.startsWith("http") }) {
             val fetched = fetch(url) { transport!!.get(url) } ?: continue
             val certs = runCatching { parseCertificates(fetched) }.getOrElse { emptyList() }
@@ -101,7 +101,6 @@ class ValidationDataResolver(
                 result += chain; return
             }
             if (chain.size >= maxDepth) return
-            if (last.isSelfIssued) return
             for (issuer in issuersOf(last)) if (issuer !in chain) walk(chain + issuer)
         }
         walk(listOf(cert))
@@ -113,7 +112,7 @@ class ValidationDataResolver(
         val chain = mutableListOf(cert)
         while (chain.size < 10) {
             val last = chain.last()
-            if (last.isSelfIssued || isTrustAnchor(last)) break
+            if (isTrustAnchor(last)) break
             val issuer = issuersOf(last).firstOrNull { it !in chain } ?: break
             chain += issuer
         }
@@ -156,6 +155,19 @@ class ValidationDataResolver(
         val signer = ocsp.findSigner(pool.certificates + issuer) ?: return null.also { log.debug { "OCSP signer not found for ${cert.subject}" } }
         val authorized = signer == issuer || (signer.isIssuedBy(issuer) && Oids.EKU_OCSP_SIGNING in signer.extendedKeyUsage)
         if (!authorized || !ocsp.verifySignature(signer)) return null
+        if (signer != issuer) {
+            val produced = ocsp.producedAt
+            if (!signer.isValidAt(produced)) return null
+            if (!signer.hasOcspNoCheck) {
+                // Check a delegated responder using issuer CRLs, without recursively trusting another OCSP responder.
+                val statuses = pool.crls.mapNotNull { crlStatus(it, signer, issuer) }.toMutableList()
+                if (fetchOnline && statuses.none { it is RevocationStatus.Good && it.issuedAt <= produced && it.nextUpdate?.let { end -> end >= produced } == true }) {
+                    fetchCrl(signer, issuer)?.let(statuses::add)
+                }
+                if (statuses.any { it is RevocationStatus.Revoked && it.revocationTime <= produced } ||
+                    statuses.none { it is RevocationStatus.Good && it.issuedAt <= produced && it.nextUpdate?.let { end -> end >= produced } == true }) return null
+            }
+        }
         signer.takeIf { it != issuer }?.let(pool::add)
         return when (val s = single.status) {
             OcspCertStatus.Good -> RevocationStatus.Good(ocsp, single.thisUpdate, single.nextUpdate)
@@ -165,7 +177,7 @@ class ValidationDataResolver(
     }
 
     suspend fun crlStatus(crl: X509Crl, cert: X509Certificate, issuer: X509Certificate): RevocationStatus? {
-        if (!crl.issuer.matches(cert.issuer) || crl.isDelta) return null
+        if (!crl.issuer.matches(cert.issuer) || crl.isDelta || !runCatching { crl.covers(cert) }.getOrDefault(false)) return null
         if (!crl.verifySignature(issuer)) return null
         val entry = crl.entryFor(cert)
         return if (entry != null && entry.reason != RevocationReason.REMOVE_FROM_CRL) {

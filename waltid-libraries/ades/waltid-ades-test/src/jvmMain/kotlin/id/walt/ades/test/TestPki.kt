@@ -156,7 +156,8 @@ class TestPki(
         KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
     } else KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
 
-    private fun issue(
+    /** Issues an additional certificate under this in-process PKI, including rollover and historical test cases. */
+    fun issue(
         dn: String,
         issuer: TestEntity?,
         ca: Boolean = false,

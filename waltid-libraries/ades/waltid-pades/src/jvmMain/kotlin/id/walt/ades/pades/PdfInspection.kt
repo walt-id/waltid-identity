@@ -305,7 +305,8 @@ internal object PdfRevisionDiff {
                 kinds += ChangeKind.DSS; continue
             }
             val annotationArray = key in update.annotationArrays
-            val problem = changeProblem(oldObject, newObject, update, annotationArray)
+            val problem = changeProblem(oldObject, newObject, update, annotationArray,
+                signatureArray = annotationArray || key in update.fieldArrays)
             if (problem == null && update.isFormField(newObject)) kinds += ChangeKind.FORM_FILL
             if (problem == null && update.isAnnotation(newObject)) kinds += ChangeKind.ANNOTATION
             if (problem != null) other("object ${key.number} ${key.generation}: $problem")
@@ -320,6 +321,8 @@ internal object PdfRevisionDiff {
         val fields = document.signatureFields.map { it.cosObject }.toSet()
         val formFields = PdfPermissions.formFields(document).values.map { it.cosObject }.toSet() - fields
         val annotations = document.pages.flatMap { it.annotations }.map { it.cosObject }.toSet()
+        val fieldArrays = listOfNotNull((document.documentCatalog.cosObject.getDictionaryObject(COSName.ACRO_FORM) as? COSDictionary)
+            ?.getItem(COSName.FIELDS) as? COSObject).map { it.reference() }.toSet()
         val annotationArrays = document.pages.mapNotNull { (it.cosObject.getItem(COSName.ANNOTS) as? COSObject)?.reference() }.toSet()
         fun isFormField(item: COSBase?) = permission in 2..3 && item in formFields
         fun isAnnotation(item: COSBase?) = permission == 3 && item in annotations &&
@@ -336,8 +339,8 @@ internal object PdfRevisionDiff {
         (a.keySet() + b.keySet()).filter { !same(a.getItem(it), b.getItem(it)) }.toSet()
 
     /** Null when the modification of an existing object is one of those allowed after signing. */
-    private fun changeProblem(old: COSBase?, new: COSBase?, update: SignatureUpdate, annotations: Boolean = false): String? {
-        if (old is COSArray && new is COSArray) return arrayGrowthProblem(old, new, update, annotations)
+    private fun changeProblem(old: COSBase?, new: COSBase?, update: SignatureUpdate, annotations: Boolean = false, signatureArray: Boolean = false): String? {
+        if (old is COSArray && new is COSArray) return if (signatureArray) arrayGrowthProblem(old, new, update, annotations) else "ordinary array modified"
         if (old !is COSDictionary || new !is COSDictionary || old is COSStream || new is COSStream) return "content modified"
         val diff = differingKeys(old, new)
         val type = new.getCOSName(COSName.TYPE)

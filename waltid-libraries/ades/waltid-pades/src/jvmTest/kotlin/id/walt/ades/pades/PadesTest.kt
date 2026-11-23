@@ -16,6 +16,7 @@ import id.walt.ades.validation.CheckStatus
 import id.walt.ades.validation.DocumentValidationResult
 import id.walt.ades.validation.Indication
 import id.walt.ades.validation.SubIndication
+import id.walt.ades.validation.ValidationData
 import id.walt.ades.validation.ValidationDataCollector
 import id.walt.ades.x509.X509Certificate
 import java.io.ByteArrayOutputStream
@@ -391,6 +392,17 @@ class PadesTest {
     }
 
     /** Replaces the DER object in /Contents of the [index]-th signature field (ByteRange order) without touching signed bytes. */
+    @Test
+    fun offlineDocumentTimestampUsesCallerSuppliedRevocationData() = runTest {
+        val signed = signer.sign(samplePdf(), pki.credentials(), PadesSignatureParameters(level = AdesLevel.B_T, timestampMode = PadesTimestampMode.DOCUMENT_TIMESTAMP))
+        val extra = collector.collect(listOf(pki.signer.certificate, pki.tsa.certificate),
+            ValidationData(certificates = listOf(pki.issuingCa.certificate))).required
+        val policy = AdesValidationPolicy(listOf(pki.root.certificate), strictTimestamps = true, additionalValidationData = extra)
+        val result = validate(signed, policy)
+        assertPassed(result, AdesLevel.B_T)
+        assertTrue(result.documentChecks.any { it.id.startsWith("pdf:document-timestamp") && it.status == CheckStatus.PASSED })
+    }
+
     private fun rewriteContents(pdf: ByteArray, index: Int, mutate: (ByteArray) -> ByteArray): ByteArray {
         val br = Loader.loadPDF(pdf).use { doc -> doc.signatureDictionaries.sortedBy { it.byteRange[2] }[index].byteRange }
         val start = br[1] + 1

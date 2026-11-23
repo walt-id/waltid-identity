@@ -10,6 +10,7 @@ group = "id.walt.openid4vci"
 kotlin {
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":waltid-libraries:waltid-json-canonicalization"))
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
 
