@@ -11,6 +11,7 @@ import id.walt.issuer2.application.Issuer2Module
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.loadIssuer2ConfigFiles
 import id.walt.issuer2.service.IssuanceSessionService
 import kotlinx.coroutines.*
@@ -66,6 +67,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.testcontainers.containers.GenericContainer
@@ -85,6 +87,9 @@ class ConfiguredRedisRepositoryTest {
             .withExposedPorts(6379)
             .waitingFor(Wait.forSuccessfulCommand("redis-cli ping"))
     }
+
+    @AfterEach
+    fun clear() = clearIssuer2TestEnvironment()
 
     @Test
     fun statusReservationsAreAtomicPermanentAndRecoverAcrossRepositoryInstances() = runTest {

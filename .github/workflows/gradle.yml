@@ -195,18 +195,6 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
 
-      - name: Test issuer2 with Redis
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.gradle-setup.outcome == 'success' }}
-        env:
-          CI: "true"
-          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-        run: |
-          reports=waltid-identity/waltid-services/waltid-issuer-api2/build/test-results/redisTest
-          rm -rf -- "$reports"
-          ./gradlew :waltid-services:waltid-issuer-api2:redisTest --rerun --console=plain
-          python3 waltid-identity/.github/scripts/mobile-ci/verify_test_results.py --reports "$reports/*.xml"
-
       - name: Require public SD-JWT payment acceptance
         if: ${{ !cancelled() && inputs.run-payment-demo && steps.gradle-setup.outcome == 'success' }}
         timeout-minutes: 20
@@ -241,11 +229,16 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Require portable JVM and JS test results
+      - name: Require JVM, JS and issuer2 Redis test results
         if: always()
         run: |
           python3 waltid-identity/.github/scripts/mobile-ci/verify_platform_test_results.py --platform jvm
           python3 waltid-identity/.github/scripts/mobile-ci/verify_platform_test_results.py --platform js-node
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            reports=waltid-identity/waltid-services/waltid-issuer-api2/build/test-results/test
+            python3 waltid-identity/.github/scripts/mobile-ci/verify_test_results.py \
+              --reports "$reports/TEST-id.walt.issuer2.repository.ConfiguredRedisRepositoryTest.xml"
+          fi
 
       - name: Require portable Android host test results
         if: ${{ always() && inputs.enable-android-build }}

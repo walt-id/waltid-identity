@@ -590,11 +590,8 @@ type = "redis"
 nodes = [{ host = "127.0.0.1", port = 6379 }]
 ```
 
-The dedicated Redis repository suite uses Testcontainers to start and stop Redis 7. With Docker running, execute:
-
-```bash
-./gradlew :waltid-services:waltid-issuer-api2:redisTest
-```
+The standard issuer2 test task uses Testcontainers to start and stop Redis 7. Run it with Docker running.
+For a local run without Docker, pass `-PskipIssuer2RedisTests=true` to skip the Redis tests.
 
 ## Building and Testing
 

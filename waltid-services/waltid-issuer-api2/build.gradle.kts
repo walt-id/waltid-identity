@@ -133,10 +133,15 @@ val installPlaywrightBrowsers = tasks.register<JavaExec>("installPlaywrightBrows
 }
 
 tasks.test {
+    val skipRedisTests = providers.gradleProperty("skipIssuer2RedisTests").orNull.toBoolean()
+    val runningInCi = providers.environmentVariable("CI").orNull.toBoolean()
     dependsOn(installPlaywrightBrowsers)
     useJUnitPlatform {
-        excludeTags("redis", "live-payment")
+        excludeTags("live-payment")
+        if (skipRedisTests) excludeTags("redis")
     }
+    // CI verifies a fresh Redis test report from this task.
+    outputs.upToDateWhen { !runningInCi }
 }
 
 tasks.register<JavaExec>("verifyPlaywrightBrowser") {
@@ -157,19 +162,6 @@ tasks.register<Test>("browserTest") {
 
     useJUnitPlatform {
         includeTags("browser")
-    }
-    shouldRunAfter(tasks.test)
-}
-
-tasks.register<Test>("redisTest") {
-    description = "Runs issuer2 Redis-backed repository tests with Testcontainers. Requires Docker."
-    group = "verification"
-
-    testClassesDirs = sourceSets["test"].output.classesDirs
-    classpath = sourceSets["test"].runtimeClasspath
-
-    useJUnitPlatform {
-        includeTags("redis")
     }
     shouldRunAfter(tasks.test)
 }
