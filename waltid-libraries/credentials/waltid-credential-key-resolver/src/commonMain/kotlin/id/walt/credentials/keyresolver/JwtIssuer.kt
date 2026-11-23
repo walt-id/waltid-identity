@@ -14,7 +14,7 @@ fun resolveJwtIssuer(payload: JsonObject): String? {
     }
     val outer = identity(payload["iss"])
     val vc = (payload["vc"] as? JsonObject)?.takeIf { "@context" in it || "type" in it }
-    val w3c = vc ?: payload.takeIf { "@context" in it || "type" in it }
+    val w3c = if ("vct" in payload) null else vc ?: payload.takeIf { "@context" in it || "type" in it }
     val inner = identity(w3c?.get("issuer"))
     require(outer == null || inner == null || outer == inner) { "Conflicting JWT and credential issuer claims" }
     return outer ?: inner ?: identity(payload["issuer"])
