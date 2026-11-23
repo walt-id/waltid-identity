@@ -20,11 +20,13 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
+import id.walt.did.dids.Crypto2DidService
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
 import id.walt.openid4vci.handlers.credential.SdJwtVcMetadataResolver
 import id.walt.openid4vci.handlers.credential.SdJwtVcMetadataContext
+import id.walt.openid4vci.handlers.credential.W3cJwtVcCredentialSigner
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceBatch
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
@@ -39,6 +41,7 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.proofs.VerifiedJwtProof
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
@@ -67,6 +70,31 @@ import kotlin.time.Instant
 
 class ProviderCredentialIssuanceTest {
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+
+    @Test
+    fun `W3C signer exposes the selected holder key to a mapped claim`() = runBlocking {
+        suspend fun key(id: String) = crypto2Runtime.generateSoftwareKey(
+            GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+        )
+        val holder = key("wallet")
+        val issuer = key("issuer")
+        val signed = W3cJwtVcCredentialSigner.generateW3CJwtVC(
+            verifiedBinding = VerifiedCredentialBinding(holderKey = holder),
+            credentialData = buildJsonObject {
+                putJsonArray("@context") { add("https://www.w3.org/2018/credentials/v1") }
+                putJsonArray("type") { add("VerifiableCredential") }
+                putJsonObject("credentialSubject") { put("name", "Alice") }
+            },
+            issuerKey = issuer,
+            algorithm = JwsAlgorithm.ES256,
+            issuerId = "https://issuer.example",
+            dataMapping = buildJsonObject { putJsonObject("credentialSubject") { put("keyReference", "<context:subjectDid>") } },
+        )
+        val payload = CompactJws.verify(signed, issuer, JwsAlgorithm.ES256).payload
+        val vc = Json.parseToJsonElement(payload.decodeToString()).jsonObject.getValue("vc").jsonObject
+        val reference = vc.getValue("credentialSubject").jsonObject.getValue("keyReference").jsonPrimitive.content
+        assertEquals(Crypto2DidService.registerByKey(holder).did, reference)
+    }
 
     @Test
     fun `unsupported credential handler is rejected`() = runBlocking {
