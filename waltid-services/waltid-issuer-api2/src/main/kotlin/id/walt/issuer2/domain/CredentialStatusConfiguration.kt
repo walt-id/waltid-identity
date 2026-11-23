@@ -18,7 +18,11 @@ sealed interface CredentialStatusConfiguration {
 
     data class Group(val statuses: JsonArray, val references: Set<String>)
 
+    private data class TokenStatusReference(val uri: URI, val index: ULong)
+
     companion object {
+        private val percentEscape = Regex("%[0-9A-Fa-f]{2}")
+
         fun credentialValue(group: JsonArray, format: CredentialFormat): JsonElement =
             if (format == CredentialFormat.SD_JWT_VC || format == CredentialFormat.MSO_MDOC) group.single()
             else group
@@ -63,8 +67,9 @@ sealed interface CredentialStatusConfiguration {
 
         private fun references(status: JsonObject, format: CredentialFormat): List<String> {
             if (format == CredentialFormat.SD_JWT_VC || format == CredentialFormat.MSO_MDOC) {
-                val list = tokenStatusList(status)
-                return listOf(reference(list.uri, list.index.toString()))
+                val list = tokenStatusReference(status)
+                val uri = if (format == CredentialFormat.MSO_MDOC) URI(mdocStatusListUri(list.uri).string) else list.uri
+                return listOf(reference(uri, list.index.toString()))
             }
             require(status["type"]?.jsonPrimitive?.content in setOf("BitstringStatusListEntry", "StatusList2021Entry")) {
                 "Unsupported preallocated W3C status type"
@@ -79,7 +84,7 @@ sealed interface CredentialStatusConfiguration {
             }
             val canonicalIndex = index.content.trimStart('0').ifEmpty { "0" }
             return buildList {
-                add(reference(uri(status["statusListCredential"], "statusListCredential"), canonicalIndex))
+                add(reference(statusListUri(status["statusListCredential"], "statusListCredential"), canonicalIndex))
                 status["id"]?.let {
                     val id = (it as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.content
                     require(!id.isNullOrBlank()) { "W3C status id must be a non-empty string" }
@@ -89,14 +94,19 @@ sealed interface CredentialStatusConfiguration {
         }
 
         internal fun tokenStatusList(status: JsonElement): StatusListInfo {
+            val list = tokenStatusReference(status)
+            return StatusListInfo(list.index, mdocStatusListUri(list.uri))
+        }
+
+        private fun tokenStatusReference(status: JsonElement): TokenStatusReference {
             val list = (status as? JsonObject)?.get("status_list") as? JsonObject
                 ?: throw IllegalArgumentException("Preallocated status requires status_list")
             val index = (list["idx"] as? JsonPrimitive)?.takeUnless { it.isString }?.content?.toULongOrNull()
             requireNotNull(index) { "status_list.idx must be an unsigned integer" }
-            return StatusListInfo(index, uri(list["uri"], "status_list.uri"))
+            return TokenStatusReference(statusListUri(list["uri"], "status_list.uri"), index)
         }
 
-        private fun uri(value: JsonElement?, field: String): UniformResourceIdentifier {
+        private fun statusListUri(value: JsonElement?, field: String): URI {
             val text = (value as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.content
             val uri = try {
                 text?.let(::URI)
@@ -106,19 +116,59 @@ sealed interface CredentialStatusConfiguration {
             require(uri?.host != null && (uri.scheme.equals("https", true) || uri.scheme.equals("http", true))) {
                 "$field must be an absolute HTTP(S) URI"
             }
-            // Use the mdoc serializer's URL representation for ownership across all formats.
+            require(uri.port <= 65535) { "$field must have a valid port" }
+            return uri
+        }
+
+        private fun mdocStatusListUri(uri: URI): UniformResourceIdentifier {
             val url = try {
                 URLBuilder(uri.toString())
             } catch (e: URLParserException) {
-                throw IllegalArgumentException("$field is not a valid HTTP(S) URL", e)
+                throw IllegalArgumentException("status_list.uri is not a valid HTTP(S) URL", e)
             }
             url.host = url.host.lowercase()
             if (url.encodedPath.isEmpty()) url.encodedPath = "/"
             return UniformResourceIdentifier(url.build())
         }
 
-        private fun reference(uri: UniformResourceIdentifier, index: String): String =
-            "list:" + JsonArray(listOf(JsonPrimitive(uri.string), JsonPrimitive(index))).toString()
+        private fun reference(uri: URI, index: String): String {
+            val scheme = uri.scheme.lowercase()
+            val defaultPort = if (scheme == "https") 443 else 80
+            // Use raw components so query order and reserved delimiters remain significant.
+            val ownershipUri = buildString {
+                append(scheme).append("://")
+                uri.rawUserInfo?.let { append(normalizePercentEscapes(it)).append('@') }
+                append(uri.host.lowercase())
+                if (uri.port != -1 && uri.port != defaultPort) append(':').append(uri.port)
+                append(canonicalStatusListPath(uri.rawPath))
+                uri.rawQuery?.let { append('?').append(normalizePercentEscapes(it)) }
+                uri.rawFragment?.let { append('#').append(normalizePercentEscapes(it)) }
+            }
+            return "list:" + JsonArray(listOf(JsonPrimitive(ownershipUri), JsonPrimitive(index))).toString()
+        }
+
+        private fun normalizePercentEscapes(component: String): String =
+            percentEscape.replace(component) { match ->
+                when (val decoded = match.value.substring(1).toInt(16).toChar()) {
+                    in 'a'..'z', in 'A'..'Z', in '0'..'9', '-', '.', '_', '~' -> decoded.toString()
+                    else -> match.value.uppercase()
+                }
+            }
+
+        // Decode unreserved escapes first so literal and percent-encoded dot segments compare alike.
+        private fun canonicalStatusListPath(path: String): String {
+            val normalized = normalizePercentEscapes(path)
+            val segments = mutableListOf<String>()
+            for (segment in normalized.split('/')) {
+                when (segment) {
+                    "." -> Unit
+                    ".." -> if (segments.size > 1) segments.removeAt(segments.lastIndex)
+                    else -> segments.add(segment)
+                }
+            }
+            if (normalized.endsWith("/.") || normalized.endsWith("/..")) segments.add("")
+            return segments.joinToString("/").ifEmpty { "/" }
+        }
 
         internal fun validateMapping(format: CredentialFormat, mapping: JsonObject?) {
             if (format == CredentialFormat.MSO_MDOC) return

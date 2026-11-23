@@ -141,6 +141,31 @@ class ConfiguredRedisRepositoryTest {
     }
 
     @Test
+    fun dotSegmentAliasesCannotSpendAnIndexInAnotherProfile() = runTest {
+        withStatusLedger { redis, storage, keys ->
+            val repository = ConfiguredCredentialStatusConsumptionRepository(storage)
+            val deadline = Clock.System.now() + 1.days
+            val original = tokenStatus(7, "https://status.example.com/list")
+            val alias = tokenStatus(7, "https://status.example.com/unused/../list")
+            fun groups(vararg values: JsonObject) = assertIs<CredentialStatusConfiguration.Preallocated>(
+                CredentialStatusConfiguration.parse(JsonArray(values.toList()), CredentialFormat.SD_JWT_VC),
+            ).groups
+
+            assertEquals(listOf(JsonArray(listOf(original))), repository.reserve(
+                "first-profile", "first-request", listOf("first-key"), groups(original), deadline,
+            ))
+            assertFailsWith<CredentialStatusCapacityException> {
+                repository.reserve("second-profile", "second-request", listOf("second-key"), groups(alias), deadline)
+            }
+            val next = tokenStatus(8, "https://status.example.com/unused/%2E%2e/list")
+            assertEquals(listOf(JsonArray(listOf(next))), repository.reserve(
+                "second-profile", "second-request", listOf("second-key"), groups(alias, next), deadline,
+            ))
+            assertEquals(4L, redis.hlen(keys.records))
+        }
+    }
+
+    @Test
     fun statusBatchesPreserveUnsignedIndexesAcrossDifferentLists() = runTest {
         withStatusLedger { redis, storage, keys ->
             val values = JsonArray(listOf("https://status.example.com/A", "https://status.example.com/B").map { uri ->

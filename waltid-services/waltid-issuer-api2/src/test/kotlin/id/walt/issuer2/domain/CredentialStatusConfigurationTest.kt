@@ -49,6 +49,41 @@ class CredentialStatusConfigurationTest {
     }
 
     @Test
+    fun statusListUriAliasesAreDuplicatesWithinOneInventory() {
+        val host = "https://status.example.com"
+        for ((path, aliasPath) in listOf(
+            "/list" to "/unused/../list",
+            "/list" to "/unused/%2e%2E/%6cist",
+            "/list" to "/./list",
+            "/list?scope=a" to "/list?scope=%61",
+            "/list?scope=%2F" to "/list?scope=%2f",
+        )) {
+            val url = host + path
+            val alias = host + aliasPath
+            for (format in listOf(CredentialFormat.SD_JWT_VC, CredentialFormat.MSO_MDOC, CredentialFormat.JWT_VC_JSON)) {
+                val inventory = if (format == CredentialFormat.JWT_VC_JSON) {
+                    JsonArray(listOf(url, alias).map {
+                        JsonArray(listOf(JsonObject(w3cStatus(7) - "id" + ("statusListCredential" to JsonPrimitive(it)))))
+                    })
+                } else {
+                    JsonArray(listOf(tokenStatus(7, url), tokenStatus(7, alias)))
+                }
+
+                val error = assertFailsWith<IllegalArgumentException>("$format: $alias") {
+                    CredentialStatusConfiguration.parse(inventory, format)
+                }
+                assertContains(error.message.orEmpty(), "duplicate status references")
+            }
+        }
+    }
+
+    @Test
+    fun statusOwnershipNormalizationPreservesTheMdocUriValue() {
+        val uri = "https://status.example.com/unused/../list"
+        assertEquals(uri, CredentialStatusConfiguration.tokenStatusList(tokenStatus(7, uri)).uri.string)
+    }
+
+    @Test
     fun statusListComparisonPreservesNonDefaultPortsPathsAndQueries() {
         val urls = listOf(
             "https://status.example.com/List?a=1",
@@ -60,6 +95,45 @@ class CredentialStatusConfigurationTest {
             CredentialStatusConfiguration.parse(JsonArray(urls.map { tokenStatus(7, it) }), CredentialFormat.MSO_MDOC),
         )
         assertEquals(urls.size, configuration.groups.flatMap { it.references }.distinct().size)
+    }
+
+    @Test
+    fun statusListComparisonPreservesReservedEscapesAndEmptyPathSegments() {
+        val urls = listOf(
+            "https://status.example.com/list/item",
+            "https://status.example.com/list%2Fitem",
+            "https://status.example.com/list//item",
+        )
+        val inventory = JsonArray(urls.map { tokenStatus(7, it) })
+        val configuration = assertIs<CredentialStatusConfiguration.Preallocated>(
+            CredentialStatusConfiguration.parse(inventory, CredentialFormat.SD_JWT_VC),
+        )
+        assertEquals(urls.size, configuration.groups.flatMap { it.references }.distinct().size)
+    }
+
+    @Test
+    fun sdJwtStatusListComparisonPreservesQueryParameterOrder() {
+        val url = "https://status.example.com/list"
+        val first = tokenStatus(7, "$url?a=1&b=2&a=3")
+        val second = tokenStatus(7, "$url?a=1&a=3&b=2")
+        val configuration = assertIs<CredentialStatusConfiguration.Preallocated>(
+            CredentialStatusConfiguration.parse(JsonArray(listOf(first, second)), CredentialFormat.SD_JWT_VC),
+        )
+        assertEquals(2, configuration.groups.flatMap { it.references }.distinct().size)
+    }
+
+    @Test
+    fun mdocOwnershipUsesTheQueryAsEncodedInTheCredential() {
+        val configured = tokenStatus(7, "https://status.example.com/list?a=1&b=2&a=3")
+        val emittedUri = CredentialStatusConfiguration.tokenStatusList(configured).uri.string
+        fun references(status: JsonObject, format: CredentialFormat) = assertIs<CredentialStatusConfiguration.Preallocated>(
+            CredentialStatusConfiguration.parse(JsonArray(listOf(status)), format),
+        ).groups.single().references
+
+        assertEquals(
+            references(tokenStatus(7, emittedUri), CredentialFormat.SD_JWT_VC),
+            references(configured, CredentialFormat.MSO_MDOC),
+        )
     }
 
     @Test
