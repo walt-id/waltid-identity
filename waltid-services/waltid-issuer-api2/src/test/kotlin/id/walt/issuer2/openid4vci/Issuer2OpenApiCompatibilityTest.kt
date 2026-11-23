@@ -55,6 +55,22 @@ class Issuer2OpenApiCompatibilityTest {
         fun body(operation: JsonObject) = operation.getValue("content").jsonObject
             .getValue("application/json").jsonObject.getValue("schema")
         val paths = specification.getValue("paths").jsonObject
+        for (path in listOf("/issuer2/profiles", "/issuer2/profiles/{profileId}")) {
+            val profileExamples = paths.getValue(path).jsonObject.getValue("get").jsonObject
+                .getValue("responses").jsonObject.getValue("200").jsonObject
+                .getValue("content").jsonObject.getValue("application/json").jsonObject
+                .getValue("examples").jsonObject
+            assertTrue(profileExamples.isNotEmpty())
+            val redactedKey = buildJsonObject { put("type", "redacted") }
+            for (example in profileExamples.values) {
+                val value = example.jsonObject.getValue("value")
+                val profiles = if (value is JsonArray) value else listOf(value)
+                assertTrue(profiles.isNotEmpty())
+                profiles.forEach {
+                    assertTrue(it.jsonObject["issuerKey"] == redactedKey, "Expected a redacted signing key in $path example")
+                }
+            }
+        }
         val challenge = paths.getValue("/openid4vci/challenge").jsonObject.getValue("post").jsonObject
         assertFalse(challenge.containsKey("requestBody"), "Challenge endpoint accepts an empty body")
         val challengeResponses = challenge.getValue("responses").jsonObject

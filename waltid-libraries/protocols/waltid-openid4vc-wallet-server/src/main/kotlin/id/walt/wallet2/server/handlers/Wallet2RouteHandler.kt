@@ -317,13 +317,27 @@ object Wallet2RouteHandler {
         get("", {
             tags = listOf(WALLET_MANAGEMENT_TAG)
             summary = "List wallet IDs"
-            description = "When auth is enabled, returns only wallets owned by the authenticated account."
-            response { HttpStatusCode.OK to { body<List<String>>() } }
+            description = "When auth is enabled, returns only wallets owned by the authenticated account, or an empty list if it owns none."
+            response {
+                HttpStatusCode.OK to {
+                    body<List<String>>()
+                    if (getAccountId != null) {
+                        header<String>(HttpHeaders.CacheControl) { description = "no-store" }
+                    }
+                }
+                if (getAccountId != null) {
+                    HttpStatusCode.Unauthorized to { description = "Authentication required" }
+                }
+            }
         }) {
-            val ids: List<String> = getAccountId
-                ?.let { call.it() }
-                ?.let { resolver.getWalletIdsForAccount(it) }
-                ?: resolver.listWalletIds().toList()
+            val ids = if (getAccountId == null) {
+                resolver.listWalletIds().toList()
+            } else {
+                val accountId = call.getAccountId()
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, "Authentication required")
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                resolver.getWalletIdsForAccount(accountId).orEmpty()
+            }
             call.respond(ids)
         }
 
