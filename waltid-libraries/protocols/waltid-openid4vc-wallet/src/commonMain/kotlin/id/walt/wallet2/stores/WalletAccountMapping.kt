@@ -23,12 +23,9 @@ interface WalletAccountMapping {
     /**
      * Return all wallet IDs owned by [accountId].
      *
-     * Returns `null` to signal that account-based ownership enforcement is
-     * not applicable — the caller should fall back to unrestricted access.
-     * Returns an empty list when ownership is enforced but the account has
-     * no wallets yet.
-     *
-     * Default: returns null (no enforcement).
+     * Returns `null` when the store has no mapping for that account or uses
+     * the default implementation. Account-scoped callers treat both `null`
+     * and an empty list as zero wallets. The caller selects the access mode.
      */
     suspend fun getWalletIdsForAccount(accountId: String): List<String>? = null
 }
