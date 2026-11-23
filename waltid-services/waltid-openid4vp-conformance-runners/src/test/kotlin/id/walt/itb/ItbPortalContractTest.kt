@@ -5,23 +5,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.time.Instant
 
 class ItbPortalContractTest {
-    private val script = """
-        async function requestCredential() {
-          const presentationRequestEndpoint = 'https://dev-i4mlab.aegean.gr/rfc-issuer/vp/dc-api/request';
-          const validationSessionId = '00000000-0000-0000-0000-000000000001';
-          const profile = 'pid-basic';
-          const dcApiProtocol = 'openid4vp-v1-signed';
-        }
-    """.trimIndent()
+    private val script = ItbDcScriptFixtures.presentation
 
     @Test
     fun dcIssuanceUsesTheDeployedPidProfileAndPinsTheIssuerStatusRoute() {
-        val script = """
-            const offerEndpoint = 'https://dev-i4mlab.aegean.gr/rfc-issuer/vci/dc-api/offer';
-            const scenario = 'pid-authorization-code';
-            const credentialType = 'urn:eu.europa.ec.eudi:pid:1';
-            const protocol = 'openid4vci-v1';
-        """.trimIndent()
+        val script = ItbDcScriptFixtures.issuance
         val issue = ItbPortalBridge.parseDigitalIssuance(script)
         assertEquals("pid-authorization-code", issue.scenario)
         assertEquals("openid4vci-v1", issue.protocol)
@@ -42,7 +30,7 @@ class ItbPortalContractTest {
 
     @Test
     fun readsTheDeployedScriptsSessionAndProtocolWithoutExecutingIt() {
-        val request = ItbPortalBridge.parseDigitalCredentials(script)
+        val request = ItbPortalBridge.parseDigitalCredentials(script, isPayment = false)
         assertEquals("00000000-0000-0000-0000-000000000001", request.validationSession)
         assertEquals("pid-basic", request.profile)
         assertEquals("openid4vp-v1-signed", request.protocol)
@@ -52,27 +40,20 @@ class ItbPortalContractTest {
     @Test
     fun refusesAmbiguousOrChangedScriptInputs() {
         assertFailsWith<IllegalArgumentException> {
-            ItbPortalBridge.parseDigitalCredentials(script + "\nconst validationSessionId = 'other-session';")
+            ItbPortalBridge.parseDigitalCredentials(script + "\nconst validationSessionId = 'other-session';", isPayment = false)
         }
         assertFailsWith<IllegalArgumentException> {
-            ItbPortalBridge.parseDigitalCredentials(script.replace("const profile = 'pid-basic';", "const profile = resolveProfile();"))
+            ItbPortalBridge.parseDigitalCredentials(script.replace("const profile = 'pid-basic';", "const profile = resolveProfile();"), isPayment = false)
         }
     }
 
     @Test
     fun preservesThePaymentFieldsFromTheTs12Script() {
-        val paymentScript = """
-            const requestEndpoint = 'https://dev-i4mlab.aegean.gr/rfc-issuer/vp/dc-api/request';
-            const sessionId = 'payment-session';
-            const profile = 'ts12-iban';
-            const attestationType = 'sca-iban';
-            const dcApiProtocol = 'openid4vp-v1-signed';
-            const body = {
-                merchant: 'Coffee Shop', payee_id: 'shop-42', currency: 'EUR',
-                amount: '12.34', transaction_id: 'tx-dc-api-iban-001'
-            };
-        """.trimIndent()
-        val request = ItbPortalBridge.parseDigitalCredentials(paymentScript)
+        assertFailsWith<IllegalArgumentException> {
+            ItbPortalBridge.parseDigitalCredentials(script, isPayment = true)
+        }
+        val paymentScript = ItbDcScriptFixtures.payment
+        val request = ItbPortalBridge.parseDigitalCredentials(paymentScript, isPayment = true)
         assertEquals("payment-session", request.validationSession)
         assertEquals("ts12-iban", request.profile)
         assertEquals(
@@ -80,7 +61,7 @@ class ItbPortalContractTest {
             request.payment,
         )
         assertFailsWith<IllegalArgumentException> {
-            ItbPortalBridge.parseDigitalCredentials(paymentScript.replace("amount: '12.34'", "amount: getAmount()"))
+            ItbPortalBridge.parseDigitalCredentials(paymentScript.replace("amount: '12.34'", "amount: getAmount()"), isPayment = true)
         }
     }
 

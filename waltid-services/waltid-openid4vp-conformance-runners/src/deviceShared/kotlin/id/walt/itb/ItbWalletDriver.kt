@@ -53,10 +53,11 @@ class ItbWalletDriver internal constructor(
     }
 
     private suspend fun receive(offer: ItbWalletInteraction.Offer): List<String> {
-        val resolved = WalletIssuanceHandler.resolveOffer(ResolveOfferRequest(offerUrl = offer.url))
+        val offerUrl = Url(offer.url.toString())
+        val resolved = WalletIssuanceHandler.resolveOffer(ResolveOfferRequest(offerUrl = offerUrl))
         val result = if (resolved.grantType == "authorization_code") {
             val authorization = WalletIssuanceHandler.generateAuthorizationUrl(
-                wallet, GenerateAuthorizationUrlRequest(offerUrl = offer.url, redirectUri = redirectUri),
+                wallet, GenerateAuthorizationUrlRequest(offerUrl = offerUrl, redirectUri = redirectUri),
             )
             val callback = authorize(authorization.authorizationUrl, redirectUri)
             require(callback.protocol == redirectUri.protocol && callback.host == redirectUri.host) {
@@ -89,7 +90,7 @@ class ItbWalletDriver internal constructor(
                 "The deployed offer requires its transaction code"
             }
             WalletIssuanceHandler.receiveCredential(
-                wallet, ReceiveCredentialRequest(offerUrl = offer.url, txCode = offer.transactionCode),
+                wallet, ReceiveCredentialRequest(offerUrl = offerUrl, txCode = offer.transactionCode),
                 httpClient = client,
             )
         }
@@ -101,7 +102,7 @@ class ItbWalletDriver internal constructor(
 
     private suspend fun present(interaction: ItbWalletInteraction.Presentation) {
         val preview = WalletPresentationHandler.previewPresentationWithTrust(
-            wallet, PreviewPresentationRequest(interaction.url),
+            wallet, PreviewPresentationRequest(Url(interaction.url.toString())),
             transactionDataTypeRegistry = paymentTypes, clientIdTrustConfiguration = clientIdTrust,
             unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
         )

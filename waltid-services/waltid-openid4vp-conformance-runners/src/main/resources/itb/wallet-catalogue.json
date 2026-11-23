@@ -1,5 +1,5 @@
 {
-  "observedOn": "2026-11-19",
+  "observedOn": "2026-11-23",
   "testBed": "https://dev-i4mlab.aegean.gr/itb",
   "testBedVersion": "1.29.5",
   "suites": [
@@ -19,7 +19,7 @@
       "profile": "CS-02",
       "id": "cs02v1",
       "name": "WE BUILD CTS - CS-02 Presentation",
-      "publishedVersion": "1.3",
+      "publishedVersion": "1.4",
       "cases": [
         { "id": "tc_vp_001", "name": "VP-001: CS-02 hash presentation with default encrypted response mode [Wallet SUT]", "prerequisite": "cs01v1/tc_vci_006" },
         { "id": "tc_vp_002", "name": "VP-002: CS-02 hash presentation with explicit encrypted response mode [Wallet SUT]", "prerequisite": "cs01v1/tc_vci_006" },
@@ -35,7 +35,7 @@
       "profile": "CS-01",
       "id": "cs01v1",
       "name": "WE BUILD CTS - CS-01 Issuance",
-      "publishedVersion": "1.1",
+      "publishedVersion": "1.4",
       "cases": [
         { "id": "tc_vci_001", "name": "Test Case VCI-001 [Wallet SUT]: WE BUILD - Authorization code flow - sdjwt - x509 signature" },
         { "id": "tc_vci_002", "name": "Test Case VCI-002 [Wallet SUT]: WE BUILD - Authorization code flow - sdjwt - jwk signature" },
@@ -51,7 +51,7 @@
       "profile": "CS-10",
       "id": "cs10-test-suite",
       "name": "WE BUILD CS-10 Attestation Revocation",
-      "publishedVersion": "1.0",
+      "publishedVersion": "1.1",
       "cases": [
         { "id": "rv_iss_01", "name": "RV-ISS-01: Shared status list and public status token [Wallet SUT]", "demoOnly": true },
         { "id": "rv_iss_02", "name": "RV-ISS-02: Wallet receives an already-revoked credential [Wallet SUT]", "demoOnly": true }
@@ -75,6 +75,29 @@
         { "id": "ts12_pay_dc_api_03", "name": "TS12 [Wallet SUT]: Authorize Payment over DC API with SCA-Card DPC", "prerequisite": "ts12/ts12_issue_03", "attended": true }
       ],
       "statement": "Payment use cases"
+    },
+    {
+      "profile": "OneSpan",
+      "id": "onespan_com",
+      "name": "onespan.com",
+      "publishedVersion": "1.0",
+      "cases": [
+        { "id": "onespan_vci_01", "name": "Test case 01: Create a credential offer (harmonised contract)", "demoOnly": true },
+        { "id": "onespan_vci_03", "name": "Test case 03: Create a pre-authorized-code offer with no transaction code", "demoOnly": true }
+      ],
+      "statement": "Reference Implementations",
+      "optIn": true
+    },
+    {
+      "profile": "Reconi",
+      "id": "rec",
+      "name": "reconi.nl Reference Implementation Test Suite",
+      "publishedVersion": "1.0",
+      "cases": [
+        { "id": "recweb_issue_01", "name": "Test case 01: RECWEB hello_world issuance - authorization code flow", "demoOnly": true }
+      ],
+      "statement": "Reference Implementations",
+      "optIn": true
     }
   ],
   "systemName": "walt.id"

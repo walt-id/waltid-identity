@@ -4,12 +4,13 @@ import io.ktor.http.Url
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.net.URI
 
 /** Inputs and credential IDs belong to the currently owned ITB session or its required issuance case. */
 sealed interface ItbWalletInteraction {
-    data class Offer(val url: Url, val transactionCode: String? = null) : ItbWalletInteraction
+    data class Offer(val url: URI, val transactionCode: String? = null) : ItbWalletInteraction
     data class CheckStatus(val credentialIds: List<String>, val expected: ItbExpectedStatus) : ItbWalletInteraction
-    data class Presentation(val url: Url, val credentialId: String? = null, val attended: Boolean = false) : ItbWalletInteraction
+    data class Presentation(val url: URI, val credentialId: String? = null, val attended: Boolean = false) : ItbWalletInteraction
     data class DigitalCredentials(
         val endpoint: Url,
         val validationSession: String,

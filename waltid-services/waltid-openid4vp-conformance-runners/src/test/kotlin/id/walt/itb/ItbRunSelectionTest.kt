@@ -78,8 +78,19 @@ class ItbRunSelectionTest {
     }
 
     @Test
+    fun referenceCasesRequireAnExplicitSelectionAndTheDemoApp() {
+        val references = listOf("onespan_com/onespan_vci_01", "onespan_com/onespan_vci_03", "rec/recweb_issue_01")
+        fun caseKeys(selection: String?) = ItbRunSelection.select(catalogue, selection, unattendedOnly = true, demoApp = true)
+            .map { (suite, case) -> "${suite.id}/${case.id}" }
+
+        assertTrue(caseKeys(null).none { it in references })
+        assertEquals(references, caseKeys(references.joinToString(",")))
+        assertFailsWith<IllegalArgumentException> { ItbRunSelection.select(catalogue, "rec/recweb_issue_01") }
+    }
+
+    @Test
     fun unknownAndEmptySelectionsAreErrors() {
-        listOf("", "tc_vp_004", "tc_vci_006,").forEach { invalid ->
+        listOf("", "tc_vp_004", "tc_vci_006,", "rec/recweb_issue_02").forEach { invalid ->
             assertFailsWith<IllegalArgumentException> { ItbRunSelection.select(catalogue, invalid) }
         }
     }

@@ -7,9 +7,11 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import java.awt.Color
 import java.awt.image.BufferedImage
+import java.util.Base64
+import java.util.Random
 import kotlin.test.*
 
-class ItbPresentationQrTest {
+class ItbWalletQrTest {
     @Test
     fun qrRemainsTheInvocationWhenTheImageAlsoHasReadableEanOrUpcPatterns() {
         val invocation = "eu-eaap://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"
@@ -21,14 +23,14 @@ class ItbPresentationQrTest {
             image.createGraphics().apply { color = Color.WHITE; fillRect(0, 0, 350, 800); dispose() }
             for (y in 0 until 350) for (x in 0 until 350) if (qr[x, y]) image.setRGB(x, y, 0)
             for (y in 0 until 80) for (x in 0 until 350) if (barcode[x, y]) image.setRGB(x, y + 360, 0)
-            assertEquals(invocation, ItbPresentationQr.decode(ItbQrFixtures.png(image)), format.name)
+            assertEquals(invocation, ItbWalletQr.decode(ItbQrFixtures.png(image)), format.name)
         }
     }
 
     @Test
     fun preservesTheFullQrPayloadIncludingEscapedOpaqueParameters() {
         val invocation = "haip-vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest%3Fopaque%3Da%252Bb%252Fc%253D&request_uri_method=post"
-        assertEquals(invocation, ItbPresentationQr.decode(ItbQrFixtures.qr(invocation)))
+        assertEquals(invocation, ItbWalletQr.decode(ItbQrFixtures.qr(invocation)))
     }
 
     @Test
@@ -41,13 +43,28 @@ class ItbPresentationQrTest {
             EncodeHintType.QR_VERSION to 18,
             EncodeHintType.QR_MASK_PATTERN to 0,
         ))
-        assertEquals(invocation, ItbPresentationQr.decode(ItbQrFixtures.png(pixels)))
+        assertEquals(invocation, ItbWalletQr.decode(ItbQrFixtures.png(pixels)))
+    }
+
+    @Test
+    fun decodesACleanOfferQrWhenFinderDetectionReturnsAFormatError() {
+        val opaque = ByteArray(185)
+        Random(22).nextBytes(opaque)
+        val reference = Base64.getUrlEncoder().withoutPadding().encodeToString(opaque)
+        val offer = "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer%2F$reference"
+        // The regular detector samples the wrong grid for this valid, dense symbol.
+        val pixels = QRCodeWriter().encode(offer, BarcodeFormat.QR_CODE, 1050, 1050, mapOf(
+            EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.H,
+            EncodeHintType.QR_VERSION to 20,
+            EncodeHintType.QR_MASK_PATTERN to 6,
+        ))
+        assertEquals(offer, ItbWalletQr.decode(ItbQrFixtures.png(pixels)))
     }
 
     @Test
     fun rejectsARealNonQrBarcode() {
         val barcode = MultiFormatWriter().encode("96385074", BarcodeFormat.EAN_8, 350, 80)
-        assertFailsWith<IllegalArgumentException> { ItbPresentationQr.decode(ItbQrFixtures.png(barcode)) }
+        assertFailsWith<IllegalArgumentException> { ItbWalletQr.decode(ItbQrFixtures.png(barcode)) }
     }
 
     @Test
@@ -55,7 +72,7 @@ class ItbPresentationQrTest {
         for (content in listOf(
             byteArrayOf(1, 2, 3),
             ItbQrFixtures.qr("openid4vp://example").copyOf(20),
-        )) assertFailsWith<IllegalArgumentException> { ItbPresentationQr.decode(content) }
+        )) assertFailsWith<IllegalArgumentException> { ItbWalletQr.decode(content) }
     }
 
     @Test
@@ -63,8 +80,8 @@ class ItbPresentationQrTest {
         val invocation = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"
         val qr = ItbQrFixtures.qr(invocation)
         // Trailing padding keeps the same PNG/QR readable while varying only the encoded size.
-        assertEquals(invocation, ItbPresentationQr.decode(qr.copyOf(1_048_576)))
-        assertFailsWith<IllegalArgumentException> { ItbPresentationQr.decode(qr.copyOf(1_048_577)) }
+        assertEquals(invocation, ItbWalletQr.decode(qr.copyOf(1_048_576)))
+        assertFailsWith<IllegalArgumentException> { ItbWalletQr.decode(qr.copyOf(1_048_577)) }
     }
 
     @Test
@@ -74,9 +91,9 @@ class ItbPresentationQrTest {
             (2048 to 350) to (2049 to 350),
             (350 to 2048) to (350 to 2049),
         )) {
-            assertEquals(invocation, ItbPresentationQr.decode(ItbQrFixtures.qr(invocation, atLimit.first, atLimit.second)))
+            assertEquals(invocation, ItbWalletQr.decode(ItbQrFixtures.qr(invocation, atLimit.first, atLimit.second)))
             assertFailsWith<IllegalArgumentException> {
-                ItbPresentationQr.decode(ItbQrFixtures.qr(invocation, beyondLimit.first, beyondLimit.second))
+                ItbWalletQr.decode(ItbQrFixtures.qr(invocation, beyondLimit.first, beyondLimit.second))
             }
         }
     }

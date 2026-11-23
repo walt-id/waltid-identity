@@ -26,6 +26,7 @@ data class ItbCatalogue(
         val publishedVersion: String? = null,
         val cases: List<Case>,
         val actor: String? = null,
+        val optIn: Boolean = false,
     )
 
     @Serializable

@@ -1,6 +1,7 @@
 # WeBuild ITB wallet runs
 
-The runner selects 27 Wallet SUT cases across CS-01, CS-02, CS-07, CS-10 and TS12.
+The runner selects 27 core Wallet SUT cases across CS-01, CS-02, CS-07, CS-10 and TS12.
+OneSpan and Reconi reference issuance cases are available by explicit selection.
 The live GitHub workflow installs the Compose Wallet Preview Debug app and drives
 its consent, credential storage and Android provider entry points. Its clean
 emulator uses the app PIN and signing protection disabled. The six TS12 payment
@@ -43,7 +44,7 @@ Portal UI IDs are not API keys. The manifest pins the deployment to
 `https://dev-i4mlab.aegean.gr/itb`, the system name to `walt.id`, and the exact
 statement, suite and case labels. A different selected system or missing/ambiguous
 label fails before wallet execution. System and actor API keys are not needed.
-The pinned inventory was checked on 2026-11-19 and retains the deployed
+The pinned inventory was checked on 2026-11-23 and retains the deployed
 `[Wallet SUT]` qualifiers. CS-07 explicitly selects its visible `User` actor
 within the configured statement. Newly deployed cases are not selected automatically.
 
@@ -65,12 +66,17 @@ and removes the forwards when the run ends. Reserve the test device for this run
 The installation retains its test data for inspection. Use a fresh emulator or
 uninstall that run's disposable Preview package before reuse.
 
-With no selector the app runs 21 unattended cases. `ITB_CASES` accepts
+With no selector the app runs 21 core unattended cases. `ITB_CASES` accepts
 comma-separated `suite/case` selectors such as `cs02v1/tc_vp_002`; bare IDs work
 when unique. The catalogue schedules each presentation's required issuance first.
 A presentation uses that exact newly stored credential and has no ITB session if
 its prerequisite fails. Select the six payments using the
 [attended guide](ITB-NATIVE.md).
+
+Select a reference issuance case with its qualified ID in `ITB_CASES` locally
+or `cases` in the live workflow. These cases use the Android Preview app and
+the same QR attachment path as core issuance. Reconi's authorization flow opens
+Chrome on the device.
 
 Running `./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet`
 without a device bridge selects the JVM protocol diagnostics. This driver uses a
@@ -89,7 +95,9 @@ not proof that every wallet protocol stage ran.
 The summary and JSON report identify the synthetic attestation fixture.
 
 The runner starts one session at a time, never retries an uncertain start, and
-records each prepared session ID before starting its test steps. Cleanup stops
+records each prepared session ID before starting its test steps. After the wallet
+and portal steps, it retries a transient status or report read up to twice
+within the case timeout. Cleanup stops
 only that owned session. A stopped ITB session can
 have `UNDEFINED` rather than `FAILURE`; the separate wallet outcome is preserved.
 Reports contain identities, timestamps and error types/codes, not credentials,
@@ -104,16 +112,17 @@ code and leave initialized case reports as `NOT_RUN`.
 The bridge authenticates to the portal and selects the exact statement, suite
 and case in **Interactive execution** mode. Each case starts from a fresh portal
 document, so prior dialogs and asynchronously updated session lists cannot
-select another interaction. For URL-based presentations it downloads the owned
-session's **Credential QR code** and decodes only QR format. This uses the actual
-wallet invocation even when ITB's separately generated request text contains a
-false EAN/UPC decode. It never falls back to that text after a QR error. The
-existing case-specific invocation-scheme check and wallet verification still apply.
-QR downloads are limited to 1 MiB and image dimensions to 2048 by 2048 pixels.
-Offers and scripts use short inline values or downloads from the exact labelled
-row. The portal exposes Copy instead of Download for short inline values; the
-bridge never accesses the clipboard. It reads declarative
-DC API inputs without executing supplied JavaScript. Downloads are removed immediately after reading. For DC API cases, the app
+select another interaction. The bridge downloads the expected attachment from the
+owned dialog once for each wallet interaction. For offer and presentation links,
+it decodes the wallet-facing QR image and passes the original URI to the wallet,
+preserving its authority and query encoding. The portal can also display a derived
+text value containing an erroneous EAN/UPC decode.
+Any transaction code comes from the same dialog. The case-specific invocation
+scheme and wallet verification still apply. For DC API cases, the bridge reads the
+declarative inputs in the downloaded instruction script. Each download is limited
+to 1 MiB and removed after reading. QR images are limited to 2048 by 2048 pixels.
+
+For DC API cases, the app
 driver uses Chrome at the counterpart's origin and the Android credential picker.
 Both demo modes confirm Chrome's disclosure prompt and Android's sharing
 sheet when the displayed origin matches the configured ITB host. The operator
@@ -169,8 +178,8 @@ inbound tunnels or coordinated enterprise checkout. ITB results are always stric
 The live workflow uses a read-only GitHub token, does not persist checkout
 credentials or write Gradle caches, and retains only sanitized reports for 14 days.
 Dispatch is available from the default branch. Its
-`cases` input can select an unattended subset, such as `tc_vp_002` with its
-issuance prerequisite. An empty input runs all 21 unattended app cases. An operator-required
+`cases` input can select core and reference cases, such as `tc_vp_002` with its
+issuance prerequisite. An empty input runs the 21 core unattended app cases. An operator-required
 case is rejected before any tenant session starts. The checked-in workflow
 alone is not a successful hosted run.
 
@@ -228,7 +237,7 @@ Do not equate the eleven local profile checks with the deployed cases.
 
 ### Deployed catalogue
 
-The authenticated Walt.id catalogue was inspected on 2026-11-19.
+The authenticated Walt.id catalogue was inspected on 2026-11-23.
 The [case manifest](../src/main/resources/itb/wallet-catalogue.json) records the
 actual suite/case identifiers exposed by the portal's REST API configuration.
 The suite metadata versions below are independent of the per-case version in each
@@ -236,11 +245,13 @@ execution report and of the normative specification version.
 
 | Target | Deployed suite ID | Cases | Suite metadata version |
 | --- | --- | --- | --- |
-| CS-01 | `cs01v1` | VCI-001/002/003/005/006/007/008 (7) | 1.1 |
-| CS-02 | `cs02v1` | VP-001/002/003/007/011/012/013 (7) | 1.3 |
+| CS-01 | `cs01v1` | VCI-001/002/003/005/006/007/008 (7) | 1.4 |
+| CS-02 | `cs02v1` | VP-001/002/003/007/011/012/013 (7) | 1.4 |
 | CS-07 | `cts07` | `tc15` presentation and `tc16` issuance (2) | 1.0 |
-| CS-10 | `cs10-test-suite` | RV-ISS-01/02 (2) | 1.0 |
+| CS-10 | `cs10-test-suite` | RV-ISS-01/02 (2) | 1.1 |
 | CS-12 / TS12 | `ts12` | 3 issuance, 3 payment, 3 DC API payment (9) | 1.0 |
+| OneSpan, opt-in | `onespan_com` | `onespan_vci_01`, `onespan_vci_03` | 1.0 |
+| Reconi, opt-in | `rec` | `recweb_issue_01` | 1.0 |
 
 ### Follow-up coverage
 
@@ -254,6 +265,33 @@ execution report and of the normative specification version.
 | CS-10 | RV-ISS-01 redeems both offers in one session and checks that the two stored SD-JWTs have one status-list URI, different indices and fresh clear status. RV-ISS-02 requires a fresh `INVALID` result, the SDK's projection of Token Status List value 1. The app run records each card's visible label before and after Check status and requires a new displayed check time before confirming the portal prompt. |
 | CS-12 | The local SCA matrix covers the updated SCA-User credential shape. The [native guide](ITB-NATIVE.md) records the earlier attended runs and the outstanding RP-permission and deployment checks. |
 | CS-13 | The inspected statements expose no dedicated [intermediary wallet suite](https://github.com/webuild-consortium/wp4-architecture/blob/d6603effe714411d5dd7e9542d4d7b7d9fe11426/conformance-specs/cs-13-intermediary-services-preflight.md). Coverage needs an intermediary counterpart and the registration material for the wallet to authenticate the intermediary and identify the represented relying party. |
+
+### Blocked wallet cases
+
+This ledger records the first observed blocker in the 2026-11-23 tenant
+inspection and local Preview runs. Case IDs are scoped to the suite in the
+first column. The Relying Parties suites test an issuer or verifier and sit
+outside the wallet inventory.
+
+| Suite | Cases | Observed blocker and what to recheck |
+| --- | --- | --- |
+| Base CS-02 (`cs02v1`) | `tc_vp_004` | The tenant disables the case. Recheck when ITB enables it with a runnable transaction-data fixture. |
+| OneSpan (`onespan_com`) | `onespan_vci_02` | The authorization-code dialog exposed neither an offer QR nor a usable offer value. The issuer fixture needs to supply an offer. |
+| OneSpan (`onespan_com`) | `onespan_vci_04` | The offer requires a transaction code and ITB supplied no code. The dialog needs to provide it. |
+| OneSpan (`onespan_com`) | `onespan_vp_01` through `onespan_vp_07` | GET retrieval returned HTTP 200. Wallet validation found no matching trust anchor. The POST-labelled cases (`02`, `05`) also omitted `request_uri_method`, and the DID-labelled cases (`05`, `06`) sent `x509_hash`. Recheck with verified test trust material and fixtures that exercise the stated methods and identifiers. |
+| Namirial (`namiral_suite`) | `nam_issue_01`, `nam_issue_02`, `nam_issue_03`, `vci_006`, `vci_007`, `vci_008`, `nam_vp_01`, `nam_vp_02`, `nam_vp_03`, `vp_001`, `vp_002`, `vp_003`, `vp_004`, `vp_007` | All 14 scan dialogs lacked a usable attachment. Sample issuance and presentation dialogs had empty QR and raw values. Recheck once the fixtures supply wallet input. |
+| Intesi (`generated_suite`) | `webuild_issuer_request_001`, `webuild_issuer_request_002` | The offer endpoint status assertion failed before the wallet had an interaction. These fixtures exercise issuer endpoints. Wallet coverage needs an offer handoff and an assertion about the wallet flow. |
+| Procivis (`ts01`) | `tc001`, `tc002` | The issuer returned HTTP 400 `invalid_client` at token exchange. Recheck the test client's issuer registration and authentication requirements. |
+| Procivis (`ts01`) | `tc003`, `tc004` | Both signed requests failed leaf certificate hash binding. Recheck that `x509_hash` matches the DER-encoded leaf in `x5c`. The deployed cases share a title, so the bridge also needs an unambiguous case selector. |
+| Reconi (`rec`) | `recweb_issue_02` | The wallet stored the credential and a subsequent report had terminal `SUCCESS`, but the runner errored while reading the verdict. Retries then stalled before session creation, including the base VCI-006 control. Qualify with the separate `Transaction Code` field, bounded verdict reads and a fresh end-to-end pass. |
+| Trust Framework (`tf-test-suite`) | `tc_vci_001`, `tc_vci_005`, `tc_vci_006`, `tc_vci_007`, `tc_vci_008` | The issuer returned HTTP 401 `invalid_client` at token exchange. Recheck test client onboarding before qualifying wallet trust evaluation. |
+| Trust Framework (`tf-test-suite`) | `tc_vp_001`, `tc_vp_002` | The sessions exposed no usable wallet input. Recheck with a deployed request attachment. |
+| Trust Framework (`tf-test-suite`) | `tc_vp_003`, `tc_vp_004`, `tc_vp_007`, `tc_vp_011`, `tc_vp_012` | Both attempts timed out before an interactive session ID appeared. Recheck portal startup before assessing wallet behavior. |
+| Trust Framework (`tf-test-suite`) | `tc_vp_013` | Request retrieval succeeded. Wallet validation found no matching trust anchor. Qualify this variant with verified test trust configuration and [WAL-1485](https://linear.app/walt-new/issue/WAL-1485). |
+| QES (`cs03_suite`) | `signatrure_01` | The wallet has no CSC remote signing and AdES flow for this case. |
+| TS12 payments (`ts12`) | `ts12_pay_01`, `ts12_pay_02`, `ts12_pay_03`, `ts12_pay_dc_api_01`, `ts12_pay_dc_api_02`, `ts12_pay_dc_api_03` | The cases are selectable in attended mode. Reference issuer DPC type metadata returned HTTP 404 and the wallet could not show the required payment instructions. See [WE BUILD architecture #357](https://github.com/webuild-consortium/wp4-architecture/issues/357). |
+
+### Exporting reports
 
 Export the portal's **Conformance Statement Report** after the target suites have
 passing sessions. Check the statement's coverage and keep the source SHA and

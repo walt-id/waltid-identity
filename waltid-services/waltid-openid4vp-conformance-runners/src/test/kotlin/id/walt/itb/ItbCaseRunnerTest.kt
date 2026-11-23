@@ -10,8 +10,10 @@ import io.ktor.http.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.net.URI
 import kotlin.test.*
 
 class ItbCaseRunnerTest {
@@ -23,9 +25,10 @@ class ItbCaseRunnerTest {
         """{"sessions":[{"session":"$session","result":"$verdict","startTime":"2026-09-21T14:48:14Z"${if (complete) ",\"endTime\":\"2026-09-21T14:49:58Z\"" else ""}}]}"""
 
     private inner class Bridge : ItbInteractionBridge {
-        var interaction: ItbWalletInteraction = ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer=%7B%7D"))
+        var interaction: ItbWalletInteraction = ItbWalletInteraction.Offer(URI("openid-credential-offer://?credential_offer=%7B%7D"))
         var reads = 0
         var completed = false
+        var completions = 0
         var confirmed = false
         var nextInteraction: ItbWalletInteraction? = null
         var readFailure: Exception? = null
@@ -41,7 +44,10 @@ class ItbCaseRunnerTest {
             completed = false
             return checkNotNull(nextInteraction)
         }
-        override suspend fun complete() { completed = true }
+        override suspend fun complete() {
+            completed = true
+            completions++
+        }
         override suspend fun confirmRevocation(session: ItbSession) {
             check(completed)
             confirmed = true
@@ -81,7 +87,7 @@ class ItbCaseRunnerTest {
             Triple("openid4vp", null, false),
         )) {
             val bridge = Bridge().apply {
-                if (scheme != null) interaction = ItbWalletInteraction.Presentation(Url("$scheme://authorize?request_uri=https://verifier.example/request"))
+                if (scheme != null) interaction = ItbWalletInteraction.Presentation(URI("$scheme://authorize?request_uri=https://verifier.example/request"))
             }
             var walletCalls = 0
             var stopped = false
@@ -126,7 +132,7 @@ class ItbCaseRunnerTest {
         val suite = ItbCatalogue.walletCases().suites.single { it.id == "cs10-test-suite" }
         val case = suite.cases.single { it.id == "rv_iss_01" }
         for (second in listOf(
-            ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer_uri=https://issuer.example/second")),
+            ItbWalletInteraction.Offer(URI("openid-credential-offer://?credential_offer_uri=https://issuer.example/second")),
             null,
         )) {
             val bridge = Bridge().apply { nextInteraction = second ?: interaction }
@@ -333,6 +339,40 @@ class ItbCaseRunnerTest {
             assertEquals("download_event", result.errorCode)
             assertEquals(ItbCaseResult.Phase.INTERACTION, result.phase)
             assertFalse(result.adapterInvoked)
+        }
+    }
+
+    @Test
+    fun retriesTransientVerdictReadsWithoutReplayingTheWalletOrPortal() = runBlocking<Unit> {
+        var statusReads = 0
+        var reportReads = 0
+        var walletCalls = 0
+        val bridge = Bridge()
+        HttpClient(MockEngine { request ->
+            when (request.url.encodedPath.substringAfterLast('/')) {
+                "status" -> when (++statusReads) {
+                    1 -> throw IOException("private network details")
+                    2 -> respond("invalid response")
+                    else -> respond(status(true))
+                }
+                session -> if (++reportReads == 1) respond("", HttpStatusCode.ServiceUnavailable) else respond(report)
+                else -> error("A terminal session must not be stopped")
+            }
+        }).use { client ->
+            val api = ItbRestClient(client, Url("https://itb.example/api/rest"), "secret")
+            val result = ItbCaseRunner(api, bridge, {
+                walletCalls++
+                ItbWalletResult()
+            }, pollMillis = 1).run(suite, case)
+            assertEquals(ItbCaseResult.Outcome.PASSED, result.outcome)
+            assertEquals(ItbSessionReport.Verdict.SUCCESS, result.testBedVerdict)
+            assertTrue(result.walletSucceeded && result.testBedCompleted)
+            assertFalse(result.cleanupFailed)
+            assertEquals(1, walletCalls)
+            assertEquals(1, bridge.reads)
+            assertEquals(1, bridge.completions)
+            assertEquals(3, statusReads)
+            assertEquals(2, reportReads)
         }
     }
 

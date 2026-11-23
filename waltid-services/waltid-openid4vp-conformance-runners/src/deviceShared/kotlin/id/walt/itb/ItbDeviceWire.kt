@@ -9,6 +9,7 @@ import kotlinx.serialization.json.*
 import java.io.EOFException
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.net.URI
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 import kotlin.coroutines.coroutineContext
@@ -113,13 +114,13 @@ internal object ItbDeviceWire {
         fun JsonObject.text(name: String) = getValue(name).jsonPrimitive.content
         val credentialId = value["credentialId"]?.jsonPrimitive?.content
         return when (value.text("kind")) {
-            "offer" -> ItbWalletInteraction.Offer(Url(value.text("url")), value["transactionCode"]?.jsonPrimitive?.content)
+            "offer" -> ItbWalletInteraction.Offer(URI(value.text("url")), value["transactionCode"]?.jsonPrimitive?.content)
             "check_status" -> ItbWalletInteraction.CheckStatus(
                 value.getValue("credentialIds").jsonArray.map { it.jsonPrimitive.content },
                 ItbExpectedStatus.valueOf(value.text("expected")),
             )
             "presentation" -> ItbWalletInteraction.Presentation(
-                Url(value.text("url")), credentialId, value.getValue("attended").jsonPrimitive.boolean,
+                URI(value.text("url")), credentialId, value.getValue("attended").jsonPrimitive.boolean,
             )
             "dc" -> ItbWalletInteraction.DigitalCredentials(
                 Url(value.text("endpoint")), value.text("validationSession"), value.text("profile"), value.text("protocol"),

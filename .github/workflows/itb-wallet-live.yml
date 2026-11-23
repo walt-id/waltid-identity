@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       cases:
-        description: Comma-separated suite/case selectors (or unique case IDs). Empty runs all 21 unattended cases.
+        description: Comma-separated suite/case selectors (or unique case IDs). Empty runs the 21 core unattended cases.
         type: string
         default: ''
 

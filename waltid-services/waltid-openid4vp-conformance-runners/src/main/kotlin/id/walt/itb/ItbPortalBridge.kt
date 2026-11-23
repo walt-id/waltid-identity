@@ -1,16 +1,16 @@
 package id.walt.itb
 
-import com.microsoft.playwright.Page
 import com.microsoft.playwright.Locator
+import com.microsoft.playwright.Page
 import com.microsoft.playwright.TimeoutError
 import com.microsoft.playwright.options.AriaRole
 import com.microsoft.playwright.options.ElementState
 import com.microsoft.playwright.options.WaitUntilState
-import io.ktor.http.URLParserException
 import io.ktor.http.Url
-import java.nio.ByteBuffer
-import java.util.regex.Pattern
+import java.net.URI
+import java.net.URISyntaxException
 import java.nio.file.Files
+import java.util.regex.Pattern
 
 /** The owned session started, but the portal displayed its generic execution error. */
 internal class ItbPortalExecutionError : IllegalStateException("The ITB portal could not start the wallet interaction")
@@ -19,13 +19,14 @@ internal class ItbPortalExecutionError : IllegalStateException("The ITB portal c
 internal class ItbPortalInputError(val reason: Reason) : IllegalArgumentException(reason.name) {
     enum class Reason {
         INTERACTION_DOWNLOAD_SIZE,
-        PRESENTATION_QR_IMAGE_FORMAT,
-        PRESENTATION_QR_IMAGE_DIMENSIONS,
-        PRESENTATION_QR_IMAGE_READ,
-        PRESENTATION_QR_UNREADABLE,
-        PRESENTATION_QR_INVALID_URL,
-        ISSUANCE_OFFER_QR_MISSING,
+        WALLET_QR_IMAGE_FORMAT,
+        WALLET_QR_IMAGE_DIMENSIONS,
+        WALLET_QR_IMAGE_READ,
+        WALLET_QR_UNREADABLE,
+        WALLET_QR_INVALID_URL,
+        ATTACHMENT_COUNT,
         ISSUANCE_OFFER_INVALID_URL,
+        TRANSACTION_CODE_MISSING,
     }
 }
 
@@ -35,6 +36,47 @@ internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The
         LOGIN_NAVIGATION, LOGIN_FORM, LOGIN_SUBMIT, LOGIN_HOME,
         NAVIGATION, SYSTEM, STATEMENT, ACTOR, EXECUTION_MODE, CASE,
         SESSION, START, INTERACTION, DIALOG, CONFIRMATION, DOWNLOAD_CONTROL, DOWNLOAD_EVENT,
+    }
+}
+
+internal enum class PortalAttachment(vararg names: String, val usesDcApi: Boolean = false) {
+    OFFER("Credential QR code", "VCI request QR code", "Credential Offer QR code", "QR code"),
+    PRESENTATION("Credential QR code"),
+    PAYMENT("VP request QR code"),
+    DC_ISSUANCE("Prepare offer and invoke wallet for PID issuance", usesDcApi = true),
+    DC_PRESENTATION("Digital Credentials API presentation request", usesDcApi = true),
+    DC_PAYMENT("TS12 payment Digital Credentials API presentation request", usesDcApi = true);
+
+    val label: Pattern = Pattern.compile(
+        names.joinToString("|", "^\\s*(?:", ")\\s*$"),
+        Pattern.CASE_INSENSITIVE,
+    )
+
+    companion object {
+        fun forCase(suite: String, case: String): PortalAttachment = when (suite) {
+            "cs01v1", "cs10-test-suite" -> OFFER
+            "cs02v1" -> PRESENTATION
+            "onespan_com" -> when (case) {
+                "onespan_vci_01", "onespan_vci_03" -> OFFER
+                else -> error("Unknown OneSpan wallet case")
+            }
+            "rec" -> when (case) {
+                "recweb_issue_01" -> OFFER
+                else -> error("Unknown Reconi wallet case")
+            }
+            "cts07" -> when (case) {
+                "tc15" -> DC_PRESENTATION
+                "tc16" -> DC_ISSUANCE
+                else -> error("Unknown CS-07 wallet case")
+            }
+            "ts12" -> when {
+                case.startsWith("ts12_issue_") -> OFFER
+                case.startsWith("ts12_pay_dc_api_") -> DC_PAYMENT
+                case.startsWith("ts12_pay_") -> PAYMENT
+                else -> error("Unknown TS-12 wallet case")
+            }
+            else -> error("Unknown ITB wallet suite")
+        }
     }
 }
 
@@ -74,6 +116,14 @@ class ItbPortalBridge(
             page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName("Interactive execution").setExact(true)).click()
         }
         step(ItbPortalStepTimeout.Step.CASE) {
+            if (suite.statement == "Reference Implementations") {
+                val menu = page.locator("button:visible").filter(
+                    Locator.FilterOptions().setHasText(Pattern.compile("^\\s*Show test suite")),
+                )
+                menu.click()
+                menu.locator("xpath=..").locator(".filterForm")
+                    .getByText(suite.name, Locator.GetByTextOptions().setExact(true)).click()
+            }
             val suiteRow = page.locator(".testSuite").filter(Locator.FilterOptions().setHas(
                 page.getByText(suite.name, Page.GetByTextOptions().setExact(true)),
             ))
@@ -119,92 +169,53 @@ class ItbPortalBridge(
 
     override suspend fun readNext(session: ItbSession): ItbWalletInteraction {
         val dialog = dialog()
-        val interaction = dialog.getByText(Pattern.compile(
-            "^\\s*(VCI request|VP request|(?:TS12 payment )?Digital Credentials API presentation request|Prepare offer and invoke wallet for PID issuance)\\s*$",
-        ))
+        val attachment = PortalAttachment.forCase(session.testSuite, session.testCase)
+        val field = dialog.locator("app-any-content-view .content-name").filter(
+            Locator.FilterOptions().setHasText(attachment.label),
+        )
         val portalError = page.getByText("Unexpected Error", Page.GetByTextOptions().setExact(true))
         // Some reference-service starts take longer than the ordinary 15-second DOM timeout.
         // Wait for this owned session's interaction, without clicking Start or creating a session again.
         step(ItbPortalStepTimeout.Step.INTERACTION) {
             page.waitForCondition(
-                { interaction.count() > 0 || portalError.count() > 0 },
+                { field.count() > 0 || portalError.count() > 0 },
                 Page.WaitForConditionOptions().setTimeout(45_000.0),
             )
         }
-        if (portalError.count() > 0 && interaction.count() == 0) throw ItbPortalExecutionError()
         verifySession(session)
-        val text = step(ItbPortalStepTimeout.Step.DIALOG) { dialog.innerText() }
-        return when {
-            text.contains("VCI request") -> {
-                val pin = Regex("\\bPIN\\s+([0-9]+)\\b").find(text)?.groupValues?.get(1)
-                require(session.testSuite != "cs01v1" || session.testCase != "tc_vci_007" || pin != null) {
-                    "The ITB interaction did not supply its transaction code"
+        val count = field.count()
+        if (count == 0 && portalError.count() > 0) throw ItbPortalExecutionError()
+        if (count != 1) throw ItbPortalInputError(ItbPortalInputError.Reason.ATTACHMENT_COUNT)
+        val content = download(field.locator("xpath=ancestor::app-any-content-view[1]"))
+        return when (attachment) {
+            PortalAttachment.OFFER -> {
+                val url = walletLink(content)
+                if (!url.scheme.equals("openid-credential-offer", ignoreCase = true)) {
+                    throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_INVALID_URL)
                 }
-                val offer = offerUrl(preview("VCI request")) ?: run {
-                    // The issuer adapter can expose a non-QR barcode decode in its derived VCI text.
-                    val qr = row(Pattern.compile(
-                        "^\\s*(?:VCI request QR code|Credential QR code|Credential Offer QR code|QR code)\\s*$",
-                        Pattern.CASE_INSENSITIVE,
-                    ))
-                    if (qr.count() != 1) throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_QR_MISSING)
-                    offerUrl(ItbPresentationQr.decode(download(qr)))
-                        ?: throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_INVALID_URL)
+                val text = step(ItbPortalStepTimeout.Step.DIALOG) { dialog.innerText() }
+                val pin = Regex("""\bPIN\s+([0-9]+)\b""").find(text)?.groupValues?.get(1)
+                if (session.testSuite == "cs01v1" && session.testCase == "tc_vci_007" && pin == null) {
+                    throw ItbPortalInputError(ItbPortalInputError.Reason.TRANSACTION_CODE_MISSING)
                 }
-                ItbWalletInteraction.Offer(offer, pin)
+                ItbWalletInteraction.Offer(url, pin)
             }
-            // Consume the wallet-facing QR directly; ITB's derived text can be a false EAN/UPC decode.
-            text.contains("VP request") -> {
-                val qrLabel = if (session.testSuite == "ts12") "VP request QR code" else "Credential QR code"
-                val invocation = ItbPresentationQr.decode(download(row(qrLabel)))
-                val url = try {
-                    Url(invocation)
-                } catch (_: URLParserException) {
-                    throw ItbPortalInputError(ItbPortalInputError.Reason.PRESENTATION_QR_INVALID_URL)
-                }
-                ItbWalletInteraction.Presentation(url)
-            }
-            text.contains(ISSUANCE_LABEL) -> parseDigitalIssuance(preview(ISSUANCE_LABEL))
-            text.contains("TS12 payment Digital Credentials API presentation request") -> parseDigitalCredentials(
-                preview("TS12 payment Digital Credentials API presentation request"),
-            )
-            text.contains("Digital Credentials API presentation request") -> parseDigitalCredentials(
-                preview("Digital Credentials API presentation request"),
-            )
-            else -> error("The deployed case has an unrecognised wallet interaction")
+            PortalAttachment.PRESENTATION, PortalAttachment.PAYMENT ->
+                ItbWalletInteraction.Presentation(walletLink(content))
+            PortalAttachment.DC_ISSUANCE -> parseDigitalIssuance(content.decodeToString(throwOnInvalidSequence = true))
+            PortalAttachment.DC_PRESENTATION, PortalAttachment.DC_PAYMENT ->
+                parseDigitalCredentials(
+                    content.decodeToString(throwOnInvalidSequence = true),
+                    isPayment = attachment == PortalAttachment.DC_PAYMENT,
+                )
         }
     }
 
-    private fun offerUrl(value: String): Url? = try {
-        Url(value).takeIf { it.protocol.name == "openid-credential-offer" }
-    } catch (_: URLParserException) {
-        null
-    }
-
-    private fun row(label: String): Locator =
-        dialog().locator("app-any-content-view").filter(
-            Locator.FilterOptions().setHas(page.getByText(label, Page.GetByTextOptions().setExact(true))),
-        )
-
-    private fun row(label: Pattern): Locator {
-        return dialog().locator("app-any-content-view").filter(
-            Locator.FilterOptions().setHas(page.getByText(label)),
-        )
-    }
-
-    private fun preview(label: String): String {
-        val row = row(label)
-        val control = row.locator("button[ngbtooltip=Download], button[ngbtooltip=Copy]")
-        step(ItbPortalStepTimeout.Step.DOWNLOAD_CONTROL) {
-            control.waitFor(Locator.WaitForOptions().setTimeout(45_000.0))
-        }
-        // GITB renders plain values up to 100 characters inline, with Copy instead of Download.
-        // Read that exact row's complete text without touching the clipboard or evaluating scripts.
-        if (control.getAttribute("ngbtooltip") == "Copy") {
-            return row.locator(".content-value").innerText().trim().also {
-                require(it.length in 1..100) { "The ITB inline interaction has an unexpected size" }
-            }
-        }
-        return Charsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(download(row))).toString().trim()
+    private fun walletLink(content: ByteArray): URI = try {
+        URI(ItbWalletQr.decode(content)).takeIf { it.isAbsolute }
+            ?: throw ItbPortalInputError(ItbPortalInputError.Reason.WALLET_QR_INVALID_URL)
+    } catch (_: URISyntaxException) {
+        throw ItbPortalInputError(ItbPortalInputError.Reason.WALLET_QR_INVALID_URL)
     }
 
     private fun download(row: Locator): ByteArray {
@@ -261,8 +272,6 @@ class ItbPortalBridge(
     companion object {
         internal const val APPLICATION_READY_TIMEOUT_MILLIS = 60_000.0
 
-        private const val ISSUANCE_LABEL = "Prepare offer and invoke wallet for PID issuance"
-
         internal fun parseDigitalIssuance(script: String): ItbWalletInteraction.DigitalIssuance =
             ItbWalletInteraction.DigitalIssuance(
                 Url(string(script, "offerEndpoint")), string(script, "scenario"),
@@ -280,8 +289,8 @@ class ItbPortalBridge(
         }
 
         /** Read only the deployed script's declarative inputs; never execute supplied JavaScript in the wallet. */
-        internal fun parseDigitalCredentials(script: String): ItbWalletInteraction.DigitalCredentials {
-            val payment = if (Regex("\\b(?:const|let|var)\\s+attestationType\\s*=").containsMatchIn(script)) {
+        internal fun parseDigitalCredentials(script: String, isPayment: Boolean): ItbWalletInteraction.DigitalCredentials {
+            val payment = if (isPayment) {
                 fun literal(name: String): String {
                     val matches = Regex("\\b${Regex.escape(name)}\\s*:\\s*[\"']([^\"'\\r\\n]+)[\"']")
                         .findAll(script).toList()

@@ -106,7 +106,7 @@ private suspend fun runItb(): Int {
                         )
                     }
                     val chromePort = if (demoMode != null && selected.any { (suite, case) ->
-                        suite.id == "cts07" || case.id.startsWith("ts12_pay_dc_api_")
+                        PortalAttachment.forCase(suite.id, case.id).usesDcApi
                     }) required("ITB_CHROME_PORT").toInt().also { require(it in 1024..65535) } else null
                     try {
                         val driver = native?.let { it::execute } ?: ItbWalletDriver.create(
@@ -163,7 +163,7 @@ internal object ItbRunSelection {
             .associateBy { (suite, case) -> "${suite.id}/${case.id}" }
         fun available(case: ItbCatalogue.Case) = (!case.attended || !unattendedOnly) && (!case.demoOnly || demoApp)
         val requested = if (selection == null) {
-            all.filterValues { (_, case) -> available(case) }.keys
+            all.filterValues { (suite, case) -> !suite.optIn && available(case) }.keys
         } else {
             selection.split(',').map { selector ->
                 val id = selector.trim()

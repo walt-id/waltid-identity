@@ -112,7 +112,7 @@ class ItbCaseRunner(
                 phase = ItbCaseResult.Phase.INTERACTION
                 val interaction = bridge.read(createdSession)
                 case.invocationScheme?.let { expected ->
-                    require((interaction as? ItbWalletInteraction.Presentation)?.url?.protocol?.name == expected) {
+                    require((interaction as? ItbWalletInteraction.Presentation)?.url?.scheme.equals(expected, ignoreCase = true)) {
                         "The ITB interaction does not use the case's invocation scheme"
                     }
                 }
@@ -164,11 +164,11 @@ class ItbCaseRunner(
                 phase = ItbCaseResult.Phase.VERDICT
                 if (expectedStatus != null) bridge.confirmRevocation(createdSession)
                 while (true) {
-                    val status = api.status(listOf(createdSession.session)).single()
+                    val status = readVerdict { api.status(listOf(createdSession.session)).single() }
                     if (status.isComplete) break
                     delay(pollMillis)
                 }
-                val finalReport = api.report(case.id, createdSession.session)
+                val finalReport = readVerdict { api.report(case.id, createdSession.session) }
                 report = finalReport
                 outcome = when {
                     finalReport.passed -> ItbCaseResult.Outcome.PASSED
@@ -189,6 +189,9 @@ class ItbCaseRunner(
                 is ItbVerifierRejection -> error.code
                 is ItbPortalStepTimeout -> error.step.name.lowercase()
                 is ItbPortalInputError -> error.reason.name.lowercase()
+                is ItbRestClient.HttpFailure -> "itb_${error.operation}_${error.statusCode}"
+                is ItbRestClient.TransportFailure -> "itb_${error.operation}_transport"
+                is ItbRestClient.InvalidStatusResponse -> "itb_status_invalid_response"
                 is CredentialEndpointException -> "credential_endpoint_http_${error.statusCode}" +
                     (error.credentialError?.error?.takeIf(credentialEndpointErrorCodes::contains)?.let { "_$it" } ?: "")
                 is TokenRequestException -> ItbTokenFailure.reportCode(error)
@@ -219,6 +222,24 @@ class ItbCaseRunner(
             start, Instant.now().toString(), failure, cleanupFailed, errorCode,
             observation.statusObservations, observation.issuedCredentialIds,
         )
+    }
+
+    private suspend fun <T> readVerdict(read: suspend () -> T): T {
+        // Status and report reads are safe to repeat within the case's existing timeout.
+        repeat(2) {
+            try {
+                return read()
+            } catch (failure: IllegalStateException) {
+                val retryable = when (failure) {
+                    is ItbRestClient.TransportFailure, is ItbRestClient.InvalidStatusResponse -> true
+                    is ItbRestClient.HttpFailure -> failure.statusCode in 500..599 || failure.statusCode in setOf(408, 429)
+                    else -> false
+                }
+                if (!retryable) throw failure
+                delay(pollMillis)
+            }
+        }
+        return read()
     }
 
     private fun ItbWalletResult.singleIssuedCredential(): String =

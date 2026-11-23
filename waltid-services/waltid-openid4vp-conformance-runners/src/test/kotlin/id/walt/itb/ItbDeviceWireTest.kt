@@ -8,6 +8,7 @@ import kotlinx.serialization.json.*
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URI
 import java.nio.ByteBuffer
 import java.io.EOFException
 import java.io.IOException
@@ -42,8 +43,8 @@ class ItbDeviceWireTest {
     @Test
     fun `all operation types preserve their exact correlated inputs`() {
         val inputs = listOf(
-            ItbWalletInteraction.Offer(Url("openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer"), "123456"),
-            ItbWalletInteraction.Presentation(Url("openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest")),
+            ItbWalletInteraction.Offer(URI("openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer"), "123456"),
+            ItbWalletInteraction.Presentation(URI("openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest")),
             ItbWalletInteraction.DigitalCredentials(
                 Url("https://verifier.example/descriptor"), "session", "profile", "openid4vp-v1-signed",
                 ItbWalletInteraction.Payment("sca-iban", "Merchant", "payee", "EUR", "12.95", "transaction"),
@@ -56,7 +57,7 @@ class ItbDeviceWireTest {
         )
         inputs.forEach { input ->
             val encoded = ItbDeviceWire.encode(input)
-            assertEquals(encoded, ItbDeviceWire.encode(ItbDeviceWire.decode(encoded)))
+            assertEquals(input, ItbDeviceWire.decode(encoded))
         }
         assertFails { ItbDeviceWire.decode(buildJsonObject { put("kind", "sign") }) }
     }
@@ -190,7 +191,7 @@ class ItbDeviceWireTest {
                     }
                     ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://dev-i4mlab.aegean.gr"), "fixture", Dispatchers.IO).use {
                         val failure = assertFailsWith<ItbWalletRejection> {
-                            it.execute(ItbWalletInteraction.Presentation(Url("openid4vp://?request=fixture")))
+                            it.execute(ItbWalletInteraction.Presentation(URI("openid4vp://?request=fixture")))
                         }
                         assertEquals(expected, failure.code)
                         assertFalse(failure.toString().contains("private"))
@@ -215,7 +216,7 @@ class ItbDeviceWireTest {
                 }
                 ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://dev-i4mlab.aegean.gr"), "fixture", Dispatchers.IO).use {
                     assertFailsWith<IllegalStateException> {
-                        it.execute(ItbWalletInteraction.Presentation(Url("openid4vp://?request=fixture")))
+                        it.execute(ItbWalletInteraction.Presentation(URI("openid4vp://?request=fixture")))
                     }
                 }
                 peer.join()
@@ -238,7 +239,7 @@ class ItbDeviceWireTest {
                     }
                 }
                 ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://dev-i4mlab.aegean.gr"), "fixture", Dispatchers.IO).use { driver ->
-                    val pending = launch { driver.execute(ItbWalletInteraction.Presentation(Url("openid4vp://?request=fixture"))) }
+                    val pending = launch { driver.execute(ItbWalletInteraction.Presentation(URI("openid4vp://?request=fixture"))) }
                     received.await()
                     pending.cancelAndJoin()
                     assertIs<EOFException>(peer.await())
@@ -286,7 +287,7 @@ class ItbDeviceWireTest {
 
     private fun operation(sequence: Int) = buildJsonObject {
         put("sequence", sequence)
-        put("interaction", ItbDeviceWire.encode(ItbWalletInteraction.Presentation(Url("openid4vp://?request=fixture"))))
+        put("interaction", ItbDeviceWire.encode(ItbWalletInteraction.Presentation(URI("openid4vp://?request=fixture"))))
     }
 
     private fun withSockets(block: suspend CoroutineScope.(Socket, Socket) -> Unit) = runBlocking {
