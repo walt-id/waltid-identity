@@ -1,6 +1,18 @@
 import SwiftUI
 import WalletSDK
 
+private struct RetainWalletReceiptKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+public extension EnvironmentValues {
+    /// An explicit receipt action cancels idle dismissal before it changes the visible page.
+    var retainWalletReceipt: () -> Void {
+        get { self[RetainWalletReceiptKey.self] }
+        set { self[RetainWalletReceiptKey.self] = newValue }
+    }
+}
+
 public struct IssuanceResultContent: View {
     private let receipt: IssuanceReceipt?
     private let saved: [Credential]
@@ -70,11 +82,15 @@ private struct SavedCredentialRow: View {
     let credential: Credential
     @State private var detailsOpen = false
     @Environment(\.walletReviewNavigationAvailable) private var hasNavigation
+    @Environment(\.retainWalletReceipt) private var retainReceipt
     var body: some View {
-        Button { detailsOpen = true } label: {
+        Button {
+            retainReceipt()
+            detailsOpen = true
+        } label: {
             HStack {
                 CredentialSummaryRow(summary: .stored(from: credential))
-                Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                Image(systemName: "chevron.forward").font(.footnote.weight(.semibold)).foregroundStyle(.tint)
             }.padding(16).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("issuance-saved-\(credential.id)")
         .walletReviewDestination(isPresented: $detailsOpen) {

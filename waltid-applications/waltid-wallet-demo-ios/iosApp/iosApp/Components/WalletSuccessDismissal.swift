@@ -20,6 +20,7 @@ private struct WalletSuccessDismissal: ViewModifier {
     func body(content: Content) -> some View {
         let eligible = enabled && sheetLayoutReady && !interacted && !voiceOver && scenePhase == .active
         return content
+            .environment(\.retainWalletReceipt, { interacted = true })
             .simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { _ in interacted = true })
             .accessibilityElement(children: .contain)
             .onChange(of: key) { _ in interacted = false }
@@ -29,7 +30,8 @@ private struct WalletSuccessDismissal: ViewModifier {
             .task(id: TimerKey(operation: key, eligible: eligible)) {
                 guard eligible else { return }
                 do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return }
-                guard !Task.isCancelled else { return }
+                // An action can retain the receipt before SwiftUI cancels this task.
+                guard !Task.isCancelled, !interacted else { return }
                 onDone()
             }
     }

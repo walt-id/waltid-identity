@@ -42,7 +42,7 @@ actual object ZlibCompressor {
                     throw IllegalArgumentException("Zlib dictionary streams are not supported")
                 }
                 if (count > 0) {
-                    require(count <= maximumOutputBytes - result.size()) { "Decompressed status list exceeds the size limit" }
+                    if (count > maximumOutputBytes - result.size()) throw StatusListSizeLimitException()
                     result.write(buffer, 0, count)
                     continue
                 }

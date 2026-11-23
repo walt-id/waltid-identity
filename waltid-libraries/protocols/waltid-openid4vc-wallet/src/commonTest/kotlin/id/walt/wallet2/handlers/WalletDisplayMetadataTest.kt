@@ -193,7 +193,7 @@ class WalletDisplayMetadataTest {
         val configuration = original.credentialConfigurationsSupported.getValue("pid")
         val issuer = original.copy(display = null, credentialConfigurationsSupported = mapOf("pid" to configuration.copy(
             credentialMetadata = CredentialMetadata(claims = listOf(ClaimDescription(
-                path = listOf("namespace.with.dots", "given_name"), display = listOf(ClaimDisplay(name = "First name", locale = "en")),
+                path = listOf(JsonPrimitive("namespace.with.dots"), JsonPrimitive("given_name")), display = listOf(ClaimDisplay(name = "First name", locale = "en")),
             ))),
         )))
         val request = kotlinx.serialization.json.buildJsonObject { put("custom", kotlinx.serialization.json.JsonPrimitive("kept")) }

@@ -302,13 +302,6 @@ data class ClaimDescription(
     val mandatory: Boolean? = null,
     val display: List<ClaimDisplay>? = null,
 ) {
-    /** Convenience constructor for paths containing only object keys. */
-    constructor(
-        path: Collection<String>,
-        mandatory: Boolean? = null,
-        display: List<ClaimDisplay>? = null,
-    ) : this(path.map { JsonPrimitive(it) }, mandatory, display)
-
     init {
         require(path.isNotEmpty()) { "claim description path must not be empty" }
         require(path.all { canonicalClaimPathSegment(it) == it }) {

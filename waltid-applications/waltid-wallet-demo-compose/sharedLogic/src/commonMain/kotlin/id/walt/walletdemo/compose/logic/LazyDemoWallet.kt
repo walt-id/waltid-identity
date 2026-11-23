@@ -2,6 +2,8 @@ package id.walt.walletdemo.compose.logic
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 internal open class LazyDemoWallet<Wallet : DemoWallet>(
     private val createWallet: suspend () -> Wallet,
@@ -37,6 +39,19 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     ): WalletDemoSigningProtectionAvailability =
         wallet().signingProtectionAvailability(signingProtection)
 
+    override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = flow {
+        wallet().credentialStatusSnapshots().collect { emit(it) }
+    }
+    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = wallet().credentialStatusSnapshot()
+    override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary = wallet().refreshCredentialStatuses(ids, force)
+    override suspend fun submitStatusReviewedPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        reviewedStatus: Map<String, String>, did: String?, paymentConsentRevision: String?,
+        statusReviewEpoch: Long?,
+    ): WalletDemoOperationResult = wallet().submitStatusReviewedPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, reviewedStatus, did, paymentConsentRevision, statusReviewEpoch)
+
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
 
@@ -56,6 +71,20 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
         wallet().continueAuthorizationIssuance(sessionId, callbackUri)
 
     override suspend fun cancelIssuance(sessionId: String) = wallet().cancelIssuance(sessionId)
+
+    override suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    ) = wallet().rejectIssuedCredential(
+        notificationId = notificationId,
+        accessToken = accessToken,
+        credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+        notificationEndpoint = notificationEndpoint,
+        eventDescription = eventDescription,
+    )
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
         wallet().resumeDeferredIssuance(deferredCredentialId)

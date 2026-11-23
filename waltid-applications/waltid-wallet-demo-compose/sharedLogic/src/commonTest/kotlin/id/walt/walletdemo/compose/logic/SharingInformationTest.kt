@@ -105,8 +105,8 @@ class SharingInformationTest {
             "en-US" to listOf("Address", "City", "Country", "Postal code"),
             "fr" to listOf("Address", "City", "Country", "Postal code"),
         )) {
-            val details = base.toCredentialDetails(listOf(locale))
-            assertEquals(labels.drop(1), details.groups.first { it.id == "requested" }.items.map { it.label })
+            val legacy = base.toSharingInformation(listOf(locale))
+            assertEquals(labels.drop(1), legacy.fields.map { it.item.label })
             val group = review.toEffectiveSharingInformation(listOf(base), emptySet(), listOf(locale)).single()
             val address = group.contributions.single().nodes.single()
             assertEquals(labels[0], address.label)

@@ -29,7 +29,7 @@ internal fun WalletAccessSettingsScreen(controller: WalletDemoController, access
             onRetry = controller::submitPin, onCancel = controller::cancelPinChange)
     } else {
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).fillMaxWidth()
-            .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 640.dp).padding(20.dp),
+            .wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = WalletContentMaxWidth).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)) {
             WalletSection {
                 SettingsActionRow(stringResource(Res.string.settings_change_pin), controller::startPinChange,

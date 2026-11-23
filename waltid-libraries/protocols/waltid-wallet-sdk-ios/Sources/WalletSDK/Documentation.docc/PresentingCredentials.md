@@ -71,6 +71,11 @@ The returned claims include clear-text data carried by selected ancestor disclos
 contribution and use source paths for labels/controls, received paths for its compacted presentation data.
 Do not fill withheld values from the stored credential. Keep optional candidate values visibly separate.
 
+For mdoc, a location with `isBinary` identifies a byte string represented by one unpadded base64url
+value in `claimsJSON`. Use the flag to display the claim as binary data.
+Effective mdoc review paths follow the signed CBOR structure. Display serializers can still
+format the stored credential view.
+
 ```swift
 let information = try await wallet.reviewPresentation(
     previewHandle: preview.previewHandle,

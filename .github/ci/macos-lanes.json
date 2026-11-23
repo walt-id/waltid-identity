@@ -177,7 +177,7 @@
       ]
     },
     "visual-browser": {
-      "description": "Shared Wasm logic tests and complete browser visual catalogue",
+      "description": "Shared Wasm logic, browser visual catalogue, and real Wallet API 2 status journey",
       "patterns": [
         "waltid-libraries/*/src/commonMain/*",
         "waltid-libraries/*/src/wasmJsMain/*",
@@ -191,7 +191,13 @@
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsTest/*",
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/build.gradle.kts",
         "waltid-applications/waltid-wallet-demo-compose/webApp/*",
-        "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*"
+        "waltid-applications/waltid-wallet-demo-test-fixtures/visual/*",
+        "waltid-applications/mobile-e2e-fixtures/status/*",
+        "waltid-libraries/credentials/waltid-credential-status/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet/*",
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-server/*",
+        "waltid-services/waltid-wallet-api2/*",
+        ".github/scripts/mobile-ci/run-browser-live-status-e2e.sh"
       ]
     }
   }

@@ -32,7 +32,19 @@ final class IssuanceBridgeContractTests: XCTestCase {
         XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", credentialIdentifier: " ", holders: .newKeys(count: 1)))
     }
 
-    func testUncertainOutcomesRemainDistinctFromRetryableNetworkAndStorageFailures() throws {
+    func testIssuerRejectionPreservesTheCoreOfferRetryDecision() throws {
+        for canRetry in [false, true] {
+            let core = Waltid_openid4vc_walletWalletIssuanceOutcomeFailed(sessionId: "session",
+                error: .init(code: .issuerResponse, message: "Rejected", canRetryOffer: canRetry),
+                storedCredentialIds: [], deferredCredentials: [], failure: nil)
+            guard case let .failed(_, error, _, _) = try core.toSwiftIssuanceOutcome() else {
+                return XCTFail("Expected an issuer rejection")
+            }
+            XCTAssertEqual(error.canRetryOffer, canRetry)
+        }
+    }
+
+    func testUncertainOutcomesRemainDistinctFromNetworkAndStorageFailures() throws {
         let codes: [(Waltid_openid4vc_walletWalletIssuanceErrorCode, IssuanceErrorCode)] = [
             (.network, .network), (.storage, .storage),
             (.remoteOutcomeUncertain, .remoteOutcomeUncertain), (.storageOutcomeUncertain, .storageOutcomeUncertain),

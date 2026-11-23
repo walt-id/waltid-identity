@@ -8,6 +8,9 @@ import id.walt.wallet2.data.HolderKeyBindingErrorCode
 import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.status.CredentialStatusSnapshotStore
+import id.walt.wallet2.status.CredentialStatusStoredRecord
+import id.walt.wallet2.status.statusFingerprint
 import id.walt.wallet2.persistence.db.Credentials
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import kotlinx.coroutines.flow.Flow
@@ -26,7 +29,27 @@ private val json = Json { ignoreUnknownKeys = true }
  */
 public class SqlDelightCredentialStore(
     private val queries: WalletPersistenceQueries,
-) : WalletCredentialStore {
+) : WalletCredentialStore, CredentialStatusSnapshotStore {
+
+    /** Loads the current evidence revision, including a cleared snapshot; unreadable metadata is unavailable. */
+    override suspend fun readCredentialStatusRecord(credentialId: String): CredentialStatusStoredRecord? =
+        queries.selectCredentialStatus(credentialId).executeAsOneOrNull()?.let(::decodeStatusRecord)
+
+    private fun decodeStatusRecord(raw: String): CredentialStatusStoredRecord? =
+        runCatching { json.decodeFromString(CredentialStatusStoredRecord.serializer(), raw) }.getOrNull()
+
+    /** Atomically replaces [expected] only while the signed credential and stored evidence are unchanged. */
+    override suspend fun compareAndSetCredentialStatus(
+        credential: StoredCredential, expected: CredentialStatusStoredRecord?, updated: CredentialStatusStoredRecord,
+    ): Boolean = queries.transactionWithResult {
+        require(updated.revision != expected?.revision)
+        require(updated.snapshot?.credentialFingerprint?.let { it == credential.statusFingerprint() } != false)
+        val raw = queries.selectCredentialStatus(credential.id).executeAsOneOrNull()
+        if (raw?.let(::decodeStatusRecord) != expected) return@transactionWithResult false
+        queries.saveCredentialStatusIfCurrent(snapshot = json.encodeToString(CredentialStatusStoredRecord.serializer(), updated),
+            credential_id = credential.id, expected_credential = credential.credential.serializedForWalletPersistence(), expected_snapshot = raw)
+        queries.credentialStatusChanges().executeAsOne() == 1L
+    }
 
     /**
      * Loads a stored credential by wallet-local identifier.
@@ -50,6 +73,8 @@ public class SqlDelightCredentialStore(
      */
     override suspend fun addCredential(entry: StoredCredential) {
         val rawString = entry.credential.serializedForWalletPersistence()
+        queries.transaction {
+            if (queries.selectCredentialById(entry.id).executeAsOneOrNull()?.serialized_credential != rawString) queries.deleteCredentialStatus(entry.id)
         queries.insertCredential(
             id = entry.id,
             serialized_credential = rawString,
@@ -61,6 +86,7 @@ public class SqlDelightCredentialStore(
                 json.encodeToString(HolderKeyBinding.serializer(), it)
             },
         )
+        }
     }
 
     /**
@@ -68,7 +94,10 @@ public class SqlDelightCredentialStore(
      */
     override suspend fun removeCredential(id: String): Boolean {
         val exists = queries.selectCredentialById(id).executeAsOneOrNull() != null
-        if (exists) queries.deleteCredentialById(id)
+        if (exists) queries.transaction {
+            queries.deleteCredentialStatus(id)
+            queries.deleteCredentialById(id)
+        }
         return exists
     }
 

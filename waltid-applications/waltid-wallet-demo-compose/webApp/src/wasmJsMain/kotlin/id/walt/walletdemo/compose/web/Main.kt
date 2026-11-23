@@ -8,12 +8,18 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CancellationException
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,6 +47,7 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import kotlin.js.ExperimentalWasmJsInterop
+import org.w3c.dom.events.Event
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
@@ -114,6 +121,7 @@ private fun WebWalletRoot(branding: WalletDemoBranding) {
         session = current,
         branding = branding,
         authorizationNotice = authorizationNotice,
+        cleanupScope = scope,
         onSessionChange = { session = it },
         onSignOut = {
             WalletApi2BrowserSessionStore.clearIfCurrent(current)
@@ -136,6 +144,7 @@ private fun WebWalletSession(
     session: WalletApi2Session,
     branding: WalletDemoBranding,
     authorizationNotice: String?,
+    cleanupScope: CoroutineScope,
     onSessionChange: (WalletApi2Session?) -> Unit,
     onSignOut: () -> Unit,
     onSessionExpired: () -> Unit,
@@ -144,23 +153,45 @@ private fun WebWalletSession(
     val sessionScope = rememberCoroutineScope()
     val expireSession by rememberUpdatedState(onSessionExpired)
     var targets by remember(session.walletId, session.walletTargets) { mutableStateOf(session.walletTargets) }
-    val controller = remember(session.token, session.walletId, session.kind, session.baseUrl) {
+    val wallet = remember(session.token, session.walletId, session.kind, session.baseUrl) {
+        createWalletApi2DemoWallet(
+            baseUrl = session.baseUrl,
+            token = session.token,
+            walletId = session.walletId,
+            redirectUri = redirectUri,
+            kind = session.kind,
+            onWalletIdChanged = { WalletApi2BrowserSessionStore.updateWalletIdIfCurrent(session, it) },
+            onSessionExpired = { expireSession() },
+        )
+    }
+    val ownerScope = remember(wallet) {
+        CoroutineScope(sessionScope.coroutineContext + SupervisorJob(sessionScope.coroutineContext[Job]))
+    }
+    val controller = remember(wallet) {
         WalletDemoController(
-            wallet = createWalletApi2DemoWallet(
-                baseUrl = session.baseUrl,
-                token = session.token,
-                walletId = session.walletId,
-                redirectUri = redirectUri,
-                kind = session.kind,
-                onWalletIdChanged = { WalletApi2BrowserSessionStore.updateWalletIdIfCurrent(session, it) },
-                onSessionExpired = { expireSession() },
-            ),
+            wallet = wallet,
             pinStore = InMemoryDemoPinStore(),
             skipPin = true,
-            scope = sessionScope,
+            scope = ownerScope,
             issuanceRedirectUri = redirectUri,
             signingProtectionMode = WalletDemoSigningProtectionMode.Disabled,
         )
+    }
+
+    DisposableEffect(controller) {
+        val visibility: (Event) -> Unit = {
+            if (isWalletDocumentVisible()) controller.handleApplicationForegrounded()
+            else controller.handleApplicationBackgrounded()
+        }
+        if (isWalletDocumentVisible()) controller.handleApplicationForegrounded()
+        else controller.handleApplicationBackgrounded()
+        document.addEventListener("visibilitychange", visibility)
+        onDispose {
+            document.removeEventListener("visibilitychange", visibility)
+            controller.handleApplicationBackgrounded()
+            ownerScope.cancel()
+            cleanupScope.launch(start = CoroutineStart.UNDISPATCHED) { wallet.close() }
+        }
     }
 
     LaunchedEffect(session.token, session.kind, session.baseUrl) {
@@ -189,7 +220,11 @@ private fun WebWalletSession(
     WalletDemoApp(
         controller,
         branding = branding,
-        onSignOut = onSignOut,
+        onSignOut = {
+            controller.handleApplicationBackgrounded()
+            ownerScope.cancel()
+            cleanupScope.launch { wallet.close(); onSignOut() }
+        },
         resetWalletDescription = "This deletes the current wallet, including its keys and credentials, from the server and creates an empty wallet. Your account remains signed in.",
         allowWalletReset = session.kind.canManageWallet,
         allowCredentialDelete = session.kind.canDeleteCredential,
@@ -247,3 +282,7 @@ private fun isAuthorizationCallbackHref(href: String): Boolean {
 private fun clearPageQueryFromAddressBar() {
     window.history.replaceState(null, "", window.location.pathname)
 }
+
+@OptIn(ExperimentalWasmJsInterop::class)
+@JsFun("() => document.visibilityState === 'visible'")
+private external fun isWalletDocumentVisible(): Boolean

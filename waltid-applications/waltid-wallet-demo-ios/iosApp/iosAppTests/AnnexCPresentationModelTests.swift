@@ -1,7 +1,7 @@
 import Foundation
 import WalletDemoIdentityDocumentSupport
 import WalletDemoSharingUI
-import WalletSDK
+@testable import WalletSDK
 import XCTest
 
 /// What the provider extension does with a request, without an iOS 26 request to do it with.
@@ -146,6 +146,57 @@ final class AnnexCPresentationModelTests: XCTestCase {
     }
 
     @MainActor
+    func testProviderSubmitsTheCapturedStatusRevisionWithoutUsingTheOrdinaryPath() async throws {
+        let status = try WalletVisualFixtures().credentialStatus("revoked_current")
+        let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [
+            CredentialStatusRecord(credentialID: "cred-mdl", storeIndex: 0, value: status),
+        ], refreshingCredentialIDs: [])
+        let context = StubRequestContext(rawRequest: Self.rawRequestJSON)
+        let wallet = StubWallet(preview: Self.preview(documentTypes: ["org.iso.18013.5.1.mDL"]),
+            responseJSON: #"{"response":"-_--An8"}"#, statusSnapshot: snapshot)
+        let model = AnnexCPresentationModel(context: context, makeWallet: { wallet })
+        await model.prepare()
+        XCTAssertEqual(model.credentialStatusReadState, .available)
+        XCTAssertEqual(model.credentialStatuses["cred-mdl"], status)
+        let revisions = ["cred-mdl": status.presentation.advisoryRevision]
+
+        await model.submit(reviewedStatus: revisions)
+
+        XCTAssertNil(model.failure)
+        XCTAssertEqual(wallet.reviewedStatus, revisions)
+        XCTAssertEqual(wallet.ordinarySubmissions, 0, "The provider must not discard the reviewed binding")
+        XCTAssertEqual(wallet.submitted?.selectedCredentialOptions.map(\.credentialID), ["cred-mdl"])
+        XCTAssertEqual(context.sentResponse, Data([0xfb, 0xff, 0xbe, 0x02, 0x7f]))
+        XCTAssertEqual(wallet.closed, 1)
+    }
+
+    @MainActor
+    func testStatusChangeWithAnUnreadableRereadReturnsTheProviderToReviewWithoutSealing() async throws {
+        let status = try WalletVisualFixtures().credentialStatus("revoked_current")
+        let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [
+            CredentialStatusRecord(credentialID: "cred-mdl", storeIndex: 0, value: status),
+        ], refreshingCredentialIDs: [])
+        let context = StubRequestContext(rawRequest: Self.rawRequestJSON)
+        let wallet = StubWallet(preview: Self.preview(documentTypes: ["org.iso.18013.5.1.mDL"]),
+            submitFailure: WalletError.credentialStatusReviewChanged,
+            statusSnapshot: snapshot, failStatusReread: true)
+        let model = AnnexCPresentationModel(context: context, makeWallet: { wallet })
+        await model.prepare()
+
+        await model.submit(reviewedStatus: ["cred-mdl": status.presentation.advisoryRevision])
+
+        XCTAssertFalse(model.isSubmitting)
+        XCTAssertTrue(model.hasCompleteSelection)
+        XCTAssertEqual(model.credentialStatusReadState, .unavailable)
+        XCTAssertEqual(model.credentialStatuses["cred-mdl"], status, "A failed local read retains earlier evidence")
+        XCTAssertEqual(model.statusReviewNotice, "Status changed, but its latest details are unavailable. Try again.")
+        XCTAssertNil(context.sentResponse)
+        XCTAssertEqual(wallet.ordinarySubmissions, 0)
+        model.cancel()
+        XCTAssertEqual(context.cancelCount, 1, "The recovered review must remain dismissible")
+    }
+
+    @MainActor
     func testAMissingVerifiedOriginFailsTheRequestRatherThanReviewingAnAnonymousCaller() async {
         let model = AnnexCPresentationModel(
             context: StubRequestContext(verifiedOrigin: nil),
@@ -160,7 +211,7 @@ final class AnnexCPresentationModelTests: XCTestCase {
 
     @MainActor
     func testCancellationDuringPreparationCannotRestoreAReviewOrAutoSubmit() async {
-        for pauseAtPreview in [false, true] {
+        for (pauseAtPreview, cancelTask) in [(false, false), (false, true), (true, false)] {
             let started = expectation(description: "Preparation suspended")
             let gate = PreparationGate(started: started)
             let context = StubRequestContext()
@@ -173,8 +224,8 @@ final class AnnexCPresentationModelTests: XCTestCase {
             let preparation = Task { await model.prepare() }
             await fulfillment(of: [started], timeout: 5)
             await model.prepare() // A repeated SwiftUI task must not open a second request.
-            model.cancel()
-            model.cancel()
+            if cancelTask { preparation.cancel() }
+            else { model.cancel(); model.cancel() }
             await gate.release()
             await preparation.value
             await model.submit() // The preview-off path also cannot release a cancelled request.
@@ -182,6 +233,9 @@ final class AnnexCPresentationModelTests: XCTestCase {
             XCTAssertNil(model.failure)
             XCTAssertEqual(context.cancelCount, 1)
             XCTAssertEqual(context.sendResponseCount, 0)
+            let closed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in wallet.closed == 1 }, object: nil)
+            let closure = await XCTWaiter.fulfillment(of: [closed], timeout: 5)
+            XCTAssertEqual(closure, .completed, "Cancellation must close even a wallet opened after the request ended")
         }
     }
 
@@ -259,23 +313,44 @@ final class AnnexCPresentationModelTests: XCTestCase {
         private let responseJSON: String
         private let submitFailure: (any Error)?
         private let previewGate: PreparationGate?
+        private let statusSnapshot: CredentialStatusSnapshot?
+        private let failStatusReread: Bool
         private let lock = NSLock()
         private var recorded: SubmittedPresentation?
+        private var recordedStatus: [String: String]?
+        private var statusReads = 0
+        private var ordinaryCount = 0
+        private var closeCount = 0
 
         /// Stage 2's arguments, or `nil` if the wallet was never asked to seal anything.
         var submitted: SubmittedPresentation? { lock.withLock { recorded } }
+        var reviewedStatus: [String: String]? { lock.withLock { recordedStatus } }
+        var ordinarySubmissions: Int { lock.withLock { ordinaryCount } }
+        var closed: Int { lock.withLock { closeCount } }
 
         init(
             preview: AnnexCPresentationPreview,
             responseJSON: String = "{}",
             submitFailure: (any Error)? = nil,
-            previewGate: PreparationGate? = nil
+            previewGate: PreparationGate? = nil,
+            statusSnapshot: CredentialStatusSnapshot? = nil,
+            failStatusReread: Bool = false
         ) {
             self.preview = preview
             self.responseJSON = responseJSON
             self.submitFailure = submitFailure
             self.previewGate = previewGate
+            self.statusSnapshot = statusSnapshot
+            self.failStatusReread = failStatusReread
         }
+
+        func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? {
+            let shouldFail = lock.withLock { statusReads += 1; return failStatusReread && statusReads > 1 }
+            if shouldFail { throw StubWalletFailure() }
+            return statusSnapshot
+        }
+
+        func closeStatusWallet() async throws { lock.withLock { closeCount += 1 } }
 
         func previewAnnexCPresentation(
             parsedRequest: AnnexCParsedRequest,
@@ -293,6 +368,23 @@ final class AnnexCPresentationModelTests: XCTestCase {
             encryptionInfoBase64URL: String,
             selectedCredentialOptions: [PresentationCredentialSelection]
         ) async throws -> DigitalCredentialResponse {
+            lock.withLock { ordinaryCount += 1 }
+            return try seal(requestID: requestID, verifiedOrigin: verifiedOrigin,
+                deviceRequestBase64URL: deviceRequestBase64URL, encryptionInfoBase64URL: encryptionInfoBase64URL,
+                selectedCredentialOptions: selectedCredentialOptions)
+        }
+
+        func submitStatusReviewedAnnexCPresentation(reviewedStatus: [String: String], requestID: String, verifiedOrigin: String,
+            deviceRequestBase64URL: String, encryptionInfoBase64URL: String,
+            selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse {
+            lock.withLock { recordedStatus = reviewedStatus }
+            return try seal(requestID: requestID, verifiedOrigin: verifiedOrigin,
+                deviceRequestBase64URL: deviceRequestBase64URL, encryptionInfoBase64URL: encryptionInfoBase64URL,
+                selectedCredentialOptions: selectedCredentialOptions)
+        }
+
+        private func seal(requestID: String, verifiedOrigin: String, deviceRequestBase64URL: String,
+            encryptionInfoBase64URL: String, selectedCredentialOptions: [PresentationCredentialSelection]) throws -> DigitalCredentialResponse {
             lock.withLock {
                 recorded = SubmittedPresentation(
                     requestID: requestID,
