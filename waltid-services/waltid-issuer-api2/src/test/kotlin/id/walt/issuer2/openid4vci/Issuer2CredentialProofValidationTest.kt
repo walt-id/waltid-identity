@@ -341,6 +341,7 @@ class Issuer2CredentialProofValidationTest {
         )
         val flow = prepareFlow(apiClient(), openBadge)
         val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
+        assertRejectedCredentialRequest(flow.request(proof(holders.first(), flow.nonce())))
         val dids = holders.map { DidJwkRegistrar().registerByKey(it, DidJwkCreateOptions(KeyType.secp256r1)).did }
         val nonce = flow.nonce()
         for (valid in listOf(false, true)) {
