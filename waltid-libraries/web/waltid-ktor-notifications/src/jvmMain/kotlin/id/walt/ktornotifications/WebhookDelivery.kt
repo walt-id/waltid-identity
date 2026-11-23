@@ -43,7 +43,7 @@ data class WebhookDelivery(
     /** Internal storage key for erasure, independent of the receiver-visible session ID. */
     val sessionOwner: String? = null,
     val retainOnFailure: Boolean = true,
-    /** Original session updates use zero. Only erasure can issue a generation for a redacted callback. */
+    /** Generation of the session snapshot that produced this callback. Older snapshots use zero. */
     val sessionGeneration: Long = 0,
 ) {
     fun deadLetter(): WebhookDeadLetter = WebhookDeadLetter(

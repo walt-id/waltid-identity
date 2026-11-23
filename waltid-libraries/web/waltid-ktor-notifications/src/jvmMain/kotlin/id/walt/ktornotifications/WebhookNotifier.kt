@@ -250,8 +250,8 @@ internal class WebhookDeliveryQueue(
         claims.size
     }
 
-    suspend fun eraseSession(sessionOwner: String, allowPurgeNotification: Boolean = false) =
-        store.eraseSession(sessionOwner, allowPurgeNotification)
+    suspend fun eraseSession(sessionOwner: String, allowFutureCallbacks: Boolean = false) =
+        store.eraseSession(sessionOwner, allowFutureCallbacks)
 
     suspend fun deadLetters(): List<WebhookDeadLetter> = store.deadLetters()
 
@@ -400,8 +400,8 @@ object WebhookNotifier {
         return activeQueue.enqueue(update, config, sessionOwner, retainOnFailure, sessionGeneration)
     }
 
-    suspend fun eraseSession(sessionOwner: String, allowPurgeNotification: Boolean = false) =
-        queue().eraseSession(sessionOwner, allowPurgeNotification)
+    suspend fun eraseSession(sessionOwner: String, allowFutureCallbacks: Boolean = false) =
+        queue().eraseSession(sessionOwner, allowFutureCallbacks)
 
     suspend fun deadLetters(): List<WebhookDeadLetter> = queue().deadLetters()
 

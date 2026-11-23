@@ -510,7 +510,7 @@ class WebhookDeliveryQueueTest {
             resumeProducer.await()
             queue.enqueue(oldUpdate, webhook(), sessionOwner = owner)
         }
-        val purged = queue.eraseSession(owner, allowPurgeNotification = true)
+        val purged = queue.eraseSession(owner, allowFutureCallbacks = true)
         resumeProducer.complete(Unit)
         assertNull(store.pending(late.await()))
 

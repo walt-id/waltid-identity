@@ -16,6 +16,8 @@ import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -165,6 +167,15 @@ data class Verification2Session(
     @SerialName("failure")
     var failure: SessionFailure? = null,
 ) {
+    /** Internal outbox generation of this stored snapshot. An attempt keeps the generation it loaded. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    var webhookGeneration: Long = 0
+
+    /** Keep internal delivery state when copying a session for storage or processing rollback. */
+    fun copyWithWebhookGeneration(generation: Long = webhookGeneration): Verification2Session =
+        copy().also { it.webhookGeneration = generation }
+
     /** Request retrieval only transitions an idle session; it never resets an attempt's outcome. */
     val needsInUseTransition: Boolean
         get() = status.successful == null && status !in setOf(

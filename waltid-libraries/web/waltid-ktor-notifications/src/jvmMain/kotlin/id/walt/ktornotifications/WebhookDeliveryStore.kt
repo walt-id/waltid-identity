@@ -28,7 +28,7 @@ private val storeLog = io.github.oshai.kotlinlogging.KotlinLogging.logger { }
 interface WebhookDeliveryStore {
     suspend fun enqueue(delivery: WebhookDelivery)
     /** Revoke older generations, including producers that still hold a pre-erasure snapshot. */
-    suspend fun eraseSession(sessionOwner: String, allowPurgeNotification: Boolean = false): Long
+    suspend fun eraseSession(sessionOwner: String, allowFutureCallbacks: Boolean = false): Long
     /** Keep erasure from succeeding between admission of a scoped claim and completion of its send. */
     suspend fun dispatch(claim: WebhookDeliveryClaim, send: suspend () -> Unit)
     suspend fun pending(deliveryId: String): WebhookDelivery?
@@ -103,10 +103,10 @@ internal class FileWebhookDeliveryStore(
 
     private fun accepts(owner: String, expected: Long) = expected >= 0 && generation(owner) == expected
 
-    override suspend fun eraseSession(sessionOwner: String, allowPurgeNotification: Boolean): Long {
+    override suspend fun eraseSession(sessionOwner: String, allowFutureCallbacks: Boolean): Long {
         val (next, inFlight) = mutex.withLock {
             val previous = generation(sessionOwner)
-            val next = if (allowPurgeNotification && previous >= 0) Math.incrementExact(previous) else DELETED_WEBHOOK_SESSION
+            val next = if (allowFutureCallbacks && previous >= 0) Math.incrementExact(previous) else DELETED_WEBHOOK_SESSION
             writeAtomically(generations.resolve(webhookSessionKey(sessionOwner)), next.toString())
             // Remove pending first so a shadow left by an interrupted redrive cannot become visible.
             for (directory in listOf(pendingDirectory, deadLetterDirectory)) {

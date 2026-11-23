@@ -10,6 +10,7 @@ import io.ktor.server.plugins.BadRequestException
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.fetchBinaryFile
+import id.walt.commons.web.WebException
 import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.WebhookNotifier
@@ -133,6 +134,7 @@ object Verifier2Service {
     ) -> Unit = { session, event, block ->
         log.trace { "Updating session due to '$event': ${session.id}" }
         val notificationConfig = session.notifications
+        val webhookGeneration = session.webhookGeneration
         // Request retrieval retries only a real status transition and never changes a processing claim's version.
         val updated = if (event == SessionEvent.authorization_request_requested) {
             repository.update(session.id, shouldUpdate = {
@@ -141,6 +143,9 @@ object Verifier2Service {
             }, transform = block).session
         } else {
             val current = repository.get(session.id) ?: throw VerificationSessionNotFoundException(session.id)
+            if (current.session.webhookGeneration != webhookGeneration) {
+                throw WebException(409, "Verification session was purged during this attempt")
+            }
             // The verification engine reads this same instance between updates.
             repository.compareAndSet(session.id, current.version, session.apply(block)).session
         }
@@ -151,7 +156,10 @@ object Verifier2Service {
             val publicSession = updated.publicView()
             Verifier2SessionUpdate(publicSession.id, event, publicSession)
                 .toKtorSessionUpdate()
-                .notifySessionUpdate(publicSession.id, notificationConfig, sessionOwner = publicSession.id)
+                .notifySessionUpdate(
+                    publicSession.id, notificationConfig, sessionOwner = publicSession.id,
+                    sessionGeneration = webhookGeneration,
+                )
         } catch (exception: WebhookDestinationNotAllowedException) {
             log.warn { "Could not deliver verification session notification for ${updated.id}: ${exception.message}" }
         } catch (exception: Exception) {
@@ -258,17 +266,20 @@ object Verifier2Service {
                         request { pathParameter<String>(VERIFICATION_SESSION) }
                         response {
                             HttpStatusCode.NoContent to { description = "Personal data purged" }
+                            HttpStatusCode.Conflict to { description = "Session deletion in progress" }
                             HttpStatusCode.NotFound to { description = "No such session" }
                         }
                     }) {
                         val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
-                        val current = repository.get(sessionId)
-                            ?: throw VerificationSessionNotFoundException(sessionId)
-                        // Compare-and-set rather than a blind write: a presentation may be landing on this
-                        // session concurrently, and the purge must not resurrect the state it read.
-                        val purged = current.session.copyForStorage().apply { deletePII() }
-                        repository.compareAndSet(sessionId, current.version, purged)
-                        WebhookNotifier.eraseSession(sessionId)
+                        if (repository.get(sessionId) == null) throw VerificationSessionNotFoundException(sessionId)
+                        val generation = WebhookNotifier.eraseSession(sessionId, allowFutureCallbacks = true)
+                        if (generation < 0) throw WebException(409, "Verification session deletion is in progress")
+                        // Update the redacted snapshot and its generation in the same CAS. A concurrent
+                        // purge can finish first, so never replace a newer generation with this one.
+                        repository.update(sessionId, shouldUpdate = { webhookGeneration < generation }) {
+                            deletePII()
+                            webhookGeneration = generation
+                        }
                         call.respond(HttpStatusCode.NoContent)
                     }
 
