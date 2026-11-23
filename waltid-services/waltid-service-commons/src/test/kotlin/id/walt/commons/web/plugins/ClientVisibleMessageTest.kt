@@ -1,5 +1,6 @@
 package id.walt.commons.web.plugins
 
+import id.walt.errors.StatusException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -13,6 +14,10 @@ class ClientVisibleMessageTest {
     @Test
     fun `a client error keeps its message`() {
         assertEquals("id_token is required", clientVisibleMessage(IllegalArgumentException("id_token is required")))
+        assertEquals(
+            "Wallet 'w' holds no key usable for signing",
+            clientVisibleMessage(StatusException(400, "Wallet 'w' holds no key usable for signing")),
+        )
     }
 
     @Test

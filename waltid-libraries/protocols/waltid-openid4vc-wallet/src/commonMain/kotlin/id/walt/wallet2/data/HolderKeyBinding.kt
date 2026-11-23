@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.data
 
+import id.walt.errors.HttpStatusError
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.did.dids.DidService
@@ -102,7 +103,20 @@ class HolderKeyBindingException(
     val credentialId: String,
     message: String,
     cause: Throwable? = null,
-) : IllegalStateException(message, cause)
+) : IllegalStateException(message, cause), HttpStatusError {
+    /**
+     * Most codes mean the credential cannot be used with the wallet's current keys (409), which the caller can act
+     * on. A persisted binding that cannot be read ([HolderKeyBindingErrorCode.BINDING_INVALID]) is corrupt stored
+     * data and an unavailable key provider is an outage, so those stay server errors whose message is not returned.
+     */
+    override val status: Int
+        get() = when (code) {
+            HolderKeyBindingErrorCode.CREDENTIAL_NOT_FOUND -> 404
+            HolderKeyBindingErrorCode.BINDING_INVALID -> 500
+            HolderKeyBindingErrorCode.KEY_PROVIDER_UNAVAILABLE -> 503
+            else -> 409
+        }
+}
 
 data class ResolvedHolderKey(
     val keyMaterial: WalletKeyStoreEntry,

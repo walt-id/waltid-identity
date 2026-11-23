@@ -1,9 +1,13 @@
 package id.walt.wallet2.status
 
+import id.walt.errors.HttpStatusError
 import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
 
 /** The selected credential's semantic warning changed since the host rendered its confirmation. */
-class CredentialStatusReviewChangedException : IllegalStateException("Credential status changed. Review the updated information before sharing.")
+class CredentialStatusReviewChangedException : IllegalStateException("Credential status changed. Review the updated information before sharing."),
+    HttpStatusError {
+    override val status: Int get() = 409
+}
 
 /** Captures one local review; timestamps are excluded from the shared semantic revision. */
 fun WalletCredentialStatusService.reviewGuard(selectedIds: Set<String>, reviewed: Map<String, String>): PresentationReviewGuard {

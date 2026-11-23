@@ -2,6 +2,8 @@
 
 package id.walt.wallet2.handlers
 
+import id.walt.errors.HttpStatusError
+import id.walt.wallet2.WalletRequestException
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.DirectSerializedKey
@@ -114,8 +116,8 @@ interface CredentialOfferSource {
 
 /** Validates the mutual exclusivity of [offerUrl] and [offerJson]. Call from `init {}` blocks. */
 fun CredentialOfferSource.checkOfferSource() {
-    check(offerUrl != null || offerJson != null) { "Either offerUrl or offerJson must be provided" }
-    check(offerUrl == null || offerJson == null) { "Only one of offerUrl or offerJson may be provided, not both" }
+    if (offerUrl == null && offerJson == null) throw WalletRequestException("Either offerUrl or offerJson must be provided")
+    if (offerUrl != null && offerJson != null) throw WalletRequestException("Only one of offerUrl or offerJson may be provided, not both")
 }
 
 // ---------------------------------------------------------------------------
@@ -1099,6 +1101,13 @@ data class ExchangeCodeRequest(
 // ---------------------------------------------------------------------------
 
 /**
+ * The wallet has no key it may sign the credential proof with, and the request named none: the caller must supply
+ * an inline key or a keyId, or add a signing key to the wallet. A 400 whose message is returned to the caller,
+ * who owns the wallet, so they can fix the request rather than read an opaque internal error.
+ */
+class WalletSigningKeyUnavailableException(message: String) : WalletRequestException(message)
+
+/**
  * Thrown when an issuer's only token authentication method is a wallet instance attestation
  * and this wallet has no provider that can obtain one.
  *
@@ -1107,7 +1116,9 @@ data class ExchangeCodeRequest(
  */
 public class WalletInstanceAttestationRequiredException(
     message: String = "This issuer requires a wallet instance attestation, and no wallet provider is configured",
-) : IllegalStateException(message)
+) : IllegalStateException(message), HttpStatusError {
+    override val status: Int get() = 400
+}
 
 /**
  * OpenID4VCI 1.0 credential issuance logic.
@@ -1314,7 +1325,7 @@ object WalletIssuanceHandler {
             // The previous wording claimed the wallet had no key stores, which misreports the common
             // case of a store that exists but is empty - resolveKeyMaterial also returns null when a
             // named key is absent, or when the keys present do not permit signing.
-            ?: error(
+            ?: throw WalletSigningKeyUnavailableException(
                 request.keyId?.let { "Wallet '${wallet.id}' has no key '$it' usable for signing" }
                     ?: "Wallet '${wallet.id}' holds no key usable for signing: none of its " +
                     "${wallet.keyStores.size} key store(s) contained a key permitting KeyUsage.SIGN, " +
@@ -1351,7 +1362,7 @@ object WalletIssuanceHandler {
 
         // 3. Pre-authorized code grant only (auth-code handled by separate flow)
         val preAuthGrant = offer.grants?.preAuthorizedCode
-            ?: error("Only pre-authorized code grant is currently supported. Offer grants: ${offer.grants}")
+            ?: throw WalletRequestException("This operation supports only offers with a pre-authorized code grant")
         log.trace { "Using pre-authorized code grant" }
 
         // 4. Request token
@@ -1806,11 +1817,11 @@ object WalletIssuanceHandler {
     ): SignProofsResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
-            ?: error("No key available for signing proof")
+            ?: throw WalletSigningKeyUnavailableException("No key available for signing proof")
         val issuerMetadata = IssuerMetadataResolver(httpClient)
             .resolveCredentialIssuerMetadata(request.issuerUrl.toString()).metadata
         val configuration = issuerMetadata.credentialConfigurationsSupported[request.credentialConfigurationId]
-            ?: error(
+            ?: throw WalletRequestException(
                 "Unknown credential configuration '${request.credentialConfigurationId}' " +
                         "for issuer '${issuerMetadata.credentialIssuer}'"
             )
@@ -2397,7 +2408,7 @@ object WalletIssuanceHandler {
 
         log.debug { "Issuer supports attestation-based client auth, building attestation headers" }
         val key = resolveInstanceKey()
-            ?: error("No key available for client attestation")
+            ?: throw WalletSigningKeyUnavailableException("No key available for client attestation")
         val context = flowId?.let { wallet?.clientAttestationChallenges(asMetadata.issuer, clientId, key, it) }
             ?: ClientAttestationChallengeContext()
         if (restoredDiscovery) context.restore(
@@ -2667,7 +2678,7 @@ object WalletIssuanceHandler {
         parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val httpClient = httpClient
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
-            ?: error("credentialIssuerBaseUrl must be provided")
+            ?: throw WalletRequestException("credentialIssuerBaseUrl must be provided")
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient).metadata
         return exchangeCodeDetailed(
             request = request,
@@ -2697,7 +2708,7 @@ object WalletIssuanceHandler {
     ): RequestTokenDetailedResult {
         val manualAttestation = parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
-            ?: error("credentialIssuerBaseUrl must be provided")
+            ?: throw WalletRequestException("credentialIssuerBaseUrl must be provided")
         val asResolution = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
         val asMetadata = asResolution.metadata
         val tokenEndpoint = asMetadata.tokenEndpoint
@@ -3032,7 +3043,7 @@ object WalletIssuanceHandler {
         wallet.issuanceSessions(httpClient).ensureOpen()
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
-            ?: error("No key available for proof-of-possession")
+            ?: throw WalletSigningKeyUnavailableException("No key available for proof-of-possession")
         val holderDid = request.did ?: wallet.defaultDid()
 
         val issuerMetadata = IssuerMetadataResolver(httpClient)

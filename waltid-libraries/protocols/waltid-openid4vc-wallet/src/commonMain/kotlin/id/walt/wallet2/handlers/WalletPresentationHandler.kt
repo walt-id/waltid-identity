@@ -2,6 +2,9 @@
 
 package id.walt.wallet2.handlers
 
+import id.walt.errors.HttpStatusError
+import id.walt.wallet2.WalletStateConflictException
+import id.walt.wallet2.WalletRequestException
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.signatures.sdjwt.locatedDisclosures
 import id.walt.dcql.models.meta.SdJwtVcMeta
@@ -363,7 +366,10 @@ data class SubmitDcApiPresentationRequest(
 )
 
 class MissingPresentationPreviewException :
-    IllegalStateException("Presentation request preview expired or was not found; preview the request again before responding.")
+    IllegalStateException("Presentation request preview expired or was not found; preview the request again before responding."),
+    HttpStatusError {
+    override val status: Int get() = 404
+}
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -481,7 +487,7 @@ object WalletPresentationHandler {
     ): WalletPresentResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
-            ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
+            ?: throw WalletSigningKeyUnavailableException("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
         log.trace { "presentCredential: keyId=${keyMaterial.keyId}, did=$did, requestUrl=${request.requestUrl}" }
 
@@ -579,7 +585,7 @@ object WalletPresentationHandler {
     ): WalletPresentResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
-            ?: error("No key available for isolated presentation")
+            ?: throw WalletSigningKeyUnavailableException("No key available for isolated presentation")
         val did = request.did ?: wallet.defaultDid()
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
@@ -740,7 +746,7 @@ object WalletPresentationHandler {
             results.map { result ->
                 val raw = result.credential as RawDcqlCredential
                 val stored = storedById[raw.id]
-                    ?: error("Credential '${raw.id}' disappeared while building presentation preview")
+                    ?: throw WalletStateConflictException("Credential '${raw.id}' disappeared while building presentation preview")
                 val credential = stored.credential
                 PresentationCredentialOption(
                     queryId = queryId,
@@ -841,7 +847,7 @@ object WalletPresentationHandler {
         val credentialOptions = matched.flatMap { (queryId, results) ->
             results.map { result ->
                 val raw = result.credential as RawDcqlCredential
-                val stored = storedById[raw.id] ?: error("Credential '${raw.id}' disappeared while building presentation preview")
+                val stored = storedById[raw.id] ?: throw WalletStateConflictException("Credential '${raw.id}' disappeared while building presentation preview")
                 val credential = stored.credential
                 PresentationCredentialOption(
                     queryId = queryId,
@@ -961,7 +967,7 @@ object WalletPresentationHandler {
             results.map { result ->
                 val raw = result.credential as RawDcqlCredential
                 val stored = storedById[raw.id]
-                    ?: error("Credential '${raw.id}' disappeared while building DC API presentation preview")
+                    ?: throw WalletStateConflictException("Credential '${raw.id}' disappeared while building DC API presentation preview")
                 PresentationCredentialOption(
                     queryId = queryId,
                     credentialId = stored.id,
@@ -1077,7 +1083,7 @@ object WalletPresentationHandler {
         require(preview is PreviewedPresentation.Ready) { "Cannot prepare an invalid presentation" }
         require(request.keyId == null || request.keyId == preview.keyId) { "The signing key must match the reviewed key" }
         val authorization = preview.resolvedAuthorizationRequest.authorizationRequest
-        val key = wallet.resolveKeyMaterial(preview.keyId, setOf(KeyUsage.SIGN)) ?: error("Reviewed signing key is unavailable")
+        val key = wallet.resolveKeyMaterial(preview.keyId, setOf(KeyUsage.SIGN)) ?: throw WalletStateConflictException("Reviewed signing key is unavailable")
         val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
             request.selectedCredentialOptions, request.selectedDisclosureOptions)
         validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
@@ -1098,7 +1104,7 @@ object WalletPresentationHandler {
             "A selected credential was not offered by the retained Digital Credentials preview"
         }
         val authorization = preview.request.authorizationRequest
-        val key = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)) ?: error("Signing key is unavailable")
+        val key = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN)) ?: throw WalletSigningKeyUnavailableException("Signing key is unavailable")
         val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
             request.selectedCredentialOptions, request.selectedDisclosureOptions)
         validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
@@ -1188,7 +1194,7 @@ object WalletPresentationHandler {
             val resolvedAuthorizationRequest = ready.resolvedAuthorizationRequest
             // Sign with exactly the key the request was validated against during preview.
             val keyMaterial = wallet.resolveKeyMaterial(ready.keyId, setOf(KeyUsage.SIGN))
-                ?: error("Key '${ready.keyId}' selected while previewing is no longer available")
+                ?: throw WalletStateConflictException("Key '${ready.keyId}' selected while previewing is no longer available")
             val did = request.did ?: wallet.defaultDid()
             val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
             validateSelectedTransactionDataCredentials(
@@ -1417,7 +1423,7 @@ object WalletPresentationHandler {
             // The Digital Credentials API is a crypto2-only surface: it ships no v1 key path, so a
             // wallet whose key material has no crypto2 representation cannot present through it.
             val keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
-                ?: error("No key available: wallet has no keyStores and no staticKey")
+                ?: throw WalletSigningKeyUnavailableException("No key available: wallet has no keyStores and no staticKey")
             val holderKey = requireNotNull(keyMaterial.crypto2Key) {
                 "Key '${keyMaterial.keyId}' has no crypto2 signing representation"
             }
@@ -1480,7 +1486,7 @@ object WalletPresentationHandler {
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
     ): ResolveVpRequestResult {
         val keyMaterial = wallet.resolveKeyMaterial(null, setOf(KeyUsage.SIGN))
-            ?: error("No key available: wallet has no keyStores and no staticKey")
+            ?: throw WalletSigningKeyUnavailableException("No key available: wallet has no keyStores and no staticKey")
         val authRequest = WalletPresentFunctionality2.resolveAuthorizationRequest(
             presentationRequestUrl = request.requestUrl,
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
@@ -1830,7 +1836,7 @@ object WalletPresentationHandler {
         metadataHttpClient: HttpClient? = null,
     ): CredentialSelection {
         if (wallet.credentialStores.isEmpty()) {
-            error("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
+            throw WalletRequestException("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
         }
 
         val candidates = storedCredentials.filter { stored ->
@@ -1954,7 +1960,7 @@ object WalletPresentationHandler {
             results.filter { result ->
                 val raw = result.credential as RawDcqlCredential
                 val stored = storedById[raw.id]
-                    ?: error("Credential '${raw.id}' disappeared while checking holder-key eligibility")
+                    ?: throw WalletStateConflictException("Credential '${raw.id}' disappeared while checking holder-key eligibility")
                 if (allowedCredentialIds != null && stored.id !in allowedCredentialIds) {
                     false
                 } else if (stored.credential !is id.walt.credentials.formats.MdocsCredential) {
@@ -2174,7 +2180,7 @@ object WalletPresentationHandler {
             formatCapabilities = formatCapabilities,
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
-            error(
+            throw WalletRequestException(
                 "Presentation request is invalid (${validation.error.code.code}): ${validation.error.message}"
             )
         }
@@ -2509,7 +2515,7 @@ object WalletPresentationHandler {
  * request - must surface that rejection, not a wallet-local missing-key error.
  */
 internal fun WalletKeyStoreEntry?.requiredOnUse(): () -> WalletKeyStoreEntry = {
-    this ?: error("No key available: wallet has no keyStores and no staticKey")
+    this ?: throw WalletSigningKeyUnavailableException("No key available: wallet has no keyStores and no staticKey")
 }
 
 private suspend fun resolvePreviewKeyMaterial(

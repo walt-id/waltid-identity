@@ -1,5 +1,7 @@
 package id.walt.wallet2.consent
 
+import id.walt.errors.HttpStatusError
+
 /** Why the wallet cannot prepare authoritative payment consent. */
 enum class PaymentConsentFailure {
     UNTRUSTED_CREDENTIAL,
@@ -26,7 +28,17 @@ class PaymentConsentException(val reason: PaymentConsentFailure) : IllegalStateE
     PaymentConsentFailure.MISSING_TRANSLATION -> "Required payment instructions are unavailable in your preferred languages."
     PaymentConsentFailure.CONSENT_REQUIRED -> "Review the payment before authorizing it."
     PaymentConsentFailure.STALE_CONSENT -> "The payment selection changed. Review it again before authorizing."
-})
+}), HttpStatusError {
+    override val status: Int
+        get() = when (reason) {
+            // The payment must be reviewed (again) before it can be authorized.
+            PaymentConsentFailure.CONSENT_REQUIRED, PaymentConsentFailure.STALE_CONSENT -> 409
+            // The issuer's payment instructions could not be fetched: an upstream failure.
+            PaymentConsentFailure.METADATA_UNAVAILABLE -> 502
+            // The credential or payment cannot be processed by this wallet as presented.
+            else -> 422
+        }
+}
 
 /** Placement prescribed by the attestation type, resolved once in shared code. */
 enum class PaymentFieldPlacement { PROMINENT, MAIN, DETAILS, OMITTED }
