@@ -69,7 +69,7 @@ internal class ItbAndroidWalletDriver private constructor(
             }
 
         suspend fun connect(
-            port: Int, token: String, origin: Url, trustPem: String, connectDispatcher: CoroutineDispatcher,
+            port: Int, token: String, origin: Url, trustPem: String?, connectDispatcher: CoroutineDispatcher,
             provider: String = "android-native-biometric", operationTimeoutMillis: Long = 110_000,
         ): ItbAndroidWalletDriver {
             require(port in 1024..65535 && token.matches(Regex("[0-9a-f]{64}")))
@@ -81,7 +81,7 @@ internal class ItbAndroidWalletDriver private constructor(
                 withSocketDeadline(socket, 180_000, connectDispatcher) {
                     ItbDeviceWire.write(socket, buildJsonObject {
                         put("version", ItbDeviceWire.VERSION); put("token", token); put("origin", origin.toString())
-                        put("trustPem", trustPem)
+                        trustPem?.let { put("trustPem", it) }
                     })
                     val response = ItbDeviceWire.read(socket)
                     check(response["ready"]?.jsonPrimitive?.booleanOrNull == true &&

@@ -142,8 +142,10 @@ class ItbPortalBridge(
                 }
                 val offer = offerUrl(preview("VCI request")) ?: run {
                     // The issuer adapter can expose a non-QR barcode decode in its derived VCI text.
-                    val qr = row(Pattern.compile("^(?:VCI request QR code|Credential QR code|Credential Offer QR code|QR code)$",
-                        Pattern.CASE_INSENSITIVE))
+                    val qr = row(Pattern.compile(
+                        "^\\s*(?:VCI request QR code|Credential QR code|Credential Offer QR code|QR code)\\s*$",
+                        Pattern.CASE_INSENSITIVE,
+                    ))
                     if (qr.count() != 1) throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_QR_MISSING)
                     offerUrl(ItbPresentationQr.decode(download(qr)))
                         ?: throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_INVALID_URL)

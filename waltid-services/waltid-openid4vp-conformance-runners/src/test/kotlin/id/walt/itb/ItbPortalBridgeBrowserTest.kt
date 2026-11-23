@@ -53,6 +53,26 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun readsTheIssuanceQrAndKeepsThePinWhenDerivedTextIsANumericBarcode() = runBlocking<Unit> {
+        val offerUrl = "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer"
+        val pin = "012345"
+        withPage(
+            inlineInteraction = "12345678",
+            interactionLabel = "VCI request",
+            qr = ItbQrFixtures.qr(offerUrl),
+            transactionCode = pin,
+        ) { page ->
+            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+            val session = bridge.prepare(suite.copy(id = "cs01v1"), case.copy(id = "tc_vci_007"))
+            val interaction = assertIs<ItbWalletInteraction.Offer>(bridge.read(session))
+            assertEquals("openid-credential-offer", interaction.url.protocol.name)
+            assertEquals("https://issuer.example/offer", interaction.url.parameters["credential_offer_uri"])
+            assertEquals(pin, interaction.transactionCode)
+            assertEquals(1, page.evaluate("window.qrDownloadCount"))
+        }
+    }
+
+    @Test
     fun readsThePresentationQrWhenDerivedTextIsANumericBarcode() = runBlocking<Unit> {
         withPage(inlineInteraction = "12345678") { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
@@ -68,7 +88,7 @@ class ItbPortalBridgeBrowserTest {
 
     @Test
     fun readsTheTs12PaymentQrFromItsDeployedRow() = runBlocking<Unit> {
-        withPage(inlineInteraction = "12345678", presentationQrLabel = "VP request QR code") { page ->
+        withPage(inlineInteraction = "12345678", qrLabel = "VP request QR code") { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val session = bridge.prepare(suite.copy(id = "ts12"), case.copy(id = "ts12_pay_02"))
             val interaction = assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
@@ -82,7 +102,7 @@ class ItbPortalBridgeBrowserTest {
     fun neverFallsBackToTextWhenThePresentationQrIsInvalid() = runBlocking<Unit> {
         withPage(
             inlineInteraction = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Fshort",
-            presentationQr = byteArrayOf(1, 2, 3),
+            qr = byteArrayOf(1, 2, 3),
         ) { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val rejection = assertFailsWith<ItbPortalInputError> { bridge.read(bridge.prepare(suite, case)) }
@@ -302,8 +322,9 @@ class ItbPortalBridgeBrowserTest {
         applicationDelayMillis: Int = 0,
         inlineInteraction: String? = null,
         interactionLabel: String = "VP request",
-        presentationQr: ByteArray = ItbQrFixtures.qr("openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"),
-        presentationQrLabel: String = "Credential QR code",
+        qr: ByteArray = ItbQrFixtures.qr("openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"),
+        qrLabel: String = "Credential QR code",
+        transactionCode: String? = null,
         interactionDelayMillis: Int = 30,
         downloadDelayMillis: Int = 0,
         failStart: Boolean = false,
@@ -321,7 +342,7 @@ class ItbPortalBridgeBrowserTest {
                             val html = fixture(
                                 session, systemName, interactionDelayMillis, downloadDelayMillis, failStart,
                                 startNeverEnabled, actorVisible, applicationDelayMillis, inlineInteraction,
-                                interactionLabel, presentationQrLabel, Base64.getEncoder().encodeToString(presentationQr),
+                                interactionLabel, qrLabel, Base64.getEncoder().encodeToString(qr), transactionCode,
                             )
                             route.fulfill(Route.FulfillOptions().setContentType("text/html").setBody(html))
                         } else route.abort()
@@ -337,7 +358,7 @@ class ItbPortalBridgeBrowserTest {
     private fun fixture(
         session: String, systemName: String, interactionDelayMillis: Int, downloadDelayMillis: Int, failStart: Boolean,
         startNeverEnabled: Boolean, actorVisible: Boolean, applicationDelayMillis: Int, inlineInteraction: String?,
-        interactionLabel: String, presentationQrLabel: String, qrBase64: String,
+        interactionLabel: String, qrLabel: String, qrBase64: String, transactionCode: String?,
     ) = """
         <script>
         setTimeout(() => {
@@ -397,8 +418,9 @@ class ItbPortalBridgeBrowserTest {
                 }
                 const dialog = document.createElement('ngb-modal-window');
                 // A different suite's label must not select the attachment.
-                dialog.innerHTML = `<app-any-content-view><div> ${if (presentationQrLabel == "Credential QR code") "VP request QR code" else "Credential QR code"} </div><button ngbtooltip="Download" onclick="download(false)">Download</button></app-any-content-view>
-                  <app-any-content-view><div> $presentationQrLabel </div><button ngbtooltip="Download" onclick="download(true)">Download</button></app-any-content-view>
+                dialog.innerHTML = `<app-any-content-view><div> ${if (qrLabel == "Credential QR code") "VP request QR code" else "Credential QR code"} </div><button ngbtooltip="Download" onclick="download(false)">Download</button></app-any-content-view>
+                  <app-any-content-view><div> $qrLabel </div><button ngbtooltip="Download" onclick="download(true)">Download</button></app-any-content-view>
+                  ${transactionCode?.let { "<p>Use PIN $it</p>" }.orEmpty()}
                   <app-any-content-view><div> $interactionLabel </div>${
                       if (inlineInteraction == null) """<button ngbtooltip="Download" onclick="download(false)">Download</button>"""
                       else """<div class="content-value">$inlineInteraction </div><button ngbtooltip="Copy" onclick="window.copyCount++">Copy</button>"""

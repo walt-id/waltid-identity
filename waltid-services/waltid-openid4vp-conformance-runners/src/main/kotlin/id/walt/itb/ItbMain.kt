@@ -75,13 +75,17 @@ private suspend fun runItb(): Int {
     val password = required("ITB_PASSWORD")
     val organisationId = required("ITB_ORGANISATION_ID").also { require(it.matches(Regex("[0-9]+"))) }
 
-    // This test-only CA is pinned from the official EUDI reference wallet, independently of request x5c.
-    val pem = System.getenv("ITB_X509_TRUST_ANCHORS")?.let { Files.readString(Path.of(it)) }
-        ?: requireNotNull(ItbCatalogue::class.java.getResource("/itb/pidissuerca02-eu.pem")).readText()
-    val certificates = Regex("-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----")
-        .findAll(pem).map { X509CertificateUtil.parseCertificatePem(it.value) }.toList()
-    require(certificates.isNotEmpty()) { "The ITB trust anchor file has no certificates" }
-    val trust = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(certificates))
+    // SDK diagnostics pin the EUDI reference CA independently of request x5c.
+    val sdkTrustPem = if (demoMode == null) {
+        System.getenv("ITB_X509_TRUST_ANCHORS")?.let { Files.readString(Path.of(it)) }
+            ?: requireNotNull(ItbCatalogue::class.java.getResource("/itb/pidissuerca02-eu.pem")).readText()
+    } else null
+    val jvmTrust = if (androidPort == null) {
+        val certificates = Regex("-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----")
+            .findAll(checkNotNull(sdkTrustPem)).map { X509CertificateUtil.parseCertificatePem(it.value) }.toList()
+        require(certificates.isNotEmpty()) { "The ITB trust anchor file has no certificates" }
+        ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(certificates))
+    } else null
 
     val showPortal = !ci && System.getenv("ITB_SHOW_BROWSER") == "true"
     Playwright.create().use { playwright ->
@@ -96,7 +100,7 @@ private suspend fun runItb(): Int {
                     val caseTimeoutMillis = if (demoMode == null) 120_000L else if (demoMode == "attended") 300_000L else 210_000L
                     val native = androidPort?.let {
                         ItbAndroidWalletDriver.connect(
-                            it, required("ITB_ANDROID_TOKEN"), origin, pem, Dispatchers.IO,
+                            it, required("ITB_ANDROID_TOKEN"), origin, sdkTrustPem, Dispatchers.IO,
                             provider = demoMode?.let { "android-demo-$it" } ?: "android-native-biometric",
                             operationTimeoutMillis = caseTimeoutMillis - 10_000,
                         )
@@ -105,7 +109,9 @@ private suspend fun runItb(): Int {
                         suite.id == "cts07" || case.id.startsWith("ts12_pay_dc_api_")
                     }) required("ITB_CHROME_PORT").toInt().also { require(it in 1024..65535) } else null
                     try {
-                        val driver = native?.let { it::execute } ?: ItbWalletDriver.create(client, origin, trust) { url, callback ->
+                        val driver = native?.let { it::execute } ?: ItbWalletDriver.create(
+                            client, origin, checkNotNull(jvmTrust),
+                        ) { url, callback ->
                             ItbReferenceAuthorization.resolve(client, origin, url, callback)
                         }.let { it::execute }
                         client.config { followRedirects = false }.use { restClient ->

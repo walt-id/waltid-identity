@@ -297,8 +297,11 @@ private class DemoInteractions(
         waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_card_not_clickable") { activateCard() }
         // An accepted action can race with a collection redraw. Only retry from the collection.
         if (!device.wait(Until.hasObject(statusDetails), 5_000)) {
+            var retryAccepted = false
             waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_status_detail_not_open") {
-                device.hasObject(statusDetails) || activateCard()
+                val detailsOpen = device.hasObject(statusDetails)
+                if (!detailsOpen && !retryAccepted) retryAccepted = activateCard()
+                detailsOpen
             }
         }
         // The caller scrolls to the Check status control keyed to this exact credential.
