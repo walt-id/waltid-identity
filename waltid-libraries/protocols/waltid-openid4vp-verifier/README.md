@@ -203,7 +203,8 @@ The library provides `Verifier2Response` error types for common failures:
 
 The default `mso_mdoc` presentation policies check issuer authentication, MSO validity,
 disclosed-item digests, device authentication, device-key authorization and transaction data.
-A custom `policies.vp_policies.mso_mdoc` list replaces that default. Keep
+Supplying `policies.vp_policies` replaces the defaults for every format, including omitted format lists.
+Keep all required policies for every format you accept. For mdoc, retain
 `mso_mdoc/issuer_auth` and `mso_mdoc/mso` alongside the integrity and device checks.
 The generic credential `expiration` and `not-before` policies do not replace MSO validity checks.
 Keep the configured IACA/VICAL or trusted-list policy as well: signature verification alone does
@@ -241,11 +242,15 @@ Set `core_flow.encrypted_response` to `true` when application-layer response enc
 Unencrypted `direct_post` is a supported OpenID4VP mode; transport security and intermediary body
 logging remain deployment concerns.
 
-An OpenID4VP mdoc presentation must contain one successful version-1.0 DeviceResponse with exactly
+An OpenID4VP mdoc presentation must contain one successful major-version-1 DeviceResponse with exactly
 one document. Multiple presentations use the DCQL query's `multiple` option. Missing requested
 claims and unrequested selectively disclosable mdoc elements are rejected. The same credential may
 carry claims requested under another selected query, as allowed by OpenID4VP 1.0 section 6.4.
+Each selected query authorizes one satisfied `claim_sets` option. Rejected extra disclosures are
+excluded from stored results and notifications. Compatible `1.x` minor versions are accepted.
 Device-key authorizations restrict `DeviceSigned` elements, not the issuer's own signed elements.
+DCQL mdoc claim matching currently reads issuer-signed elements. General device-signed claim queries
+are not supported; requested device-signed transaction-binding fields are checked separately.
 
 External-reader proximity submissions enforce configured DCQL claim constraints, but the kiosk owns
 the DeviceRequest; OpenID4VP extra-disclosure restrictions do not apply to that flow. Both flows
