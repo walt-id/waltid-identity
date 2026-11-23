@@ -251,7 +251,9 @@ object AuthorizationRequestResolver {
         )
 
         val response = when (requestUriMethod) {
-            null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
+            null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri) {
+                header(HttpHeaders.Accept, "application/$REQUEST_OBJECT_TYPE, application/json;q=0.9")
+            }
             RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
                 method = HttpMethod.Post
                 contentType(ContentType.Application.FormUrlEncoded)

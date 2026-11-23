@@ -453,6 +453,27 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
+    fun `request URI GET prefers signed request objects and still accepts JSON`() = runBlocking {
+        val requestObjectType = "application/oauth-authz-req+jwt"
+        HttpClient(MockEngine { request ->
+            assertEquals(HttpMethod.Get, request.method)
+            val accept = parseHeaderValue(request.headers.getAll(HttpHeaders.Accept).orEmpty().joinToString(","))
+            assertEquals(listOf(requestObjectType, "application/json"), accept.map { it.value })
+            assertTrue(accept[0].quality > accept[1].quality)
+            respond("signed-request-object", headers = headersOf(HttpHeaders.ContentType, requestObjectType))
+        }).use { client ->
+            val fetcher = WebDataFetcher.wrapping(client, id = "authorization-request-resolver-get-test")
+            for (method in listOf(null, RequestUriHttpMethod.GET)) {
+                val response = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    fetcher, "https://verifier.example/request.jwt", method,
+                )
+                assertEquals(HttpStatusCode.OK, response.status)
+                assertEquals(ContentType.parse(requestObjectType), response.contentType)
+            }
+        }
+    }
+
+    @Test
     fun `request uri post fetch sends wallet metadata and wallet nonce as form fields`() = runBlocking {
         var capturedRequest: HttpRequestData? = null
         val client = HttpClient(MockEngine) {
