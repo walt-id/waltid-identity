@@ -7,6 +7,7 @@ import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.storeddata.PasswordStoredData
 import id.walt.ktorauthnz.security.PasswordHash
+import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers.userId
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData
@@ -27,8 +28,8 @@ class AuthenticationService internal constructor(
     constructor(dispatcher: CoroutineDispatcher = Dispatchers.IO) : this(false, dispatcher)
 
     val editableAccountStore: EditableAccountStore = object : VersionedPasswordPepperStore {
-        // Wallet v1 used this literal before the optional plugin started applying its configuration.
-        override val unmarkedPasswordPepper = "waltid-ktor-authnz"
+        // Pre-1.3 Wallet v1 used the library's public default for unmarked credentials.
+        override val unmarkedPasswordPepper = PasswordHashingConfiguration.DEFAULT_PEPPER
         override val writeUnmarkedPasswords = legacyPasswordWrites
 
         override suspend fun addAccountIdentifierToAccount(
