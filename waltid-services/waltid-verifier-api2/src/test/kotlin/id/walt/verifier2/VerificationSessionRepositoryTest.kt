@@ -437,7 +437,7 @@ class VerificationSessionRepositoryTest {
                             throw PresentationVerificationUnavailableException("PRIVATE database failure")
                         },
                         failSessionCallback = { _, _, _ -> error("unused") },
-                        beforeRespond = { cleanupCalls++ },
+                        beforeRespond = { _: Boolean -> cleanupCalls++ },
                     )
                 }
             }
