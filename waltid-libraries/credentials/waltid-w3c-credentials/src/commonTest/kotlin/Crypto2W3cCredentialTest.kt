@@ -121,6 +121,17 @@ class Crypto2W3cCredentialTest {
     }
 
     @Test
+    fun `kid for an issuer uses the key ID for URLs and the verification method for DIDs`() = runTest {
+        val issuerKey = key("signing-1")
+        val didJwk = Crypto2DidJwkRegistrar().createByKey(issuerKey, DidJwkCreateOptions()).did
+        val didWeb = "did:web:issuer.example"
+
+        assertEquals("signing-1", Issuer.kidForIssuer(issuerKey, "https://issuer.example"))
+        assertEquals("$didJwk#0", Issuer.kidForIssuer(issuerKey, didJwk))
+        assertEquals("$didWeb#${publicJwkThumbprint(issuerKey)}", Issuer.kidForIssuer(issuerKey, didWeb))
+    }
+
+    @Test
     fun `issuer DID key IDs are qualified exactly once`() = runTest {
         val issuerDid = "did:web:issuer.example"
         val fullKeyId = "$issuerDid#signing-key"

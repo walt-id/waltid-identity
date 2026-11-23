@@ -75,6 +75,11 @@ object Issuer {
         )
     }
 
+    /** Selects the signing key's public ID for an issuer URL or its verification method for an issuer DID. */
+    @JsExport.Ignore
+    suspend fun kidForIssuer(issuerKey: Crypto2Key, issuerId: String): String =
+        getKidHeader(issuerKey, issuerId.takeIf(DidUtils::isDidUrl))
+
     @Deprecated("Use getKidHeader with a crypto2 Key")
     @JvmBlocking
     @JvmAsync
