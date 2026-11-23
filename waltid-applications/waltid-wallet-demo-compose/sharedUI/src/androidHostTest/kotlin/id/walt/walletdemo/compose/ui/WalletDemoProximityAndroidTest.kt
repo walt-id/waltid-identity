@@ -1,5 +1,8 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.ui.test.ExperimentalTestApi
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
 import kotlin.test.Test
@@ -9,19 +12,18 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "en-rUS-w393dp-h852dp-notnight-mdpi")
-@org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-@OptIn(androidx.compose.ui.test.ExperimentalTestApi::class, com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@OptIn(ExperimentalTestApi::class, ExperimentalRoborazziApi::class)
 class WalletDemoProximityAndroidTest {
     private val scenarios = WalletDemoProximityTestScenarios()
 
     @Test
     fun unmatchedRequestShowsContextAndPagesLargeRequestsWithoutConsent() =
         scenarios.unmatchedRequestShowsContextAndPagesLargeRequestsWithoutConsent { id ->
-            System.getenv("WAL1798_EVIDENCE_DIR")?.let { directory ->
+            System.getenv("WALLET_UI_CAPTURE_DIR")?.let { directory ->
                 onRoot().captureRoboImage("$directory/android/$id.png")
             }
         }
-
 
     @Test
     fun userFixedPermissionShowsSettingsWithoutChangingTheSdkAction() =

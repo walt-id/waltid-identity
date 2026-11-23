@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.ui
 
+import id.walt.wallet2.mobile.ProximityUnsatisfiedDocument
+import id.walt.wallet2.mobile.ProximityUnsatisfiedRequest
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
@@ -77,8 +79,8 @@ class WalletDemoProximityTestScenarios {
         runUiTest: (suspend ComposeUiTest.() -> Unit) -> Unit = { block -> runComposeUiTest(block = block) },
         capture: ComposeUiTest.(String) -> Unit = {},
     ) = runUiTest {
-        val summary = id.walt.wallet2.mobile.ProximityUnsatisfiedRequest(listOf(
-            id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(0, "org.example.photoid", listOf(
+        val summary = ProximityUnsatisfiedRequest(listOf(
+            ProximityUnsatisfiedDocument(0, "org.example.photoid", listOf(
                 ProximityRequestedElement("org.example.identity", "portrait", true),
             )),
         ))
@@ -100,35 +102,35 @@ class WalletDemoProximityTestScenarios {
         onNodeWithText("No credential data was shared for this request.").assertIsDisplayed()
         capture("nearby-unmatched-request")
         val evidenceCases = listOf(
-            "N1" to listOf(id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(0, "unknown.document", listOf(
+            "N1" to listOf(ProximityUnsatisfiedDocument(0, "unknown.document", listOf(
                 ProximityRequestedElement("org.iso.18013.5.1", "given_name", false)))),
-            "N2" to listOf(id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(0, "org.iso.18013.5.1.mDL", listOf(
+            "N2" to listOf(ProximityUnsatisfiedDocument(0, "org.iso.18013.5.1.mDL", listOf(
                 ProximityRequestedElement("unknown.namespace", "given_name", false)))),
             "N3" to listOf(
-                id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(0, "org.iso.18013.5.1.mDL", listOf(
+                ProximityUnsatisfiedDocument(0, "org.iso.18013.5.1.mDL", listOf(
                     ProximityRequestedElement("org.iso.18013.5.1", "given_name", false),
                     ProximityRequestedElement("org.iso.18013.5.1", "family_name", false))),
-                id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(1, "missing.document", listOf(
+                ProximityUnsatisfiedDocument(1, "missing.document", listOf(
                     ProximityRequestedElement("namespace", "name", false)))),
             "N4" to listOf(
-                id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(0, "missing.document", listOf(
+                ProximityUnsatisfiedDocument(0, "missing.document", listOf(
                     ProximityRequestedElement("first.namespace", "名", true),
                     ProximityRequestedElement("first.namespace", "age", true))),
-                id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(1, "missing.document", listOf(
+                ProximityUnsatisfiedDocument(1, "missing.document", listOf(
                     ProximityRequestedElement("second.namespace", "portrait", false),
                     ProximityRequestedElement("third.namespace", "address", false)))),
         )
         for ((caseId, documents) in evidenceCases) {
             runOnIdle { terminal.value = ProximityState.NoData(2,
-                id.walt.wallet2.mobile.ProximityUnsatisfiedRequest(documents)) }
+                ProximityUnsatisfiedRequest(documents)) }
             onNodeWithText("Request could not be satisfied").performScrollTo().assertIsDisplayed()
             onAllNodesWithText(documents.first().docType).assertCountEquals(documents.size.takeIf { caseId == "N4" } ?: 1)
             onAllNodesWithTag(WalletUiTestTags.ProximityReview).assertCountEquals(0)
             capture(caseId)
         }
         runOnIdle {
-            terminal.value = ProximityState.NoData(3, id.walt.wallet2.mobile.ProximityUnsatisfiedRequest((0..5).map { index ->
-                id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(index, "document-$index", (0..20).map { field ->
+            terminal.value = ProximityState.NoData(3, ProximityUnsatisfiedRequest((0..5).map { index ->
+                ProximityUnsatisfiedDocument(index, "document-$index", (0..20).map { field ->
                     ProximityRequestedElement("namespace", "field_$field", false)
                 })
             }))
@@ -291,8 +293,8 @@ class WalletDemoProximityTestScenarios {
         onAllNodesWithText("Connection settings").assertCountEquals(0)
         onAllNodesWithTag("proximity-show-Qr").assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
-        runOnIdle { sessionState.value = ProximityState.NoData(2, id.walt.wallet2.mobile.ProximityUnsatisfiedRequest(listOf(
-            id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(0, "org.example.photoid", listOf(
+        runOnIdle { sessionState.value = ProximityState.NoData(2, ProximityUnsatisfiedRequest(listOf(
+            ProximityUnsatisfiedDocument(0, "org.example.photoid", listOf(
                 ProximityRequestedElement("org.example.identity", "portrait", true),
             )),
         ))) }

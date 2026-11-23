@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.mdoc.proximity.MdocRequestPreparation
 import kotlinx.io.bytestring.ByteString
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
@@ -1132,7 +1133,7 @@ class ProximityRequestProcessorTest {
                 DocRequest.fromValues("missing.document", linkedMapOf("first.namespace" to listOf("名", "age")), intentToRetain = true),
                 DocRequest.fromValues("missing.document", linkedMapOf("second.namespace" to listOf("portrait"), "third.namespace" to listOf("address")), intentToRetain = false),
             ), readerAuthAll = authentication)
-            assertEquals(id.walt.mdoc.proximity.MdocRequestPreparation.NoData,
+            assertEquals(MdocRequestPreparation.NoData,
                 processor.prepare(requestContext(request, transcript(), fixture.readerEphemeralKey, exchange = 2)))
             assertNull(processor.takeUnsatisfiedRequest(1))
             val summary = assertNotNull(processor.takeUnsatisfiedRequest(2))
@@ -1162,7 +1163,7 @@ class ProximityRequestProcessorTest {
                     mandatory = true, documentSets = listOf(listOf(0u, 1u)),
                 )))))
             val context = requestContext(request, transcript(), fixture.readerEphemeralKey, exchange = 2)
-            assertEquals(id.walt.mdoc.proximity.MdocRequestPreparation.NoData, processor.prepare(context))
+            assertEquals(MdocRequestPreparation.NoData, processor.prepare(context))
             val owner = owner(fixture, processor)
             val summary = assertNotNull(processor.takeUnsatisfiedRequest(2))
             owner.publish(ProximityState.NoData(2, summary))
@@ -1184,7 +1185,7 @@ class ProximityRequestProcessorTest {
                 transcript(), fixture.readerEphemeralKey)
             val processor = processor(fixture)
             processor.prepare(unmatched)
-            assertIs<id.walt.mdoc.proximity.MdocRequestPreparation.Review>(processor.prepare(requestContext(fixture.readerEphemeralKey)))
+            assertIs<MdocRequestPreparation.Review>(processor.prepare(requestContext(fixture.readerEphemeralKey)))
             assertNull(processor.takeUnsatisfiedRequest(1))
             processor.cancel()
             val cancelled = processor(fixture)
