@@ -57,7 +57,9 @@ internal object SdJwtDisclosureLocator {
         }
 
         // W3C JWT-VC claim paths are relative to the vc object, as in the credential parser.
-        scan((payload["vc"] as? JsonObject) ?: payload, emptyList())
+        // SD-JWT VC paths start at the issuer payload; its private vc object is an ordinary claim.
+        val root = if ("vct" in payload) payload else (payload["vc"] as? JsonObject) ?: payload
+        scan(root, emptyList())
         val uniqueLocated = located.map { it.encoded }.toSet().size
         if (located.size != disclosures.size || uniqueLocated != disclosures.size) {
             throw UnreachableDisclosuresException(
