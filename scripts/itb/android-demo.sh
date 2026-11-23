@@ -57,6 +57,39 @@ export ITB_ANDROID_PORT ITB_CHROME_PORT
 ITB_ANDROID_TOKEN="$(openssl rand -hex 32)"
 export ITB_ANDROID_TOKEN
 
+# Android can include the bridge token and wallet data in exception messages.
+# Print only recognized runner events and the first test source location.
+report_startup_failure() {
+  awk '
+    { sub(/\r$/, "") }
+    /^INSTRUMENTATION_STATUS: test=runOwnedItbSessions$/ { started = 1 }
+    /^INSTRUMENTATION_STATUS: stack=/ {
+      exception = 1
+      type = $2
+      sub(/^stack=/, "", type)
+      sub(/:$/, "", type)
+      if (type !~ /^(java\.lang|java\.net|java\.io|android\.os)\.[A-Za-z]*(Exception|Error)$/) type = ""
+    }
+    exception && !line && /^[[:space:]]+at id\.walt\.walletdemo\.compose\.android\..*\(ItbDemoWalletTest\.kt:[0-9]+\)$/ {
+      line = $0
+      sub(/^.*\(ItbDemoWalletTest\.kt:/, "", line)
+      sub(/\)$/, "", line)
+    }
+    /^INSTRUMENTATION_(FAILED|ABORTED):/ || /^INSTRUMENTATION_STATUS: Error=Unable to find instrumentation info/ { launch_failed = 1 }
+    /^INSTRUMENTATION_RESULT: shortMsg=Process crashed\.$/ { crashed = 1 }
+    /^(adb: |error: )(device offline|closed|no devices\/emulators found)$/ { disconnected = 1 }
+    END {
+      if (crashed) print "Android reported that the instrumentation process crashed."
+      else if (exception) print "AndroidJUnitRunner reported a test exception" (type ? " (" type ")." : ".")
+      else if (launch_failed) print "Android reported an instrumentation launch failure."
+      else if (disconnected) print "ADB lost its connection to the device."
+      else if (started) print "AndroidJUnitRunner started the test but did not report a failure reason."
+      else print "AndroidJUnitRunner did not report starting the test."
+      if (line) print "First wallet test frame: ItbDemoWalletTest.kt:" line
+    }
+  ' "$instrumentation_output" >&2
+}
+
 adb shell am start -a android.intent.action.VIEW -d about:blank -p com.android.chrome >/dev/null
 adb shell am instrument -w -r \
   -e class id.walt.walletdemo.compose.android.ItbDemoWalletTest \
@@ -67,9 +100,14 @@ for attempt in {1..60}; do
   if grep -q '^INSTRUMENTATION_STATUS: itb_state=listening' "$instrumentation_output"; then break; fi
   if ! kill -0 "$instrumentation_pid" 2>/dev/null; then
     echo 'Demo instrumentation exited before connecting.' >&2
+    report_startup_failure
     exit 2
   fi
-  if [[ "$attempt" == 60 ]]; then echo 'Demo instrumentation did not open its bridge.' >&2; exit 2; fi
+  if [[ "$attempt" == 60 ]]; then
+    echo 'Demo instrumentation did not open its bridge.' >&2
+    report_startup_failure
+    exit 2
+  fi
   sleep 1
 done
 
