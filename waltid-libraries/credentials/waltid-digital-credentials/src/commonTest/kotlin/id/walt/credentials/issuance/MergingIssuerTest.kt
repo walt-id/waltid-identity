@@ -16,6 +16,7 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.vc.vcs.W3CVC
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
@@ -27,6 +28,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -106,6 +108,23 @@ class MergingIssuerTest {
             assertTrue(derived.getValue("reference").jsonPrimitive.content.startsWith("did:jwk:"))
             assertEquals(derived["reference"], derived["holder"]?.jsonObject?.get("id"))
             assertEquals(1, exports)
+        }
+    }
+
+    @Test
+    fun `a requested subject DID reports unavailable key material and propagates cancellation`() = runTest {
+        val key = key()
+        val mapping = buildJsonObject { put("reference", "<subjectDid>") }
+        val unavailable = MappingKey(key) { error("Public key unavailable") }
+        val failure = withContext(IssuanceHolderKey(unavailable)) {
+            assertFailsWith<IllegalArgumentException> { credential.mergingToVc("issuer", "", mapping) }
+        }
+        assertEquals("Cannot find in context: subjectDid", failure.message)
+        assertEquals("Public key unavailable", failure.cause?.message)
+
+        val cancelled = MappingKey(key) { throw CancellationException("Export cancelled") }
+        assertFailsWith<CancellationException> {
+            withContext(IssuanceHolderKey(cancelled)) { credential.mergingToVc("issuer", "", mapping) }
         }
     }
 
