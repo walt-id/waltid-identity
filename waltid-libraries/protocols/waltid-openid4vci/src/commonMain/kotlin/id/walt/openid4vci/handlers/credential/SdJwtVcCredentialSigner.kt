@@ -23,6 +23,8 @@ import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
 import id.walt.w3c.issuance.Issuer.getKidHeader
 import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.credentials.issuance.IssuanceHolderKey
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import id.walt.crypto2.keys.Key as Crypto2Key
 
@@ -122,15 +124,17 @@ object SdJwtVcCredentialSigner {
         val holderKeyJson = exportHolderJwk(binding.holderKey)
         val holderDid = binding.holderDid
 
-        val mappedCredentialData = credentialData.mergeSDJwtVCPayloadWithMapping(
-            mapping = dataMapping ?: JsonObject(emptyMap()),
-            context = issuanceTemplateContext(
-                issuerId = issuerId,
-                subjectDid = holderDid,
-                display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray
-            ),
-            data = issuanceDataFunctions()
-        )
+        val mappedCredentialData = withContext(IssuanceHolderKey(binding.holderKey)) {
+            credentialData.mergeSDJwtVCPayloadWithMapping(
+                mapping = dataMapping ?: JsonObject(emptyMap()),
+                context = issuanceTemplateContext(
+                    issuerId = issuerId,
+                    subjectDid = holderDid,
+                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray
+                ),
+                data = issuanceDataFunctions()
+            )
+        }
 
         val defaultPayloadProperties = defaultPayloadProperties(
             issuerId = issuerId,
