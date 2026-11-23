@@ -2,6 +2,9 @@ package id.walt.webwallet.service.account.authnz
 
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
+import id.walt.ktorauthnz.methods.EmailPass
+import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
+import id.walt.ktorauthnz.security.PasswordHashing
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData
 import id.walt.webwallet.db.models.authnz.AuthnzUsers
@@ -142,6 +145,19 @@ class AuthenticationServiceTest {
         val result = authenticationService.editableAccountStore.lookupAccountUuid(identifier)
 
         assertEquals(accountId, result, "Should return the correct account ID")
+    }
+
+    @Test
+    fun `a stale login upgrade preserves the newer SQL credential`() = runBlocking {
+        val identifier = EmailIdentifier("migration@example.test")
+        val store = authenticationService.editableAccountStore
+        store.addAccountIdentifierToAccount(UUID.randomUUID().toString(), identifier)
+        val original = EmailPassStoredData(passwordHash = PasswordHashing.hash("fixture").toString())
+        store.addAccountIdentifierStoredData(identifier, EmailPass.id, original)
+        val upgraded = PasswordHashing.hash("fixture")
+        store.upgradePasswordHash(identifier, original, upgraded)
+        store.upgradePasswordHash(identifier, original, PasswordHashing.hash("different fixture"))
+        assertEquals(original.withPasswordHash(upgraded), store.lookupStoredDataForAccountIdentifier(identifier, EmailPass))
     }
 
     @Test

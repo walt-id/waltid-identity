@@ -39,9 +39,8 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
 
         authCheck(check.valid, InvalidCredentialsException())
 
-        if (check.updated) {
-            val newData = storedData.copy(passwordHash = check.updatedHash!!.toString())
-            KtorAuthnzManager.accountStore.updateAccountIdentifierStoredData(identifier, id, newData)
+        check.updatedHash?.let { upgraded ->
+            KtorAuthnzManager.accountStore.upgradePasswordHash(identifier, storedData, upgraded)
         }
 
         return identifier

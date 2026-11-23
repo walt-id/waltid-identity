@@ -30,6 +30,8 @@ import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.EmailPass
 import id.walt.ktorauthnz.methods.registerAuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.PasswordStoredData
+import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
 import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
 import id.walt.wallet2.OSSWallet2AuthConfig
@@ -99,6 +101,10 @@ object OSSWallet2AccountStore : EditableAccountStore {
 
     override suspend fun updateAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData) {
         accountStoredData.getOrPut(accountId) { ConcurrentHashMap() }[method] = data.transformSavable()
+    }
+
+    override suspend fun upgradePasswordHash(identifier: AccountIdentifier, verified: PasswordStoredData, replacement: PasswordHash) {
+        identifierStoredData[identifier]?.replace(verified.authMethod().id, verified, verified.withPasswordHash(replacement))
     }
 
     override suspend fun deleteAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String) {

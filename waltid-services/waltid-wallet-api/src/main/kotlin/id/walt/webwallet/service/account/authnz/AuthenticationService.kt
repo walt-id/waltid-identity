@@ -4,6 +4,8 @@ import id.walt.ktorauthnz.accounts.EditableAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.PasswordStoredData
+import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers.userId
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData
@@ -97,6 +99,22 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             data: AuthMethodStoredData
         ) {
             throw NotImplementedError("updateAccountIdentifierStoredData")
+        }
+
+        override suspend fun upgradePasswordHash(identifier: AccountIdentifier, verified: PasswordStoredData, replacement: PasswordHash) {
+            withContext(dispatcher) {
+                transaction {
+                    val userId = getAccountIdByAccountIdentifier(identifier) ?: return@transaction
+                    val row = AuthnzStoredData.select(AuthnzStoredData.id, AuthnzStoredData.data)
+                        .where { (AuthnzStoredData.accountId eq userId) and (AuthnzStoredData.method eq verified.authMethod().id) }
+                        .forUpdate().singleOrNull() ?: return@transaction
+                    if (row[AuthnzStoredData.data] == verified) {
+                        AuthnzStoredData.update({ AuthnzStoredData.id eq row[AuthnzStoredData.id] }) {
+                            it[AuthnzStoredData.data] = verified.withPasswordHash(replacement)
+                        }
+                    }
+                }
+            }
         }
 
         override suspend fun updateAccountStoredData(
