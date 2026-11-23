@@ -11,6 +11,9 @@ interface Crypto2DidService {
 
     suspend fun resolveToKeys(did: String): Result<Set<Key>>
 
+    /** Derives a self-contained `did:jwk` from the public material of [key] when no method is specified. */
+    suspend fun registerByKey(key: Key): DidResult = registerByKey(method = "jwk", key = key)
+
     suspend fun registerByKey(
         method: String,
         key: Key,
