@@ -37,6 +37,7 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.SettingsNotice
 import id.walt.walletdemo.compose.ui.components.WalletAction
 import id.walt.walletdemo.compose.ui.components.WalletActions
+import id.walt.walletdemo.compose.ui.components.WalletContentMaxWidth
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -58,7 +59,7 @@ fun AccountAuthScreen(
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Box(Modifier.fillMaxSize().safeDrawingPadding().imePadding(), contentAlignment = Alignment.TopCenter) {
             Column(
-                modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth()
+                modifier = Modifier.widthIn(max = WalletContentMaxWidth).fillMaxWidth()
                     .verticalScroll(rememberScrollState()).padding(20.dp)
                     .testTag(WalletUiTestTags.AccountAuthScreen),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

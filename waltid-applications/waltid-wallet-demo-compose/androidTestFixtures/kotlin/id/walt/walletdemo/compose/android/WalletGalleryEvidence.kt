@@ -1,9 +1,12 @@
 package id.walt.walletdemo.compose.android
 
+import android.graphics.Bitmap
+import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import org.junit.Assert.assertTrue
 import java.io.File
+import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
 /** Opt-in wallet-gallery/v1 evidence; normal E2E runs produce no gallery output. */
@@ -40,6 +43,26 @@ internal object WalletGalleryEvidence {
         assertTrue("Gallery app is not foreground", device.currentPackageName == packageName)
         val target = File(directory(), "waltid-wallet-gallery-$name.png")
         check(!target.exists()) { "Gallery capture already exists" }
-        assertTrue("Could not capture gallery frame", device.takeScreenshot(target))
+        val started = SystemClock.uptimeMillis()
+        var unchangedSince = started
+        var previous: ByteArray? = null
+        while (SystemClock.uptimeMillis() - started < 10_000) {
+            val bitmap = requireNotNull(InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot())
+            val bytes = ByteArrayOutputStream().use { output ->
+                try {
+                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+                    output.toByteArray()
+                } finally { bitmap.recycle() }
+            }
+            val at = SystemClock.uptimeMillis()
+            if (previous?.contentEquals(bytes) == true) {
+                if (at - unchangedSince >= 500) {
+                    target.writeBytes(bytes)
+                    return
+                }
+            } else { previous = bytes; unchangedSince = at }
+            SystemClock.sleep(100)
+        }
+        error("Gallery frame did not settle: $name")
     }
 }

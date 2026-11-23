@@ -66,8 +66,8 @@ import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierApi
-import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.data.StoredCredentialMetadata
+import id.walt.wallet2.status.WalletCredentialResponse
+import id.walt.wallet2.status.WalletCredentialMetadataResponse
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.handlers.BuildVpTokenRequest
 import id.walt.wallet2.handlers.BuildVpTokenResult
@@ -434,7 +434,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                             }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<ReceiveCredentialsResult>()
                             assertEquals(names.size * keys.size, received.credentialIds.size)
                             val stored = received.credentialIds.map { id -> http.get("$path/credentials/$id")
-                                .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<StoredCredential>() }
+                                .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }.body<WalletCredentialResponse>() }
                             assertEquals(2, stored.map { assertNotNull(it.holderKeyBinding).publicKeyThumbprint }.distinct().size)
                             assertEquals(names.associateWith { 2 }, stored.map { it.credential.credentialData.getValue("given_name").jsonPrimitive.content }
                                 .groupingBy { it }.eachCount())
@@ -769,7 +769,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                 // 3. Credential is visible in wallet
                 testAndReturn("[$tag] Credential visible in wallet") {
                     val creds = http.get("/wallet/$walletId/credentials")
-                        .body<List<StoredCredentialMetadata>>()
+                        .body<List<WalletCredentialMetadataResponse>>()
                     assertTrue(creds.isNotEmpty())
                     assertEquals(receiveResult.credentialIds.size, creds.size)
                 }

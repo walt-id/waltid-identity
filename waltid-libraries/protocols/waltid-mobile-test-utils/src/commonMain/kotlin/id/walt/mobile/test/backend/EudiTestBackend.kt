@@ -225,29 +225,51 @@ object EudiTestBackend {
 
             val response = client.get("$VERIFIER_BACKEND/ui/presentations/$transactionId/events")
             val body = response.bodyAsText()
-            if (body.isNotBlank()) {
-                val events = when (val responseElement = Json.parseToJsonElement(body)) {
-                    is JsonArray -> responseElement
-                    is JsonObject -> when (val eventsField = responseElement["events"]) {
-                        is JsonArray -> eventsField
-                        null -> error("Verifier events response did not contain an events field: $body")
-                        else -> error("Verifier events field was not an array: $body")
-                    }
-                    else -> error("Unexpected verifier events response shape: $body")
-                }
-                for (event in events) {
-                    val text = event.toString().lowercase()
-                    if (text.contains("failed") || text.contains("error") || text.contains("invalid")) {
-                        error("Verifier reported failure: $event")
-                    }
-                    if (text.contains("wallet response posted") || text.contains("successful") || text.contains("verified")) {
-                        return
-                    }
-                }
+            if (body.isNotBlank() && verifierEventsConfirmPresentation(body)) {
+                return
             }
 
             delay(2000.milliseconds)
         }
+    }
+
+    internal fun verifierEventsConfirmPresentation(body: String): Boolean {
+        val events = when (val responseElement = Json.parseToJsonElement(body)) {
+            is JsonArray -> responseElement
+            is JsonObject -> when (val eventsField = responseElement["events"]) {
+                is JsonArray -> eventsField
+                null -> error("Verifier events response did not contain an events field")
+                else -> error("Verifier events field was not an array")
+            }
+            else -> error("Unexpected verifier events response shape")
+        }
+        for (event in events) {
+            val eventObject = event as? JsonObject ?: error("Verifier event was not an object")
+            val name = (eventObject["event"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: error("Verifier event did not contain a string event name")
+            when (name) {
+                "FailedToRetrieve request",
+                "Wallet failed to post response",
+                "Verifier failed to get wallet",
+                "Presentation expired",
+                "Attestation status check failed" -> error("Verifier reported failure event: $name")
+
+                "Wallet response posted", "Verifier got wallet response" -> {
+                    val walletResponse = eventObject["wallet_response"] as? JsonObject
+                        ?: error("Verifier event did not contain a wallet response: $name")
+                    val walletError = walletResponse["error"]
+                    check(walletError == null || walletError == JsonNull) {
+                        "Verifier reported a wallet error: $name"
+                    }
+                    val vpToken = walletResponse["vp_token"] as? JsonObject
+                    check(vpToken != null && vpToken.isNotEmpty()) {
+                        "Verifier wallet response did not contain vp_token: $name"
+                    }
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     internal fun buildDcqlQuery(credentialId: String): JsonElement {

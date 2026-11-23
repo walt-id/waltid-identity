@@ -27,10 +27,10 @@ final class SharingReviewModelTests: XCTestCase {
             ("en-US", ["Address", "City", "Country", "Postal code"]),
             ("fr", ["Address", "City", "Country", "Postal code"]),
         ] {
-            let details = CredentialDisplayNormalizer.details(for: option, preferredLocales: [locale])
+            let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true, preferredLocales: [locale])
             XCTAssertEqual(details.groups.first { $0.id == "requested" }?.items.map(\.label), Array(labels.dropFirst()))
             let review = try EffectivePresentationReview(prepared: prepared,
-                model: .init(request: .init(requester: nil), credentialOptions: [option]), details: [details],
+                model: .init(request: .init(requester: nil), credentialOptions: [option]),
                 selection: .init(credentials: [option.selection]), preferredLocales: [locale])
             let address = try XCTUnwrap(review.contributions.first?.nodes.first)
             XCTAssertEqual(address.label, labels[0])
@@ -107,7 +107,7 @@ final class SharingReviewModelTests: XCTestCase {
         }
         let model = SharingReviewModel(request: .init(requester: nil), credentialOptions: [option])
         XCTAssertThrowsError(try EffectivePresentationReview(prepared: effectivePrepared("{}"), model: model,
-            details: [CredentialDisplayNormalizer.details(for: option)], selection: .init()))
+            selection: .init()))
         XCTAssertFalse(ClaimReviewState.loading().canConfirm)
         XCTAssertFalse(ClaimReviewState.failed("Unavailable").canConfirm)
     }
@@ -157,7 +157,6 @@ final class SharingReviewModelTests: XCTestCase {
             let model = SharingReviewModel(request: .init(requester: nil), credentialOptions: options)
             let review = try EffectivePresentationReview(prepared: .init(credentials: [
                 contribution("first", index: 1), contribution("second", index: index)]), model: model,
-                details: options.map(CredentialDisplayNormalizer.details(for:)),
                 selection: .init(credentials: Set(options.map(\.selection))))
             XCTAssertEqual(review.groups.count, 1)
             XCTAssertEqual(review.contributions.count, index == 1 ? 1 : 2)
@@ -184,7 +183,7 @@ final class SharingReviewModelTests: XCTestCase {
     private func effectiveReview(_ prepared: PreparedPresentationReview, _ option: PresentationCredentialOption,
                                  disclosures: Set<PresentationDisclosureSelection> = []) throws -> EffectivePresentationReview {
         try .init(prepared: prepared, model: .init(request: .init(requester: nil), credentialOptions: [option]),
-            details: [CredentialDisplayNormalizer.details(for: option)], selection: .init(credentials: [option.selection], disclosures: disclosures))
+            selection: .init(credentials: [option.selection], disclosures: disclosures))
     }
 
     private func effectivePrepared(_ claims: String) -> PreparedPresentationReview {
@@ -661,7 +660,7 @@ final class SharingReviewModelTests: XCTestCase {
             ),
         ]).sharingReview()
 
-        let details = CredentialDisplayNormalizer.details(for: review.credentialOptions[0])
+        let details = CredentialDisplayNormalizer.sharingDetails(for: review.credentialOptions[0], includeDisclosures: true)
         let requested = details.groups.first { $0.title == CredentialDisplayVocabulary.requestedDisclosuresTitle }
 
         XCTAssertNotNil(
@@ -716,7 +715,7 @@ final class SharingReviewModelTests: XCTestCase {
         let first = informationOption(id: "one", name: "Ada")
         let second = informationOption(id: "two", name: "Grace")
         let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: [first, second])
-        let details = [first, second].map { CredentialDisplayNormalizer.details(for: $0) }
+        let details = [first, second].map { CredentialDisplayNormalizer.sharingDetails(for: $0, includeDisclosures: true) }
         XCTAssertEqual(review.informationToShare(selection: .init(credentials: [first.selection]), details: details)
             .first?.fields.first?.item.rawValue, #""Ada""#)
         XCTAssertEqual(review.informationToShare(selection: .init(credentials: [second.selection]), details: details)
@@ -734,7 +733,7 @@ final class SharingReviewModelTests: XCTestCase {
         ])
         let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: [required, optional])
         let groups = review.informationToShare(selection: .init(credentials: [required.selection, optional.selection]),
-            details: [required, optional].map { CredentialDisplayNormalizer.details(for: $0) })
+            details: [required, optional].map { CredentialDisplayNormalizer.sharingDetails(for: $0, includeDisclosures: true) })
         XCTAssertEqual(groups.count, 1)
         XCTAssertEqual(groups.first?.options.count, 2)
         XCTAssertEqual(groups.first?.fields.count, 2)
@@ -749,7 +748,7 @@ final class SharingReviewModelTests: XCTestCase {
         let technical = PresentationDisclosure(path: "iss", name: "iss", valueJSON: #""Issuer""#,
             displayValue: "Issuer", selectivelyDisclosable: false, required: false, selectable: false, requested: false)
         let option = informationOption(name: "Ada", extra: [extra, technical])
-        let details = CredentialDisplayNormalizer.details(for: option)
+        let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
         let fields = informationFields(option: option, details: details, disclosures: [])
         XCTAssertEqual(fields.count, 2)
         XCTAssertTrue(fields[1].included)
@@ -767,12 +766,12 @@ final class SharingReviewModelTests: XCTestCase {
         }
         let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: options)
         let fields = review.informationToShare(selection: .init(credentials: Set(options.map(\.selection))),
-            details: options.map { CredentialDisplayNormalizer.details(for: $0) }).first?.fields ?? []
+            details: options.map { CredentialDisplayNormalizer.sharingDetails(for: $0, includeDisclosures: true) }).first?.fields ?? []
         XCTAssertEqual(fields.count, 3)
         XCTAssertEqual(Set(fields.map(\.id)).count, 3)
         let reversed = SharingReviewModel(request: review.request, credentialOptions: options.reversed())
             .informationToShare(selection: .init(credentials: Set(options.map(\.selection))),
-                details: options.map { CredentialDisplayNormalizer.details(for: $0) }).first?.fields ?? []
+                details: options.map { CredentialDisplayNormalizer.sharingDetails(for: $0, includeDisclosures: true) }).first?.fields ?? []
         XCTAssertEqual(Dictionary(uniqueKeysWithValues: fields.map { ($0.item.rawValue, $0.id) }),
             Dictionary(uniqueKeysWithValues: reversed.map { ($0.item.rawValue, $0.id) }))
         XCTAssertEqual(Set(fields.compactMap { $0.item.rawValue }), [#""Vienna""#, #""Ada""#, #""Literal""#])
@@ -780,7 +779,7 @@ final class SharingReviewModelTests: XCTestCase {
 
     func testOptionalValuesRemainVisibleWithoutSharingUntilSelected() {
         let option = informationOption(name: "Ada", required: false)
-        let details = CredentialDisplayNormalizer.details(for: option)
+        let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
         let field = informationFields(option: option, details: details, disclosures: [])[0]
         XCTAssertFalse(field.included)
         XCTAssertEqual(field.item.rawValue, #""Ada""#)
@@ -791,7 +790,7 @@ final class SharingReviewModelTests: XCTestCase {
         let disclosure = PresentationDisclosure(path: "given_name", name: "given_name", valueJSON: #""Ada""#,
             displayValue: "Ada", selectivelyDisclosable: false, required: false, selectable: false)
         let option = informationOption(name: "Ada", replacing: [disclosure])
-        let field = informationFields(option: option, details: CredentialDisplayNormalizer.details(for: option), disclosures: [])[0]
+        let field = informationFields(option: option, details: CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true), disclosures: [])[0]
         XCTAssertTrue(field.included)
         XCTAssertFalse(field.alwaysIncluded)
     }

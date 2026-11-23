@@ -365,6 +365,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     func testReceiveEudiPidSdJwtFromEudi() async throws {
         let wallet = try await makeEudiWallet()
+        addTeardownBlock { try await wallet.close() }
         _ = try await initializeSigningIdentity(wallet)
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
@@ -385,6 +386,29 @@ final class MobileWalletIntegrationTests: XCTestCase {
         }
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
+        _ = try await checkEudiPidStatus(wallet, ids: credentialIDs)
+    }
+
+    private func checkEudiPidStatus(_ wallet: Wallet, ids: [String]) async throws -> [CredentialStatusRecord] {
+        let results = try await wallet.refreshCredentialStatuses(ids: ids, force: true)
+        XCTAssertEqual(Set(results.map { $0.reference.credentialID }), Set(ids))
+        for result in results { XCTAssertEqual(result.outcome, .completed) }
+        let snapshot = try await wallet.credentialStatusSnapshot()
+        let records = snapshot.credentials.filter { ids.contains($0.credentialID) }
+        XCTAssertEqual(records.count, ids.count)
+        for record in records {
+            let status = record.value.presentation
+            XCTAssertEqual(status.kind, .checked, "EUDI PID must have authenticated status, not merely a completed attempt")
+            XCTAssertEqual(status.freshness, .fresh)
+            XCTAssertEqual(status.coverage, .complete)
+            XCTAssertEqual(status.issue, .none)
+            XCTAssertNil(status.failure)
+            XCTAssertNotNil(status.lastCheckedAt)
+            XCTAssertEqual(status.references.count, 1)
+            XCTAssertEqual(status.references.first?.protocolName, "TOKEN_STATUS_LIST")
+            XCTAssertEqual(status.references.first?.result, .clear)
+        }
+        return records
     }
 
     func testReceiveEudiPidSdJwtCredentialFromDemoIssuer2() async throws {
@@ -544,6 +568,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     func testEudiPidSdJwtPersistsAcrossControllerRecreation() async throws {
         let walletId = "ios-eudi-pid-sd-jwt-persistence-\(UUID().uuidString)"
         let wallet1 = try await makeEudiWallet(walletId: walletId)
+        addTeardownBlock { try await wallet1.close() }
         _ = try await initializeSigningIdentity(wallet1)
 
         let offer = try await EudiTestBackend.shared.generateOffer(credentialId: Self.eudiPidSdJwtCredentialID)
@@ -555,12 +580,26 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
-        // Recreate wallet facade (simulates app restart)
+        let checked = try await checkEudiPidStatus(wallet1, ids: credentialIDs)
+        let checkedAt = try Dictionary(uniqueKeysWithValues: checked.map { ($0.credentialID, try XCTUnwrap($0.value.presentation.lastCheckedAt)) })
+        try await wallet1.close()
         let wallet2 = try await makeEudiWallet(walletId: walletId)
+        addTeardownBlock { try await wallet2.close() }
 
         _ = try await initializeSigningIdentity(wallet2)
         let credentials = try await wallet2.credentials()
-        XCTAssertFalse(credentials.isEmpty, "Credentials should persist across controller recreation")
+        XCTAssertEqual(Set(credentials.map(\.id)), Set(credentialIDs))
+        let restored = try await wallet2.credentialStatusSnapshot()
+        XCTAssertEqual(Set(restored.credentials.map(\.credentialID)), Set(credentialIDs))
+        for record in restored.credentials {
+            XCTAssertEqual(record.value.presentation.lastCheckedAt, checkedAt[record.credentialID])
+            XCTAssertEqual(record.value.presentation.freshness, .stale, "Restored evidence is historical until authenticated again")
+        }
+        let refreshed = try await checkEudiPidStatus(wallet2, ids: credentialIDs)
+        for record in refreshed {
+            XCTAssertGreaterThan(try XCTUnwrap(record.value.presentation.lastCheckedAt),
+                                 try XCTUnwrap(checkedAt[record.credentialID]))
+        }
     }
 
     func testDemoCredentialPersistsAcrossControllerRecreation() async throws {

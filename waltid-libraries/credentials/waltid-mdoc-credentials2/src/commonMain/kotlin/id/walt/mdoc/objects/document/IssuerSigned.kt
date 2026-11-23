@@ -8,7 +8,6 @@ import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.encoding.validateMdocCbor
@@ -20,7 +19,6 @@ import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.*
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
@@ -87,13 +85,10 @@ data class IssuerSigned private constructor(
                 issuerSignedList.entries.forEach { wrappedItem ->
                     val item = wrappedItem.value
 
-                    val serialized: JsonElement = MdocsCborSerializer.lookupSerializer(namespace, item.elementIdentifier)
-                        ?.runCatching {
-                            // The registry erases serializer types; a mismatch uses the fallback below.
-                            @Suppress("UNCHECKED_CAST")
-                            Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
-                        }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
-                        ?: item.elementValue.toSerializedJsonElement()
+                    // The registry erases serializer types; toJsonElement handles mismatches with its fallback.
+                    val serialized: JsonElement = MdocsCborSerializer.toJsonElement(
+                        namespace, item.elementIdentifier, item.elementValue,
+                    )
 
                     if (serialized != JsonNull)
                         put(item.elementIdentifier, serialized)

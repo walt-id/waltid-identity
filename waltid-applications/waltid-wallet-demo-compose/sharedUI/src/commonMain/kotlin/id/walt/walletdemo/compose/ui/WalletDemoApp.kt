@@ -1,5 +1,13 @@
 package id.walt.walletdemo.compose.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
+import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
+import id.walt.walletdemo.compose.ui.components.PresentationStatusRefreshActions
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
@@ -82,6 +90,17 @@ internal fun WalletDemoAppHost(
         onFailed = controller::failPresentationContinuation,
     )
 
+    CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(
+        state.credentialStatuses, state.checkingCredentialStatuses,
+        check = { controller.checkCredentialStatuses(setOf(it)) },
+        automatic = state.automaticCredentialStatusChecks,
+        setAutomatic = controller::setAutomaticCredentialStatusChecks,
+        checkAll = { controller.checkCredentialStatuses() },
+        summary = state.credentialStatusSummary, error = state.credentialStatusBatchError,
+        contextKey = controller to state.credentialStatusContext,
+        reviewRefresh = PresentationStatusRefreshActions(controller::checkPresentationCredentialStatus,
+            controller::presentationStatusRefreshRendered, controller::releasePresentationStatusRefresh),
+    )) {
     WalletDemoTheme(branding) {
         Surface(
             modifier = Modifier
@@ -137,6 +156,12 @@ internal fun WalletDemoAppHost(
                         serverSettingsContent = serverSettingsContent,
                     )
                 }
+                val statusSnackbar = remember { SnackbarHostState() }
+                LaunchedEffect(state.credentialStatusNotice) {
+                    state.credentialStatusNotice?.let { statusSnackbar.showSnackbar(it); controller.dismissCredentialStatusNotice() }
+                }
+                if (state.auth == WalletAuthState.Unlocked && state.presentationReview == null)
+                    SnackbarHost(statusSnackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp))
                 if (state.externalFlow != null && (state.auth != WalletAuthState.Unlocked || state.session !is WalletSessionState.Ready)) {
                     IconButton(onClick = { controller.closeExternalFlow() }, enabled = state.canDismissExternalFlow,
                         modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).testTag("wallet.external.close")) {
@@ -170,6 +195,7 @@ internal fun WalletDemoAppHost(
                 },
             )
         }
+    }
     }
 }
 

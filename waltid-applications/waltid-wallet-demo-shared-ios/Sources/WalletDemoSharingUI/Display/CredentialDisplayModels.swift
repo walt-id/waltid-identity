@@ -258,6 +258,7 @@ public enum ClaimRole: Hashable {
 }
 
 public enum CredentialDisplayText {
+    static let binaryData = "Binary data"
     public static let unknown = "Unknown"
     static let imageUnavailable = "Image unavailable or unsupported"
 

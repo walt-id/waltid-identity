@@ -1,6 +1,8 @@
 package id.walt.mobile.test.backend
 
 import io.ktor.http.encodeURLParameter
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -9,12 +11,129 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class EudiTestBackendTest {
+    @Test
+    fun requestObjectPayloadCannotReportVerifierFailure() {
+        listOf("error", "failed", "invalid").forEach { word ->
+            val events = JsonArray(listOf(buildJsonObject {
+                put("event", "Request object retrieved")
+                put("jwt", "opaque.$word.payload")
+            }))
+
+            assertFalse(EudiTestBackend.verifierEventsConfirmPresentation(events.toString()), word)
+        }
+    }
+
+    @Test
+    fun requestObjectPayloadCannotConfirmPresentation() {
+        listOf("successful", "verified").forEach { word ->
+            val events = JsonArray(listOf(buildJsonObject {
+                put("event", "Request object retrieved")
+                put("jwt", "opaque.$word.payload")
+            }))
+
+            assertFalse(EudiTestBackend.verifierEventsConfirmPresentation(events.toString()), word)
+        }
+    }
+
+    @Test
+    fun postedWalletResponsesConfirmPresentationInBothResponseShapes() {
+        listOf("Wallet response posted", "Verifier got wallet response").forEach { name ->
+            val events = JsonArray(listOf(buildJsonObject {
+                put("event", name)
+                putJsonObject("wallet_response") {
+                    put("error", JsonNull)
+                    putJsonObject("vp_token") {
+                        putJsonArray("identity") {
+                            add(JsonPrimitive("opaque.error.failed.invalid.verified.payload"))
+                        }
+                    }
+                }
+            }))
+
+            assertTrue(EudiTestBackend.verifierEventsConfirmPresentation(events.toString()), name)
+            assertTrue(EudiTestBackend.verifierEventsConfirmPresentation(buildJsonObject {
+                put("transaction_id", "test-transaction")
+                put("events", events)
+            }.toString()), name)
+        }
+    }
+
+    @Test
+    fun verifierFailureEventsRejectPresentation() {
+        listOf(
+            "FailedToRetrieve request",
+            "Wallet failed to post response",
+            "Verifier failed to get wallet",
+            "Presentation expired",
+            "Attestation status check failed",
+        ).forEach { name ->
+            val events = JsonArray(listOf(buildJsonObject {
+                put("event", name)
+                put("jwt", "opaque-payload-must-not-be-logged")
+            }))
+
+            val failure = assertFailsWith<IllegalStateException> {
+                EudiTestBackend.verifierEventsConfirmPresentation(events.toString())
+            }
+            assertTrue(failure.message.orEmpty().contains(name))
+            assertFalse(failure.message.orEmpty().contains("opaque-payload-must-not-be-logged"))
+        }
+    }
+
+    @Test
+    fun postedWalletErrorCannotConfirmPresentation() {
+        listOf("Wallet response posted", "Verifier got wallet response").forEach { name ->
+            val events = JsonArray(listOf(buildJsonObject {
+                put("event", name)
+                putJsonObject("wallet_response") {
+                    put("error", "access_denied")
+                    put("error_description", "opaque-description-must-not-be-logged")
+                }
+            }))
+
+            val failure = assertFailsWith<IllegalStateException> {
+                EudiTestBackend.verifierEventsConfirmPresentation(events.toString())
+            }
+            assertTrue(failure.message.orEmpty().contains("wallet error"))
+            assertFalse(failure.message.orEmpty().contains("opaque-description-must-not-be-logged"))
+        }
+    }
+
+    @Test
+    fun unrelatedOrUnknownEventsCannotConfirmPresentation() {
+        listOf("Attestation status check succeeded", "Future wallet response posted event").forEach { name ->
+            val events = JsonArray(listOf(buildJsonObject { put("event", name) }))
+            assertFalse(EudiTestBackend.verifierEventsConfirmPresentation(events.toString()), name)
+        }
+    }
+
+    @Test
+    fun rejectsMalformedVerifierEventEvidence() {
+        listOf(
+            "null",
+            "{}",
+            """{"events":{}}""",
+            "[1]",
+            "[{}]",
+            """[{"event":true}]""",
+            """[{"event":"Wallet response posted"}]""",
+            """[{"event":"Wallet response posted","wallet_response":{}}]""",
+            """[{"event":"Wallet response posted","wallet_response":{"vp_token":{}}}]""",
+        ).forEach { body ->
+            assertFailsWith<IllegalStateException>(body) {
+                EudiTestBackend.verifierEventsConfirmPresentation(body)
+            }
+        }
+    }
+
     @Test
     fun redirectPreservesOptionalSignedPayload() {
         val payload = """<input name="payload" value='{}'>"""

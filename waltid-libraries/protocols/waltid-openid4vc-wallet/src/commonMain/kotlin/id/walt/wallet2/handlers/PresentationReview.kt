@@ -12,7 +12,7 @@ data class PresentationCredentialClaims(
     val queryId: String,
     val credentialId: String,
     val format: String,
-    /** Received positions, not stored-credential/control positions. Never merge arrays by these indices. */
+    /** Effective JSON values. Locations identify binary leaves and map received positions to stored ones. */
     val claims: JsonObject,
     val wholeCredential: Boolean,
     val locations: List<PresentationClaimLocation>,

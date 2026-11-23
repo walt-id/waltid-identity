@@ -2,9 +2,13 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialDetectorTypes
 import id.walt.credentials.formats.SdJwtCredential
+import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.dcql.*
 import id.walt.dcql.models.*
+import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.NoMeta
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.json.*
 import kotlin.test.*
 
@@ -43,6 +47,26 @@ class WalletPresentationDisclosurePreviewTest {
     @Test fun mdocPreviewNeverAddsUnrequestedDocumentElements() {
         val data = Json.parseToJsonElement("""{"given_name":"Ada","family_name":"Lovelace"}""").jsonObject
         assertEquals(listOf(JsonPrimitive("given_name").toString()), preview("mso_mdoc", data).map { it.path })
+    }
+
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
+    @Test
+    fun mdocPreviewReusesPackedPortraitWhenNothingIsWithheld() {
+        val namespace = "org.iso.18013.5.1"
+        val docType = "$namespace.mDL"
+        val portrait = CborByteString(byteArrayOf(-128, 0, 32, 127)).toJsonElement()
+        val data = buildJsonObject {
+            put("docType", docType)
+            putJsonObject(namespace) { put("portrait", portrait) }
+        }
+        val query = CredentialQuery(
+            "mdl", CredentialFormat.MSO_MDOC, meta = MsoMdocMeta(docType),
+            claims = listOf(ClaimsQuery(pathStrings = listOf(namespace, "portrait"))),
+        )
+        val match = DcqlMatcher.matchCredential(query, RawDcqlCredential("one", "mso_mdoc", data)).getOrThrow()
+
+        val disclosure = WalletPresentationHandler.run { match.toPresentationDisclosures() }.single()
+        assertSame(portrait, disclosure.value)
     }
 
     @Test fun nonSelectiveCredentialIncludesAllOtherValuesAndDoesNotDuplicateRequestedParents() {

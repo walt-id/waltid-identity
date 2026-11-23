@@ -518,7 +518,8 @@ class Issuer2AttestationChallengeTest {
             override suspend fun get(sessionId: String) = records[sessionId]
             override suspend fun list() = records.values.toList()
             override suspend fun remove(sessionId: String) { records.remove(sessionId) }
-            override suspend fun take(sessionId: String) = records.remove(sessionId)
+            override suspend fun compareAndSet(expected: IssuanceSession, replacement: IssuanceSession): Boolean =
+                records.replace(expected.sessionId, expected, replacement)
         })
         val metadata = MetadataService(config, metadataConfig, profiles, sessions, typeMetadata,
             preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,
@@ -546,7 +547,7 @@ class Issuer2AttestationChallengeTest {
                     credentialData = JsonObject(emptyMap()))),
                 expiresAt = Clock.System.now() + 10.minutes,
             )
-            sessions.saveSession(session)
+            sessions.createSession(session)
             return DefaultSession(subject = session.sessionId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to session.expiresAt))
         }
 

@@ -47,13 +47,16 @@ fun List<SharingCredentialInformation>.informationToShare(
 
 fun WalletDemoPresentationCredentialOption.toSharingInformation(
     preferredLocales: List<String> = platformPreferredLocales(),
+    includeDisclosures: Boolean = true,
 ): SharingCredentialInformation {
-    val details = toCredentialDetails(preferredLocales)
-    val items = details.groups.firstOrNull { it.id == "requested" }?.items.orEmpty()
+    val summary = toCredentialSummary().toCardDisplayData(preferredLocales)
+    if (!includeDisclosures) return SharingCredentialInformation(this, summary, emptyList())
+
+    val metadata = StoredCredentialMetadataParser.claims(metadataJson, preferredLocales, format)
     val fields = disclosures.mapIndexedNotNull { index, disclosure ->
-        val item = items.getOrNull(index) ?: return@mapIndexedNotNull null
         val path = disclosurePathExpression(disclosure.path, format).segments
         if (!disclosure.requested && isCredentialSummaryClaim(path, format)) return@mapIndexedNotNull null
+        val item = disclosure.toClaimItem(index, format, metadata)
         val selection = WalletDemoPresentationDisclosureSelection(queryId, credentialId, disclosure.path)
         SharingInformationField(item, path,
             included = !disclosure.selectivelyDisclosable || disclosure.required,
@@ -61,7 +64,7 @@ fun WalletDemoPresentationCredentialOption.toSharingInformation(
             optionalSelections = if (disclosure.selectable) setOf(selection) else emptySet(),
             selections = setOf(selection))
     }
-    return SharingCredentialInformation(this, details.toCardDisplayData(), fields)
+    return SharingCredentialInformation(this, summary, fields)
 }
 
 /** Only the issuer/type already represented by the credential selector may be summarized away.

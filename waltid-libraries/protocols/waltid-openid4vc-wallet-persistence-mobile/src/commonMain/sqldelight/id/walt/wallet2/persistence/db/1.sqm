@@ -1,0 +1,4 @@
+CREATE TABLE credential_status_snapshots (
+    credential_id TEXT NOT NULL PRIMARY KEY REFERENCES credentials(id) ON DELETE CASCADE,
+    snapshot TEXT NOT NULL
+);

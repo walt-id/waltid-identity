@@ -337,6 +337,7 @@ public data class MobileWalletPreparedPresentationReview(
  * @property format Credential format identifier used by the presenter.
  * @property claimsJson JSON object containing the effective credential claims carried by this
  * contribution, before holder signing and response transport, including unavoidable extra values.
+ * Locations marked [MobileWalletPresentationClaimLocation.isBinary] identify base64url strings.
  * @property wholeCredential Whether the presenter sends the credential in full rather than
  * selectively disclosing its claims.
  * @property locations Mappings from stored claim identities to positions in [claimsJson], with
@@ -362,10 +363,13 @@ public data class MobileWalletPresentationCredentialClaims(
  * carry this value. These are selection identifiers, not received claim paths.
  * @property alwaysCarried Whether the value is clear text outside any selectively disclosed
  * ancestor, or belongs to a credential that is shared in full.
+ * @property isBinary Whether the value is an mdoc CBOR byte string. Its review JSON value is
+ * unpadded base64url and the location has no per-byte child paths.
  */
 public data class MobileWalletPresentationClaimLocation(
     val sourcePathJson: String,
     val receivedPathJson: String,
     val sharedBy: List<String>,
     val alwaysCarried: Boolean,
+    val isBinary: Boolean = false,
 )

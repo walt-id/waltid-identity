@@ -39,7 +39,7 @@ public struct ExpandableMetadataCard<Summary: View, Details: View>: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Image(systemName: "chevron.down")
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tint)
                 }
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
