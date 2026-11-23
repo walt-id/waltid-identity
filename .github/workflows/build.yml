@@ -41,7 +41,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.15'
       - name: Install browser certificate tooling
         run: |
           apt-get update
