@@ -73,7 +73,10 @@ public actor Wallet {
         try await bridge.pendingCredentialStatusNotices()
     }
 
-    /// Acknowledges the displayed version, even when another check is in flight.
+    /// Acknowledges the displayed version so a newer notice for the same credential stays pending.
+    /// - Parameters:
+    ///   - credentialID: The stored credential ID from the displayed notice.
+    ///   - version: The opaque version from the displayed notice.
     public func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
         try await bridge.acknowledgeCredentialStatusNotice(credentialID: credentialID, version: version)
     }

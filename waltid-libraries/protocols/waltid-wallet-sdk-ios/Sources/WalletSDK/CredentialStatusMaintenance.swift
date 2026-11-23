@@ -30,9 +30,14 @@ public enum CredentialStatusMaintenanceResult: Equatable, Sendable {
 
 /// A wallet-local change to show after unlock. Acknowledgement is scoped to this version.
 public struct PendingCredentialStatusNotice: Sendable, Equatable {
+    /// The stored credential's identifier within this wallet.
     public let credentialID: String
+    /// The opaque notice version to pass back when acknowledging it.
     public let version: String
+    /// The adverse status that triggered this notice.
     public let kind: CredentialStatusIssue
+    /// The time of the check that first recorded this notice version.
     public let checkedAt: Date
+    /// Whether the status evidence for this notice is stale when read.
     public let historical: Bool
 }
