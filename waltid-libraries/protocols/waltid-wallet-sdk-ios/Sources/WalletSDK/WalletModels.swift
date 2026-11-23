@@ -1286,6 +1286,9 @@ public struct IssuanceFailure: Equatable, Sendable {
     /// Failed target and unattempted targets, when failure occurred during credential processing.
     public let targetFailure: IssuanceTargetFailure?
 
+    /// Whether the caller may submit the same reviewed offer again after this transition.
+    public let canRetryOffer: Bool
+
     /// Creates a sanitized issuance failure.
     ///
     /// - Parameters:
@@ -1293,9 +1296,21 @@ public struct IssuanceFailure: Equatable, Sendable {
     ///   - message: Public error description.
     ///   - targetFailure: Optional target-level failure details.
     public init(code: IssuanceErrorCode, message: String, targetFailure: IssuanceTargetFailure? = nil) {
+        self.init(code: code, message: message, targetFailure: targetFailure, canRetryOffer: false)
+    }
+
+    /// Creates a failure with the session's explicit offer retry decision.
+    ///
+    /// - Parameters:
+    ///   - code: The category of the failed issuance transition.
+    ///   - message: A public description that excludes protocol secrets.
+    ///   - targetFailure: The failed credential target and any unattempted targets, when available.
+    ///   - canRetryOffer: Whether the caller may submit the same reviewed offer again.
+    public init(code: IssuanceErrorCode, message: String, targetFailure: IssuanceTargetFailure? = nil, canRetryOffer: Bool) {
         self.code = code
         self.message = message
         self.targetFailure = targetFailure
+        self.canRetryOffer = canRetryOffer
     }
 }
 

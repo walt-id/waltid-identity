@@ -39,9 +39,15 @@ final class BatchIssuanceE2ETests: XCTestCase {
         attachScreenshot(app, name: "Two credentials stored")
 
         app.terminate()
-        ui.launch(environment: ["ATTESTATION_BASE_URL": "", "TRANSACTION_DATA_PROFILES_URL": ""])
+        ui.launch(
+            environment: ["ATTESTATION_BASE_URL": "", "TRANSACTION_DATA_PROFILES_URL": ""],
+            initializeSigningIdentity: false
+        )
+        let walletReadyDeadline = Date().addingTimeInterval(60)
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: 60), "Wallet ready")
+        XCTAssertFalse(app.buttons["wallet.keySetupContinue"].exists, "Relaunch must reuse the saved signing identity")
         ui.returnToWallet()
-        ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: 60)
+        ui.assertExists(identifierPrefix: "wallet.credentialCard.", timeout: max(0, walletReadyDeadline.timeIntervalSinceNow))
         XCTAssertEqual(Set(cards.allElementsBoundByIndex.map(\.identifier)), storedIDs)
         attachScreenshot(app, name: "Same credentials after relaunch")
     }

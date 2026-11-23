@@ -460,7 +460,11 @@ final class MockWalletUITests: XCTestCase {
         XCTAssertTrue(app.buttons["wallet.proximityStartButton"].isHittable)
         ui.openScanner()
         XCTAssertFalse(app.buttons["wallet.scanContinue"].isEnabled)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         ui.returnToWallet()
+        XCTAssertTrue(app.buttons["wallet.scanButton"].isHittable)
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5),
+            "Closing the scanner must dismiss its keyboard before continuing on Home")
         XCTAssertTrue(app.buttons["wallet.proximityStartButton"].isHittable)
 
         ui.openWalletLink("openid4vp://mock")
@@ -811,8 +815,9 @@ final class MockWalletUITests: XCTestCase {
         details.name = "rtl-credential-information"
         details.lifetime = .keepAlways
         add(details)
-        // Start on native Back and complete the pan across the bar before releasing.
-        back.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        // Exercise the RTL leading-edge navigation gesture across the bar.
+        navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+            .withOffset(CGVector(dx: -3, dy: 0))
             .press(forDuration: 0.05, thenDragTo: navigationBar.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5))
                 .withOffset(CGVector(dx: 3, dy: 0)), withVelocity: .slow, thenHoldForDuration: 0.2)
         XCTAssertTrue(app.buttons["wallet.offerAcceptButton"].waitForExistence(timeout: 5), app.debugDescription)
