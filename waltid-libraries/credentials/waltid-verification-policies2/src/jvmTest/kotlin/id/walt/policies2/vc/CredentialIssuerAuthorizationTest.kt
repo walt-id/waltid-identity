@@ -177,6 +177,24 @@ class CredentialIssuerAuthorizationTest {
     }
 
     @Test
+    fun `SD JWT VC private vc issuer is business data`() = runTest {
+        val key = key("assertion")
+        withDocument(document(key)) {
+            val payload = buildJsonObject {
+                put("iss", did)
+                put("vct", "https://example.com/identity")
+                put("vc", buildJsonObject { put("type", "business_record"); put("issuer", "business-source") })
+            }
+            val signed = CompactJws.sign(Json.encodeToString(payload).encodeToByteArray(), key, JwsAlgorithm.ES256,
+                protectedHeader = buildJsonObject { put("kid", key.id.value); put("typ", "dc+sd-jwt") })
+            val credential = CredentialParser.parseOnly("$signed~")
+            assertEquals(did, credential.issuer)
+            assertTrue(CredentialSignaturePolicy().verify(credential).isSuccess)
+            assertTrue(AllowedIssuerPolicy(JsonPrimitive(did)).verify(credential).isSuccess)
+        }
+    }
+
+    @Test
     fun `assertion relationship resolves relative paths queries and fragments`() = runTest {
         val key = key("assertion")
         for ((relative, absolute) in listOf(
