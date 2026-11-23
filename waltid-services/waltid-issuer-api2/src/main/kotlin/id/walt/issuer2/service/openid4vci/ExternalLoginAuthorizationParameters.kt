@@ -1,5 +1,6 @@
 package id.walt.issuer2.service.openid4vci
 
+import id.walt.openid4vci.errors.ClientInputException
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 
@@ -10,18 +11,19 @@ internal fun Map<String, List<String>>.encodeExternalLoginAuthorizationParameter
         .encode(Json.encodeToString(this).encodeToByteArray())
         .trimEnd('=')
 
-    require(encoded.length <= MAX_EXTERNAL_LOGIN_AUTHORIZATION_PARAMETERS_LENGTH) {
+    // The wallet's own authorization parameters (e.g. a long state) make the envelope too large.
+    if (encoded.length > MAX_EXTERNAL_LOGIN_AUTHORIZATION_PARAMETERS_LENGTH) throw ClientInputException(
         "External login authorization parameters exceed the maximum encoded length of " +
                 "$MAX_EXTERNAL_LOGIN_AUTHORIZATION_PARAMETERS_LENGTH characters"
-    }
+    )
     return encoded
 }
 
 internal fun String.decodeExternalLoginAuthorizationParameters(): Map<String, List<String>> {
-    require(length <= MAX_EXTERNAL_LOGIN_AUTHORIZATION_PARAMETERS_LENGTH) {
+    if (length > MAX_EXTERNAL_LOGIN_AUTHORIZATION_PARAMETERS_LENGTH) throw ClientInputException(
         "External login authorization parameters exceed the maximum encoded length of " +
                 "$MAX_EXTERNAL_LOGIN_AUTHORIZATION_PARAMETERS_LENGTH characters"
-    }
+    )
 
     return runCatching {
         val paddingLength = (4 - length % 4) % 4
@@ -30,6 +32,6 @@ internal fun String.decodeExternalLoginAuthorizationParameters(): Map<String, Li
             .decodeToString(throwOnInvalidSequence = true)
         Json.decodeFromString<Map<String, List<String>>>(json)
     }.getOrElse { cause ->
-        throw IllegalArgumentException("Invalid external login authorization parameters", cause)
+        throw ClientInputException("Invalid external login authorization parameters", cause)
     }
 }

@@ -42,6 +42,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -135,10 +136,11 @@ class Issuer2MsoDataWalletFlowTest {
             )
         }.exceptionOrNull()
         assertNotNull(error)
-        assertTrue(
-            error.message!!.contains("msoData") || error.message!!.contains("validFrom"),
-            error.message,
-        )
+        // The rejection comes from the issuer's own offer configuration, not from the wallet's request: the
+        // wallet gets a generic server_error whose errorId leads the operator to the logged msoData reason.
+        val message = error.message.orEmpty()
+        assertTrue("server_error" in message && "errorId=" in message, message)
+        assertFalse("msoData" in message || "validFrom" in message, message)
     }
 
     @Test

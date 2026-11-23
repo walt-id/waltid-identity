@@ -22,8 +22,14 @@ fun Application.configureStatusPages() {
     install(StatusPages) {
         exception<Throwable> { call, cause ->
             val errorId = UUID.randomUUID().toString()
-            logger.error(cause) { "Unhandled exception, errorId=$errorId" }
             val status = statusCodeForException(cause)
+            if (status.value >= 500) {
+                logger.error(cause) { "Unhandled exception, errorId=$errorId" }
+            } else {
+                // A deliberate rejection (unknown session, invalid input, conflict) is not a server fault: one line
+                // with what the client was told is enough to find it by errorId, without an ERROR and stack trace.
+                logger.info("Request rejected with ${status.value}, errorId=$errorId: ${cause::class.simpleName}: ${cause.message}")
+            }
             call.response.header("X-Error-Id", errorId)
             call.respond(status, exceptionMap(cause, status , errorId))
         }

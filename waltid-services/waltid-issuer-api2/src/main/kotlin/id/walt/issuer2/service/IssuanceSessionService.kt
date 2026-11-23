@@ -1,5 +1,6 @@
 package id.walt.issuer2.service
 
+import id.walt.errors.HttpStatusError
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
@@ -79,7 +80,7 @@ class IssuanceSessionService(
         while (true) {
             currentCoroutineContext().ensureActive()
             val current = getSession(session.sessionId)
-            check(current.issuanceClaimId == null) { "Issuance session is being processed" }
+            if (current.issuanceClaimId != null) throw IssuanceSessionConflictException("Issuance session is being processed")
             val state = current.deferredState
             val denied = state?.status == DeferredStatus.DENIED
             val replacement = session.copy(
@@ -103,7 +104,7 @@ class IssuanceSessionService(
                 require(identifiers.all { it in selected }) { "Token exceeds the established issuance selection" }
                 return current
             }
-            check(current.issuanceClaimId == null) { "Issuance session is being processed" }
+            if (current.issuanceClaimId != null) throw IssuanceSessionConflictException("Issuance session is being processed")
             val selected = current.issuanceRequests.map { it.credentialIdentifier }.filter { it in identifiers }
             require(identifiers.all { it in selected }) { "Token exceeds the established issuance selection" }
             val replacement = current.copy(authorizedCredentialIdentifiers = selected)
@@ -134,7 +135,7 @@ class IssuanceSessionService(
         val claimId = requireNotNull(session.issuanceClaimId)
         while (true) {
             val current = getSession(session.sessionId)
-            check(current.issuanceClaimId == claimId) { "Issuance session claim has changed" }
+            if (current.issuanceClaimId != claimId) throw IssuanceSessionConflictException("Issuance session claim has changed")
             val replacement = session.copy(
                 issuanceResults = current.issuanceResults + session.issuanceResults,
                 issuanceClaimId = null,
@@ -164,4 +165,13 @@ class IssuanceSessionService(
         )
         return saveSession(updated)
     }
+}
+
+/**
+ * The issuance session is in use by another request (a credential request still being processed, or a claim that
+ * changed meanwhile). The caller can retry once that request finishes, so this is a 409 with its message, not an
+ * internal error. It stays an [IllegalStateException], as the checks it replaces threw.
+ */
+class IssuanceSessionConflictException(message: String) : IllegalStateException(message), HttpStatusError {
+    override val status: Int get() = 409
 }
