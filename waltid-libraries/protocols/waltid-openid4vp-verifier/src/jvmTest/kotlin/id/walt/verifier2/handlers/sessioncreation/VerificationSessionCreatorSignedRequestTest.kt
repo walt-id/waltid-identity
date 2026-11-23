@@ -12,6 +12,7 @@ import id.walt.dcql.models.meta.JwtVcJsonMeta
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.VerificationSessionSetup
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -51,6 +52,39 @@ class VerificationSessionCreatorSignedRequestTest {
 
     private fun decodeJwtPart(jwt: String, index: Int) =
         Json.parseToJsonElement(jwt.split(".")[index].decodeFromBase64Url().decodeToString()).jsonObject
+
+    @Test
+    fun `registration certificate and JWT verifier info appear in the signed request payload`() = runTest {
+        val verifierInfo = Json.parseToJsonElement(
+            """[
+                {"format":"registration_cert","data":"example-registration-attestation","credential_ids":["credential"]},
+                {"format":"jwt","data":"example-jwt-attestation"}
+            ]"""
+        )
+        val setup = Json.decodeFromString<VerificationSessionSetup>(
+            """{
+                "flow_type":"cross_device",
+                "core_flow":{
+                    "dcql_query":{"credentials":[
+                        {"id":"credential","format":"mso_mdoc","meta":{"doctype_value":"org.example.credential"}}
+                    ]},
+                    "signed_request":true,
+                    "verifier_info":$verifierInfo
+                }
+            }"""
+        )
+
+        val session = VerificationSessionCreator.createVerificationSession(
+            setup = setup,
+            clientId = "decentralized_identifier:did:web:verifier.example.com",
+            urlPrefix = "https://verifier.example.com/verification-session",
+            urlHost = "openid4vp://authorize",
+            key = JWKKey.generate(KeyType.secp256r1),
+        )
+
+        val jwt = assertNotNull(session.signedAuthorizationRequestJwt)
+        assertEquals(verifierInfo, decodeJwtPart(jwt, 1)["verifier_info"])
+    }
 
     @Test
     fun `did key kid uses multibase fragment not vault url`() = runTest {
