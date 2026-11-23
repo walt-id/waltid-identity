@@ -238,13 +238,35 @@ data class Verification2Session(
             ?.forEach { it.results = emptyMap() }
     }
 
-    fun publicView(): Verification2Session = copy(
+    fun publicView(): Verification2Session = publicView(includeSameDeviceResult = false)
+
+    /** Release a same-device outcome only to the browser carrying the wallet redirect code. */
+    fun completionView(responseCode: String?): Verification2Session {
+        if (setup is SameDeviceFlowSetup && status == VerificationSessionStatus.SUCCESSFUL) {
+            require(responseCode != null && responseCode == this.responseCode) { "A valid response_code is required to retrieve the same-device result." }
+            return publicView(includeSameDeviceResult = true)
+        }
+        return publicView()
+    }
+
+    private fun publicView(includeSameDeviceResult: Boolean): Verification2Session = copy(
         setup = setup.publicView(),
         notifications = notifications?.publicView(),
         policies = policies.publicView(),
         ephemeralDecryptionKey = null,
         crypto2EphemeralDecryptionKey = null,
-    )
+        responseCode = null,
+    ).let { view ->
+        if (setup !is SameDeviceFlowSetup || includeSameDeviceResult) view else view.copy(
+            presentedRawData = null,
+            presentedPresentations = null,
+            presentedCredentials = null,
+            policyResults = null,
+            presentationValidationResults = null,
+            failure = null,
+            statusReason = null,
+        )
+    }
 
     private fun redactCredentialSubject(resultElement: JsonElement): JsonElement {
         val resultObj = resultElement.jsonObject
