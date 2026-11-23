@@ -200,7 +200,7 @@ class TestPki(
     }
 
     /** CRL issued by [ca] listing all revoked certificates it issued. */
-    fun crl(ca: TestEntity, thisUpdate: Instant = Clock.System.now()): ByteArray {
+    fun crl(ca: TestEntity, thisUpdate: Instant = now): ByteArray {
         val b = X509v2CRLBuilder(ca.holder.subject, Date.from(thisUpdate.toJavaInstant()))
         b.setNextUpdate(Date.from((thisUpdate + 7.days).toJavaInstant()))
         revoked.forEach { (sn, at) -> if (at <= thisUpdate) b.addCRLEntry(sn, Date.from(at.toJavaInstant()), CRLReason.keyCompromise) }
@@ -211,7 +211,8 @@ class TestPki(
     private fun ocsp(body: ByteArray): ByteArray {
         val req = OCSPReq(body)
         val builder = BasicOCSPRespBuilder(RespID(ocspResponder.holder.subject))
-        val produced = Clock.System.now()
+        // Stable evidence predates validation even when an online fetch crosses a clock second.
+        val produced = now
         for (r in req.requestList) {
             val at = revoked[r.certID.serialNumber]
             val status: CertificateStatus? = if (at != null && at <= produced) RevokedStatus(Date.from(at.toJavaInstant()), CRLReason.keyCompromise) else CertificateStatus.GOOD
