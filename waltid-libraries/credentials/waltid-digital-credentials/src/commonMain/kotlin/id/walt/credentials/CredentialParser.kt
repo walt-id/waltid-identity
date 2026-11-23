@@ -2,6 +2,7 @@
 
 package id.walt.credentials
 
+import id.walt.mdoc.encoding.requireSupportedMdocVersion
 import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
@@ -196,14 +197,14 @@ object CredentialParser {
         validateMdocCbor(bytes)
         val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(bytes)
         require(response.status == 0u) { "Mdoc DeviceResponse status must indicate success" }
-        require(response.version == "1.0") { "Unsupported mdoc DeviceResponse version" }
+        requireSupportedMdocVersion(response.version)
         val document = requireNotNull(response.documents?.singleOrNull()) {
             "An OpenID4VP mdoc presentation must contain exactly one document"
         }
         return handleMdocDocument(credential, document)
     }
 
-    private suspend fun handleMdocDocument(
+    suspend fun handleMdocDocument(
         credential: String,
         document: Document,
     ): Pair<CredentialDetectionResult, MdocsCredential> {
