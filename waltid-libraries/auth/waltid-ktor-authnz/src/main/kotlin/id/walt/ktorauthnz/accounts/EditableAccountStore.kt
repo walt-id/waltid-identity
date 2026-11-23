@@ -29,3 +29,10 @@ interface EditableAccountStore : AccountStore {
 interface PasswordHashUpgradeStore : EditableAccountStore {
     suspend fun upgradePasswordHash(identifier: AccountIdentifier, verified: PasswordStoredData, replacement: PasswordHash)
 }
+
+/** Existing unmarked records in this store were written with [unmarkedPasswordPepper]. */
+interface VersionedPasswordPepperStore : PasswordHashUpgradeStore {
+    val unmarkedPasswordPepper: String
+    /** Keep new records readable by older replicas while the new readers are being deployed. */
+    val writeUnmarkedPasswords: Boolean
+}

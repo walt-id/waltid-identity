@@ -1,11 +1,20 @@
 package id.walt.webwallet.service.account.authnz
 
+import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.accounts.InMemoryAccountStore
 import id.walt.ktorauthnz.accounts.PasswordHashUpgradeStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.methods.EmailPass
+import id.walt.ktorauthnz.exceptions.InvalidCredentialsException
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
+import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.ktorauthnz.security.PasswordHashing
+import id.walt.ktorauthnz.security.PasswordHashingConfiguration
+import id.walt.ktorauthnz.security.PasswordHashingAlgorithm.ARGON2
+import id.walt.ktorauthnz.security.PasswordHashingAlgorithm.BCRYPT
+import id.walt.webwallet.config.KtorAuthnzConfig
+import id.walt.webwallet.web.plugins.configureWalletPasswordAuthentication
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData
 import id.walt.webwallet.db.models.authnz.AuthnzUsers
@@ -25,8 +34,10 @@ import org.junit.jupiter.api.TestInstance
 import java.io.File
 import java.util.*
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -147,6 +158,80 @@ class AuthenticationServiceTest {
         val result = authenticationService.editableAccountStore.lookupAccountUuid(identifier)
 
         assertEquals(accountId, result, "Should return the correct account ID")
+    }
+
+    @Test
+    fun `configured wallet passwords coexist with pre-upgrade SQL credentials across restarts`() = runBlocking {
+        val previousConfig = KtorAuthnzManager.passwordHashingConfig
+        val previousStore = runCatching { KtorAuthnzManager.accountStore }.getOrElse { InMemoryAccountStore() }
+        val legacy = EmailIdentifier("legacy@example.test")
+        val fresh = EmailIdentifier("fresh@example.test")
+        val configuredPepper = "wallet-test-key"
+        val config = KtorAuthnzConfig(requireHttps = false, pepper = configuredPepper, hashAlgorithm = BCRYPT, cookieDomain = null)
+        // Frozen output of the pre-1.3 Password4j writer, including its Argon2 secret input.
+        val oldHash = "ARGON2/\$argon2id\$v=19\$m=15360,t=2,p=1" +
+                "\$F11DstKLjiZjsDWf54u5C2dhuyXeognrwnB11zCp50JjLFkMk2LhJW7oG/SoV9jdfdGETiscx3jb17cxxHb9pA" +
+                "\$7iRQ3t5hvDkYJdFFctIEU+19B0q2CG2Qn+43xDVA/Zs"
+        suspend fun persist(identifier: EmailIdentifier, data: EmailPassStoredData) {
+            val store = KtorAuthnzManager.accountStore
+            val account = UUID.randomUUID().toString()
+            store.addAccountIdentifierToAccount(account, identifier)
+            store.addAccountStoredData(account, EmailPass.id, data)
+        }
+        suspend fun stored(identifier: EmailIdentifier) = assertNotNull(
+            (KtorAuthnzManager.accountStore.lookupStoredDataForAccountIdentifier(identifier, EmailPass) as EmailPassStoredData).passwordHash
+        )
+        try {
+            val bridge = config.copy(legacyPasswordWritesDuringRollout = true, hashMigrations = mapOf(ARGON2 to BCRYPT))
+            configureWalletPasswordAuthentication(bridge)
+            persist(legacy, EmailPassStoredData(passwordHash = oldHash))
+            val staged = EmailIdentifier("staged@example.test")
+            persist(staged, EmailPassStoredData(password = "bridge-fixture"))
+            val stagedHash = stored(staged)
+            assertTrue(stagedHash.startsWith("ARGON2/\$argon2"))
+            // Read a bridge write using the historical configuration and ordinary, untagged format.
+            KtorAuthnzManager.accountStore = InMemoryAccountStore()
+            KtorAuthnzManager.passwordHashingConfig = PasswordHashingConfiguration(pepper = "waltid-ktor-authnz")
+            assertTrue(PasswordHashing.check("bridge-fixture", PasswordHash.fromString(stagedHash)).valid)
+
+            configureWalletPasswordAuthentication(config)
+            persist(fresh, EmailPassStoredData(password = "fresh-wallet-fixture"))
+            val newHash = stored(fresh)
+            assertEquals(BCRYPT, PasswordHash.fromString(newHash).algorithm)
+            assertEquals(fresh, EmailPass.verifyPassword(fresh.email, "fresh-wallet-fixture"))
+            assertEquals(legacy, EmailPass.verifyPassword(legacy.email, "legacy-wallet-fixture"))
+            assertEquals(oldHash, stored(legacy))
+
+            configureWalletPasswordAuthentication(bridge)
+            assertEquals(fresh, EmailPass.verifyPassword(fresh.email, "fresh-wallet-fixture"))
+            assertEquals(legacy, EmailPass.verifyPassword(legacy.email, "legacy-wallet-fixture"))
+            assertEquals(oldHash, stored(legacy))
+
+            configureWalletPasswordAuthentication(config.copy(pepper = "different-wallet-key"))
+            assertFailsWith<InvalidCredentialsException> { EmailPass.verifyPassword(fresh.email, "fresh-wallet-fixture") }
+            assertEquals(newHash, stored(fresh))
+            assertEquals(legacy, EmailPass.verifyPassword(legacy.email, "legacy-wallet-fixture"))
+
+            configureWalletPasswordAuthentication(config.copy(hashMigrations = mapOf(ARGON2 to BCRYPT)))
+            assertFailsWith<InvalidCredentialsException> { EmailPass.verifyPassword(legacy.email, "incorrect") }
+            assertEquals(oldHash, stored(legacy))
+            assertEquals(legacy, EmailPass.verifyPassword(legacy.email, "legacy-wallet-fixture"))
+            val upgraded = stored(legacy)
+            assertEquals(BCRYPT, PasswordHash.fromString(upgraded).algorithm)
+            configureWalletPasswordAuthentication(config)
+            assertEquals(legacy, EmailPass.verifyPassword(legacy.email, "legacy-wallet-fixture"))
+            assertEquals(upgraded, stored(legacy))
+
+            configureWalletPasswordAuthentication(config.copy(hashAlgorithm = ARGON2, hashMigrations = mapOf(ARGON2 to ARGON2)))
+            assertEquals(staged, EmailPass.verifyPassword(staged.email, "bridge-fixture"))
+            val rekeyed = stored(staged)
+            assertNotEquals(stagedHash, rekeyed)
+            assertEquals(staged, EmailPass.verifyPassword(staged.email, "bridge-fixture"))
+            assertEquals(rekeyed, stored(staged))
+        } finally {
+            KtorAuthnzManager.passwordHashingConfig = previousConfig
+            KtorAuthnzManager.accountStore = previousStore
+        }
     }
 
     @Test

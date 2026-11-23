@@ -1,5 +1,29 @@
 # Example: Multiple authentication methods
 
+## Upgrading the Wallet API v1 password configuration
+
+Before 1.3, the optional `ktor-authnz` feature used the library's built-in pepper
+and Argon2 even when `ktor-authnz.conf` specified different values. Version 1.3
+uses `pepper` and `hashAlgorithm` for new passwords. On a fresh deployment,
+provide one deployment-specific secret to every replica and retain it across restarts.
+
+For a live rolling upgrade, start every **new** replica with the final deployment
+pepper and `legacyPasswordWritesDuringRollout = true`. In this mode it reads
+both credential formats, creates historical Argon2 records that old replicas can
+read, and pauses login-time migration. Once every replica runs the fixed reader,
+roll `legacyPasswordWritesDuringRollout = false` across the fleet. Both groups
+can authenticate records written during this second rollout. To pause activation,
+switch the flag back to true on the fixed binary and retain the deployment pepper.
+After tagged records have been written, keep a fixed reader when rolling back.
+
+Wallet v1 records written with a distinct configured pepper carry a version tag
+inside the stored hash. Existing unmarked records verify with the historical pepper.
+An empty migration map keeps those records intact. To move an existing Argon2
+credential to the new pepper on successful login, configure `ARGON2: ARGON2`
+or a conversion such as `ARGON2: BCRYPT`. The replacement uses the configured
+pepper. Wrong passwords leave the record intact. Retain that pepper once
+activated because tagged records depend on it.
+
 ## Configuration
 
 `_features.conf`:

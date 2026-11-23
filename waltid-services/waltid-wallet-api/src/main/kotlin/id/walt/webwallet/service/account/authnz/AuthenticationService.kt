@@ -1,7 +1,7 @@
 package id.walt.webwallet.service.account.authnz
 
 import id.walt.ktorauthnz.accounts.EditableAccountStore
-import id.walt.ktorauthnz.accounts.PasswordHashUpgradeStore
+import id.walt.ktorauthnz.accounts.VersionedPasswordPepperStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
@@ -20,9 +20,17 @@ import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.UUID
 
-class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispatchers.IO) {
+class AuthenticationService internal constructor(
+    private val legacyPasswordWrites: Boolean,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
+    constructor(dispatcher: CoroutineDispatcher = Dispatchers.IO) : this(false, dispatcher)
 
-    val editableAccountStore: EditableAccountStore = object : PasswordHashUpgradeStore {
+    val editableAccountStore: EditableAccountStore = object : VersionedPasswordPepperStore {
+        // Wallet v1 used this literal before the optional plugin started applying its configuration.
+        override val unmarkedPasswordPepper = "waltid-ktor-authnz"
+        override val writeUnmarkedPasswords = legacyPasswordWrites
+
         override suspend fun addAccountIdentifierToAccount(
             accountId: String,
             newAccountIdentifier: AccountIdentifier
