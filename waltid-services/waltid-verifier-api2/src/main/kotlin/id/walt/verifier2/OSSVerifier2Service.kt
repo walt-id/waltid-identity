@@ -243,6 +243,7 @@ object Verifier2Service {
                         }
                     }) {
                         val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
+                        if (repository.get(sessionId) == null) throw VerificationSessionNotFoundException(sessionId)
                         WebhookNotifier.eraseSession(sessionId)
                         if (!repository.delete(sessionId)) throw VerificationSessionNotFoundException(sessionId)
                         call.respond(HttpStatusCode.NoContent)

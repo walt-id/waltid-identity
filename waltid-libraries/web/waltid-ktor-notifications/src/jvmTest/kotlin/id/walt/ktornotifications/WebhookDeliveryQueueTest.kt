@@ -11,6 +11,7 @@ import io.ktor.http.Url
 import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.headersOf
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -494,6 +495,61 @@ class WebhookDeliveryQueueTest {
         assertTrue(store.deadLetters().isEmpty())
         assertFalse(queue.redrive(failed))
         assertNotNull(store.pending(other))
+    }
+
+    @Test
+    fun `producer holding an old snapshot cannot enqueue after erasure or restart`() = runTest {
+        val directory = temporaryDirectory()
+        val store = FileWebhookDeliveryStore(directory)
+        val transport = RecordingTransport()
+        val queue = queue(store, transport) { 1_000L }
+        val owner = "verifier.session"
+        val oldUpdate = update()
+        val resumeProducer = CompletableDeferred<Unit>()
+        val late = async(start = CoroutineStart.UNDISPATCHED) {
+            resumeProducer.await()
+            queue.enqueue(oldUpdate, webhook(), sessionOwner = owner)
+        }
+        val purged = queue.eraseSession(owner, allowPurgeNotification = true)
+        resumeProducer.complete(Unit)
+        assertNull(store.pending(late.await()))
+
+        val restarted = FileWebhookDeliveryStore(directory)
+        val resumed = queue(restarted, transport) { 1_000L }
+        assertNull(restarted.pending(resumed.enqueue(oldUpdate, webhook(), sessionOwner = owner)))
+        val redacted = resumed.enqueue(update("data_retention_purge"), webhook(), owner, sessionGeneration = purged)
+        assertNotNull(restarted.pending(redacted))
+        resumed.eraseSession(owner)
+        assertNull(restarted.pending(redacted))
+        assertNull(restarted.pending(resumed.enqueue(update("data_retention_purge"), webhook(), owner, sessionGeneration = purged)))
+        assertEquals(0, resumed.processDue())
+    }
+
+    @Test
+    fun `erasure waits for an admitted transport and rejects a previously claimed send`() = runTest {
+        val store = FileWebhookDeliveryStore(temporaryDirectory())
+        val admitted = CompletableDeferred<Unit>()
+        val continueSend = CompletableDeferred<Unit>()
+        val transport = object : WebhookTransport {
+            override suspend fun deliver(delivery: WebhookDelivery, attempt: Int, timestampEpochSeconds: Long): WebhookAttemptResult {
+                admitted.complete(Unit)
+                continueSend.await()
+                return WebhookAttemptResult(statusCode = 503)
+            }
+        }
+        val queue = queue(store, transport) { 1_000L }
+        val owner = "verifier.session"
+        val id = queue.enqueue(update(), webhook(), owner)
+        val sending = async { queue.processDue() }
+        admitted.await()
+        val stale = assertNotNull(store.pending(id))
+        val erasing = async(start = CoroutineStart.UNDISPATCHED) { queue.eraseSession(owner) }
+        assertFalse(erasing.isCompleted)
+        continueSend.complete(Unit)
+        sending.await()
+        erasing.await()
+        assertNull(store.pending(id))
+        store.dispatch(WebhookDeliveryClaim(stale, requireNotNull(stale.leaseId))) { error("Revoked send started") }
     }
 
     @Test

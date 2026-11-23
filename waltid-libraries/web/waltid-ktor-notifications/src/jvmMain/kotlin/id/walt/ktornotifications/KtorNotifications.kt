@@ -17,6 +17,7 @@ object KtorNotifications {
         sessionNotifications: KtorSessionNotifications?,
         sessionOwner: String?,
         retainOnFailure: Boolean = true,
+        sessionGeneration: Long = 0,
     ) {
         val update = this
 
@@ -24,7 +25,7 @@ object KtorNotifications {
 
         if (sessionNotifications != null && sessionNotifications.webhook != null) {
             log.debug { "Webhook configured for session $sessionId, sending notification for event: ${update.event}" }
-            WebhookNotifier.enqueue(update, sessionNotifications.webhook!!, sessionOwner, retainOnFailure)
+            WebhookNotifier.enqueue(update, sessionNotifications.webhook!!, sessionOwner, retainOnFailure, sessionGeneration)
         } else {
             log.trace { "No webhook configured for session $sessionId (notifications: ${sessionNotifications != null}, webhook: ${sessionNotifications?.webhook != null})" }
         }

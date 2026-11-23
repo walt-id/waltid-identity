@@ -198,6 +198,7 @@ internal class WebhookDeliveryQueue(
         config: VerificationSessionWebhookNotification,
         sessionOwner: String? = null,
         retainOnFailure: Boolean = true,
+        sessionGeneration: Long = 0,
     ): String {
         val payload = DefaultJson.encodeToString(update)
         val now = clock()
@@ -216,6 +217,7 @@ internal class WebhookDeliveryQueue(
             retryPolicy = config.retryPolicy,
             sessionOwner = sessionOwner,
             retainOnFailure = retainOnFailure,
+            sessionGeneration = sessionGeneration,
             enqueueOrder = enqueueSequence.updateAndGet { previous ->
                 maxOf(previous + 1, now * 1_000)
             },
@@ -240,7 +242,7 @@ internal class WebhookDeliveryQueue(
             claims.map { claim ->
                 async {
                     deliveryPermits.withPermit {
-                        process(claim)
+                        store.dispatch(claim) { process(claim) }
                     }
                 }
             }.awaitAll()
@@ -248,7 +250,8 @@ internal class WebhookDeliveryQueue(
         claims.size
     }
 
-    suspend fun eraseSession(sessionOwner: String) = store.eraseSession(sessionOwner)
+    suspend fun eraseSession(sessionOwner: String, allowPurgeNotification: Boolean = false) =
+        store.eraseSession(sessionOwner, allowPurgeNotification)
 
     suspend fun deadLetters(): List<WebhookDeadLetter> = store.deadLetters()
 
@@ -260,7 +263,6 @@ internal class WebhookDeliveryQueue(
 
     private suspend fun process(claim: WebhookDeliveryClaim) {
         val delivery = claim.delivery
-        if (delivery.sessionOwner != null && store.pending(delivery.deliveryId)?.leaseId != claim.leaseId) return
         val now = clock()
         val attempt = delivery.attemptCount + 1
         val result = try {
@@ -391,13 +393,15 @@ object WebhookNotifier {
         config: VerificationSessionWebhookNotification,
         sessionOwner: String?,
         retainOnFailure: Boolean,
+        sessionGeneration: Long = 0,
     ): String {
         val activeQueue = queue()
         activeQueue.start()
-        return activeQueue.enqueue(update, config, sessionOwner, retainOnFailure)
+        return activeQueue.enqueue(update, config, sessionOwner, retainOnFailure, sessionGeneration)
     }
 
-    suspend fun eraseSession(sessionOwner: String) = queue().eraseSession(sessionOwner)
+    suspend fun eraseSession(sessionOwner: String, allowPurgeNotification: Boolean = false) =
+        queue().eraseSession(sessionOwner, allowPurgeNotification)
 
     suspend fun deadLetters(): List<WebhookDeadLetter> = queue().deadLetters()
 

@@ -1,5 +1,8 @@
 package id.walt.ktornotifications
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
@@ -11,6 +14,8 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFileAttributeView
 import java.nio.file.attribute.PosixFilePermissions
+import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.UUID
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
@@ -22,7 +27,10 @@ private val storeLog = io.github.oshai.kotlinlogging.KotlinLogging.logger { }
 /** Durable outbox storage. Implementations must claim due deliveries atomically across all workers. */
 interface WebhookDeliveryStore {
     suspend fun enqueue(delivery: WebhookDelivery)
-    suspend fun eraseSession(sessionOwner: String)
+    /** Revoke older generations, including producers that still hold a pre-erasure snapshot. */
+    suspend fun eraseSession(sessionOwner: String, allowPurgeNotification: Boolean = false): Long
+    /** Keep erasure from succeeding between admission of a scoped claim and completion of its send. */
+    suspend fun dispatch(claim: WebhookDeliveryClaim, send: suspend () -> Unit)
     suspend fun pending(deliveryId: String): WebhookDelivery?
     suspend fun claimDue(
         nowEpochMilliseconds: Long,
@@ -35,6 +43,13 @@ interface WebhookDeliveryStore {
     suspend fun deadLetters(): List<WebhookDeadLetter>
     suspend fun redrive(deliveryId: String, nowEpochMilliseconds: Long): Boolean
 }
+
+/** Opaque durable marker keys avoid persisting tenant paths or session IDs after erasure. */
+fun webhookSessionKey(sessionOwner: String): String =
+    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(sessionOwner.encodeToByteArray()))
+
+/** No callback, including a redacted purge event, can use this generation. */
+const val DELETED_WEBHOOK_SESSION: Long = -1
 
 /**
  * A single-process durable webhook outbox.
@@ -51,11 +66,15 @@ internal class FileWebhookDeliveryStore(
     },
 ) : WebhookDeliveryStore {
     private val mutex = Mutex()
+    private val dispatches = mutableMapOf<String, MutableSet<CompletableDeferred<Unit>>>()
+    private val generations = root.resolve("session-erasure")
     private val pendingDirectory = root.resolve("pending")
     private val deadLetterDirectory = root.resolve("dead-letter")
     private val corruptDirectory = root.resolve("corrupt")
 
     init {
+        Files.createDirectories(generations)
+        setOwnerOnlyPermissions(generations, "rwx------")
         Files.createDirectories(pendingDirectory)
         Files.createDirectories(deadLetterDirectory)
         Files.createDirectories(corruptDirectory)
@@ -66,6 +85,9 @@ internal class FileWebhookDeliveryStore(
     }
 
     override suspend fun enqueue(delivery: WebhookDelivery) = mutex.withLock {
+        delivery.sessionOwner?.let { owner ->
+            if (!accepts(owner, delivery.sessionGeneration)) return@withLock
+        }
         val path = pendingPath(delivery.deliveryId)
         require(!Files.exists(path) && !Files.exists(deadLetterPath(delivery.deliveryId))) {
             "Webhook delivery ${delivery.deliveryId} already exists"
@@ -73,11 +95,49 @@ internal class FileWebhookDeliveryStore(
         writeAtomically(path, delivery)
     }
 
-    override suspend fun eraseSession(sessionOwner: String) = mutex.withLock {
-        // Remove pending first so a shadow left by an interrupted redrive cannot become visible.
-        for (directory in listOf(pendingDirectory, deadLetterDirectory)) {
-            for (path in listDeliveryFiles(directory)) {
-                if (readOrQuarantine(path)?.sessionOwner == sessionOwner) Files.deleteIfExists(path)
+    private fun generation(owner: String): Long = try {
+        Files.readString(generations.resolve(webhookSessionKey(owner))).toLong()
+    } catch (_: NoSuchFileException) {
+        0L
+    }
+
+    private fun accepts(owner: String, expected: Long) = expected >= 0 && generation(owner) == expected
+
+    override suspend fun eraseSession(sessionOwner: String, allowPurgeNotification: Boolean): Long {
+        val (next, inFlight) = mutex.withLock {
+            val previous = generation(sessionOwner)
+            val next = if (allowPurgeNotification && previous >= 0) Math.incrementExact(previous) else DELETED_WEBHOOK_SESSION
+            writeAtomically(generations.resolve(webhookSessionKey(sessionOwner)), next.toString())
+            // Remove pending first so a shadow left by an interrupted redrive cannot become visible.
+            for (directory in listOf(pendingDirectory, deadLetterDirectory)) {
+                for (path in listDeliveryFiles(directory)) {
+                    if (readOrQuarantine(path)?.sessionOwner == sessionOwner) Files.deleteIfExists(path)
+                }
+            }
+            next to dispatches[sessionOwner].orEmpty().toList()
+        }
+        inFlight.forEach { it.await() }
+        return next
+    }
+
+    override suspend fun dispatch(claim: WebhookDeliveryClaim, send: suspend () -> Unit) {
+        val owner = claim.delivery.sessionOwner ?: return send()
+        val finished = CompletableDeferred<Unit>()
+        mutex.withLock {
+            if (!accepts(owner, claim.delivery.sessionGeneration) ||
+                readPending(pendingPath(claim.delivery.deliveryId))?.leaseId != claim.leaseId) return
+            dispatches.getOrPut(owner) { mutableSetOf() }.add(finished)
+        }
+        withContext(NonCancellable) {
+            try {
+                send()
+            } finally {
+                mutex.withLock {
+                    val active = dispatches.getValue(owner)
+                    active.remove(finished)
+                    if (active.isEmpty()) dispatches.remove(owner)
+                    finished.complete(Unit)
+                }
             }
         }
     }
@@ -216,11 +276,13 @@ internal class FileWebhookDeliveryStore(
         storeLog.error { "Quarantined invalid webhook delivery record (source=$path, quarantined=$quarantined)" }
     }
 
-    private fun writeAtomically(path: Path, delivery: WebhookDelivery) {
+    private fun writeAtomically(path: Path, delivery: WebhookDelivery) = writeAtomically(path, json.encodeToString(delivery))
+
+    private fun writeAtomically(path: Path, content: String) {
         val temporary = Files.createTempFile(path.parent, ".${path.name}.", ".tmp")
         try {
             setOwnerOnlyPermissions(temporary, "rw-------")
-            Files.writeString(temporary, json.encodeToString(delivery))
+            Files.writeString(temporary, content)
             Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } finally {
             Files.deleteIfExists(temporary)
