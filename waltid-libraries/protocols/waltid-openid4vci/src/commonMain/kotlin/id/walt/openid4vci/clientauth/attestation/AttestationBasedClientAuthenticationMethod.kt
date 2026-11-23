@@ -34,7 +34,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -171,8 +170,8 @@ class AttestationBasedClientAuthenticationMethod(
         // Keep v1 only for accepted optional algorithms not implemented by the portable crypto2 provider.
         val legacyClientInstanceKey = if (
             crypto2ClientInstanceKey == null &&
-            confirmationJwk["kty"]?.jsonPrimitive?.contentOrNull == "EC" &&
-            confirmationJwk["crv"]?.jsonPrimitive?.contentOrNull == "secp256k1"
+            confirmationJwk.stringClaim("kty") == "EC" &&
+            confirmationJwk.stringClaim("crv") == "secp256k1"
         ) {
             runCatching { JWKKey.importJWK(confirmationJwk.toString()).getOrThrow() }.getOrNull()
         } else null
@@ -196,8 +195,8 @@ class AttestationBasedClientAuthenticationMethod(
         }.getOrElse {
             return failure("Client attestation PoP algorithm is invalid")
         }
-        val confirmationAlgorithm = confirmationJwk["alg"]?.jsonPrimitive?.contentOrNull
-        if (confirmationAlgorithm != null && confirmationAlgorithm != popAlgorithm.identifier) {
+        val confirmationAlgorithm = confirmationJwk["alg"]
+        if (confirmationAlgorithm != null && (confirmationAlgorithm as? JsonPrimitive)?.contentOrNull != popAlgorithm.identifier) {
             return failure("Client attestation PoP algorithm does not match confirmation JWK alg")
         }
         val popSignatureValid = if (crypto2ClientInstanceKey != null) {
@@ -280,6 +279,13 @@ class AttestationBasedClientAuthenticationMethod(
             ?: return "Client attestation ${JwtHeaderParams.ALGORITHM} header is required"
         if (alg !in acceptedAttestationSigningAlgorithms) {
             return "Client attestation ${JwtHeaderParams.ALGORITHM} is not supported"
+        }
+        // RFC 7515 4.1.4: kid is a string. Rejecting other values here keeps a malformed header a client error
+        // and away from any verifier or trust source.
+        jwt.header[JwtHeaderParams.KEY_ID]?.let { kid ->
+            if (kid !is JsonPrimitive || !kid.isString) {
+                return "Client attestation ${JwtHeaderParams.KEY_ID} header must be a string"
+            }
         }
         if (jwt.payload.stringClaim(JwtPayloadClaims.SUBJECT).isNullOrBlank()) {
             return "Client attestation ${JwtPayloadClaims.SUBJECT} claim is required"

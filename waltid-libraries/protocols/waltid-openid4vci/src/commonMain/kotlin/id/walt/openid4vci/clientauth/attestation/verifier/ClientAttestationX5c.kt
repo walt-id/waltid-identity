@@ -2,11 +2,12 @@ package id.walt.openid4vci.clientauth.attestation.verifier
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
-import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.exportPublicJwkObject
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.json.JsonArray
@@ -42,18 +43,25 @@ internal fun parseX5cCertificate(element: JsonElement): X509Certificate? {
     }
 }
 
-private val leafKeyResolver = Crypto2JwtKeyResolver()
+private val leafKeyRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
 /**
- * Verifies [jwt] with the public key of the x5c leaf certificate and returns that key as the signer,
- * for later status checks.
+ * Verifies [jwt] with the public key of the parsed x5c [leaf] and returns that key as the signer, for later
+ * status checks. Only the leaf and `alg` are used, so other header members such as `kid` cannot redirect or
+ * break the key lookup.
  */
 internal suspend fun verifyClientAttestationLeafSignature(
     jwt: String,
     header: JsonObject,
+    leaf: X509Certificate,
 ): ClientAttestationVerificationResult {
-    val leafKey = leafKeyResolver.resolveFromJwt(header, JsonObject(emptyMap()))?.key
-        ?: return ClientAttestationVerificationResult.Rejected("Client attestation certificate key is invalid")
+    val leafKey = try {
+        leaf.restoreSubjectPublicKey(leafKeyRuntime)
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (_: Exception) {
+        return ClientAttestationVerificationResult.Rejected("Client attestation certificate key is invalid")
+    }
     val algorithm = runCatching {
         JwsAlgorithm.parse(requireNotNull(header["alg"]?.jsonPrimitive?.contentOrNull))
     }.getOrElse {

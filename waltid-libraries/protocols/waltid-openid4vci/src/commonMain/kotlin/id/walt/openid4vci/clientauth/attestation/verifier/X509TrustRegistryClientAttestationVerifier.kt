@@ -46,7 +46,7 @@ class X509TrustRegistryClientAttestationVerifier(
         if (!certificateChain.isOneLeafFirstChain()) {
             return ClientAttestationVerificationResult.Rejected("Client attestation x5c must contain one leaf-first certificate chain")
         }
-        val verified = verifyClientAttestationLeafSignature(jwt, header)
+        val verified = verifyClientAttestationLeafSignature(jwt, header, certificateChain.first())
         if (verified is ClientAttestationVerificationResult.Rejected) return verified
 
         val evaluator = evaluator

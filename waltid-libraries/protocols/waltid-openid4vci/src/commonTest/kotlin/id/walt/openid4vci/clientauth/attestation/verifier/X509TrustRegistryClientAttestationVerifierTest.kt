@@ -1,5 +1,7 @@
 package id.walt.openid4vci.clientauth.attestation.verifier
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.exportPublicJwkObject
@@ -28,8 +30,11 @@ import id.walt.trust.model.TrustedEntityType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -40,6 +45,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 
 class X509TrustRegistryClientAttestationVerifierTest {
@@ -140,24 +146,8 @@ class X509TrustRegistryClientAttestationVerifierTest {
     fun `configured method authenticates with the injected evaluator and never reports an outage as invalid_client`() = runTest {
         val pki = TestAttesterPki.create()
         val holder = generateTestP256Key("client-instance")
-        val headers = mapOf(
-            ClientAttestationHeaders.CLIENT_ATTESTATION to listOf(attestation(pki, holder = holder)),
-            ClientAttestationHeaders.CLIENT_ATTESTATION_POP to listOf(proofOfPossession(holder)),
-        )
-        suspend fun authenticate(evaluator: TrustDecisionEvaluator) = ClientAuthenticationService(
-            ClientAuthenticationConfig(
-                listOf(
-                    ClientAuthenticationMethodConfig.ClientAttestation(
-                        ClientAttestationVerifierConfig(ClientAttestationVerificationMethod.X509TrustRegistry(types)),
-                    ),
-                ),
-            ).toClientAuthenticationServiceConfig(trustEvaluator = evaluator),
-        ).authenticate(
-            endpoint = ClientAuthenticationEndpoint.TOKEN,
-            parameters = emptyMap(),
-            headers = headers,
-            context = ClientAuthenticationContext(authorizationServerIssuer = ISSUER),
-        )
+        val wia = attestation(pki, holder = holder)
+        suspend fun authenticate(evaluator: TrustDecisionEvaluator) = authenticate(evaluator, wia, proofOfPossession(holder))
 
         val authenticated = assertIs<ClientAuthenticationResult.Authenticated>(authenticate { registryDecision() })
         assertEquals(CLIENT_ID, authenticated.client.id)
@@ -169,6 +159,64 @@ class X509TrustRegistryClientAttestationVerifierTest {
         )
         for (outage in outages) {
             assertEquals("server_error", assertIs<ClientAuthenticationResult.Failure>(authenticate(outage)).error.error)
+        }
+    }
+
+    @Test
+    fun `a kid that is not a string is invalid_client and never reaches the registry`() = runTest {
+        val pki = TestAttesterPki.create()
+        val holder = generateTestP256Key("client-instance")
+        val evaluator = RecordingTrustEvaluator { registryDecision() }
+        val malformed = listOf(buildJsonObject { put("kid", "nested") }, JsonArray(listOf(JsonPrimitive("a"))), JsonPrimitive(7))
+
+        for (kid in malformed) {
+            val failure = assertIs<ClientAuthenticationResult.Failure>(
+                authenticate(evaluator, attestation(pki, holder = holder, kid = kid), proofOfPossession(holder)), "$kid",
+            )
+            assertEquals("invalid_client", failure.error.error, "$kid")
+            assertEquals("Client attestation kid header must be a string", failure.error.description, "$kid")
+        }
+        assertTrue(evaluator.requests.isEmpty())
+        assertIs<ClientAuthenticationResult.Authenticated>(
+            authenticate(evaluator, attestation(pki, holder = holder, kid = JsonPrimitive("wallet-key-1")), proofOfPossession(holder)),
+        )
+    }
+
+    @Test
+    fun `x5c verifiers verify with the parsed leaf and ignore kid`() = runTest {
+        val pki = TestAttesterPki.create()
+        val jwt = attestation(pki, kid = buildJsonObject { put("kid", "nested") })
+        val ca = X509CertificateUtil.parseCertificateDerEncoded(ByteString(Base64.decode(pki.chainBase64.last())))
+        val verifiers = listOf(
+            X509TrustRegistryClientAttestationVerifier({ registryDecision() }, types),
+            X509ChainClientAttestationVerifier(InMemoryTrustStore(listOf(ca))),
+        )
+        for (verifier in verifiers) {
+            val verified = assertIs<ClientAttestationVerificationResult.VerifiedWithSigner>(verify(verifier, jwt), "$verifier")
+            assertEquals(pki.leafKey.exportPublicJwkObject(), verified.publicJwk)
+        }
+    }
+
+    @Test
+    fun `a confirmation key member that is not a primitive is invalid_client`() = runTest {
+        val pki = TestAttesterPki.create()
+        val holder = generateTestP256Key("client-instance")
+        val holderJwk = holder.exportPublicJwkObject()
+        val malformed = listOf(
+            JsonObject(holderJwk + ("kty" to buildJsonObject { put("kty", "EC") })),
+            JsonObject(holderJwk + ("crv" to JsonArray(listOf(JsonPrimitive("P-256"))))),
+            JsonObject(holderJwk + ("alg" to buildJsonObject { put("alg", "ES256") })),
+        )
+        for (confirmationKey in malformed) {
+            val failure = assertIs<ClientAuthenticationResult.Failure>(
+                authenticate(
+                    RecordingTrustEvaluator { registryDecision() },
+                    attestation(pki, holder = holder, confirmationKey = confirmationKey),
+                    proofOfPossession(holder),
+                ),
+                "$confirmationKey",
+            )
+            assertEquals("invalid_client", failure.error.error, "$confirmationKey")
         }
     }
 
@@ -202,26 +250,48 @@ class X509TrustRegistryClientAttestationVerifierTest {
         )
     }
 
+    private suspend fun authenticate(evaluator: TrustDecisionEvaluator, attestationJwt: String, popJwt: String) =
+        ClientAuthenticationService(
+            ClientAuthenticationConfig(
+                listOf(
+                    ClientAuthenticationMethodConfig.ClientAttestation(
+                        ClientAttestationVerifierConfig(ClientAttestationVerificationMethod.X509TrustRegistry(types)),
+                    ),
+                ),
+            ).toClientAuthenticationServiceConfig(trustEvaluator = evaluator),
+        ).authenticate(
+            endpoint = ClientAuthenticationEndpoint.TOKEN,
+            parameters = emptyMap(),
+            headers = mapOf(
+                ClientAttestationHeaders.CLIENT_ATTESTATION to listOf(attestationJwt),
+                ClientAttestationHeaders.CLIENT_ATTESTATION_POP to listOf(popJwt),
+            ),
+            context = ClientAuthenticationContext(authorizationServerIssuer = ISSUER),
+        )
+
     private suspend fun attestation(
         pki: TestAttesterPki,
         signer: Key = pki.leafKey,
         holder: Key? = null,
         x5c: JsonArray = pki.x5c,
+        kid: JsonElement? = null,
+        confirmationKey: JsonObject? = null,
     ): String {
         val now = Clock.System.now().epochSeconds
-        val confirmationKey: JsonObject = (holder ?: generateTestP256Key("client-instance")).exportPublicJwkObject()
+        val cnfJwk: JsonObject = confirmationKey ?: (holder ?: generateTestP256Key("client-instance")).exportPublicJwkObject()
         return CompactJws.sign(
             payload = buildJsonObject {
                 put("sub", CLIENT_ID)
                 put("iat", now)
                 put("exp", now + 300)
-                putJsonObject("cnf") { put("jwk", confirmationKey) }
+                putJsonObject("cnf") { put("jwk", cnfJwk) }
             }.toString().encodeToByteArray(),
             key = signer,
             algorithm = JwsAlgorithm.ES256,
             protectedHeader = buildJsonObject {
                 put("typ", ClientAttestationJwtTypes.CLIENT_ATTESTATION)
                 put("x5c", x5c)
+                kid?.let { put("kid", it) }
             },
         )
     }

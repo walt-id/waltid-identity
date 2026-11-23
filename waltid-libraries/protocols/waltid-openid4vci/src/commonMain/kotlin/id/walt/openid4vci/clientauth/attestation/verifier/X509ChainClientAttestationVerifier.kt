@@ -30,6 +30,6 @@ class X509ChainClientAttestationVerifier(
         if (!validationResult.valid) {
             return ClientAttestationVerificationResult.Rejected("Client attestation x5c chain is not trusted")
         }
-        return verifyClientAttestationLeafSignature(jwt, header)
+        return verifyClientAttestationLeafSignature(jwt, header, certificateChain.first())
     }
 }
