@@ -97,10 +97,18 @@ jobs:
           sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" |
           sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
 
+      - name: Setup kubectl
+        if: ${{ hashFiles(format('{0}/deployment_mod.yaml', matrix.services.k8s)) != '' }}
+        uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4.0.1
+
       - name: Continuous deployment - ${{ matrix.services.name }}
         if: ${{ hashFiles(format('{0}/deployment_mod.yaml', matrix.services.k8s)) != '' }}
-        uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
-        with:
-          args: apply -n ${{ matrix.services.namespace }} -f ${{ matrix.services.k8s }}/deployment_mod.yaml
+          NAMESPACE: ${{ matrix.services.namespace }}
+          MANIFEST: ${{ matrix.services.k8s }}/deployment_mod.yaml
+        run: |
+          set -euo pipefail
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          (umask 077; printf '%s' "$KUBE_CONFIG" | base64 -d > "$KUBECONFIG")
+          kubectl apply -n "$NAMESPACE" -f "$MANIFEST"
