@@ -19,7 +19,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
@@ -78,8 +77,7 @@ internal fun CredentialsTab(
     onDetailsChromeChange: (CredentialDetailsChrome?) -> Unit = {},
     onDetailsOpened: suspend (String) -> Unit = {},
     statusNotices: List<WalletDemoCredentialStatusNotice> = emptyList(),
-    transientStatusNotice: String? = null,
-    onDismissTransientStatusNotice: () -> Unit = {},
+    statusSnackbar: SnackbarHostState? = null,
     onAcknowledgeStatusNotice: (WalletDemoCredentialStatusNotice) -> Unit = {},
     openStatusNoticeOnHome: Boolean = false,
     onStatusNoticeOpenedOnHome: () -> Unit = {},
@@ -120,10 +118,9 @@ internal fun CredentialsTab(
             onStatusNoticeOpenedOnHome()
         }
     }
-    val statusSnackbar = remember { SnackbarHostState() }
     val notice = statusNotices.firstOrNull { entry -> cards.any { it.id == entry.credentialId } }
         ?.takeUnless { showingDetails || confirmDelete }
-    val noticeMessage = if (notice != null) {
+    if (statusSnackbar != null && notice != null) {
         val title = cards.first { it.id == notice.credentialId }.title
         val kind = stringResource(when (notice.kind) {
             "REVOKED" -> Res.string.credential_status_revoked
@@ -131,22 +128,15 @@ internal fun CredentialsTab(
             else -> Res.string.credential_status_invalid
         })
         val checkedAt = LocalWalletTimeFormatter.current(Instant.parse(notice.checkedAt)).fullText
-        stringResource(if (notice.historical) Res.string.credential_status_notice_historical
+        val message = stringResource(if (notice.historical) Res.string.credential_status_notice_historical
             else Res.string.credential_status_notice_current, title, kind, checkedAt)
-    } else transientStatusNotice.takeUnless { confirmDelete }
-    if (noticeMessage != null) {
-        val action = if (notice != null) stringResource(Res.string.credential_status_notice_view) else null
-        LaunchedEffect(notice?.version, noticeMessage) {
+        val action = stringResource(Res.string.credential_status_notice_view)
+        LaunchedEffect(statusSnackbar, notice.version, message) {
             val result = statusSnackbar.showSnackbar(
-                noticeMessage, action, withDismissAction = notice != null,
-                duration = if (notice != null) SnackbarDuration.Indefinite else SnackbarDuration.Short,
+                message, action, withDismissAction = true, duration = SnackbarDuration.Indefinite,
             )
-            if (notice == null) {
-                onDismissTransientStatusNotice()
-            } else {
-                onAcknowledgeStatusNotice(notice)
-                if (result == SnackbarResult.ActionPerformed) expandedId = notice.credentialId
-            }
+            onAcknowledgeStatusNotice(notice)
+            if (result == SnackbarResult.ActionPerformed) expandedId = notice.credentialId
         }
     }
 
@@ -238,7 +228,6 @@ internal fun CredentialsTab(
                 }
             }
         }
-        if (noticeMessage != null) SnackbarHost(statusSnackbar, Modifier.align(Alignment.BottomCenter).padding(12.dp))
     }
 
     if (confirmDelete) {

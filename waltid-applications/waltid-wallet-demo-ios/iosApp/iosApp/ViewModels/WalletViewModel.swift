@@ -115,7 +115,12 @@ class WalletViewModel: ObservableObject {
     @Published var automaticCredentialStatusChecks = true {
         didSet {
             UserDefaults.standard.set(automaticCredentialStatusChecks, forKey: statusPreferenceKey)
-            if automaticCredentialStatusChecks { checkCredentialStatuses(force: false) } else { credentialStatusRefreshTask?.cancel(); credentialStatusTimer?.cancel() }
+            if automaticCredentialStatusChecks {
+                checkCredentialStatuses(force: false)
+            } else {
+                credentialStatusTimer?.cancel()
+                if credentialStatusRefreshIsAutomatic { credentialStatusRefreshTask?.cancel() }
+            }
         }
     }
     @Published private(set) var backgroundStatusChecks: Bool?
@@ -130,12 +135,14 @@ class WalletViewModel: ObservableObject {
     private let statusNow: @MainActor () -> Date
     private let statusSleep: @MainActor (TimeInterval) async throws -> Void
     private var credentialStatusGeneration = 0
+    private var reconciledStatusGeneration: Int?
     private var credentialStatusTimer: Task<Void, Never>?
     private var nextCredentialStatusRefreshAt: Date?
     private var lastAutomaticStatusCheckAt: Date?
     private var automaticallyCheckedInventory: Set<String>?
     private var credentialStatusObservationTask: Task<Void, Never>?
     private var credentialStatusRefreshTask: Task<Void, Never>?
+    private var credentialStatusRefreshIsAutomatic = false
     private var credentialStatusRefreshID: UUID?
     private struct StatusReviewOwner: Equatable {
         let handle: PresentationPreviewHandle
@@ -453,10 +460,14 @@ class WalletViewModel: ObservableObject {
             automaticCredentialStatusChecks = enabled
             return
         }
+        let generation = credentialStatusGeneration
         changeBackgroundStatus { model in
+            model.reconciledStatusGeneration = nil
             if enabled { model.automaticCredentialStatusChecks = true }
             let enrollment = try await model.walletClient.reconcileBackgroundStatus(automaticChecks: enabled, resumePaused: enabled)
             if !enabled { model.automaticCredentialStatusChecks = false }
+            model.reconciledStatusGeneration = generation
+            if enabled { model.checkCredentialStatuses(force: false) }
             model.publishBackgroundStatus(enrollment)
         }
     }
@@ -470,11 +481,19 @@ class WalletViewModel: ObservableObject {
 
     private func changeBackgroundStatus(_ update: @escaping @MainActor (WalletViewModel) async throws -> Void) {
         guard backgroundStatusScheduler != nil, backgroundStatusTask == nil, isReady, auth == .unlocked else { return }
+        let generation = credentialStatusGeneration
         savingBackgroundStatus = true
         backgroundStatusSaveFailed = false
         backgroundStatusTask = Task { [weak self] in
             guard let self else { return }
-            defer { savingBackgroundStatus = false; backgroundStatusTask = nil }
+            defer {
+                savingBackgroundStatus = false
+                backgroundStatusTask = nil
+                // A resume during a settings write or earlier recovery needs its own local read.
+                if credentialStatusGeneration != generation && credentialStatusObservationTask != nil {
+                    reconcileBackgroundStatusEnrollment()
+                }
+            }
             do { try await update(self) }
             catch is CancellationError {}
             catch { backgroundStatusSaveFailed = true }
@@ -482,14 +501,18 @@ class WalletViewModel: ObservableObject {
     }
 
     private func reconcileBackgroundStatusEnrollment() {
+        let generation = credentialStatusGeneration
         changeBackgroundStatus { model in
             let enrollment = try await model.walletClient.reconcileBackgroundStatus(
                 automaticChecks: model.automaticCredentialStatusChecks, resumePaused: false
             )
+            guard model.credentialStatusGeneration == generation else { return }
             if model.automaticCredentialStatusChecks, enrollment?.preference == .paused {
                 model.automaticCredentialStatusChecks = false
             }
+            model.reconciledStatusGeneration = generation
             model.publishBackgroundStatus(enrollment)
+            model.scheduleCredentialStatusCheck()
         }
     }
 
@@ -518,19 +541,12 @@ class WalletViewModel: ObservableObject {
         let client = walletClient
         credentialStatusObservationTask = Task { [weak self] in
             defer { if self?.credentialStatusGeneration == generation { self?.credentialStatusObservationTask = nil } }
-            var initialRead = true
             while !Task.isCancelled {
                 do {
                     for try await snapshot in try await client.credentialStatusUpdates() {
                         try Task.checkCancellation()
                         guard let self, credentialStatusGeneration == generation else { return }
                         installCredentialStatuses(snapshot)
-                        if initialRead {
-                            initialRead = false
-                            if backgroundStatusScheduler != nil && automaticCredentialStatusChecks {
-                                checkCredentialStatuses(force: false)
-                            }
-                        }
                     }
                     guard let self, credentialStatusGeneration == generation, !Task.isCancelled else { return }
                     if credentialStatusReadState == .loading { credentialStatusReadState = .unavailable }
@@ -553,6 +569,7 @@ class WalletViewModel: ObservableObject {
         credentialStatusGeneration += 1
         credentialStatusObservationTask?.cancel(); credentialStatusObservationTask = nil
         credentialStatusRefreshTask?.cancel(); credentialStatusRefreshTask = nil
+        credentialStatusRefreshIsAutomatic = false
         checkingCredentialStatuses = false; refreshingCredentialIDs = []
         walletStatusNotices = []
     }
@@ -561,9 +578,15 @@ class WalletViewModel: ObservableObject {
         startCredentialStatusRefresh(ids: ids, force: force)
     }
 
+    private var automaticStatusChecksAllowed: Bool {
+        applicationForeground && isReady && auth == .unlocked && automaticCredentialStatusChecks &&
+            (backgroundStatusScheduler == nil || reconciledStatusGeneration == credentialStatusGeneration) &&
+            selectedTab == .credentials && externalFlow == nil && presentationReview == nil &&
+            !isLoading && !proximityPresentation.active
+    }
+
     func checkCredentialStatusOnDetails(_ credentialID: String) async {
-        guard applicationForeground, automaticCredentialStatusChecks, isReady, auth == .unlocked,
-              selectedTab == .credentials, externalFlow == nil, !isLoading, !proximityPresentation.active else { return }
+        guard automaticStatusChecksAllowed else { return }
         _ = try? await walletClient.refreshCredentialStatuses(ids: [credentialID], force: false)
     }
 
@@ -618,8 +641,7 @@ class WalletViewModel: ObservableObject {
         if let reviewOwner, !isCurrentStatusReview(reviewOwner) { return }
         let generation = credentialStatusGeneration
         let refreshID = UUID()
-        if !force && (!automaticCredentialStatusChecks || isLoading || selectedTab != .credentials || externalFlow != nil ||
-                      presentationReview != nil || proximityPresentation.active) { return }
+        if !force && !automaticStatusChecksAllowed { return }
         let settingsBatch = force && ids == nil
         if !force {
             lastAutomaticStatusCheckAt = statusNow()
@@ -628,6 +650,7 @@ class WalletViewModel: ObservableObject {
         credentialStatusTimer?.cancel(); credentialStatusTimer = nil
         checkingCredentialStatuses = true
         credentialStatusRefreshID = refreshID
+        credentialStatusRefreshIsAutomatic = !force
         statusReviewOwner = reviewOwner
         if reviewOwner != nil, let credentialID = ids?.first {
             presentationStatusRefresh = PresentationStatusRefresh(id: refreshID, credentialID: credentialID, phase: .checking)
@@ -646,6 +669,7 @@ class WalletViewModel: ObservableObject {
                 }
             }
             do {
+                guard !Task.isCancelled, force || automaticStatusChecksAllowed else { return }
                 let result = try await walletClient.refreshCredentialStatuses(ids: ids, force: force)
                 try Task.checkCancellation()
                 guard credentialStatusGeneration == generation, credentialStatusRefreshID == refreshID else { return }
@@ -683,10 +707,8 @@ class WalletViewModel: ObservableObject {
 
     func scheduleCredentialStatusCheck() {
         credentialStatusTimer?.cancel(); credentialStatusTimer = nil
-        guard applicationForeground, automaticCredentialStatusChecks, isReady, auth == .unlocked,
-              backgroundStatusScheduler == nil || credentialStatusReadState == .available,
-              !isLoading, !checkingCredentialStatuses, selectedTab == .credentials, externalFlow == nil,
-              presentationReview == nil, !proximityPresentation.active else { return }
+        guard automaticStatusChecksAllowed, !checkingCredentialStatuses,
+              backgroundStatusScheduler == nil || credentialStatusReadState == .available else { return }
         let inventory = Set(credentials.map(\.id))
         let due = inventory != automaticallyCheckedInventory ? statusNow() : nextCredentialStatusRefreshAt
         guard let due else { return }

@@ -36,6 +36,50 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun anInterruptedPauseIsRestoredBeforeAnyAutomaticRefresh() = runTest {
+        val finishRecovery = CompletableDeferred<Unit>()
+        val finishManual = CompletableDeferred<Unit>()
+        val base = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val refreshes = mutableListOf<Boolean>()
+        var recovering = false
+        val wallet = object : DemoWallet by base {
+            override suspend fun reconcileBackgroundStatus(automaticChecks: Boolean, resumePaused: Boolean): DemoBackgroundStatusEnrollment {
+                if (resumePaused) return DemoBackgroundStatusEnrollment(DemoBackgroundStatusPreference.ENABLED, "new-grant")
+                recovering = true
+                finishRecovery.await()
+                return DemoBackgroundStatusEnrollment(DemoBackgroundStatusPreference.PAUSED, null)
+            }
+
+            override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                refreshes += force
+                if (force) finishManual.await()
+                return WalletDemoStatusRefreshSummary(1, 0, 0, 0)
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this, reconcileBackgroundStatusSchedule = {})
+        assertTrue(recovering)
+        assertTrue(controller.state.value.credentialStatuses.available)
+        backgroundScope.launch { controller.checkCredentialStatusOnDetails(sampleCredential.id) }
+        runCurrent()
+        assertTrue(refreshes.isEmpty(), "A due check must wait for the saved pause")
+
+        controller.checkCredentialStatuses()
+        runCurrent()
+        assertEquals(listOf(true), refreshes)
+        finishRecovery.complete(Unit)
+        runCurrent()
+        assertFalse(controller.state.value.automaticCredentialStatusChecks)
+        assertEquals(listOf(true), refreshes)
+        finishManual.complete(Unit)
+        runCurrent()
+        assertEquals(1, controller.state.value.credentialStatusSummary?.completed)
+
+        controller.setAutomaticCredentialStatusChecks(true)
+        runCurrent()
+        assertEquals(listOf(true, false), refreshes)
+    }
+
+    @Test
     fun aPresentationEntryDefersAutomaticChecksUntilWalletUseAndDetailsRespectTheSetting() = runTest {
         val calls = mutableListOf<Set<String>?>()
         val base = FakeDemoWallet(credentials = listOf(sampleCredential), presentationPreview = statusReviewPreview())

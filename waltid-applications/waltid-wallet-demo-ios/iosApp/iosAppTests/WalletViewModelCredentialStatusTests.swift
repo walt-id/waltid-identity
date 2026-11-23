@@ -2,11 +2,61 @@ import Combine
 import Foundation
 import XCTest
 import WalletDemoSharingUI
+@testable import WalletDemoBackgroundStatus
 @testable import WalletSDK
 @testable import iosApp
 
 @MainActor
 final class WalletViewModelCredentialStatusTests: XCTestCase {
+    func testAnInterruptedPauseIsRestoredBeforeAnyAutomaticRefresh() async throws {
+        let walletID = "status-recover-pause-\(UUID())"
+        let key = "wallet.\(walletID).status.automatic"
+        UserDefaults.standard.set(true, forKey: key)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: walletID))
+        let barrier = StatusRefreshBarrier()
+        let manual = StatusRefreshBarrier()
+        let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [], refreshingCredentialIDs: [])
+        let client = MockWalletClient(credentialStatusSnapshot: snapshot, reconcileStatus: { _, resumePaused in
+            if resumePaused { return CredentialStatusMaintenanceEnrollment(preference: .enabled, binding: "new-grant") }
+            await barrier.wait()
+            return CredentialStatusMaintenanceEnrollment(preference: .paused, binding: nil)
+        })
+        let scheduler = WalletDemoBackgroundStatusScheduler(defaults: defaults, cancelRequest: { _ in })
+        let model = WalletViewModel(walletID: walletID, walletClient: client, backgroundStatusScheduler: scheduler,
+            readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(), identityDocumentRegistrationUpdate: {},
+            pinStore: InMemoryDemoPinStore(), biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: false))
+        defer {
+            model.handleApplicationEnteredBackground()
+            Task { await barrier.resume(); await manual.resume() }
+            UserDefaults.standard.removeObject(forKey: key)
+            defaults.removePersistentDomain(forName: walletID)
+        }
+        model.auth = .unlocked
+        model.isReady = true
+        model.handleApplicationBecameActive()
+        try await waitUntil {
+            let recovering = await barrier.started
+            return recovering && model.credentialStatusAvailable
+        }
+        await model.checkCredentialStatusOnDetails("cached-credential")
+        let automaticCallsWhileRecovering = await client.statusRefreshCalls
+        XCTAssertEqual(automaticCallsWhileRecovering, 0)
+
+        await client.setStatusRefreshResults([], waitFor: { await manual.wait() })
+        model.checkCredentialStatuses()
+        try await waitUntil { await manual.started }
+        await barrier.resume()
+        try await waitUntil { !model.automaticCredentialStatusChecks && !model.savingBackgroundStatus }
+        let callsWhilePaused = await client.statusRefreshCalls
+        XCTAssertEqual(callsWhilePaused, 1)
+        await manual.resume()
+        try await waitUntil { model.credentialStatusSummary != nil && !model.checkingCredentialStatuses }
+
+        await client.setStatusRefreshResults([])
+        model.setAutomaticCredentialStatusChecks(true)
+        try await waitUntil { await client.statusRefreshCalls == 2 && !model.savingBackgroundStatus }
+    }
+
     func testExplicitReviewRefreshPreservesSelectionAndWaitsForItsRenderedAssessment() async throws {
         let client = MockWalletClient(paymentTransaction: false)
         let model = try await reviewModel(client, walletID: "status-review-completion-test")

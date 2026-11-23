@@ -54,7 +54,9 @@ internal fun CredentialStatus.noticeTransition(
     previous: CredentialStatusNoticeState?,
     authenticated: CredentialStatus,
     at: Instant,
+    transferred: CredentialStatusNoticeState? = null,
 ): CredentialStatusNoticeState? {
+    val preceding = listOfNotNull(transferred, previous)
     val evidence = entries
     val primary = adverseNoticeKinds.firstNotNullOfOrNull { kind ->
         val matching = evidence.filter { it.meaning == kind }
@@ -66,9 +68,9 @@ internal fun CredentialStatus.noticeTransition(
         authenticated.entries.any { it.matches(primary) && !it.hasCheckError && it.lastObservation() === observation } &&
         observation.checkedAt <= at && observation.validUntil?.let { at >= it } != true
     ) {
-        return if (previous?.kind == kind) previous.copy(referenceId = primary.referenceId)
-        else CredentialStatusNoticeState(Uuid.random().toString(), primary.referenceId, kind, observation.checkedAt)
+        return preceding.firstOrNull { it.kind == kind }?.copy(referenceId = primary.referenceId)
+            ?: CredentialStatusNoticeState(Uuid.random().toString(), primary.referenceId, kind, observation.checkedAt)
     }
     // Unavailable evidence alone cannot introduce a warning or confirm recovery.
-    return previous?.takeIf { notice -> evidence.any { it.referenceId == notice.referenceId && it.meaning == notice.kind } }
+    return preceding.firstOrNull { notice -> evidence.any { it.referenceId == notice.referenceId && it.meaning == notice.kind } }
 }

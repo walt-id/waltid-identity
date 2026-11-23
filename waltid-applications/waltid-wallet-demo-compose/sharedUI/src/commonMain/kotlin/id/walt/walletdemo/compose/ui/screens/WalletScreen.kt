@@ -20,6 +20,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
@@ -51,6 +52,7 @@ internal fun WalletScreen(
     allowWalletReset: Boolean = true,
     allowCredentialDelete: Boolean = true,
     serverSettingsContent: (@Composable () -> Unit)? = null,
+    statusSnackbar: SnackbarHostState? = null,
 ) {
     val setup = state.session as? WalletSessionState.IdentitySetup
     if (setup != null) {
@@ -98,6 +100,16 @@ internal fun WalletScreen(
         }
     }
 
+    val showStatusNotices = !openingStatusNotice && !showingScanner && !showingFlow && presentationContent == null &&
+        state.externalFlow == null && state.presentationReview == null && state.offerPreview == null && !state.isBusy
+    val transientStatusNotice = state.credentialStatusNotice.takeIf { showStatusNotices }
+    LaunchedEffect(statusSnackbar, transientStatusNotice) {
+        if (statusSnackbar != null && transientStatusNotice != null) {
+            statusSnackbar.showSnackbar(transientStatusNotice)
+            controller.dismissCredentialStatusNotice()
+        }
+    }
+
     if (showingSettings) {
         val ready = state.session as? WalletSessionState.Ready
         LaunchedEffect(ready?.did, ready?.keyId) {
@@ -129,9 +141,6 @@ internal fun WalletScreen(
         )
         return
     }
-
-    val showStatusNotices = !openingStatusNotice && !showingScanner && !showingFlow && presentationContent == null &&
-        state.externalFlow == null && state.presentationReview == null && state.offerPreview == null && !state.isBusy
 
     // Home remains mounted beneath scanner, review, result and nearby sheets.
     val collectionState = state.copy(selectedTab = WalletDemoTab.Credentials)
@@ -185,8 +194,7 @@ internal fun WalletScreen(
                 onDetailsOpened = controller::checkCredentialStatusOnDetails,
                 statusNotices = state.credentialStatuses.pendingNotices.orEmpty()
                     .takeIf { showStatusNotices && state.credentialStatuses.available }.orEmpty(),
-                transientStatusNotice = state.credentialStatusNotice.takeIf { showStatusNotices },
-                onDismissTransientStatusNotice = controller::dismissCredentialStatusNotice,
+                statusSnackbar = statusSnackbar,
                 onAcknowledgeStatusNotice = controller::acknowledgeCredentialStatusNotice,
                 openStatusNoticeOnHome = openingStatusNotice && !showingFlow,
                 onStatusNoticeOpenedOnHome = controller::credentialStatusNotificationOpenedOnHome,

@@ -13,6 +13,7 @@ actor MockWalletClient: WalletClient {
 
     private var storedCredentials: [Credential]
     private var statusSnapshot: CredentialStatusSnapshot?
+    private let reconcileStatus: @Sendable (Bool, Bool) async throws -> CredentialStatusMaintenanceEnrollment?
     private var statusCollectors: [UUID: AsyncThrowingStream<CredentialStatusSnapshot, Error>.Continuation] = [:]
     var statusCollectorCount: Int { statusCollectors.count }
     private(set) var statusRefreshCalls = 0
@@ -64,9 +65,11 @@ actor MockWalletClient: WalletClient {
         samplePortraitDisclosureValueJSON: String? = nil,
         deleteLocalDataDelayMilliseconds: UInt64 = 0,
         deleteLocalDataError: Error? = nil,
-        credentialStatusSnapshot: CredentialStatusSnapshot? = nil
+        credentialStatusSnapshot: CredentialStatusSnapshot? = nil,
+        reconcileStatus: @escaping @Sendable (Bool, Bool) async throws -> CredentialStatusMaintenanceEnrollment? = { _, _ in nil }
     ) {
         self.statusSnapshot = credentialStatusSnapshot
+        self.reconcileStatus = reconcileStatus
         self.storedCredentials = storedCredentials
         self.initialCredentialRead = initialCredentialRead
         self.operationDelayNanoseconds = operationDelayMilliseconds * 1_000_000
@@ -320,6 +323,11 @@ actor MockWalletClient: WalletClient {
             continuation.finish(throwing: NSError(domain: "MockWalletStatusRead", code: 1))
         }
     }
+
+    func reconcileBackgroundStatus(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await reconcileStatus(automaticChecks, resumePaused)
+    }
+
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] {
         statusRefreshCalls += 1
         await statusRefreshWait?()

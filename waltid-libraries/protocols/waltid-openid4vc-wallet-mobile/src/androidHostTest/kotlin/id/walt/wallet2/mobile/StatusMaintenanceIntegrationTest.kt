@@ -9,10 +9,14 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
+import id.walt.wallet2.status.CredentialStatusCommit
 import id.walt.wallet2.status.CredentialStatusInput
 import id.walt.wallet2.status.CredentialStatusInventory
+import id.walt.wallet2.status.CredentialStatusNoticeState
+import id.walt.wallet2.status.CredentialStatusNoticeStore
 import id.walt.wallet2.status.CredentialStatusRefreshMode
 import id.walt.wallet2.status.CredentialStatusRefreshOutcome
+import id.walt.wallet2.status.CredentialStatusStoredRecord
 import id.walt.wallet2.status.WalletCredentialStatusService
 import id.walt.wallet2.status.reviewGuard
 import io.ktor.client.HttpClient
@@ -23,10 +27,12 @@ import io.ktor.http.headersOf
 import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -136,6 +142,73 @@ class StatusMaintenanceIntegrationTest {
     }
 
     @Test
+    fun anAcknowledgedStatusKeepsItsVersionWhenEvidenceBecomesSessionOnly() = withWallet {
+        val issuer = add("a", value = 2u)
+        service(managedCredentialStatusTrustPolicy()).use { foreground ->
+            foreground.refresh()
+            val original = foreground.snapshot().pendingNotices.single()
+            foreground.acknowledgeNotice(original.reference, original.version)
+
+            setList(issuer, value = 2u, cache = "no-store")
+            foreground.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            assertTrue(foreground.snapshot().pendingNotices.isEmpty())
+            assertNull(store.readCredentialStatus("a"))
+            assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+
+            setList(issuer, value = 1u, cache = "no-store")
+            foreground.refresh(mode = CredentialStatusRefreshMode.FORCE)
+            val change = foreground.snapshot().pendingNotices.single()
+            assertEquals(StatusMeaning.INVALID, change.kind)
+            assertNotEquals(original.version, change.version)
+        }
+        service().use { assertTrue(it.snapshot().pendingNotices.isEmpty()) }
+    }
+
+    @Test
+    fun dismissingTheDisplayedVersionWhileItMovesToMemoryAcknowledgesIt() = withWallet {
+        val issuer = add("a", value = 2u)
+        val cleared = CompletableDeferred<Unit>()
+        val completeCommit = CompletableDeferred<Unit>()
+        val original = store
+        val storeAtHandoff = object : WalletCredentialStore by original, CredentialStatusInventory by original,
+            CredentialStatusNoticeStore by original {
+            override suspend fun compareAndSetCredentialStatusAndNotice(
+                credential: StoredCredential,
+                expected: CredentialStatusStoredRecord?,
+                updated: CredentialStatusStoredRecord,
+                transition: (CredentialStatusNoticeState?) -> CredentialStatusNoticeState?,
+            ): CredentialStatusCommit {
+                val commit = original.compareAndSetCredentialStatusAndNotice(credential, expected, updated, transition)
+                if (commit == CredentialStatusCommit.COMMITTED && updated.snapshot == null) {
+                    cleared.complete(Unit)
+                    completeCommit.await()
+                }
+                return commit
+            }
+        }
+        service(managedCredentialStatusTrustPolicy(), storeAtHandoff).use { foreground ->
+            foreground.refresh()
+            val notice = foreground.snapshot().pendingNotices.single()
+            setList(issuer, value = 2u, cache = "no-store")
+            coroutineScope {
+                val refresh = async { foreground.refresh(mode = CredentialStatusRefreshMode.FORCE) }
+                try {
+                    withTimeout(5.seconds) { cleared.await() }
+                    val dismiss = async(start = CoroutineStart.UNDISPATCHED) {
+                        foreground.acknowledgeNotice(notice.reference, notice.version)
+                    }
+                    completeCommit.complete(Unit)
+                    refresh.await()
+                    dismiss.await()
+                } finally {
+                    completeCommit.complete(Unit)
+                }
+            }
+            assertTrue(foreground.snapshot().pendingNotices.isEmpty())
+        }
+    }
+
+    @Test
     fun foregroundAndWorkerOverlapCreatesOnlyOneNotice() = withWallet {
         add("a", value = 1u)
         val workerRequested = CompletableDeferred<Unit>()
@@ -166,7 +239,7 @@ class StatusMaintenanceIntegrationTest {
     }
 
     @Test
-    fun replacementDuringTheLocalReadCannotInheritTheEarlierNotice() = withWallet {
+    fun replacementAfterTheRowReadCannotSplitTheEvidenceAndNotice() = withWallet {
         add("a", value = 2u)
         assertTrue(assertIs<CredentialStatusMaintenanceResult.Finished>(wake()).hasNewNotice)
         val policy = managedCredentialStatusTrustPolicy()
@@ -175,17 +248,27 @@ class StatusMaintenanceIntegrationTest {
         }
         val replacement = StatusTestIssuer.create("https://status.example/replacement").credential()
         val original = store
+        var replaced = false
         val replacing = object : WalletCredentialStore by original, CredentialStatusInventory by original {
             override suspend fun statusPage(afterId: String?, limit: Int): List<CredentialStatusInput> {
-                // Replace at the credential-read boundary where a separate notice read went stale.
-                open().use { writer ->
-                    val other = SqlDelightCredentialStore(WalletPersistenceDatabase(writer).walletPersistenceQueries)
-                    other.addCredential(StoredCredential("a", replacement))
+                val page = original.statusPage(afterId, limit)
+                if (!replaced) {
+                    open().use { writer ->
+                        val other = SqlDelightCredentialStore(WalletPersistenceDatabase(writer).walletPersistenceQueries)
+                        other.addCredential(StoredCredential("a", replacement))
+                    }
+                    replaced = true
                 }
-                return original.statusPage(afterId, limit)
+                return page
             }
         }
         service(policy, replacing).use { foreground ->
+            val before = foreground.snapshot()
+            val suspension = before.pendingNotices.single()
+            assertEquals(StatusMeaning.SUSPENDED, suspension.kind)
+            assertEquals(CredentialStatusFreshness.FRESH, before.credentials.single().presentation.freshness)
+            assertFalse(suspension.historical)
+
             val current = foreground.snapshot()
             assertTrue(current.pendingNotices.isEmpty())
             assertEquals(CredentialStatusFreshness.UNKNOWN, current.credentials.single().presentation.freshness)
