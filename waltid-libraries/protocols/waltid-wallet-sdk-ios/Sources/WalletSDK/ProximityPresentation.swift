@@ -1258,7 +1258,7 @@ public struct ProximityUnsatisfiedDocument: Sendable, Equatable {
     ///   - documentType: Nonblank document type, unchanged from the request.
     ///   - requestedElements: Nonempty list of original requested fields, without disclosure alternatives.
     public init(requestIndex: Int, documentType: String, requestedElements: [ProximityRequestedElement]) throws {
-        try requireProximityInput(requestIndex >= 0 && isProximityNonBlank(documentType))
+        try requireProximityInput(requestIndex >= 0 && isKotlinNonBlank(documentType))
         try requireProximityInput(!requestedElements.isEmpty && requestedElements.allSatisfy { $0.satisfiesRequestedElements.isEmpty })
         self.requestIndex = requestIndex
         self.documentType = documentType
@@ -1672,6 +1672,19 @@ public actor ProximitySession {
         guard !closed else { return }
         closed = true
         await bridge.close()
+    }
+}
+
+// Match Kotlin Char.isWhitespace for request identifiers accepted by the shared SDK.
+// Foundation's whitespace set differs (for example, U+200B and U+0085).
+private func isKotlinNonBlank(_ value: String) -> Bool {
+    value.unicodeScalars.contains { scalar in
+        switch scalar.properties.generalCategory {
+        case .spaceSeparator, .lineSeparator, .paragraphSeparator:
+            return false
+        default:
+            return !(0x0009...0x000D).contains(scalar.value) && !(0x001C...0x001F).contains(scalar.value)
+        }
     }
 }
 

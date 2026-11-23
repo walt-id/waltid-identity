@@ -96,6 +96,21 @@ final class KMPProximityProjectionTests: XCTestCase {
         XCTAssertEqual(projected.documents.flatMap { $0.requestedElements.map(\.intentToRetain) }, [true, false])
     }
 
+    func testNoDataProjectionPreservesKotlinAcceptedDocumentTypes() throws {
+        for documentType in ["\u{200B}", "\u{0085}", " \u{200B}\t", "org.example.\u{200B}"] {
+            let summary = WalletCore.ProximityUnsatisfiedRequest(documents: [
+                WalletCore.ProximityUnsatisfiedDocument(requestIndex: 0, docType: documentType, requestedElements: [
+                    WalletCore.ProximityRequestedElement(namespace: "namespace", elementIdentifier: "name", intentToRetain: false, satisfiesRequestedElements: []),
+                ]),
+            ])
+            let state = try WalletCore.ProximityStateNoData(exchange: 2, unsatisfiedRequest: summary).toSwiftState()
+            guard case let .noData(exchange, request) = state else { return XCTFail("Missing no-data state") }
+            XCTAssertEqual(exchange, 2)
+            XCTAssertEqual(request.documents.first?.documentType, documentType)
+            XCTAssertTrue(state.legalActions.isEmpty)
+        }
+    }
+
     func testReaderCAImportUsesSuppliedDateForValidity() async throws {
         // Public WAL-1349 test CA, valid from 2026-09-01 to 2036-08-29.
         let certificate = try XCTUnwrap(Data(base64Encoded: Self.readerCaDerBase64))
