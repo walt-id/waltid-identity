@@ -2,6 +2,7 @@
 
 package id.walt.credentials
 
+import id.walt.credentials.keyresolver.resolveJwtIssuer
 import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
@@ -84,7 +85,7 @@ object CredentialParser {
     fun getCredentialDataIssuer(data: JsonObject) =
         data["issuer"].getItAsStringOrId() ?: data["vc"]?.jsonObject?.get("issuer")?.getItAsStringOrId()
 
-    fun getJwtHeaderOrDataIssuer(data: JsonObject) = data.getString("iss") ?: getCredentialDataIssuer(data)
+    fun getJwtHeaderOrDataIssuer(data: JsonObject) = resolveJwtIssuer(data)
 
     fun getCredentialDataSubject(data: JsonObject) =
         data["credentialSubject"].getItAsStringOrId() ?: data["vc"]?.jsonObject?.get("credentialSubject")?.getItAsStringOrId()
@@ -343,7 +344,7 @@ object CredentialParser {
                         credentialData = fullCredentialData,
                         originalCredentialData = payload,
 
-                        issuer = getCredentialDataIssuer(payload),
+                        issuer = getJwtHeaderOrDataIssuer(payload),
                         subject = getCredentialDataSubject(payload)
                     )
 
@@ -356,7 +357,7 @@ object CredentialParser {
                         credentialData = fullCredentialData,
                         originalCredentialData = payload,
 
-                        issuer = getCredentialDataIssuer(payload),
+                        issuer = getJwtHeaderOrDataIssuer(payload),
                         subject = getCredentialDataSubject(payload)
                     )
                 }
@@ -405,7 +406,7 @@ object CredentialParser {
                                 signedWithDisclosures = credential,
                                 credentialData = fullCredentialData,
                                 originalCredentialData = payload,
-                                issuer = getCredentialDataIssuer(payload),
+                                issuer = getJwtHeaderOrDataIssuer(payload),
                                 subject = getCredentialDataSubject(payload)
                             )
 
@@ -417,7 +418,7 @@ object CredentialParser {
                                 signedWithDisclosures = credential,
                                 credentialData = fullCredentialData,
                                 originalCredentialData = payload,
-                                issuer = getCredentialDataIssuer(payload),
+                                issuer = getJwtHeaderOrDataIssuer(payload),
                                 subject = getCredentialDataSubject(payload)
                             )
                         }
