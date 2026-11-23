@@ -109,12 +109,11 @@ object MergingIssuer {
         completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
         context = context,
     ).run {
-        val issuerDid = issuerId.takeIf(DidUtils::isDidUrl)
         w3cVc.signJws(
             issuerKey = issuerKey,
             algorithm = algorithm,
             issuerId = issuerId,
-            issuerKid = Issuer.getKidHeader(issuerKey, issuerDid),
+            issuerKid = Issuer.kidForIssuer(issuerKey, issuerId),
             subjectDid = subjectDid,
             additionalJwtHeader = additionalJwtHeader,
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply { putAll(jwtOptions) },
@@ -187,12 +186,11 @@ object MergingIssuer {
         completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
         context = context,
     ).run {
-        val issuerDid = issuerId.takeIf(DidUtils::isDidUrl)
         w3cVc.signSdJwt(
             issuerKey = issuerKey,
             algorithm = algorithm,
             issuerId = issuerId,
-            issuerKid = Issuer.getKidHeader(issuerKey, issuerDid),
+            issuerKid = Issuer.kidForIssuer(issuerKey, issuerId),
             subjectDid = subjectDid,
             disclosureMap = disclosureMap,
             additionalJwtHeaders = additionalJwtHeaders + ("typ" to JsonPrimitive(type)),

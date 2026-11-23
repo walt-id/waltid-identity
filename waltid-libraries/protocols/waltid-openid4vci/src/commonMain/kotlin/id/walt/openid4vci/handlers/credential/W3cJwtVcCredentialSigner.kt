@@ -16,6 +16,7 @@ import id.walt.sdjwt.SDMap
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType
 import id.walt.w3c.issuance.Issuer.getKidHeader
+import id.walt.w3c.issuance.Issuer.kidForIssuer
 import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.w3c.vc.vcs.applyIssuedV2Context
 import kotlinx.coroutines.withContext
@@ -145,10 +146,9 @@ object W3cJwtVcCredentialSigner {
             )
         }
 
-        val issuerDid = issuerId.takeIf(DidUtils::isDidUrl)
         val issuerKid = when (issuerSigningKey) {
-            is IssuerSigningKey.Legacy -> getKidHeader(issuerSigningKey.key, issuerDid)
-            is IssuerSigningKey.Crypto2 -> getKidHeader(issuerSigningKey.key, issuerDid)
+            is IssuerSigningKey.Legacy -> getKidHeader(issuerSigningKey.key, issuerId.takeIf(DidUtils::isDidUrl))
+            is IssuerSigningKey.Crypto2 -> kidForIssuer(issuerSigningKey.key, issuerId)
         }
         if (selectiveDisclosure.isNullOrEmpty()) {
             return when (issuerSigningKey) {

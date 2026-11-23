@@ -22,6 +22,7 @@ import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
 import id.walt.w3c.issuance.Issuer.getKidHeader
+import id.walt.w3c.issuance.Issuer.kidForIssuer
 import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import id.walt.credentials.issuance.IssuanceHolderKey
 import kotlinx.coroutines.withContext
@@ -158,11 +159,9 @@ object SdJwtVcCredentialSigner {
             disclosureMap = SDJwtVC.effectiveDisclosureMap(selectiveDisclosure, alwaysDisclosedOverrides.keys)
         )
 
-        val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
-
         val issuerKid = when (issuerSigningKey) {
-            is IssuerSigningKey.Legacy -> getKidHeader(issuerSigningKey.key, issuerDid)
-            is IssuerSigningKey.Crypto2 -> getKidHeader(issuerSigningKey.key, issuerDid)
+            is IssuerSigningKey.Legacy -> getKidHeader(issuerSigningKey.key, issuerId.takeIf(DidUtils::isDidUrl))
+            is IssuerSigningKey.Crypto2 -> kidForIssuer(issuerSigningKey.key, issuerId)
         }
         val headers = mapOf(
             JWT_HEADER_KID to JsonPrimitive(issuerKid),
