@@ -1,6 +1,7 @@
 package id.walt.openid4vci.handlers.credential
 
 import id.walt.certificate.x509.X509Certificate
+import id.walt.credentials.issuance.IssuanceHolderKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
@@ -17,6 +18,7 @@ import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue
 import id.walt.credentials.issuance.MergingIssuer.mergingSdJwtIssue
 import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.w3c.vc.vcs.applyIssuedV2Context
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -105,7 +107,8 @@ object W3cJwtVcCredentialSigner {
             JsonObject(credentialData.toMutableMap().apply { put("credentialStatus", status) })
         } ?: credentialData
 
-        return W3CVC(vcPayload).let { vc ->
+        val vc = W3CVC(vcPayload)
+        return withContext(IssuanceHolderKey(binding.holderKey)) {
             val builderType = w3cVersion?.let { version ->
                 val serialNameMap = mapOf(
                     "W3CV11" to CredentialBuilderType.W3CV11CredentialBuilder,
