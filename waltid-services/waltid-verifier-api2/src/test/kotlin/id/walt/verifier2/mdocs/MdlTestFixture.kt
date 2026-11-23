@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.verifier2.mdocs
 
 import id.walt.cose.CoseCertificate
@@ -29,6 +31,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Shared mDL test fixture, so the DC API round trip and the cross-device mdoc test verify the same

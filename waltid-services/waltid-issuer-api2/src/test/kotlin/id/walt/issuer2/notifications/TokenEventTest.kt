@@ -1,5 +1,6 @@
 package id.walt.issuer2.notifications
 
+import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
@@ -9,6 +10,7 @@ import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 import id.walt.ktornotifications.SseNotifier
@@ -35,15 +37,52 @@ import id.walt.openid4vci.responses.token.TokenResponseOptions
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertIs
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
 class TokenEventTest {
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
+    @AfterEach
+    fun closeCatalogues() {
+        catalogues.forEach { it.close() }
+    }
+
+    @Test
+    fun `provider PKCE rejection publishes one correlated authorization code failure`() = runTest {
+        val session = issuanceSession("pkce-failed-session").copy(authenticationMethod = AuthenticationMethod.AUTHORIZED)
+        lateinit var provider: OAuth2Provider
+        val service = protocolService(session) { provider = it; it }
+        val request = assertIs<id.walt.openid4vci.requests.authorization.AuthorizationRequestResult.Success>(
+            provider.createAuthorizationRequest(mapOf(
+                "response_type" to listOf("code"), "client_id" to listOf("wallet-client"),
+                "redirect_uri" to listOf("https://wallet.example/callback"),
+                "code_challenge" to listOf("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"),
+                "code_challenge_method" to listOf("S256"),
+            ))
+        ).request
+        val code = assertIs<id.walt.openid4vci.responses.authorization.AuthorizationResponseResult.Success>(
+            provider.createAuthorizationResponse(request, DefaultSession(subject = session.sessionId))
+        ).response.code
+        val (response, events) = service.processTokenAndCaptureEvents(mapOf(
+            "grant_type" to listOf("authorization_code"), "client_id" to listOf("wallet-client"),
+            "redirect_uri" to listOf("https://wallet.example/callback"), "code" to listOf(code),
+            "code_verifier" to listOf("x".repeat(43)),
+        ), "pkce-correlated-failure")
+        assertEquals(400, response.status)
+        val event = events.single()
+        assertEquals(IssuanceSessionEvent.TOKEN_REQUEST_AUTHORIZATION_CODE_FAILED.value, event.event)
+        assertEquals(session.sessionId, event.target)
+        assertEquals(OAuthErrorCodes.INVALID_GRANT, event.error)
+    }
 
     @Test
     fun `missing grant type publishes one generic uncorrelated failure`() = runTest {
@@ -326,16 +365,21 @@ class TokenEventTest {
             metadataConfig = metadataConfig,
         )
         val sessionService = IssuanceSessionService(InMemorySessionRepository(sessions.toList()))
+        val typeMetadata = IssuerTypeMetadataCatalogue(
+            serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
         val module = OpenId4VciModule.create(
             config = serviceConfig,
             authorizationCodeRepository = InMemoryAuthorizationCodeRepository(),
             preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository(),
             parRepository = InMemoryPARRepository(),
             refreshTokenRepository = InMemoryRefreshTokenRepository(),
+            metadataResolver = typeMetadata,
         )
         val metadataService = MetadataService(
             serviceConfig = serviceConfig,
             metadataConfig = metadataConfig,
+            typeMetadata = typeMetadata,
             profileService = profileService,
             sessionService = sessionService,
             preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,
@@ -353,7 +397,8 @@ class TokenEventTest {
     private class InMemorySessionRepository(initial: List<IssuanceSession>) : IssuanceSessionRepository {
         private val sessions = initial.associateBy { it.sessionId }.toMutableMap()
 
-        override suspend fun take(sessionId: String): IssuanceSession? = sessions.remove(sessionId)
+        override suspend fun compareAndSet(expected: IssuanceSession, replacement: IssuanceSession): Boolean =
+            sessions.replace(expected.sessionId, expected, replacement)
 
         override suspend fun save(session: IssuanceSession): IssuanceSession =
             session.also { sessions[it.sessionId] = it }

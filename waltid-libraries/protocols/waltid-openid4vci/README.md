@@ -35,6 +35,52 @@ The library includes:
 - **Repository Interfaces** - Pluggable storage for authorization codes and pre-authorized codes
 - **Session Management** - Session tracking for issuance flows
 
+## PKCE
+
+The OAuth provider handles PKCE internally through `PkceService`, configured by
+`OAuth2ProviderConfig.pkceServiceConfig`. Both direct authorization and PAR use the same
+validation. The default configuration supports S256 and permits requests without PKCE;
+set `PkceServiceConfig(requirePkce = { true })` to require it. Supplied PKCE is always enforced.
+The suspend callback resolves the requirement when an authorization request or a code issued
+without PKCE is checked. Providers shared by multiple issuers can resolve the current issuer's
+policy from request context. A policy change never disables verification of a stored challenge.
+An omitted challenge method means `plain` under RFC 7636 and is rejected by the default
+S256-only configuration.
+
+Continue using `createAuthorizationRequest`, `createAuthorizationResponse`, the PAR
+methods, and `createAccessTokenRequest` / `createAccessTokenResponse`. The provider binds
+the challenge to the code and verifies the token request before resolving credential
+authorization, signing tokens, or writing refresh tokens. PKCE failures consume the code
+under the existing one-time redemption contract. Use the provider's normal response/error
+writers; issuer endpoint code needs no additional PKCE verification.
+
+Authorization-code repository implementations must persist `AuthorizationCodeRecord.pkceBinding`:
+`PkceBinding.NotUsed` explicitly records an authorization without PKCE, while
+`PkceBinding.Challenge` records the challenge and method. A missing binding identifies an
+older record and is rejected with `invalid_grant`. Release the library and updated store
+adapters together; pending authorizations from older releases must restart. No verifier is
+stored with the code or copied into the persisted refresh-token request.
+
+Use `Pkce.generateCodeVerifier()` and `Pkce.generateS256CodeChallenge(verifier)` for client
+generation. Verifiers contain 43–128 ASCII unreserved characters; generated values use
+cryptographically secure random bytes and unpadded base64url. The wallet's existing
+`PKCEManager` API delegates to these primitives. Custom challenge methods implement
+`PkceCodeChallengeMethod` and are explicitly registered in `PkceServiceConfig.methods`;
+metadata must use that configuration's `supportedCodeChallengeMethods`.
+
+RFC 7636 Appendix B example (generate a fresh verifier for every real authorization):
+
+```text
+code_verifier:         dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+code_challenge:        E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+code_challenge_method: S256
+```
+
+Malformed authorization parameters and missing/repeated verifiers return `invalid_request`.
+Invalid or mismatched verifiers, verifiers supplied without an original challenge, and
+unknown code binding state return `invalid_grant`. Verifier validation uses raw parameter
+multiplicity and ASCII ranges; blank or non-ASCII input is never silently normalized.
+
 ## Main Purpose
 
 This library serves as the foundation for building OpenID4VCI Issuer implementations. It provides a framework-agnostic OAuth2 provider that handles the authorization and token exchange flows required by the OpenID4VCI specification.
@@ -376,3 +422,46 @@ Provider error writers also preserve authentication and attestation challenge he
 For failures handled before the provider runs, route integrations can apply
 `OpenId4VciResponseHeaders.NO_STORE` from `id.walt.openid4vci.responses`.
 The library does not depend on a server framework.
+
+
+## Deferred attestation lifetime
+
+Deferred collection uses the WIA and KAs accepted for that transaction. Their verified
+validity bounds, original clock skew, client identity, and holder-key associations are
+retained privately. The shared library checks those lifetimes before signing and before
+delivering a saved response, including after a restart. Original PoP, proof age, and
+nonce checks are not replayed.
+
+The provider captures WIA evidence from verified access-token authentication and
+snapshots it automatically in `acceptCredentialRequest()`, together with the verified
+KA evidence. Acceptance checks the captured lifetimes before returning: expired or
+missing required evidence returns `credential_request_denied` without creating a
+transaction. Issuers do not decode private token claims or infer WIA requirements.
+The provider uses its existing client-authentication configuration resolver when a
+legacy transaction has no recorded requirement; optional authentication methods do
+not make WIA mandatory. Originally anonymous pre-authorized grants retain that
+profile through refresh.
+
+If a required attestation has expired, or required evidence is missing, collection
+returns `credential_request_denied`. Denial is permanent for that transaction: one
+expired KA denies the entire holder-key batch. Other transactions and completed
+datasets retain their progress. This transaction denial does not change the offer's
+operator approval decision.
+
+Refreshing an access token preserves its original WIA evidence and never replaces a
+transaction's accepted evidence. Resubmitting a Credential Request also keeps the
+original acceptance. Transactions stored before evidence capture fail closed when
+their required profile cannot be enforced. Standalone KAs without `exp` retain the
+existing optional-expiration rule; JWT-header KAs still require `exp`. Fresh-WUA
+replacement and attestation status-list enforcement are separate work (status: F6).
+
+`createCredentialResponse` validates accepted evidence before allocation and signing.
+`createDeferredCredentialResponse` validates the persisted claim for both fresh and
+checkpointed credentials, prepares response encryption, and rechecks lifetime before
+returning `CredentialResponseResult.Success` or `Failure`. The response writer only
+formats that prepared output; it does not resolve transactions or decide denial.
+
+The shared `DeferredIssuanceStore` persists transaction denial. Embedding services
+provide a `DeferredCredentialResponseContext` with the accepted claim and store-backed
+coordinator, and perform usage accounting and successful-result writes only after
+response creation succeeds. Runtime response bodies are excluded from checkpoints.

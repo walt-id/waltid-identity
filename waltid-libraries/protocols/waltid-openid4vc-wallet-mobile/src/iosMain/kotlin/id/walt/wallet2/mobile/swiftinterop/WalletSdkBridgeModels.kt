@@ -26,6 +26,7 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.wallet2.mobile.WalletProviderConfig
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.MetadataSigner
 import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
@@ -49,6 +50,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Instant
+import id.walt.wallet2.status.CredentialStatusReviewChangedException
 
 /**
  * Configuration used when creating an iOS [WalletSdkBridge].
@@ -72,6 +74,8 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
+    /** Enterprise Wallet Provider. When set, it supplies WIA and is the fallback KA provider. */
+    public val walletProvider: WalletProviderConfig? = null,
     /** Signed metadata is neither requested nor accepted when this trust resolver is absent. */
     public val issuerMetadataTrustResolver: WalletBridgeIssuerMetadataTrustResolver? = null,
     public val preferredLocales: List<String> = emptyList(),
@@ -254,6 +258,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
     return MobileWalletConfig(
         walletId = walletId,
         attestationConfig = attestation,
+        walletProvider = walletProvider,
         credentialIssuerMetadataTrustResolver = issuerMetadataTrustResolver?.let { bridgeResolver ->
             CredentialIssuerMetadataTrustResolver { compactJwt, expectedCredentialIssuer ->
                 bridgeResolver.verify(compactJwt, expectedCredentialIssuer).toMetadataSigner()
@@ -602,6 +607,9 @@ public enum class WalletBridgeErrorCategory {
 
     /** Unexpected wallet failure that does not fit a narrower category. */
     internalFailure,
+
+    /** The local semantic status warning changed after host review. */
+    credentialStatusReviewChanged,
 }
 
 /**
@@ -654,6 +662,7 @@ public class WalletBridgeError internal constructor(
             val presentationFailure = throwable as? UnsafePresentationErrorResponseException
             val category = when {
                 presentationFailure != null -> WalletBridgeErrorCategory.presentationValidation
+                throwable is CredentialStatusReviewChangedException -> WalletBridgeErrorCategory.credentialStatusReviewChanged
                 paymentFailure != null -> WalletBridgeErrorCategory.paymentConsent
                 authorizationFailure != null -> WalletBridgeErrorCategory.authorization
                 throwable is CancellationException -> WalletBridgeErrorCategory.cancelled

@@ -13,6 +13,10 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
 
     private val log = noCoLogger<CommonsFeatureCatalog>()
 
+    val proximityVerifierFeature = OptionalFeature(
+        "proximity-verifier", "Verify ISO 18013-5 responses submitted by an external reader", default = false,
+    )
+
     val webFeature = BaseFeature("web", "Web service", WebConfig::class)
     val webDataFetcherFeature =
         OptionalFeature("httpclient", "HTTP Web Data Fetcher", ServiceWebDataFetcherConfiguration::class, default = true, {

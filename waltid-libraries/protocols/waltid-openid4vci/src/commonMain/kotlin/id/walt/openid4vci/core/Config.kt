@@ -1,5 +1,7 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.attestation.AttestationStatusResolver
+
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
@@ -9,6 +11,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandle
 import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
+import id.walt.openid4vci.pkce.PkceServiceConfig
 import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
@@ -27,6 +30,8 @@ import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
 import id.walt.openid4vci.validation.IssuerStateValidator
+import id.walt.openid4vci.validation.NotificationRequestValidator
+import id.walt.openid4vci.validation.DefaultNotificationRequestValidator
 
 /**
  * Configuration holds handler registries and injectable objects used by the provider.
@@ -76,6 +81,10 @@ data class OAuth2ProviderConfig(
     val credentialProofVerifier: CredentialProofVerifier = DefaultCredentialProofVerifier(),
     val credentialEndpointHandlers: CredentialEndpointHandlers,
     val credentialResponseEncryptor: CredentialResponseEncryptor = Crypto2JweCredentialResponseEncryptor,
+    val pkceServiceConfig: PkceServiceConfig = PkceServiceConfig(),
+    val attestationStatusResolver: AttestationStatusResolver? = null,
+
+    val notificationRequestValidator: NotificationRequestValidator = DefaultNotificationRequestValidator(),
 )
 
 data class PushedAuthorizationConfig(

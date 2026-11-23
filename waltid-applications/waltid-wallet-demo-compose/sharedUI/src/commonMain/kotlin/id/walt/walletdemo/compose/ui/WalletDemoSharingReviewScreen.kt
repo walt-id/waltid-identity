@@ -9,20 +9,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.rememberCoroutineScope
+import id.walt.walletdemo.compose.logic.WalletDemoClaimReview
 import id.walt.walletdemo.compose.logic.WalletDemoPaymentConsent
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReviewController
+import id.walt.walletdemo.compose.logic.canConfirm
 import id.walt.walletdemo.compose.logic.hasCompleteCredentialSelection
 import id.walt.walletdemo.compose.logic.isPaymentTransaction
 import id.walt.walletdemo.compose.ui.components.ReviewScaffold
 import id.walt.walletdemo.compose.ui.components.SharingActionsRow
+import id.walt.walletdemo.compose.ui.components.ReviewChangedNotice
+import id.walt.walletdemo.compose.ui.components.rememberSharingSubmission
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import id.walt.walletdemo.compose.ui.components.SharingReviewSection
+import id.walt.walletdemo.compose.ui.components.selectedReviewStatuses
 import id.walt.walletdemo.compose.ui.components.rememberSharingInformation
 import id.walt.walletdemo.compose.ui.components.WalletScreenHeader
 import id.walt.walletdemo.compose.ui.components.WalletIcon
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
+import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
+import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
 
 /**
  * Shared modal review for provider hosts. Choices and payment consent belong to the request owner.
@@ -42,18 +52,32 @@ fun WalletDemoSharingReviewScreen(
     compact: Boolean = true,
     preparePaymentConsent: (suspend (WalletDemoSharingSelection) -> WalletDemoPaymentConsent?)? = null,
     controller: WalletDemoSharingReviewController? = null,
+    credentialStatuses: WalletDemoCredentialStatuses? = null,
+    statusReviewNotice: String? = null,
 ) {
     val scope = rememberCoroutineScope()
-    val owner = controller ?: remember(review) { WalletDemoSharingReviewController(review, scope, preparePaymentConsent) }
+    val owner = controller ?: remember(review) { WalletDemoSharingReviewController(review, scope, prepare = preparePaymentConsent) }
     require(owner.review == review) { "The review controller belongs to another request" }
     DisposableEffect(owner) { onDispose { if (controller == null) owner.close() } }
     val state by owner.state.collectAsState()
     val selection = state.selection
     val paymentReview = state.payment
-    val submit = { owner.selectionForSubmission(state)?.let(onSubmit); Unit }
-    val information by rememberSharingInformation(review.credentialOptions)
-    val selectionComplete = information != null && review.hasCompleteCredentialSelection(selection.credentials)
+    val statuses = credentialStatuses ?: LocalCredentialStatusUi.current.snapshot
+    val submit: (Map<String, String>) -> Unit = { revisions ->
+        owner.selectionForSubmission(state)?.let { onSubmit(it.copy(credentialStatusRevisions = revisions)) }
+    }
+    val information by rememberSharingInformation(review.credentialOptions, state.information is WalletDemoClaimReview.Legacy)
+    val selectionComplete = information != null && state.information.canConfirm && review.hasCompleteCredentialSelection(selection.credentials)
 
+    CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(statuses,
+        contextKey = LocalCredentialStatusUi.current.contextKey ?: owner)) {
+    val submission = rememberSharingSubmission(
+        reviewKey = listOf(owner, review, state.information, selection.credentials, selection.disclosures),
+        credentialStatuses = selectedReviewStatuses(information, selection.credentials, statuses),
+        paymentReview = paymentReview,
+        isPayment = review.request.transactionData.any { it.isPaymentTransaction },
+        enabled = enabled, selectionComplete = selectionComplete, onSubmit = submit,
+    )
     WalletReviewHost(dismissEnabled = enabled, onDismiss = onBackAtRoot) {
         ReviewScaffold(
             fillViewport = false,
@@ -67,19 +91,22 @@ fun WalletDemoSharingReviewScreen(
             },
             actions = {
                 SharingActionsRow(
+                    submission = submission,
                     paymentReview = paymentReview,
                     isPayment = review.request.transactionData.any { it.isPaymentTransaction },
                     enabled = enabled,
-                    selectionComplete = selectionComplete,
-                    onSubmit = submit,
                     onCancel = onCancel,
                     onReject = onReject,
                     showCancelWithReject = false,
                 )
             },
         ) {
+            statusReviewNotice?.let { Text(it) }
+            ReviewChangedNotice(submission)
             SharingReviewSection(
                 paymentReview = paymentReview,
+                claimReview = state.information,
+                onRetryClaimReview = owner::retry,
                 review = review,
                 information = information,
                 selectedCredentialOptions = selection.credentials,
@@ -90,6 +117,7 @@ fun WalletDemoSharingReviewScreen(
                 onToggleDisclosure = owner::toggleDisclosure,
             )
         }
+    }
     }
 }
 

@@ -16,7 +16,6 @@ import id.walt.mdoc.objects.mso.UniformResourceIdentifier
 import id.walt.policies2.vc.policies.StatusPolicy
 import id.walt.policies2.vc.policies.status.entry.IETFEntryExtractor
 import id.walt.policies2.vc.policies.status.entry.MDocEntryExtractor
-import id.walt.policies2.vc.policies.status.entry.requireEvaluableStatusList
 import id.walt.policies2.vc.policies.status.model.IETFEntry
 import id.walt.policies2.vc.policies.status.model.IETFStatusPolicyAttribute
 import id.walt.crypto2.CryptoRuntime
@@ -169,17 +168,6 @@ class CredentialStatusVariantTest {
             val result = policy.verify(MdocIssuerFixture.issue(status))
             assertEquals(expected, result.exceptionOrNull()?.message, name)
         }
-    }
-
-    @Test
-    fun `an empty mso status object is rejected when it is actually present`() {
-        val error = assertFailsWith<IllegalArgumentException> {
-            Status().requireEvaluableStatusList("mdoc")
-        }
-        assertEquals(
-            "mdoc has a status object with no status_list, identifier_list, or ETSI flat status members. $IETF_STATUS_LIST.",
-            error.message,
-        )
     }
 
     @Test

@@ -45,7 +45,7 @@ class AuthorizationServerMetadataTest {
     }
 
     @Test
-    fun `response types supported is required`() {
+    fun `response types must not contain blank entries`() {
         assertFailsWith<IllegalArgumentException> {
             AuthorizationServerMetadata(
                 issuer = "https://issuer.example",

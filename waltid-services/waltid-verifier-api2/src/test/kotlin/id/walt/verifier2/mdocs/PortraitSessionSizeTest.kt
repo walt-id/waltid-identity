@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.verifier2.mdocs
 
 import id.walt.commons.config.ConfigManager
@@ -61,6 +63,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * A verification session carrying a portrait must stay inside the document limit of a persistent store.

@@ -87,5 +87,10 @@ The Apple adapter retains a per-key LocalAuthentication context for that interva
 Keychain metadata does not expose the interval for independent readback. Timed reuse is recent
 provider authentication, not consent for issuance, presentation, or another wallet action.
 
+For TS-12 payments, the SDK requests fresh native biometrics for each payment proof
+even when this interval is still open. The payment signer is single-use, expires
+with the configured interval and closes on completion or cancellation. Ordinary
+key operations retain their reuse behavior; the app still owns informed payment consent.
+
 Use the returned ``SigningIdentity/did`` when a verifier flow needs an
 explicit wallet DID.

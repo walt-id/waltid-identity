@@ -5,6 +5,8 @@ import android.content.Context
 fun createAndroidDemoSharingSettingsStore(context: Context): DemoSharingSettingsStore {
     val preferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     return PersistentDemoSharingSettingsStore(
+        readStatusChecks = { preferences.getBoolean(AUTOMATIC_CREDENTIAL_STATUS_CHECKS_KEY, true) },
+        writeStatusChecks = { check(preferences.edit().putBoolean(AUTOMATIC_CREDENTIAL_STATUS_CHECKS_KEY, it).commit()) { "Status preference could not be persisted" } },
         readEnabled = {
             if (preferences.contains(SHOW_DC_API_PRESENTATION_PREVIEW_KEY)) {
                 preferences.getBoolean(SHOW_DC_API_PRESENTATION_PREVIEW_KEY, true)

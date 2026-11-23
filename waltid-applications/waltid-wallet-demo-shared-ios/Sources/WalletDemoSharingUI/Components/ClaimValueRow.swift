@@ -4,15 +4,72 @@ import UIKit
 
 public struct ClaimValueRow: View {
     public let item: ClaimItem
+    private let depth: Int
+    private let ancestors: [String]
 
-    public init(item: ClaimItem) {
+    public init(item: ClaimItem) { self.init(item: item, depth: 0, ancestors: []) }
+
+    init(item: ClaimItem, depth: Int, ancestors: [String]) {
         self.item = item
+        self.depth = depth
+        self.ancestors = ancestors
+    }
+
+    private var label: String {
+        item.label
     }
 
     public var body: some View {
-        CredentialDataRow(item.label, labelIdentifier: WalletAccessibilityID.claim(item.path.id)) {
-            ClaimValueView(value: item.value, path: item.path)
-        }
+        Group {
+            if case .object(let entries) = item.value {
+                MetadataDisclosure(title: label, initiallyExpanded: false,
+                    accessibilityIdentifier: WalletAccessibilityID.claim(item.path.id)) {
+                    ClaimObjectEntriesView(entries: entries, path: item.path, depth: depth, ancestors: ancestors + [item.label])
+                }
+            } else if case .list(let values, _) = item.value, values.hasOnlyContainers {
+                MetadataDisclosure(title: label, initiallyExpanded: false,
+                    accessibilityIdentifier: WalletAccessibilityID.claim(item.path.id)) {
+                    ClaimValueView(value: item.value, path: item.path, depth: depth, ancestors: ancestors + [item.label])
+                }
+            } else {
+                CredentialDataRow(label, labelIdentifier: WalletAccessibilityID.claim(item.path.id)) {
+                    ClaimValueView(value: item.value, path: item.path, depth: depth, ancestors: ancestors + [item.label])
+                }
+            }
+        }.id(item.path.id)
+    }
+
+}
+
+private struct ClaimObjectEntriesView: View {
+    let entries: [ClaimItem]
+    let path: ClaimItemPath
+    let depth: Int
+    let ancestors: [String]
+    @State private var fieldLimit = DisplayListPreview.maxItems
+
+    var body: some View {
+        let readable = entries.filter { !$0.roles.contains(.technical) }
+        let technical = entries.filter { $0.roles.contains(.technical) }
+        LazyVStack(alignment: .leading, spacing: 10) {
+            if entries.isEmpty { Text("No fields", bundle: .module) }
+            ForEach(Array(readable.prefix(fieldLimit))) { entry in
+                ClaimValueRow(item: entry, depth: depth + 1, ancestors: ancestors)
+            }
+            if readable.count > fieldLimit {
+                Text("Showing first \(fieldLimit) of \(readable.count) items", bundle: .module).font(.caption).foregroundStyle(.secondary)
+                Button("Show \(min(DisplayListPreview.maxItems, readable.count - fieldLimit)) more") {
+                    fieldLimit = min(fieldLimit + DisplayListPreview.maxItems, readable.count)
+                }.frame(minHeight: 44)
+            }
+            if !technical.isEmpty {
+                MetadataDisclosure(title: "Technical details", initiallyExpanded: false) {
+                    ForEach(technical) { entry in
+                        ClaimValueRow(item: entry, depth: depth + 1, ancestors: ancestors)
+                    }
+                }
+            }
+        }.onChange(of: path) { _ in fieldLimit = DisplayListPreview.maxItems }
     }
 }
 
@@ -20,6 +77,8 @@ struct ClaimValueView: View {
     let value: DisplayValue
     let path: ClaimItemPath
     var textFont: Font = .body
+    var depth: Int = 0
+    var ancestors: [String] = []
 
     var body: some View {
         switch value {
@@ -35,8 +94,8 @@ struct ClaimValueView: View {
             DeferredImageValue(source: source, path: path)
         case .image(_, let data, let mimeType, let byteCount):
             ImageValue(data: data, mimeType: mimeType, byteCount: byteCount, path: path)
-        case .list(let values):
-            ClaimListView(values: values, path: path)
+        case .list(let values, let labels):
+            ClaimListView(values: values, labels: labels, path: path, depth: depth, ancestors: ancestors)
         case .null:
             Text("No value supplied", bundle: .module)
                 .font(textFont)
@@ -44,8 +103,8 @@ struct ClaimValueView: View {
         case .object(let entries):
             LazyVStack(alignment: .leading, spacing: 6) {
                 if entries.isEmpty { Text("No fields", bundle: .module) }
-                ForEach(entries) { entry in
-                    ClaimValueRow(item: entry)
+                if !entries.isEmpty {
+                    ClaimObjectEntriesView(entries: entries, path: path, depth: depth, ancestors: ancestors)
                 }
             }
         case .raw(let value):
@@ -71,19 +130,53 @@ struct DisplayListPreview {
     }
 }
 
+private extension Array where Element == DisplayValue {
+    var hasOnlyContainers: Bool {
+        !isEmpty && allSatisfy { $0.isContainer }
+    }
+}
+
 private struct ClaimListView: View {
     let values: [DisplayValue]
+    let labels: [Int: String]
     let path: ClaimItemPath
+    let depth: Int
+    let ancestors: [String]
     @State private var limit = DisplayListPreview.maxItems
 
     var body: some View {
         let preview = DisplayListPreview(values: values, limit: limit)
+        let containerCount = values.filter { $0.isContainer }.count
+        let mixed = containerCount > 0 && containerCount < values.count
         LazyVStack(alignment: .leading, spacing: 4) {
             if values.isEmpty { Text("No items", bundle: .module) }
             ForEach(Array(preview.values.enumerated()), id: \.offset) { index, value in
-                HStack(alignment: .top, spacing: 4) {
-                    Text("\(index + 1).")
-                    ClaimValueView(value: value, path: path.indexedChild(index))
+                if mixed || value.isContainer {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if let label = labels[index] { Text(label).font(.headline).accessibilityAddTraits(.isHeader) }
+                        if case .object(let entries) = value {
+                            ClaimObjectEntriesView(entries: entries, path: path.indexedChild(index), depth: depth + 1, ancestors: ancestors)
+                        } else {
+                            ClaimValueView(value: value, path: path.indexedChild(index), depth: depth + 1, ancestors: ancestors)
+                        }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.secondary.opacity(0.25), lineWidth: 1))
+                    .padding(.vertical, 4)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier(WalletAccessibilityID.claim(path.indexedChild(index).id))
+                } else if let label = labels[index] {
+                    HStack(alignment: .top, spacing: 4) {
+                        Text("\(index + 1).")
+                        ClaimValueRow(item: ClaimItem(path: path.indexedChild(index), label: label, value: value, rawValue: nil),
+                            depth: depth + 1, ancestors: ancestors)
+                    }
+                } else {
+                    HStack(alignment: .top, spacing: 4) {
+                        Text("\(index + 1).")
+                        ClaimValueView(value: value, path: path.indexedChild(index), depth: depth, ancestors: ancestors)
+                    }
                 }
             }
             if let label = preview.overflowLabel {
@@ -306,4 +399,10 @@ private struct TransparentPresentationBackground: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {}
+}
+
+private extension DisplayValue {
+    var isContainer: Bool {
+        switch self { case .object, .list: return true; default: return false }
+    }
 }

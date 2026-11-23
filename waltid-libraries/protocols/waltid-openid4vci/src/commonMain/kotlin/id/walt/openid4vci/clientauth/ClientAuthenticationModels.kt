@@ -1,5 +1,6 @@
 package id.walt.openid4vci.clientauth
 
+import id.walt.openid4vci.clientauth.attestation.VerifiedClientAttestation
 import id.walt.openid4vci.errors.OAuthError
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -11,6 +12,7 @@ data class AuthenticatedClient(
     val registered: Boolean = false,
     val confirmationJwk: JsonObject? = null,
     val claims: JsonObject? = null,
+    val attestation: VerifiedClientAttestation? = null,
 )
 
 data class ClientAuthenticationContext(

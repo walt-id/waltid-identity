@@ -1,6 +1,8 @@
 package id.walt.wallet2.handlers
 
 import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.Signer
+import id.waltid.openid4vp.wallet.presentation.ScaPresentationAuthorizer
 import id.waltid.openid4vp.wallet.presentation.ScaAuthenticationMethods
 import id.waltid.openid4vp.wallet.presentation.ScaPresentation
 
@@ -14,4 +16,24 @@ import id.waltid.openid4vp.wallet.presentation.ScaPresentation
  */
 fun interface WalletScaPresentationAuthorizer {
     suspend fun authorize(key: Key, presentation: ScaPresentation): ScaAuthenticationMethods
+
+    /** Authorizes and signs this proof using the resolved holder key, within one native lifetime. */
+    suspend fun withAuthorizedSigner(
+        key: Key,
+        presentation: ScaPresentation,
+        operation: suspend (ScaAuthenticationMethods, Signer) -> String,
+    ): String = operation(authorize(key, presentation), requireNotNull(key.capabilities.signer))
 }
+
+internal fun WalletScaPresentationAuthorizer.forKey(key: Key): ScaPresentationAuthorizer =
+    object : ScaPresentationAuthorizer {
+        override suspend fun authorize(presentation: ScaPresentation): ScaAuthenticationMethods =
+            this@forKey.authorize(key, presentation)
+
+        override suspend fun withAuthorizedSigner(
+            presentation: ScaPresentation,
+            signer: Signer,
+            operation: suspend (ScaAuthenticationMethods, Signer) -> String,
+        ): String =
+            this@forKey.withAuthorizedSigner(key, presentation, operation)
+    }

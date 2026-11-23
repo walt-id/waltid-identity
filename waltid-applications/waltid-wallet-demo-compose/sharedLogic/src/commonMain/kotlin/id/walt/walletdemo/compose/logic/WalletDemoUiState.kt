@@ -1,6 +1,15 @@
 package id.walt.walletdemo.compose.logic
 
 data class WalletDemoUiState(
+    val credentialStatuses: WalletDemoCredentialStatuses = WalletDemoCredentialStatuses(readState = WalletDemoStatusReadState.Loading),
+    val credentialStatusContext: Long = 0,
+    val automaticCredentialStatusChecks: Boolean = true,
+    val checkingCredentialStatuses: Boolean = false,
+    val presentationStatusRefresh: WalletDemoReviewStatusRefresh? = null,
+    val credentialStatusSummary: WalletDemoStatusRefreshSummary? = null,
+    val credentialStatusBatchError: String? = null,
+    val credentialStatusError: String? = null,
+    val credentialStatusNotice: String? = null,
     val access: WalletAccessState = WalletAccessState(),
     val identityDetails: WalletDemoIdentityDetailsState = WalletDemoIdentityDetailsState.Loading,
     val identityProgress: String? = null,
@@ -31,6 +40,7 @@ data class WalletDemoUiState(
     val selectedPresentationCredentialOptions: Set<WalletDemoPresentationCredentialSelection> = emptySet(),
     val selectedPresentationDisclosureOptions: Set<WalletDemoPresentationDisclosureSelection> = emptySet(),
     val paymentReview: WalletDemoPaymentReview = WalletDemoPaymentReview.NotRequired,
+    val claimReview: WalletDemoClaimReview = WalletDemoClaimReview.Legacy,
     val presentationCompleted: Boolean = false,
     val presentationNavigationResetKey: Int = 0,
     val warning: String? = null,

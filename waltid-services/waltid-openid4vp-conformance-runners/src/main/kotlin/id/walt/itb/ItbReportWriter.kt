@@ -22,9 +22,11 @@ data class ItbRunReport(
 
 /** Only bounded outcome metadata is published; raw reports, browser state and protocol payloads stay private. */
 object ItbReportWriter {
+    private val prettyJson = Json { prettyPrint = true }
+
     fun write(directory: Path, report: ItbRunReport) {
         Files.createDirectories(directory)
-        writeAtomically(directory.resolve("results.json"), Json { prettyPrint = true }.encodeToString(report))
+        writeAtomically(directory.resolve("results.json"), prettyJson.encodeToString(report))
         val failures = report.cases.count { it.outcome != ItbCaseResult.Outcome.PASSED }
         writeAtomically(directory.resolve("summary.md"), buildString {
             appendLine("# WeBuild ITB wallet sessions")

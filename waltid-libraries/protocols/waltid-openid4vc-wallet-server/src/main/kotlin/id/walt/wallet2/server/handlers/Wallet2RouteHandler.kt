@@ -1,5 +1,17 @@
 package id.walt.wallet2.server.handlers
 
+import id.walt.wallet2.status.CredentialStatusReviewChangedException
+import id.walt.wallet2.status.CredentialStatusReviewChangedResponse
+import id.walt.wallet2.status.RefreshCredentialStatusesRequest
+import id.walt.wallet2.status.StatusReviewedBuildVpTokenRequest
+import id.walt.wallet2.status.StatusReviewedSendResponseRequest
+import id.walt.wallet2.status.WalletCredentialMetadataResponse
+import id.walt.wallet2.status.WalletCredentialResponse
+import id.walt.wallet2.status.WalletCredentialStatusRefreshResponse
+import id.walt.wallet2.status.WalletCredentialStatusSnapshotResponse
+import id.walt.wallet2.status.toMetadataResponse
+import id.walt.wallet2.status.toResponse
+import id.walt.wallet2.server.WalletCredentialStatusRequests
 import id.walt.errors.StatusException
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.TypedKeyGenerationRequest
@@ -40,8 +52,25 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.Uuid
+import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
+import kotlinx.coroutines.currentCoroutineContext
 
 private val log = KotlinLogging.logger {}
+
+private const val MANUAL_TOKEN_ATTESTATION_DESCRIPTION =
+    "Supply both OAuth-Client-Attestation and OAuth-Client-Attestation-PoP in tokenRequestHeaders " +
+        "to use manual client authentication instead of automatic client authentication. " +
+        "Header names are case-insensitive; incomplete, blank or duplicate pairs return HTTP 400. " +
+        "Issuer rejections do not switch authentication methods. Static manual proofs cannot be " +
+        "regenerated for challenge or DPoP nonce retries; supply a fresh PoP in a new request. " +
+        "Token headers do not authenticate PAR."
+
+internal fun WalletInstanceAttestationRequiredException.toStatusException(): StatusException =
+    StatusException(
+        HttpStatusCode.BadRequest.value,
+        message ?: "wallet_instance_attestation_required",
+        cause = this,
+    )
 
 internal fun TokenRequestException.toStatusException(): StatusException {
     val status = if (statusCode in 400..499) {
@@ -201,6 +230,8 @@ object Wallet2RouteHandler {
         clientIdTrustConfiguration: ClientIdTrustConfiguration,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
     ) {
+        val credentialStatuses = WalletCredentialStatusRequests()
+
 
         post("", Wallet2OpenApiDocs.createWallet()) {
             val req = runCatching { call.receive<CreateWalletRequest>() }
@@ -340,6 +371,7 @@ object Wallet2RouteHandler {
             }) {
                 val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@delete
                 resolver.deleteWallet(wallet.id)
+                credentialStatuses.forget(WalletCredentialStatusRequests.Scope(resolver.walletStore, wallet.id))
                 call.respond(HttpStatusCode.NoContent)
             }
 
@@ -532,18 +564,78 @@ object Wallet2RouteHandler {
             // Credential management + issuance + presentation
             // -----------------------------------------------------------------
 
+            route("/credential-status") {
+                get("", {
+                    tags = listOf(CREDENTIALS_TAG)
+                    summary = "Read local credential status observations without contacting issuers"
+                    request {
+                        pathParameter<String>("walletId")
+                        queryParameter<String>("statusContext") { required = false; description = "Optional active status review identifier" }
+                    }
+                    response {
+                        HttpStatusCode.OK to { body<WalletCredentialStatusSnapshotResponse>() }
+                        HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() }
+                    }
+                }) {
+                    val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
+                    try {
+                        call.response.header(HttpHeaders.CacheControl, "no-store")
+                        call.respond(credentialStatuses.snapshot(wallet, statusScope(resolver, wallet), call.request.queryParameters["statusContext"]))
+                    } catch (_: CredentialStatusReviewChangedException) { call.respond(HttpStatusCode.Conflict, CredentialStatusReviewChangedResponse()) }
+                }
+                post("/context", {
+                    tags = listOf(CREDENTIALS_TAG)
+                    summary = "Open a bounded active status review without contacting issuers"
+                    description = "Retains detached nonpersistent evidence for five idle minutes. The identifier conveys no authorization; normal wallet ownership checks apply to every request."
+                    request { pathParameter<String>("walletId") }
+                    response {
+                        HttpStatusCode.Created to { body<WalletCredentialStatusSnapshotResponse>() }
+                        HttpStatusCode.TooManyRequests to { description = "Active review capacity exceeded" }
+                    }
+                }) {
+                    val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                    call.response.header(HttpHeaders.CacheControl, "no-store")
+                    call.respond(HttpStatusCode.Created, credentialStatuses.createContext(wallet, statusScope(resolver, wallet)))
+                }
+                delete("/context/{contextId}", {
+                    tags = listOf(CREDENTIALS_TAG)
+                    summary = "Close an active status review"
+                    request { pathParameter<String>("walletId"); pathParameter<String>("contextId") }
+                    response { HttpStatusCode.NoContent to { description = "Closed or already absent" } }
+                }) {
+                    val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@delete
+                    credentialStatuses.closeContext(statusScope(resolver, wallet), requireNotNull(call.parameters["contextId"]))
+                    call.respond(HttpStatusCode.NoContent)
+                }
+                post("/refresh", {
+                    tags = listOf(CREDENTIALS_TAG)
+                    summary = "Refresh status for stored credentials (bounded, advisory)"
+                    description = "Uses authenticated status references in this wallet. At most 100 records per request; a 30-second per-wallet cooldown returns DEFERRED outcomes. No caller-supplied URL is accepted."
+                    request { pathParameter<String>("walletId"); body<RefreshCredentialStatusesRequest>() }
+                    response {
+                        HttpStatusCode.OK to { body<List<WalletCredentialStatusRefreshResponse>>() }
+                        HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() }
+                        HttpStatusCode.TooManyRequests to { description = "Active review capacity exceeded" }
+                    }
+                }) {
+                    val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                    try {
+                        call.response.header(HttpHeaders.CacheControl, "no-store")
+                        call.respond(credentialStatuses.refresh(wallet, statusScope(resolver, wallet), call.receive()))
+                    } catch (_: CredentialStatusReviewChangedException) { call.respond(HttpStatusCode.Conflict, CredentialStatusReviewChangedResponse()) }
+                }
+            }
+
             route("/credentials") {
 
                 get("", {
                     tags = listOf(CREDENTIALS_TAG)
                     summary = "List credentials (metadata only, no raw credential data)"
                     request { pathParameter<String>("walletId") }
-                    response { HttpStatusCode.OK to { body<List<StoredCredentialMetadata>>() } }
+                    response { HttpStatusCode.OK to { body<List<WalletCredentialMetadataResponse>>() } }
                 }) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
-                    val credentials = wallet.streamAllCredentials()
-                        .toList()
-                        .map { it.toMetadata() }
+                    val credentials = credentialStatuses.reads(wallet).map { it.toMetadataResponse() }
                     call.respond(credentials)
                 }
 
@@ -568,15 +660,15 @@ object Wallet2RouteHandler {
                         summary = "Get a credential including raw credential data"
                         request { pathParameter<String>("walletId"); pathParameter<String>("credentialId") }
                         response {
-                            HttpStatusCode.OK to { body<StoredCredential>() }
+                            HttpStatusCode.OK to { body<WalletCredentialResponse>() }
                             HttpStatusCode.NotFound to {}
                         }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
                         val credentialId = call.parameters["credentialId"]!!
-                        val entry = wallet.findCredential(credentialId)
+                        val entry = credentialStatuses.read(wallet, credentialId)
                             ?: return@get call.respond(HttpStatusCode.NotFound, "Credential '$credentialId' not found")
-                        call.respond(entry)
+                        call.respond(entry.toResponse())
                     }
 
                     delete("", {
@@ -676,6 +768,39 @@ object Wallet2RouteHandler {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<MatchCredentialsFromStoreRequest>()
                         call.respond(WalletPresentationHandler.matchCredentialsFromStore(wallet, req))
+                    }
+
+                    post("/build-vp-token/status-reviewed", {
+                        summary = "Build a presentation against the credential status warnings actually reviewed"
+                        request { pathParameter<String>("walletId"); body<StatusReviewedBuildVpTokenRequest>() }
+                        response { HttpStatusCode.OK to { body<BuildVpTokenResult>() }; HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val req = call.receive<StatusReviewedBuildVpTokenRequest>()
+                        val ids = resolveSelectedCredentialOptions(req.request.selectedCredentialOptions, req.request.selectedCredentialIds)
+                            .mapTo(mutableSetOf()) { it.credentialId }
+                        try {
+                            call.respond(credentialStatuses.withReviewedStatus(wallet, statusScope(resolver, wallet), ids, req.reviewedStatus, req.statusContext) {
+                                WalletPresentationHandler.buildVpToken(wallet, req.request, transactionDataTypeRegistry = transactionDataTypeRegistry,
+                                    clientIdTrustConfiguration = clientIdTrustConfiguration).also {
+                                    currentCoroutineContext()[PresentationReviewGuard]?.check()
+                                }
+                            })
+                        } catch (_: CredentialStatusReviewChangedException) { call.respond(HttpStatusCode.Conflict, CredentialStatusReviewChangedResponse()) }
+                    }
+                    post("/send-response/status-reviewed", {
+                        summary = "Deliver a presentation only if the selected local status warnings are unchanged"
+                        request { pathParameter<String>("walletId"); body<StatusReviewedSendResponseRequest>() }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() }; HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val req = call.receive<StatusReviewedSendResponseRequest>()
+                        try {
+                            call.respond(credentialStatuses.withReviewedStatus(wallet, statusScope(resolver, wallet), req.selectedCredentialIds, req.reviewedStatus, req.statusContext) {
+                                WalletPresentationHandler.sendAuthorizationResponse(wallet, req.request, transactionDataTypeRegistry = transactionDataTypeRegistry,
+                                    clientIdTrustConfiguration = clientIdTrustConfiguration)
+                            })
+                        } catch (_: CredentialStatusReviewChangedException) { call.respond(HttpStatusCode.Conflict, CredentialStatusReviewChangedResponse()) }
                     }
 
                     post("/build-vp-token", {
@@ -817,6 +942,8 @@ object Wallet2RouteHandler {
                         attestationAssembler = attestationAssembler,
                     )
                     call.respondIssuanceResult(result, legacy = req.credentials == null)
+                } catch (e: WalletInstanceAttestationRequiredException) {
+                    throw e.toStatusException()
                 } catch (e: TokenRequestException) {
                     throw e.toStatusException()
                 }
@@ -842,11 +969,15 @@ object Wallet2RouteHandler {
             for (batch in listOf(false, true)) {
                 post("/request-token${if (batch) "/batch" else ""}", {
                     summary = if (batch) "Batch: token and granted authorization details" else "Isolated: exchange pre-authorized code for access token"
-                    description = "Supply credentialIssuer and credentialConfigurationIds to select authorization_details or scopes automatically from metadata."
+                    description = "Supply credentialIssuer and credentialConfigurationIds to select authorization_details or scopes automatically from metadata. " +
+                        MANUAL_TOKEN_ATTESTATION_DESCRIPTION
                     request { pathParameter<String>("walletId"); body<RequestTokenRequest> {
                         example("Automatic authorization for selected configurations") { value = Wallet2RequestExamples.REQUEST_TOKEN_AUTOMATIC }
                     } }
-                    response { HttpStatusCode.OK to { if (batch) body<RequestTokenDetailedResult>() else body<RequestTokenResult>() } }
+                    response {
+                        HttpStatusCode.OK to { if (batch) body<RequestTokenDetailedResult>() else body<RequestTokenResult>() }
+                        HttpStatusCode.BadRequest to { description = "Malformed manual attestation headers or token request rejected" }
+                    }
                 }) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                     val req = call.receive<RequestTokenRequest>()
@@ -856,6 +987,8 @@ object Wallet2RouteHandler {
                         } else {
                             call.respond(WalletIssuanceHandler.requestToken(wallet, req, attestationAssembler))
                         }
+                    } catch (e: WalletInstanceAttestationRequiredException) {
+                        throw e.toStatusException()
                     } catch (e: TokenRequestException) {
                         throw e.toStatusException()
                     }
@@ -935,6 +1068,23 @@ object Wallet2RouteHandler {
                 }
             }
 
+            post("/reject", {
+                summary = "Isolated: reject a fetched credential"
+                description =
+                    "Posts OpenID4VCI credential_deleted for a credential fetched with " +
+                            "storeInWallet=false. Pass notificationId and accessToken from fetch-credential " +
+                            "plus either notificationEndpoint or credentialIssuerBaseUrl to resolve it. " +
+                            "Use a Bearer access token. Delivery is best-effort: a missing issuer " +
+                            "notification_endpoint is a no-op and still returns 204."
+                request { pathParameter<String>("walletId"); body<RejectIssuedCredentialRequest>() }
+                response { HttpStatusCode.NoContent to {} }
+            }) {
+                call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                val req = call.receive<RejectIssuedCredentialRequest>()
+                WalletIssuanceHandler.rejectIssuedCredential(req)
+                call.respond(HttpStatusCode.NoContent)
+            }
+
             // Auth-code grant isolated steps
 
             post("/authorization-url", {
@@ -990,9 +1140,12 @@ object Wallet2RouteHandler {
                         "Exchanges the authorization code for an access token. " +
                                 "credentialIssuerBaseUrl is used to resolve authorization server metadata. " +
                                 "If attestation is configured and supported by the issuer, the wallet key is used " +
-                                "to create token endpoint client authentication headers."
+                                "to create token endpoint client authentication headers. " + MANUAL_TOKEN_ATTESTATION_DESCRIPTION
                     request { pathParameter<String>("walletId"); body<ExchangeCodeRequest>() }
-                    response { HttpStatusCode.OK to { if (batch) body<RequestTokenDetailedResult>() else body<RequestTokenResult>() } }
+                    response {
+                        HttpStatusCode.OK to { if (batch) body<RequestTokenDetailedResult>() else body<RequestTokenResult>() }
+                        HttpStatusCode.BadRequest to { description = "Malformed manual attestation headers or token request rejected" }
+                    }
                 }) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                     val req = call.receive<ExchangeCodeRequest>()
@@ -1002,6 +1155,8 @@ object Wallet2RouteHandler {
                         } else {
                             call.respond(WalletIssuanceHandler.exchangeCode(wallet, req, attestationAssembler))
                         }
+                    } catch (e: WalletInstanceAttestationRequiredException) {
+                        throw e.toStatusException()
                     } catch (e: TokenRequestException) {
                         throw e.toStatusException()
                     }
@@ -1046,6 +1201,9 @@ object Wallet2RouteHandler {
                             "Polls the issuer's deferred credential endpoint for a previously " +
                             "deferred credential. Returns a pending transaction and retry interval when issuance is not ready. " +
                             "A partial local save returns storageOutcome and a retained handle with HTTP 207; resume the handle instead of polling the issuer again. " +
+                            "Structured issuer 4xx errors retain their status and CredentialError body, including error and optional error_description. " +
+                            "Issuer-originated 401 and 403 errors are separate from wallet authentication or permission failures. " +
+                            "Other issuer 4xx statuses are relayed in the same way; malformed errors and issuer 5xx use the existing exception handling. " +
                             "Pass credentialIssuerBaseUrl (and optionally credentialConfigurationId) so " +
                             "issuer display metadata and labels are stored like the full receive path. " +
                             "When the response can contain an mdoc, keyId must identify the exact wallet " +
@@ -1056,11 +1214,31 @@ object Wallet2RouteHandler {
                     HttpStatusCode.Conflict to { body<PollDeferredResult>() }
                     HttpStatusCode.MultiStatus to { body<PollDeferredResult>() }
                     HttpStatusCode.InternalServerError to { body<PollDeferredResult>() }
+                    HttpStatusCode.BadRequest to {
+                        description = "The issuer rejected the deferred request (for example credential_request_denied or invalid_transaction_id); preserves its error code and optional error_description"
+                        body<CredentialError>()
+                    }
+                    HttpStatusCode.Unauthorized to {
+                        description = "Issuer rejected the issuance access token, with a CredentialError body. Wallet authentication failures also use 401 with their normal wallet error response."
+                        body<CredentialError>()
+                    }
+                    HttpStatusCode.Forbidden to {
+                        description = "Issuer denied the deferred request, with a CredentialError body. Wallet permission failures also use 403 with their normal wallet error response."
+                        body<CredentialError>()
+                    }
+                    HttpStatusCode.TooManyRequests to {
+                        description = "Issuer refused the poll, with its CredentialError body and optional error_description"
+                        body<CredentialError>()
+                    }
                 }
             }) {
                 val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                 val req = call.receive<PollDeferredRequest>()
-                call.respondPollDeferredResult(WalletIssuanceHandler.pollDeferred(wallet, req), req)
+                try {
+                    call.respondPollDeferredResult(WalletIssuanceHandler.pollDeferred(wallet, req), req)
+                } catch (error: CredentialEndpointException) {
+                    call.respondCredentialEndpointError(error)
+                }
             }
             post("/authorized", {
                 summary = "Complete the authorization-code grant"
@@ -1096,6 +1274,8 @@ object Wallet2RouteHandler {
                     )
                 } catch (e: CredentialReceiveException) {
                     call.respondIssuanceResult(e.result, legacy = true)
+                } catch (e: WalletInstanceAttestationRequiredException) {
+                    throw e.toStatusException()
                 } catch (e: TokenRequestException) {
                     throw e.toStatusException()
                 }
@@ -1134,6 +1314,8 @@ object Wallet2RouteHandler {
                             attestationAssembler = attestationAssembler,
                         )
                     )
+                } catch (e: WalletInstanceAttestationRequiredException) {
+                    throw e.toStatusException()
                 } catch (e: TokenRequestException) {
                     throw e.toStatusException()
                 }
@@ -1223,6 +1405,11 @@ object Wallet2RouteHandler {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private suspend fun statusScope(resolver: WalletResolver, wallet: Wallet) = WalletCredentialStatusRequests.Scope(
+        resolver.walletStore, wallet.id,
+        storeConfiguration = resolver.walletStore.loadDescriptor(wallet.id)?.credentialStoreIds.orEmpty(),
+    )
 
     private suspend fun RoutingCall.resolveOrRespond(
         resolver: WalletResolver,

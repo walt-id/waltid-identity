@@ -22,7 +22,7 @@ public struct WalletNavigationRow: View {
                     Text(title).font(.body).foregroundStyle(.primary)
                     if let subtitle { Text(subtitle).font(.footnote).foregroundStyle(.secondary) }
                 }.frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.secondary).accessibilityHidden(true)
+                Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.tint).accessibilityHidden(true)
             }
             .padding(16)
             .frame(minHeight: 56)

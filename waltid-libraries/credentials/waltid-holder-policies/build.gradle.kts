@@ -7,6 +7,10 @@ plugins {
 group = "id.walt.holderpolicies"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     js {
         outputModuleName.set("holder-policies")
     }

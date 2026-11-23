@@ -27,7 +27,13 @@ class DisclosuresToPresentTest {
             givenName.copy(location = location("given_name")),
         )
         override val signedWithDisclosures: String? = null
-        override val originalCredentialData: JsonObject? = null
+        override val originalCredentialData = buildJsonObject {
+            putJsonArray("_sd") { add(givenName.asHashedFromEncoded()) }
+            putJsonArray("nationalities") {
+                addJsonObject { put("...", india.asHashedFromEncoded()) }
+                addJsonObject { put("...", france.asHashedFromEncoded()) }
+            }
+        }
     }
 
     private val query = DcqlParser.parse(
@@ -45,6 +51,20 @@ class DisclosuresToPresentTest {
     )
 
     private fun SdJwtSelectiveDisclosure.toDcql(location: List<JsonElement>?) = DcqlDisclosure(name, value, location)
+
+    @Test
+    fun sourceLocationsCountKnownWithheldElementsAndClearValuesButNeverDecoys() {
+        val payload = Json.parseToJsonElement("""{"nationalities":[{"...":"decoy-before"},
+            {"...":"${india.asHashedFromEncoded()}"},false,{"...":"decoy-between"},
+            {"...":"${france.asHashedFromEncoded()}"},{"...":"decoy-after"}]}""").jsonObject
+        val locations = sdJwtClaimLocations(payload, listOf(india, france), listOf(france))
+        assertEquals(listOf(
+            PresentationClaimLocation(emptyList(), emptyList()),
+            PresentationClaimLocation(location("nationalities"), location("nationalities")),
+            PresentationClaimLocation(location("nationalities", 1), location("nationalities", 0)),
+            PresentationClaimLocation(location("nationalities", 2), location("nationalities", 1), alwaysCarried = false),
+        ), locations)
+    }
 
     @Test
     fun arrayElementIsResolvedByLocationNotByMissingName() {

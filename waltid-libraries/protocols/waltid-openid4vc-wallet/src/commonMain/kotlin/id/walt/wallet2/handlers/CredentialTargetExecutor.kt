@@ -1,6 +1,7 @@
 package id.walt.wallet2.handlers
 
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyStoreEntry
@@ -19,7 +20,10 @@ internal class CredentialIssuanceAccess(
     val accessToken: String,
     val senderKey: WalletKeyStoreEntry,
     dpopAlgorithms: Set<String>?,
+    /** Credential proof `iss`. Absent for anonymous pre-authorized access (OpenID4VCI 1.0 Appendix F.1). */
     val proofIssuer: String?,
+    /** OAuth client id stored as the wallet-provider unit subject. Independent of [proofIssuer]. */
+    val walletClientId: String? = proofIssuer,
 ) {
     val dpop = dpopAlgorithms?.let { DpopRequestContext(it, senderKey) }
     val tokenType: String get() = if (dpop == null) "Bearer" else "DPoP"
@@ -57,7 +61,7 @@ internal suspend fun executeCredentialTargets(
                 issuerMetadata.nonceEndpoint, httpClient,
                 buildProof = algorithms?.let { { nonce ->
                     WalletIssuanceHandler.buildProofCollection(wallet, selected.bindings, configuration,
-                        issuerMetadata.credentialIssuer, nonce, access.proofIssuer)
+                        issuerMetadata.credentialIssuer, nonce, access.proofIssuer, access.walletClientId)
                 } },
                 onProofGenerated = { if (algorithms != null) onEvent.emitSafely(WalletSessionEvent.issuance_proof_signed) },
                 dpop = access.dpop,
@@ -89,7 +93,8 @@ internal suspend fun executeCredentialTargets(
                             access.dpop?.algorithms, access.senderKey, access.persistable, label, metadata,
                             sessionId = sessionId ?: public.id, dpopNonce = access.dpop?.nonce,
                             credentialIssuer = issuerMetadata.credentialIssuer,
-                            issuerMetadataSnapshot = issuerMetadata)
+                            issuerMetadataSnapshot = issuerMetadata,
+                            notificationEndpoint = issuerMetadata.notificationEndpoint)
                     } finally {
                         // Keep accepted progress during a storage outage, but not after terminal closure.
                         sessions.ensureOpen()
@@ -100,11 +105,29 @@ internal suspend fun executeCredentialTargets(
                 onEvent.emitSafely(WalletSessionEvent.issuance_deferred)
             } else {
                 onEvent.emitSafely(WalletSessionEvent.issuance_credential_received)
-                val prepared = wallet.prepareIssuedCredentials(rawCredentials.map {
-                    val value = it.credential
-                    if (value is JsonPrimitive) value.content else value.toString()
-                }, selected.bindings, label, metadata, proofRequired = algorithms != null,
-                    expectedConfiguration = configuration)
+                val notificationTarget = IssuerNotificationTarget(
+                    notificationEndpoint = issuerMetadata.notificationEndpoint,
+                    notificationId = response.notificationId,
+                    accessToken = access.accessToken,
+                    tokenType = access.tokenType,
+                    dpopProofFactory = access.dpop?.toProofFactory(access.accessToken),
+                )
+                val prepared = try {
+                    wallet.prepareIssuedCredentials(rawCredentials.map {
+                        val value = it.credential
+                        if (value is JsonPrimitive) value.content else value.toString()
+                    }, selected.bindings, label, metadata, proofRequired = algorithms != null,
+                        expectedConfiguration = configuration, typeMetadataHttpClient = httpClient)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    deliverCredentialNotification(
+                        httpClient = httpClient,
+                        target = notificationTarget,
+                        event = NotificationEvent.CREDENTIAL_FAILURE,
+                    )
+                    throw error
+                }
                 stage = CredentialIssuanceStage.STORAGE
                 ensureOwned()
                 val outcome = sessions.storeReceivedCredentials(
@@ -116,6 +139,12 @@ internal suspend fun executeCredentialTargets(
                         onCredentialStored(entry)
                         stage = CredentialIssuanceStage.STORAGE
                     },
+                    notificationEndpoint = issuerMetadata.notificationEndpoint,
+                    notificationId = response.notificationId,
+                    accessToken = access.accessToken,
+                    tokenType = access.tokenType,
+                    dpop = access.dpop?.algorithms,
+                    keyMaterial = access.senderKey,
                 )
                 if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
             }

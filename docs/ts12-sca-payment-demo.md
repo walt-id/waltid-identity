@@ -181,12 +181,12 @@ metadata document requires a coordinated rollout and, where necessary, credentia
 
 ## Wallet setup
 
-Use an isolated demo installation with no recovery, hardware-backed storage and
-**Current biometrics only**. The SDK must offer hardware-backed P-256 with
-`BiometricCurrentSet`. Approve native prompts during setup, issuance and payment.
-Reopening the wallet preserves this policy. Existing timed-biometric or unprotected
-keys cannot authorize this payment; changing the key requires explicit reprovisioning
-and credential reissuance. Enrollment changes can invalidate a current-set key.
+Use an isolated demo installation with no recovery and hardware-backed P-256 storage.
+Both `BiometricCurrentSet` and `BiometricTimedReuse` can authorize payments. Timed
+keys retain their ordinary reuse interval, with fresh native biometrics required for
+each payment proof after review. Existing ten-second keys need no reprovisioning or
+credential reissuance. Per-use keys still authenticate during each signature;
+enrollment changes can invalidate a current-set key. Unprotected keys remain ineligible.
 
 Android uses Credential Manager. Compose iOS and native SwiftUI use the existing
 OpenID4VP URL/deep-link route with a `cross_device` verifier session. Apple's mdoc-only

@@ -299,13 +299,17 @@ Ordinary SD-JWT presentations retain their existing behavior.
 presentation before signing. The shared wallet's reviewed submission overloads bind
 an application authorizer to the actual resolved Crypto2 key. Persistent mobile
 wallets provide a native adapter only for generated, non-exportable hardware keys
-with a validated per-use `BiometricCurrentSet` policy. Successful signing establishes
-possession and inherence, both reported as `other`; the adapter does not infer a
+with a validated `BiometricCurrentSet` or `BiometricTimedReuse` policy. Per-use keys
+authenticate during signing. Timed keys obtain fresh native biometrics for each
+payment through `withAuthorizedSigner`, which keeps one single-use signer alive
+only within the configured timeout and the proof-building callback. Successful
+authorized signing establishes possession and inherence, both reported as `other`;
+the adapter does not infer a
 biometric modality or a certified WSCD category. Unsupported policies fail closed.
 The headless ITB runner supplies no authentication evidence.
 
-Native policy provenance requires the provider changes in external PR #2222.
-This bounded adapter does not implement action batching, timed authentication reuse,
+The key's ordinary reuse policy is unchanged; payment freshness and single use are
+enforced by the scoped operation. This bounded adapter does not implement action batching,
 transaction UI requirements, or full SCA assurance. Protocol tests with simulated
 methods cannot establish real user authentication, factor independence, WSCD
 qualification, or native conformance.

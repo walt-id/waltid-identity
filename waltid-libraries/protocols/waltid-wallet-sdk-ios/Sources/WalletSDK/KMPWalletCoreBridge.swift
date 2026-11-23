@@ -165,23 +165,79 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return try Self.issuanceOutcome(result, operation: "cancel issuance")
     }
 
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {
+        let result = try await bridge.rejectIssuedCredential(
+            notificationId: notificationID,
+            accessToken: accessToken,
+            credentialIssuerBaseUrl: credentialIssuerBaseURL?.absoluteString,
+            notificationEndpoint: notificationEndpoint?.absoluteString,
+            eventDescription: eventDescription
+        )
+        _ = try Self.successAnyValue(result, operation: "reject issued credential")
+    }
+
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
         let result = try await bridge.resumeDeferredIssuance(deferredCredentialId: deferredCredentialID)
         return try Self.issuanceOutcome(result, operation: "resume deferred issuance")
     }
 
+    var credentialStatuses: AsyncThrowingStream<CredentialStatusSnapshot, Error> {
+        AsyncThrowingStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            let task = Task { [self] in
+                let flow = SkieSwiftFlow<WalletBridgeCredentialStatusUpdate>(SkieKotlinFlow(bridge.credentialStatuses))
+                do {
+                    for await update in flow {
+                        switch update {
+                        case let value as WalletBridgeCredentialStatusUpdateSnapshot:
+                            continuation.yield(try decodeCredentialStatusSnapshot(value.snapshotJson))
+                        case let failure as WalletBridgeCredentialStatusUpdateFailure:
+                            throw failure.error.toSwiftWalletError()
+                        default: throw WalletError.internalFailure("Unknown credential status update")
+                        }
+                    }
+                    continuation.finish()
+                } catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot {
+        let result = try await bridge.credentialStatusSnapshot()
+        guard let json = try Self.successAnyValue(result, operation: "read credential status") as? String else {
+            throw WalletError.internalFailure("Unexpected credential status result")
+        }
+        return try decodeCredentialStatusSnapshot(json)
+    }
+
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] {
+        let result = try await bridge.refreshCredentialStatuses(credentialIds: ids, force: force)
+        guard let json = try Self.successAnyValue(result, operation: "check credential status") as? String else {
+            throw WalletError.internalFailure("Unexpected credential status refresh result")
+        }
+        return try decodeCredentialStatus([CredentialStatusRefreshResult].self, json: json)
+    }
+
+    func close() async throws {
+        _ = try Self.successAnyValue(try await bridge.close(), operation: "close wallet")
+    }
+
     func credentials() async throws -> [Credential] {
-        let result = try await bridge.credentials()
+        let result = try await bridge.credentialReads()
         let value = try Self.successAnyValue(result, operation: "list credentials")
-
-        if let credentials = value as? [MobileWalletCredential] {
-            return credentials.map { $0.toSwiftCredential() }
-        }
-        if let credentials = value as? NSArray {
-            return credentials.compactMap { ($0 as? MobileWalletCredential)?.toSwiftCredential() }
-        }
-
-        throw WalletError.internalFailure("Unexpected credentials result type: \(type(of: value))")
+        let reads: [WalletBridgeCredentialRead]
+        if let values = value as? [WalletBridgeCredentialRead] { reads = values }
+        else if let values = value as? NSArray {
+            reads = values.compactMap { $0 as? WalletBridgeCredentialRead }
+            guard reads.count == values.count else { throw WalletError.internalFailure("Invalid credential read result") }
+        } else { throw WalletError.internalFailure("Unexpected credentials result type") }
+        return reads.map { $0.toSwiftCredential() }
     }
 
     func deleteCredential(id: String) async throws -> Bool {
@@ -227,6 +283,27 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return try value.toSwiftPreviewResult()
     }
 
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PreparedPresentationReview {
+        let result = try await bridge.reviewPresentation(
+            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
+            selectedCredentialOptions: selectedCredentialOptions.map { MobileWalletPresentationCredentialSelection(queryId: $0.queryID, credentialId: $0.credentialID) },
+            selectedDisclosureOptions: selectedDisclosureOptions?.map { MobileWalletPresentationDisclosureSelection(queryId: $0.queryID, credentialId: $0.credentialID, path: $0.path) },
+            did: did)
+        let value = try Self.successValue(result, as: MobileWalletPreparedPresentationReview.self, operation: "review presentation")
+        return PreparedPresentationReview(credentials: value.credentials.map { claim in
+            PresentationCredentialClaims(queryID: claim.queryId, credentialID: claim.credentialId, format: claim.format,
+                claimsJSON: claim.claimsJson, wholeCredential: claim.wholeCredential, locations: claim.locations.map {
+                    PresentationClaimLocation(sourcePathJSON: $0.sourcePathJson, receivedPathJSON: $0.receivedPathJson,
+                        sharedBy: $0.sharedBy, alwaysCarried: $0.alwaysCarried, isBinary: $0.isBinary)
+                })
+        })
+    }
+
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -241,6 +318,44 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         return try Self.successValue(result, as: WalletBridgePaymentConsentPreparation.self, operation: "prepare payment consent")
             .consent?.toSwiftPaymentConsent()
+    }
+
+    func submitStatusReviewedPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        reviewedStatus: [String: String],
+        did: String?,
+        runPolicies: Bool?,
+        paymentConsentRevision: String?
+    ) async throws -> PresentationResult {
+        let result = try await bridge.submitStatusReviewedPresentation(
+            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
+            selectedCredentialOptions: selectedCredentialOptions.map {
+                MobileWalletPresentationCredentialSelection(
+                    queryId: $0.queryID,
+                    credentialId: $0.credentialID
+                )
+            },
+            selectedDisclosureOptions: selectedDisclosureOptions?.map {
+                MobileWalletPresentationDisclosureSelection(
+                    queryId: $0.queryID,
+                    credentialId: $0.credentialID,
+                    path: $0.path
+                )
+            },
+            reviewedStatus: reviewedStatus,
+            did: did,
+            runPolicies: runPolicies.map { KotlinBoolean(bool: $0) },
+            paymentConsentRevision: paymentConsentRevision
+        )
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletPresentationResult.self,
+            operation: "submit presentation"
+        )
+
+        return try value.toSwiftPresentationResult()
     }
 
     func submitPresentation(
@@ -355,6 +470,37 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             as: MobileWalletAnnexCPreview.self,
             operation: "preview Annex C presentation"
         ).toSwiftPreview()
+    }
+
+    func submitStatusReviewedAnnexCPresentation(
+        reviewedStatus: [String: String],
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse {
+        let result = try await bridge.submitStatusReviewedAnnexCPresentation(
+            submission: MobileWalletAnnexCSubmission(
+                requestId: requestID,
+                verifiedOrigin: verifiedOrigin,
+                deviceRequestBase64Url: deviceRequestBase64URL,
+                encryptionInfoBase64Url: encryptionInfoBase64URL,
+                selectedCredentialOptions: selectedCredentialOptions.map {
+                    MobileWalletPresentationCredentialSelection(
+                        queryId: $0.queryID,
+                        credentialId: $0.credentialID
+                    )
+                }
+            ),
+            reviewedStatus: reviewedStatus
+        )
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletDigitalCredentialResponse.self,
+            operation: "submit Annex C presentation"
+        )
+        return DigitalCredentialResponse(protocolIdentifier: value.protocol, dataJSON: value.dataJson)
     }
 
     func submitAnnexCPresentation(
@@ -475,6 +621,13 @@ private final class KMPSharingPlanBridge: ProximitySharingPlanBridge, @unchecked
     let plan: WalletCore.ProximitySharingPlan
     init(_ plan: WalletCore.ProximitySharingPlan) { self.plan = plan }
     var isExpired: Bool { plan.isExpired }
+
+    func approveStatusReviewed(_ submission: ProximitySubmission, reviewedStatus: [String: String]) throws -> ProximityPreparationResult {
+        switch onEnum(of: plan.approveStatusReviewed(submission: submission.toKMPSubmission(), reviewedStatus: reviewedStatus)) {
+        case .prepared(let value): return .prepared(try value.sharing.toSwiftPreparedSharing())
+        case .rejected(let value): return .rejected(value.error.toSwiftError())
+        }
+    }
 
     func approve(_ submission: ProximitySubmission) throws -> ProximityPreparationResult {
         switch onEnum(of: plan.approve(submission: submission.toKMPSubmission())) {
@@ -1038,6 +1191,10 @@ final class KMPProximityPresentationSessionBridge:
         }
     }
 
+    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult {
+        try await session.dispatchStatusReviewed(action: action.toKMPAction(), reviewedStatus: reviewedStatus).toSwiftResult()
+    }
+
     func dispatch(
         _ action: ProximityAction
     ) async throws -> ProximityActionResult {
@@ -1179,7 +1336,8 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
                 error: IssuanceFailure(
                     code: value.error.code.toSwiftIssuanceErrorCode(),
                     message: value.error.message,
-                    targetFailure: value.failure?.toSwiftTargetFailure()
+                    targetFailure: value.failure?.toSwiftTargetFailure(),
+                    canRetryOffer: value.error.canRetryOffer
                 ),
                 storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self),
                 deferredCredentials: swiftArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletIssuanceContinuation.self)
@@ -1275,6 +1433,7 @@ private extension WalletConfiguration {
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration(),
+            walletProvider: walletProvider?.toKMPWalletProvider(),
             issuerMetadataTrustResolver: issuerMetadataTrustResolver.map {
                 KMPIssuerMetadataTrustResolverAdapter(resolver: $0)
             },
@@ -1535,6 +1694,18 @@ extension Data {
     }
 }
 
+private extension WalletProviderConfiguration {
+    func toKMPWalletProvider() -> WalletProviderConfig {
+        WalletProviderConfig(
+            baseUrl: baseURL,
+            servicePath: servicePath,
+            bearerToken: bearerToken,
+            hostHeader: hostHeader,
+            composition: composition
+        )
+    }
+}
+
 private extension WalletAttestationConfiguration {
     func toKMPAttestationConfiguration() -> WalletAttestationConfig {
         WalletAttestationConfig(
@@ -1677,8 +1848,16 @@ private extension Waltid_crypto2KeyUseAuthorizationFailure {
     }
 }
 
-private extension MobileWalletCredential {
+extension WalletBridgeCredentialRead {
     func toSwiftCredential() -> Credential {
+        // Advisory decoding cannot remove an otherwise readable credential. The status snapshot /
+        // stream still reports invalid status data explicitly; nil is never a clear assessment.
+        credential.toSwiftCredential(status: try? decodeCredentialStatus(CredentialStatus.self, json: statusJson))
+    }
+}
+
+private extension MobileWalletCredential {
+    func toSwiftCredential(status: CredentialStatus? = nil) -> Credential {
         Credential(
             id: id,
             format: format,
@@ -1687,7 +1866,8 @@ private extension MobileWalletCredential {
             label: label,
             addedAt: addedAt.flatMap(parseWalletISO8601Date),
             credentialDataJSON: requiredCredentialDataJSON(credentialDataJson),
-            metadataJSON: metadataJson
+            metadataJSON: metadataJson,
+            status: status
         )
     }
 }
@@ -2106,6 +2286,8 @@ private extension MobileWalletEvent {
 private extension WalletBridgeError {
     func toSwiftWalletError() -> WalletError {
         switch category {
+        case .credentialStatusReviewChanged:
+            return .credentialStatusReviewChanged
         case .presentationValidation:
             guard let presentationValidationFailure else {
                 return .internalFailure("Presentation validation error did not include a failure reason")

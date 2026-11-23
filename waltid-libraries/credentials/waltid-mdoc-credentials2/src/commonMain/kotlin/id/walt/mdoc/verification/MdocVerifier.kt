@@ -114,7 +114,7 @@ object MdocVerifier {
         val credentialData = mergeMdocDataToJson(document)
 
         val issuerAuthOrNull = issuerAuthResult.getOrNull()
-        val x5c = issuerAuthOrNull?.certificateChain?.map { Base64.encode(it.bytes.toByteArray()) }
+        val x5c = issuerAuthOrNull?.certificateChain?.map { Base64.encode(it.encodedDer.toByteArray()) }
         val signerKey = issuerAuthOrNull?.signerKey?.toCompatibilityJwkKey()?.let { DirectSerializedKey(it) }
 
 
@@ -159,7 +159,7 @@ object MdocVerifier {
             validateCertificateConstraints = false,
         )
         val issuerKey = verification.signerKey.toCompatibilityJwkKey()
-        return verification.certificateChain.map { CoseCertificate(it.bytes.toByteArray()) } to issuerKey
+        return verification.certificateChain.map { CoseCertificate(it.encodedDer.toByteArray()) } to issuerKey
     }
 
     fun verifyMso(mso: MobileSecurityObject) = verifyMso(mso, Clock.System)

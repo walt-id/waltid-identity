@@ -67,12 +67,13 @@ internal fun OfferedCredentialRow(
             if (showLargeArt) {
                 Box(Modifier.fillMaxWidth().testTag("issuance-large-art-${credential.configurationId}")) {
                     CredentialCardArt(art, Modifier.clearAndSetSemantics { contentDescription = title })
+                    CredentialCardAccessory {
                     IconButton(onClick = openInformation,
-                        // Align the 20dp icon with the card's 16dp inset: 2 + (48 - 20) / 2.
-                        modifier = Modifier.align(Alignment.BottomStart).padding(2.dp).size(48.dp)
+                        modifier = Modifier.size(48.dp)
                             .testTag("issuance-details-${credential.configurationId}"),
                         colors = IconButtonDefaults.iconButtonColors(contentColor = parseCssColor(art.textColor) ?: Color.White)) {
                         Icon(Icons.Outlined.Info, informationLabel, Modifier.size(20.dp))
+                    }
                     }
                 }
             } else if (onSelectionChange != null && needsSeparateSelection) {
@@ -89,7 +90,7 @@ internal fun OfferedCredentialRow(
                     CredentialSummaryRow(art, modifier = Modifier.weight(1f)
                         .testTag("issuance-identity-${credential.configurationId}"))
                     if (onSelectionChange != null) OfferSelection(credential.configurationId, receiveLabel, count, canSelect, onSelectionChange)
-                    else Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null)
+                    else Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }

@@ -3,6 +3,10 @@ import Foundation
 @available(macOS 10.15, *)
 protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
+    var credentialStatuses: AsyncThrowingStream<CredentialStatusSnapshot, Error> { get }
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult]
+    func close() async throws
     var signingIdentityCore: any SigningIdentityCore { get }
 
     func keyUseAuthorizationPreflight(
@@ -16,18 +20,40 @@ protocol WalletCoreBridge: Sendable {
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func credentials() async throws -> [Credential]
     func deleteCredential(id: String) async throws -> Bool
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PreparedPresentationReview
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?
     ) async throws -> PaymentConsent?
+    func submitStatusReviewedPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        reviewedStatus: [String: String],
+        did: String?,
+        runPolicies: Bool?,
+        paymentConsentRevision: String?
+    ) async throws -> PresentationResult
     func submitPresentation(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -54,6 +80,14 @@ protocol WalletCoreBridge: Sendable {
         verifiedOrigin: String,
         selectedRegistryEntryIDs: [String]
     ) async throws -> AnnexCPresentationPreview
+    func submitStatusReviewedAnnexCPresentation(
+        reviewedStatus: [String: String],
+        requestID: String,
+        verifiedOrigin: String,
+        deviceRequestBase64URL: String,
+        encryptionInfoBase64URL: String,
+        selectedCredentialOptions: [PresentationCredentialSelection]
+    ) async throws -> DigitalCredentialResponse
     func submitAnnexCPresentation(
         requestID: String,
         verifiedOrigin: String,
@@ -121,9 +155,26 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {
+        throw unavailableError()
+    }
+
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
         throw unavailableError()
     }
+
+    var credentialStatuses: AsyncThrowingStream<CredentialStatusSnapshot, Error> {
+        AsyncThrowingStream { $0.finish(throwing: unavailableError()) }
+    }
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot { throw unavailableError() }
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { throw unavailableError() }
+    func close() async throws { }
 
     func credentials() async throws -> [Credential] {
         throw unavailableError()
@@ -218,4 +269,35 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
 @available(macOS 10.15, *)
 extension WalletCoreBridge {
     var signingIdentityCore: any SigningIdentityCore { UnavailableSigningIdentityCore() }
+}
+
+// Unsupported bridges fail closed instead of silently submitting an unreviewed selection.
+@available(macOS 10.15, *)
+extension WalletCoreBridge {
+    func reviewPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        did: String?
+    ) async throws -> PreparedPresentationReview {
+        throw WalletError.invalidInput("Effective claim review is unavailable")
+    }
+}
+
+extension WalletCoreBridge {
+    func submitStatusReviewedPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        reviewedStatus: [String: String], did: String?, runPolicies: Bool?, paymentConsentRevision: String?
+    ) async throws -> PresentationResult {
+        throw WalletError.internalFailure("Status-reviewed presentation is unavailable")
+    }
+}
+
+extension WalletCoreBridge {
+    func submitStatusReviewedAnnexCPresentation(reviewedStatus: [String: String], requestID: String, verifiedOrigin: String,
+        deviceRequestBase64URL: String, encryptionInfoBase64URL: String, selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse {
+        throw WalletError.internalFailure("Status-reviewed Annex C presentation is unavailable")
+    }
 }

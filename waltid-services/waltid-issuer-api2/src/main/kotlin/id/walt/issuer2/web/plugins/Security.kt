@@ -21,12 +21,14 @@ val issuer2AuthenticationPluginAmendment: suspend () -> Unit = suspend {
             oauth("auth-oauth") {
                 client = HttpClient()
                 providerLookup = {
+                    val clientSecret = authenticationServiceConfig.clientSecret.takeIf(String::isNotBlank)
+                        ?: error("Issuer OAuth client secret is missing or blank; configure KEYCLOAK_CLIENT_SECRET or an inline clientSecret")
                     OAuthServerSettings.OAuth2ServerSettings(
                         name = authenticationServiceConfig.name,
                         authorizeUrl = authenticationServiceConfig.authorizeUrl,
                         accessTokenUrl = authenticationServiceConfig.accessTokenUrl,
                         clientId = authenticationServiceConfig.clientId,
-                        clientSecret = authenticationServiceConfig.clientSecret,
+                        clientSecret = clientSecret,
                         defaultScopes = authenticationServiceConfig.defaultScopes,
                         requestMethod = HttpMethod.Post,
                         authorizeUrlInterceptor = { request ->

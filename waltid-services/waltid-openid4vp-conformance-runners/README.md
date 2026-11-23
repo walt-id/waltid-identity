@@ -97,14 +97,22 @@ compacted to the module suffix and variant values so the table stays readable.
 When a role did not write a report, the workflow still writes the same heading,
 totals, and table, with a note that no results were produced.
 
+Required wallet/verifier jobs validate their structured `results.json`: missing,
+malformed, empty, unavailable-suite and all-skipped reports fail the job. At least
+one accepted case with a suite test ID must execute, and every other case must
+be accepted or explicitly skipped as inapplicable. Each role clears its previous
+report before running. CI sets `CONFORMANCE_REQUIRED=true`, so suite unavailability
+also produces a JUnit failure. Optional local suite-availability skips remain possible,
+but their report is labelled `unavailable` and is not accepted as conformance
+evidence.
+
 Executed OpenID4VP verifier/wallet, OpenID4VCI wallet, and OpenID4VCI issuer
 failures fail their respective jobs. Issuer batch and key-attestation coverage
 remain required independently for both proof modes. The aggregate issuer artifact
 retains the name `issuer-conformance-basic-haip-batch` and its existing JSON format.
 Wallet and verifier aggregation retains `openid-conformance-summaries` and
-`junit-conformance`. When every role job succeeded, a missing report or
-requested JUnit artifact fails aggregation after the files that did arrive
-are uploaded. A failed role job still blocks publication on its own.
+`junit-conformance`. Failed role jobs, missing reports or requested JUnit artifacts
+fail aggregation after the files that did arrive are uploaded.
 
 Artifacts (when a role actually runs):
 

@@ -61,7 +61,7 @@ internal fun requireIsolatedIssuerProofType(metadata: JsonObject, configurationI
         "$configurationId must advertise only $proofType proofs for isolated coverage; " +
             "suite module preferences can override the proof-type hint."
     }
-    val selected = types!!.getValue(proofType).jsonObject
+    val selected = types.getValue(proofType).jsonObject
     require(selected["proof_signing_alg_values_supported"]?.jsonArray?.any { it.jsonPrimitive.content == "ES256" } == true) {
         "$configurationId must support ES256 $proofType proofs."
     }

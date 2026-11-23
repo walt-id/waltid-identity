@@ -1,5 +1,6 @@
 package id.walt.crypto2.signum
 
+import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.HardwarePreference
 import id.walt.crypto2.keys.KeyProtectionLevel
@@ -173,6 +174,13 @@ public class AndroidSignumKeyBackend(
             nativePublicKey = signer.publicKey,
             keyAgreementEnabled = KeyUsage.KEY_AGREEMENT in usages && policy.keyAgreement,
         ).let { delegate -> object : SignumPlatformKey by delegate {
+            override suspend fun <T> withFreshBiometricAuthorization(operation: suspend (Signer) -> T): T {
+                val auth = policy.authentication.requireTimedBiometrics()
+                require(spec == KeySpec.Ec(EcCurve.P256) && KeyUsage.SIGN in usages) { "Fresh biometric signing requires a P-256 signing key" }
+                val authenticatedAt = authenticateFreshBiometrics(requireInteractionContext(alias), auth)
+                return withFreshBiometricSigner(auth.timeoutSeconds, androidNonInteractiveSigner(alias, publicKey), authenticatedAt, operation)
+            }
+
             override val origin = when ((signer as? AndroidKeystoreSigner)?.keyInfo?.origin) {
                 KeyProperties.ORIGIN_IMPORTED -> KeyOrigin.IMPORTED
                 KeyProperties.ORIGIN_GENERATED -> KeyOrigin.GENERATED

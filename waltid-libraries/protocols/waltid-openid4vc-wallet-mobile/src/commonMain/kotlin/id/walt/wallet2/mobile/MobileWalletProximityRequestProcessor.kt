@@ -2,7 +2,10 @@
 
 package id.walt.wallet2.mobile
 
-import kotlinx.io.bytestring.ByteString
+import id.walt.wallet2.status.reviewGuard
+import id.walt.wallet2.status.CredentialStatusReviewChangedException
+import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
+import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.selectCoseSignatureAlgorithm
@@ -37,20 +40,19 @@ import id.walt.mdoc.proximity.MdocResponseResolution
 import id.walt.mdoc.proximity.MdocSessionContinuation
 import id.walt.mdoc.proximity.PreviewDocument
 import id.walt.mdoc.proximity.PreviewElement
-import id.walt.mdoc.proximity.ProximityError as EngineProximityError
 import id.walt.mdoc.proximity.ProximityException
 import id.walt.mdoc.proximity.ReaderAuthenticationDisplayEntry
 import id.walt.mdoc.proximity.ReaderAuthenticationDisplayValidity
-import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
 import id.walt.mdoc.proximity.ReaderAuthenticationResult
-import id.walt.mdoc.readertrust.ReaderAuthenticationScope
 import id.walt.mdoc.proximity.ReaderAuthenticationVerifier
-import id.walt.mdoc.readertrust.ReaderTrustDecision
-import id.walt.mdoc.readertrust.ReaderTrustEvaluator
-import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.proximity.SelectedDocument
 import id.walt.mdoc.proximity.supportsMdocDeviceMac
 import id.walt.mdoc.proximity.toDisplaySafe
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.verification.verifyIssuerAuthentication
 import id.walt.mdoc.verification.verifyIssuerSignedItemDigests
 import id.walt.wallet2.data.HolderKeyBindingErrorCode
@@ -59,21 +61,20 @@ import id.walt.wallet2.data.ResolvedHolderKey
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.resolveHolderKey
-import id.walt.x509.authorityKeyIdentifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborBoolean
 import kotlinx.serialization.cbor.CborElement
-import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.json.JsonObject
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.uuid.Uuid
-import kotlinx.serialization.json.JsonObject
+import id.walt.mdoc.proximity.ProximityError as EngineProximityError
 
 internal class ProximityRequestProcessor(
     private val wallet: Wallet,
@@ -112,6 +113,7 @@ internal class ProximityRequestProcessor(
         val submission: ProximitySubmission,
         val applicationProfiles: List<ApplicationProfileSnapshot>,
         val choiceDigest: ByteString,
+        val statusGuard: PresentationReviewGuard?,
     )
 
     private data class ReaderTrustKey(
@@ -183,9 +185,14 @@ internal class ProximityRequestProcessor(
         prompt: MdocConsentPrompt,
         reviewId: ProximityReviewId,
         submission: ProximitySubmission,
+        reviewedStatus: Map<String, String>? = null,
     ): ProximityError? {
         val owned = try { submission.snapshot() } catch (_: IllegalArgumentException) {
             return staleError("The proximity submission is invalid")
+        }
+        val statusGuard = reviewedStatus?.let { wallet.credentialStatuses().reviewGuard(owned.documents.mapTo(mutableSetOf()) { it.credentialId }, it) }
+        try { statusGuard?.check() } catch (_: CredentialStatusReviewChangedException) {
+            return approvalError("credential_status_review_changed", "Credential status changed. Review the updated information before sharing.")
         }
         return stateMutex.withLock {
             val snapshot = currentSnapshot
@@ -198,7 +205,7 @@ internal class ProximityRequestProcessor(
             if (approved != null) return@withLock staleError("The proximity review was already submitted")
             approved = Approved(
                 prompt.exchange, reviewId, owned, snapshot.applicationProfiles,
-                choiceDigest(reviewId, owned, snapshot.applicationProfiles),
+                choiceDigest(reviewId, owned, snapshot.applicationProfiles), statusGuard,
             )
             null
         }
@@ -252,7 +259,9 @@ internal class ProximityRequestProcessor(
             throw ProximityException(EngineProximityError.Security(error.code, error.message))
         }
         stateMutex.withLock { check(!closed) { "The proximity processor is closed" } }
+        retained.statusGuard?.check()
         val response = buildResponse(context, fresh, retained.submission, retained.applicationProfiles)
+        retained.statusGuard?.check()
         stateMutex.withLock { check(!closed) { "The proximity processor is closed" } }
         return MdocResponseResolution.Send(
             exactResponse = ByteString(
@@ -487,7 +496,7 @@ internal class ProximityRequestProcessor(
             holderKey = authentication.holderKey,
             deviceAuthentication = authentication.method,
             issuerAuthorityKeyIdentifiers = issuerAuthentication.certificateChain.mapNotNull {
-                it.authorityKeyIdentifier?.let({ ByteString(it) })
+                it.data.extensionAuthorityKeyIdentifier?.keyIdentifier
             }.distinct(),
         )
     }

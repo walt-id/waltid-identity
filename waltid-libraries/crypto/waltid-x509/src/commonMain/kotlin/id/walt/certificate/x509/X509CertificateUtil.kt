@@ -243,6 +243,12 @@ class X509CertificateUtilBuilder internal constructor(val from: X509CertificateU
             X509CertificateChainValidator(newValidators.values, certificateChainValidator.trustStore)
     }
 
+    fun removeValidator(validatorToRemoveId: String) {
+        val newValidators = certificateChainValidator.validators.filter { it.id != validatorToRemoveId }
+        certificateChainValidator =
+            X509CertificateChainValidator(newValidators, certificateChainValidator.trustStore)
+    }
+
     fun setServices(
         csrParser: Pkcs10CertificateSigningRequestParser,
         csrSigner: Pkcs10CertificateSigningRequestSigner,

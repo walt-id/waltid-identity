@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.etsi.generator
 
 import id.walt.crypto.keys.KeyManager
@@ -11,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Regression tests for ETSI plugtest mdoc (MDL) generator test-data fixes (FIX 5):

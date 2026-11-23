@@ -43,7 +43,7 @@ class IssuerMetadataIntegrationTest : AbstractIntegrationTest() {
         assertTrue(credentialConfigs.isNotEmpty(), "Should have at least one credential configuration")
         
         val hasJwtConfig = credentialConfigs.any { (_, config) ->
-            val formatValue = config.format?.value
+            val formatValue = config.format.value
             formatValue == "jwt_vc_json" || formatValue == "jwt_vc"
         }
         assertTrue(hasJwtConfig, "Should have at least one JWT credential configuration")
@@ -58,7 +58,7 @@ class IssuerMetadataIntegrationTest : AbstractIntegrationTest() {
         assertNotNull(credentialConfigs, "Credential configurations should not be null")
         
         val hasSdJwtConfig = credentialConfigs.any { (_, config) ->
-            val formatValue = config.format?.value
+            val formatValue = config.format.value
             formatValue == "vc+sd-jwt" || formatValue == "sd_jwt_vc"
         }
         assertTrue(hasSdJwtConfig, "Should have at least one SD-JWT credential configuration")
@@ -73,7 +73,7 @@ class IssuerMetadataIntegrationTest : AbstractIntegrationTest() {
         assertNotNull(credentialConfigs, "Credential configurations should not be null")
         
         val hasMdocConfig = credentialConfigs.any { (_, config) ->
-            config.format?.value == "mso_mdoc"
+            config.format.value == "mso_mdoc"
         }
         assertTrue(hasMdocConfig, "Should have at least one mDoc credential configuration")
     }

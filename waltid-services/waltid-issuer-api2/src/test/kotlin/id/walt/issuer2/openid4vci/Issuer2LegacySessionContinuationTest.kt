@@ -78,6 +78,7 @@ class Issuer2LegacySessionContinuationTest {
                 // have the unchanged pre-batch shape, so this does not require a new login.
                 val code = java.util.UUID.randomUUID().toString()
                 authorizationCodes.save(DefaultAuthorizationCodeRecord(
+                    pkceBinding = id.walt.openid4vci.pkce.PkceBinding.NotUsed,
                     code = code, clientId = "issuer2-wallet-test", redirectUri = "https://wallet.example/callback",
                     grantedScopes = setOf(baseline.credentialConfigurationId), grantedAudience = emptySet(),
                     session = DefaultSession(subject = offer.offerId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to current.expiresAt)),
@@ -130,6 +131,12 @@ class Issuer2LegacySessionContinuationTest {
         override fun getAndRemove(id: String) = raw.getAndRemove(id)?.let(IssuanceSessionStorageCodec::decode)
         override fun set(id: String, value: IssuanceSession) = set(id, value, null)
         override fun set(id: String, value: IssuanceSession, ttl: Duration?) = raw.set(id, Json.encodeToString(value), ttl)
+        override fun compareAndSet(id: String, expected: IssuanceSession?, replacement: IssuanceSession, ttl: Duration?): Boolean {
+            val stored = raw[id]
+            val current = stored?.let(IssuanceSessionStorageCodec::decode)
+            if (Json.encodeToString(current) != Json.encodeToString(expected)) return false
+            return raw.compareAndSet(id, stored, Json.encodeToString(replacement), ttl)
+        }
         override fun remove(id: String) = raw.remove(id)
         override fun contains(id: String) = id in raw
         override fun listAllKeys() = raw.listAllKeys()

@@ -186,8 +186,8 @@
         },
         "approval": {
           "id": "biometric",
-          "title": "Biometric approval",
-          "detail": "Approve signing with biometrics. App unlock remains separate."
+          "title": "Biometrics with timed approval",
+          "detail": "Biometric approval may be reused for ordinary signing for up to 10 seconds. Each payment requires fresh biometric approval."
         }
       },
       {
@@ -204,8 +204,8 @@
         },
         "approval": {
           "id": "biometric",
-          "title": "Biometric approval",
-          "detail": "Approve signing with biometrics. App unlock remains separate."
+          "title": "Biometrics with timed approval",
+          "detail": "Biometric approval may be reused for ordinary signing for up to 10 seconds. Each payment requires fresh biometric approval."
         }
       },
       {
@@ -240,8 +240,8 @@
         },
         "approval": {
           "id": "biometric",
-          "title": "Biometric approval",
-          "detail": "Approve signing with biometrics. App unlock remains separate."
+          "title": "Biometrics with timed approval",
+          "detail": "Biometric approval may be reused for ordinary signing for up to 10 seconds. Each payment requires fresh biometric approval."
         }
       }
     ]

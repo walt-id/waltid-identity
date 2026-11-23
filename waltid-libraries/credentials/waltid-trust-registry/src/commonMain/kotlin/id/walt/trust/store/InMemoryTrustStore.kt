@@ -98,6 +98,14 @@ class InMemoryTrustStore : TrustStore {
     override suspend fun listCertificateIdentities(): Flow<ServiceIdentity> =
         snapshotFlow { identities.values.filter { it.certificateDerBase64 != null } }
 
+    override suspend fun findCertificateIdentitiesByCanonicalSubject(hashes: Set<String>): Flow<ServiceIdentity> =
+        snapshotFlow {
+            identities.values.filter {
+                it.certificateDerBase64 != null &&
+                    (it.canonicalSubjectSha256Hex == null || it.canonicalSubjectSha256Hex in hashes)
+            }
+        }
+
     override suspend fun findIdentitiesBySubjectDn(subjectDn: String): Flow<ServiceIdentity> =
         snapshotFlow {
             identities.values.filter {

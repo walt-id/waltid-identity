@@ -1,7 +1,10 @@
 package id.walt.walletdemo.compose.ui
 
 import id.walt.walletdemo.compose.logic.*
+import id.walt.credentials.status.CredentialStatus
+import id.walt.credentials.status.presentation
 import kotlinx.serialization.json.*
+import kotlin.time.Instant
 
 /** The same synthetic specification is read by native SwiftUI tests. No wallet or network is created. */
 internal object WalletVisualFixtures {
@@ -9,6 +12,20 @@ internal object WalletVisualFixtures {
         Json.parseToJsonElement(SyntheticCredentialImageFiles.read("wallet-visual-data.json").decodeToString()).jsonObject
             .also { check(it.getValue("schemaVersion").jsonPrimitive.int == 1) }
     }
+    val statusData by lazy {
+        Json.parseToJsonElement(SyntheticCredentialImageFiles.read("credential-status.json").decodeToString())
+            .jsonObject.getValue("values").jsonObject
+    }
+    fun credentialStatus(name: String): WalletDemoCredentialStatus {
+        val value = statusData.getValue(name).jsonObject
+        val metadata = Json.decodeFromJsonElement<CredentialStatus>(value.getValue("status"))
+        return metadata.presentation(Instant.parse(value.getValue("evaluatedAt").jsonPrimitive.content)).toDemoStatus().copy(storeIndex = 0)
+    }
+
+    val noReferenceStatuses: WalletDemoCredentialStatuses get() = WalletDemoCredentialStatuses(
+        (listOf(credentialSummary.id) + WalletVisualProximityFixtures.details.keys + (sharingCredentials + informationCredentials + dateCredentials)
+            .map { it.credentialId }).associateWith { credentialStatus("not_provided") })
+
     private val issuer get() = data.getValue("issuer").jsonObject
     private val credential get() = data.getValue("credential").jsonObject
     private val offered get() = data.getValue("offer").jsonObject

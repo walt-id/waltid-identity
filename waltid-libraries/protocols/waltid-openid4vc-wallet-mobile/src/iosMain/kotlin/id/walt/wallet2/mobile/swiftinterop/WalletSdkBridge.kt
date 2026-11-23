@@ -6,6 +6,13 @@ import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
 import id.walt.wallet2.mobile.MobileWalletAnnexCRequest
 import id.walt.wallet2.mobile.MobileWalletAnnexCSubmission
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletCredentialRead
+import id.walt.wallet2.status.WalletCredentialStatusSnapshot
+import id.walt.wallet2.status.CredentialStatusRefreshResult
+import id.walt.wallet2.status.CredentialStatusRefreshMode
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.catch
+import kotlinx.serialization.builtins.ListSerializer
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
@@ -17,6 +24,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.MobileWalletPreparedPresentationReview
 import id.walt.wallet2.mobile.MobileWalletPresentationPreviewHandle
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.ProximityCapabilities
@@ -63,6 +71,35 @@ public class WalletSdkBridge private constructor(
      * Buffered stream of recent issuance and presentation events emitted by the bridged wallet.
      */
     public val events: Flow<MobileWalletEvent> = eventFlow
+
+    /** Initial/current status values, including freshness changes, with bounded native delivery. */
+    public val credentialStatuses: Flow<WalletBridgeCredentialStatusUpdate>
+        get() = operations.credentialStatuses.map<WalletCredentialStatusSnapshot, WalletBridgeCredentialStatusUpdate> {
+            WalletBridgeCredentialStatusUpdate.Snapshot(it.toStatusBridgeSnapshot())
+        }.catch { cause ->
+            if (cause is CancellationException) throw cause
+            emit(WalletBridgeCredentialStatusUpdate.Failure(WalletBridgeError.fromThrowable(
+                IllegalStateException("Credential status observation failed"))))
+        }
+
+    /** Local composed reads; no status endpoint is requested. */
+    public suspend fun credentialReads(): WalletBridgeResult<List<WalletBridgeCredentialRead>> = walletBridgeCall {
+        operations.credentialReads().map { it.toStatusBridgeRead() }
+    }
+
+    /** Explicit wallet-scoped status check, preserving typed partial outcomes. */
+    public suspend fun refreshCredentialStatuses(credentialIds: List<String>? = null, force: Boolean = false): WalletBridgeResult<String> = walletBridgeCall {
+        credentialStatusJson.encodeToString(ListSerializer(CredentialStatusRefreshResult.serializer()),
+            operations.refreshCredentialStatuses(credentialIds, if (force) CredentialStatusRefreshMode.FORCE else CredentialStatusRefreshMode.IF_DUE))
+    }
+
+    /** Local status snapshot, independent of artwork/credential JSON normalization. */
+    public suspend fun credentialStatusSnapshot(): WalletBridgeResult<String> = walletBridgeCall {
+        operations.credentialStatusSnapshot().toStatusBridgeSnapshot()
+    }
+
+    /** Closes this instance and status observers without deleting persisted data. */
+    public suspend fun close(): WalletBridgeResult<Unit> = walletBridgeCall { operations.close() }
 
     /** Attaches runtime key attestation support to this wallet instance. */
     public suspend fun attachKeyAttestationProvider(
@@ -190,6 +227,26 @@ public class WalletSdkBridge private constructor(
     public suspend fun listDeferredIssuance(): WalletBridgeResult<List<WalletIssuanceContinuation>> =
         walletBridgeCall { operations.listDeferredIssuance() }
 
+    /**
+     * Reports OpenID4VCI `credential_deleted` for a credential the holder rejected instead of storing.
+     */
+    public suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String? = null,
+        notificationEndpoint: String? = null,
+        eventDescription: String? = null,
+    ): WalletBridgeResult<Unit> =
+        walletBridgeCall {
+            operations.rejectIssuedCredential(
+                notificationId = notificationId,
+                accessToken = accessToken,
+                credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+                notificationEndpoint = notificationEndpoint,
+                eventDescription = eventDescription,
+            )
+        }
+
     /** Resumes one deferred credential issuance result. */
     public suspend fun resumeDeferredIssuance(
         deferredCredentialId: String,
@@ -246,6 +303,16 @@ public class WalletSdkBridge private constructor(
             operations.previewPresentation(requestUrl = requestUrl)
         }
 
+    /** Prepares exact selection data through the same typed error/cancellation bridge as submission. */
+    public suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null,
+        did: String? = null,
+    ): WalletBridgeResult<MobileWalletPreparedPresentationReview> = walletBridgeCall {
+        operations.reviewPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
+    }
+
     /** Resolves authenticated payment instructions without signing. */
     public suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
@@ -257,6 +324,16 @@ public class WalletSdkBridge private constructor(
     }
 
     /** Submits the selected credentials, acknowledging the prepared payment revision when required. */
+    public suspend fun submitStatusReviewedPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        reviewedStatus: Map<String, String>, did: String?, runPolicies: Boolean?, paymentConsentRevision: String?,
+    ): WalletBridgeResult<MobileWalletPresentationResult> = walletBridgeCall {
+        operations.submitStatusReviewedPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, reviewedStatus, did, runPolicies, paymentConsentRevision)
+    }
+
+    /** Submits an ordinary presentation using the existing confirmation behavior. */
     public suspend fun submitPresentation(
         previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
@@ -319,6 +396,11 @@ public class WalletSdkBridge private constructor(
         walletBridgeCall { operations.previewAnnexCPresentation(request) }
 
     /** Verifies the post-consent raw request and builds the encrypted Annex C response. */
+    public suspend fun submitStatusReviewedAnnexCPresentation(
+        submission: MobileWalletAnnexCSubmission, reviewedStatus: Map<String, String>,
+    ): WalletBridgeResult<MobileWalletDigitalCredentialResponse> = walletBridgeCall { operations.submitStatusReviewedAnnexCPresentation(submission, reviewedStatus) }
+
+    /** Submits an approved Annex C response using the existing platform trust checks. */
     public suspend fun submitAnnexCPresentation(
         submission: MobileWalletAnnexCSubmission,
     ): WalletBridgeResult<MobileWalletDigitalCredentialResponse> =
@@ -357,6 +439,8 @@ internal interface WalletSdkBridgeOperations {
     suspend fun previewAnnexCPresentation(request: MobileWalletAnnexCRequest): MobileWalletAnnexCPreview =
         error("Annex C is not implemented by this test bridge")
 
+    suspend fun submitStatusReviewedAnnexCPresentation(submission: MobileWalletAnnexCSubmission, reviewedStatus: Map<String, String>): MobileWalletDigitalCredentialResponse = error("Annex C status review is unavailable")
+
     suspend fun submitAnnexCPresentation(
         submission: MobileWalletAnnexCSubmission,
     ): MobileWalletDigitalCredentialResponse = error("Annex C is not implemented by this test bridge")
@@ -389,9 +473,22 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation>
 
+    suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    )
+
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome
 
     suspend fun credentials(): List<MobileWalletCredential>
+    suspend fun credentialReads(): List<MobileWalletCredentialRead>
+    val credentialStatuses: Flow<WalletCredentialStatusSnapshot>
+    suspend fun credentialStatusSnapshot(): WalletCredentialStatusSnapshot
+    suspend fun refreshCredentialStatuses(credentialIds: List<String>?, mode: CredentialStatusRefreshMode): List<CredentialStatusRefreshResult>
+    suspend fun close()
 
     suspend fun deleteCredential(credentialId: String): Boolean
 
@@ -407,12 +504,26 @@ internal interface WalletSdkBridgeOperations {
         requestUrl: String,
     ): MobileWalletPresentationPreviewResult
 
+    suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+    ): MobileWalletPreparedPresentationReview = error("Claim review is not implemented by this test bridge")
+
     suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
         selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
         did: String?,
     ): id.walt.wallet2.consent.PreparedPaymentConsent?
+
+    suspend fun submitStatusReviewedPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        reviewedStatus: Map<String, String>, did: String?, runPolicies: Boolean?, paymentConsentRevision: String?,
+    ): MobileWalletPresentationResult = error("Status-reviewed presentation is unavailable")
 
     suspend fun submitPresentation(
         previewHandle: MobileWalletPresentationPreviewHandle,
@@ -458,6 +569,8 @@ internal class MobileWalletSdkBridgeOperations(
     override suspend fun previewAnnexCPresentation(request: MobileWalletAnnexCRequest): MobileWalletAnnexCPreview =
         wallet.previewAnnexCPresentation(request)
 
+    override suspend fun submitStatusReviewedAnnexCPresentation(submission: MobileWalletAnnexCSubmission, reviewedStatus: Map<String, String>): MobileWalletDigitalCredentialResponse = wallet.submitStatusReviewedAnnexCPresentation(submission, reviewedStatus)
+
     override suspend fun submitAnnexCPresentation(
         submission: MobileWalletAnnexCSubmission,
     ): MobileWalletDigitalCredentialResponse = wallet.submitAnnexCPresentation(submission)
@@ -495,11 +608,32 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation> = wallet.listDeferredIssuance()
 
+    override suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String?,
+        notificationEndpoint: String?,
+        eventDescription: String?,
+    ) {
+        wallet.rejectIssuedCredential(
+            notificationId = notificationId,
+            accessToken = accessToken,
+            credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+            notificationEndpoint = notificationEndpoint,
+            eventDescription = eventDescription,
+        )
+    }
+
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome =
         wallet.resumeDeferredIssuance(deferredCredentialId)
 
-    override suspend fun credentials(): List<MobileWalletCredential> =
-        wallet.credentials()
+    override suspend fun credentials(): List<MobileWalletCredential> = wallet.credentials()
+    override suspend fun credentialReads(): List<MobileWalletCredentialRead> = wallet.credentialReads()
+    override val credentialStatuses: Flow<WalletCredentialStatusSnapshot> get() = wallet.credentialStatuses
+    override suspend fun credentialStatusSnapshot(): WalletCredentialStatusSnapshot = wallet.credentialStatusSnapshot()
+    override suspend fun refreshCredentialStatuses(credentialIds: List<String>?, mode: CredentialStatusRefreshMode): List<CredentialStatusRefreshResult> =
+        wallet.refreshCredentialStatuses(credentialIds, mode)
+    override suspend fun close(): Unit = wallet.close()
 
     override suspend fun deleteCredential(credentialId: String): Boolean =
         wallet.deleteCredential(credentialId)
@@ -523,6 +657,14 @@ internal class MobileWalletSdkBridgeOperations(
     ): MobileWalletPresentationPreviewResult =
         wallet.previewPresentation(requestUrl = requestUrl)
 
+    override suspend fun reviewPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        did: String?,
+    ): MobileWalletPreparedPresentationReview = wallet.reviewPresentation(
+        previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
+
     override suspend fun preparePaymentConsent(
         previewHandle: MobileWalletPresentationPreviewHandle,
         selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
@@ -531,6 +673,13 @@ internal class MobileWalletSdkBridgeOperations(
     ): id.walt.wallet2.consent.PreparedPaymentConsent? = wallet.preparePaymentConsent(
         previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did,
     )
+
+    override suspend fun submitStatusReviewedPresentation(
+        previewHandle: MobileWalletPresentationPreviewHandle,
+        selectedCredentialOptions: List<MobileWalletPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>?,
+        reviewedStatus: Map<String, String>, did: String?, runPolicies: Boolean?, paymentConsentRevision: String?,
+    ): MobileWalletPresentationResult = wallet.submitStatusReviewedPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, reviewedStatus, did, runPolicies, paymentConsentRevision)
 
     override suspend fun submitPresentation(
         previewHandle: MobileWalletPresentationPreviewHandle,

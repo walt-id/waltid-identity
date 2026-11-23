@@ -32,7 +32,7 @@ class ConformanceTests {
         @AfterAll
         fun writeSkippedSummaryIfSuiteUnavailable() {
             if (isConformanceAvailable) return
-            ConformanceReportWriter.writeSkippedIfEmpty(
+            ConformanceReportWriter.writeUnavailableIfEmpty(
                 role = ConformanceReportWriter.Role.VP_VERIFIER,
                 reason = "Conformance suite not available at $conformanceHost:$conformancePort",
             )

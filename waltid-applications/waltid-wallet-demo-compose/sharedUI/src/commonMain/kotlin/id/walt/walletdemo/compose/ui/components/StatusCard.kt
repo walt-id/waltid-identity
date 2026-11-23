@@ -146,6 +146,7 @@ internal fun StatusCard(
                         imageVector = Icons.Filled.KeyboardArrowDown,
                         modifier = Modifier.rotate(rotation),
                         contentDescription = if (expanded) "Collapse error" else "Expand error",
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }

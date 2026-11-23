@@ -78,6 +78,11 @@ class MainActivity : FragmentActivity() {
         controller.handleApplicationForegrounded()
     }
 
+    override fun onStop() {
+        if (::controller.isInitialized) controller.handleApplicationBackgrounded()
+        super.onStop()
+    }
+
     override fun onDestroy() {
         WalletDemoCredentialStoreNotifier.removeListener(onCredentialStoreChanged)
         if (isFinishing && ::proximityController.isInitialized) proximityController.dismiss()

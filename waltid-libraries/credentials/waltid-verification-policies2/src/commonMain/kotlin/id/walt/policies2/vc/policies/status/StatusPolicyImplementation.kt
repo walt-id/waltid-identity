@@ -131,7 +131,7 @@ object StatusPolicyImplementation {
         attribute: W3CStatusPolicyAttribute,
         credential: DigitalCredential,
         signerAuthorizer: StatusListSignerAuthorizer?,
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> = runStatusCheck {
         val statusEntry = w3cEntryContentParser.parse(data)
         w3cStatusValidator.validate(statusEntry, attribute, credential, signerAuthorizer).getOrThrow()
     }
@@ -142,7 +142,7 @@ object StatusPolicyImplementation {
         credential: DigitalCredential,
         signerAuthorizer: StatusListSignerAuthorizer?,
     ): Result<Unit> =
-        runCatching {
+        runStatusCheck {
             val statusEntries = w3cListEntryContentParser.parse(data)
             //check the arguments list is less or equal to entry list
             require(statusEntries.size >= attribute.list.size) { "Arguments list size mismatch: ${statusEntries.size} expecting ${attribute.list.size}" }
@@ -174,7 +174,7 @@ object StatusPolicyImplementation {
         attribute: IETFStatusPolicyAttribute,
         credential: DigitalCredential,
         signerAuthorizer: StatusListSignerAuthorizer?,
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> = runStatusCheck {
         val statusEntry = ietfEntryContentParser.parse(data)
         ietfStatusValidator.validate(statusEntry, attribute, credential, signerAuthorizer).getOrThrow()
     }

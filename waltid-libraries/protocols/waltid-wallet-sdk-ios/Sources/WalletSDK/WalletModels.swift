@@ -16,6 +16,9 @@ public struct WalletConfiguration: Sendable {
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
+    /// Enterprise Wallet Provider. The demo value points at a deployment that is not set up yet.
+    public var walletProvider: WalletProviderConfiguration?
+
     /// Trust anchors used to authenticate verifier Request Objects.
     public var clientIDTrustConfiguration: WalletClientIDTrustConfiguration
 
@@ -46,6 +49,8 @@ public struct WalletConfiguration: Sendable {
     ///     and persisted wallet state.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
+    ///   - walletProvider: Optional Enterprise Wallet Provider. Sample apps leave this unset.
+    ///     The demo value names a deployment that is not provisioned yet.
     ///   - clientIDTrustConfiguration: Trust anchors used to authenticate verifier
     ///     Request Objects. The default trusts no X.509 verifier by configuration.
     ///   - issuerMetadataTrustResolver: Verifies signed Credential Issuer Metadata
@@ -67,6 +72,7 @@ public struct WalletConfiguration: Sendable {
     public init(
         walletID: String = "default",
         attestation: WalletAttestationConfiguration? = nil,
+        walletProvider: WalletProviderConfiguration? = nil,
         clientIDTrustConfiguration: WalletClientIDTrustConfiguration = .init(),
         issuerMetadataTrustResolver: (any IssuerMetadataTrustResolver)? = nil,
         persistence: WalletPersistence = WalletPersistence(),
@@ -84,6 +90,7 @@ public struct WalletConfiguration: Sendable {
         self.defaultKeyUseAuthorizationPolicy = defaultKeyUseAuthorizationPolicy
         self.keyUseAuthorizationPrompt = keyUseAuthorizationPrompt
         self.attestation = attestation
+        self.walletProvider = walletProvider
         self.clientIDTrustConfiguration = clientIDTrustConfiguration
         self.issuerMetadataTrustResolver = issuerMetadataTrustResolver
         self.keyAttestationProvider = keyAttestationProvider
@@ -550,6 +557,53 @@ public enum WalletKeyType: Equatable, Sendable {
     case rsa4096
 }
 
+/// Enterprise Wallet Provider used for wallet instance and key attestations.
+///
+/// ``enterpriseDemo`` addresses the hosted Enterprise Stack demo. That deployment does not yet
+/// run the wallet-provider feature, and the service path is not provisioned.
+public struct WalletProviderConfiguration: Equatable, Sendable {
+    /// Opt-in address for the hosted Enterprise Stack demo.
+    /// Keep this aligned with `EnterpriseDemoWalletProvider` in `WalletProviderHttpClient.kt`.
+    /// That deployment does not yet run the wallet-provider feature, so sample apps leave it unset.
+    public static let enterpriseDemo = WalletProviderConfiguration(
+        baseURL: "https://org4.enterprise.demo.walt.id",
+        servicePath: "org4.demo.wallet-provider"
+    )
+
+    /// Origin of the Enterprise API, without a service path.
+    public var baseURL: String
+    /// Wallet-provider target, `organization.tenant.service`.
+    public var servicePath: String
+    /// Bearer token for the wallet-provider API. Empty sends no Authorization header.
+    public var bearerToken: String
+    /// Optional `Host` header override for tunneled local tests.
+    public var hostHeader: String
+    /// `wia`, `ka`, or `wia_ka`. Must match a composition that provider is configured to mint.
+    public var composition: String
+
+    /// Creates wallet-provider settings.
+    ///
+    /// - Parameters:
+    ///   - baseURL: Origin of the Enterprise API, without a service path.
+    ///   - servicePath: Wallet-provider target, `organization.tenant.service`.
+    ///   - bearerToken: Bearer token for the wallet-provider API. Empty sends no Authorization header.
+    ///   - hostHeader: Optional `Host` header override for tunneled local tests.
+    ///   - composition: `wia`, `ka`, or `wia_ka`. Defaults to both.
+    public init(
+        baseURL: String,
+        servicePath: String,
+        bearerToken: String = "",
+        hostHeader: String = "",
+        composition: String = "wia_ka"
+    ) {
+        self.baseURL = baseURL
+        self.servicePath = servicePath
+        self.bearerToken = bearerToken
+        self.hostHeader = hostHeader
+        self.composition = composition
+    }
+}
+
 /// Wallet attestation settings.
 public struct WalletAttestationConfiguration: Equatable, Sendable {
     /// Attestation API base URL.
@@ -695,6 +749,9 @@ public struct Credential: Equatable, Identifiable, Sendable {
     /// Optional sidecar metadata JSON persisted with the credential (e.g. `issuerDisplay`).
     public let metadataJSON: String?
 
+    /// Local, dated status observation, independent of credential validity and acceptance.
+    public let status: CredentialStatus?
+
     /// Creates credential metadata visible to SDK consumers.
     ///
     /// - Parameters:
@@ -710,6 +767,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
     ///     app-side display.
     ///   - metadataJSON: Optional sidecar metadata JSON persisted with the
     ///     credential.
+    ///   - status: Optional local dated status observation, independent of credential validity.
     public init(
         id: String,
         format: String,
@@ -718,7 +776,8 @@ public struct Credential: Equatable, Identifiable, Sendable {
         label: String?,
         addedAt: Date?,
         credentialDataJSON: String,
-        metadataJSON: String? = nil
+        metadataJSON: String? = nil,
+        status: CredentialStatus? = nil
     ) {
         self.id = id
         self.format = format
@@ -728,6 +787,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
         self.addedAt = addedAt
         self.credentialDataJSON = credentialDataJSON
         self.metadataJSON = metadataJSON
+        self.status = status
     }
 }
 
@@ -1226,6 +1286,9 @@ public struct IssuanceFailure: Equatable, Sendable {
     /// Failed target and unattempted targets, when failure occurred during credential processing.
     public let targetFailure: IssuanceTargetFailure?
 
+    /// Whether the caller may submit the same reviewed offer again after this transition.
+    public let canRetryOffer: Bool
+
     /// Creates a sanitized issuance failure.
     ///
     /// - Parameters:
@@ -1233,9 +1296,21 @@ public struct IssuanceFailure: Equatable, Sendable {
     ///   - message: Public error description.
     ///   - targetFailure: Optional target-level failure details.
     public init(code: IssuanceErrorCode, message: String, targetFailure: IssuanceTargetFailure? = nil) {
+        self.init(code: code, message: message, targetFailure: targetFailure, canRetryOffer: false)
+    }
+
+    /// Creates a failure with the session's explicit offer retry decision.
+    ///
+    /// - Parameters:
+    ///   - code: The category of the failed issuance transition.
+    ///   - message: A public description that excludes protocol secrets.
+    ///   - targetFailure: The failed credential target and any unattempted targets, when available.
+    ///   - canRetryOffer: Whether the caller may submit the same reviewed offer again.
+    public init(code: IssuanceErrorCode, message: String, targetFailure: IssuanceTargetFailure? = nil, canRetryOffer: Bool) {
         self.code = code
         self.message = message
         self.targetFailure = targetFailure
+        self.canRetryOffer = canRetryOffer
     }
 }
 

@@ -81,31 +81,35 @@ object ConformanceReportWriter {
     }
 
     /**
-     * Writes a skipped-suite placeholder when this role has no `summary.md` yet.
+     * Records an unavailable suite when this role has no `summary.md` yet.
      *
-     * Used by conformance test classes after a skipped run so GitHub Actions can still
-     * publish the same per-role heading and table shape as a completed verifier report.
+     * Local tests may skip when the suite is absent, but this placeholder is never
+     * accepted as conformance evidence. Required CI rejects it.
      */
-    fun writeSkippedIfEmpty(
+    fun writeUnavailableIfEmpty(
         role: Role,
         reason: String,
         reportRoot: String = DEFAULT_REPORT_ROOT,
     ) {
-        if (Files.exists(reportDir(role, reportRoot).resolve("summary.md"))) return
-        write(
-            role = role,
-            entries = listOf(
-                Entry(
-                    name = "conformance-suite",
-                    status = "skipped",
-                    error = reason,
-                    accepted = true,
-                )
-            ),
-            reportRoot = reportRoot,
-            mergeExisting = false,
-            producer = "suite-availability",
-        )
+        if (!Files.exists(reportDir(role, reportRoot).resolve("summary.md"))) {
+            write(
+                role = role,
+                entries = listOf(
+                    Entry(
+                        name = "conformance-suite",
+                        status = "unavailable",
+                        error = reason,
+                        accepted = false,
+                    )
+                ),
+                reportRoot = reportRoot,
+                mergeExisting = false,
+                producer = "suite-availability",
+            )
+        }
+        check(!System.getenv("CONFORMANCE_REQUIRED").equals("true", ignoreCase = true)) {
+            "Required ${role.title} conformance suite is unavailable"
+        }
     }
 
     fun writeTestPlanResults(

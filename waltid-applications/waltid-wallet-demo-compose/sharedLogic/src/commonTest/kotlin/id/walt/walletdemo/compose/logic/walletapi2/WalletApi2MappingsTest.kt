@@ -1,20 +1,108 @@
 package id.walt.walletdemo.compose.logic.walletapi2
 
 import id.walt.walletdemo.compose.logic.WalletDeepLinkScheme
+import id.walt.walletdemo.compose.logic.incomingWalletPageLink
+import io.ktor.http.encodeURLParameter
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceGrant
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationDisclosureSelection
+import id.walt.walletdemo.compose.logic.claimDisplayGroups
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import id.walt.walletdemo.compose.logic.WalletDemoIssuanceOutcome
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class WalletApi2MappingsTest {
+    @Test
+    fun typedClaimMetadataReachesOfferPreview() {
+        val response = walletApi2Json.decodeFromString<ResolveOfferDetailedResponseDto>(
+            """
+            {
+              "credentialIssuer":"https://issuer.example",
+              "credentialEndpoint":"https://issuer.example/credential",
+              "issuer":{"credentialIssuer":"https://issuer.example"},
+              "offeredCredentials":[{
+                "configurationId":"pid","format":"dc+sd-jwt",
+                "claims":[
+                  {"path":["given_name"],"displayName":"Given name"},
+                  {"path":["nationalities",null],"mandatory":true,"displayName":"Nationality"},
+                  {"path":["other_nationalities",0],"mandatory":false,"displayName":"First nationality"}
+                ]
+              }]
+            }
+            """.trimIndent()
+        )
+        val preview = response.toDemoPreview()
+        assertEquals(listOf("pid"), preview.offeredCredentials.map { it.configurationId })
+        val offered = preview.offeredCredentials.single()
+        assertEquals(listOf("Given name", "Nationality", "First nationality"), offered.claims.map { it.displayName })
+        assertEquals(listOf(null, true, false), offered.claims.map { it.mandatory })
+        assertEquals(Json.parseToJsonElement("""["nationalities",null]""").jsonArray.toList(), offered.claims[1].path)
+        assertEquals(Json.parseToJsonElement("""["other_nationalities",0]""").jsonArray.toList(), offered.claims[2].path)
+        assertEquals(listOf("May be included", "Always included", "May be included"), offered.claimDisplayGroups().single().claims.map { it.inclusion })
+        assertEquals(
+            listOf("Given name", "Nationality", "First nationality"),
+            offered.claimDisplayGroups().single().claims.map { it.label },
+        )
+    }
+
+    @Test
+    fun futurePresentationAndUnsupportedMethodNamesStayConservative() {
+        fun render(presentation: CredentialStatusPresentationDto) = CredentialStatusSnapshotDto(listOf(
+            CredentialStatusRecordDto(CredentialStatusReferenceDto(0, "identity"), presentation),
+        )).toDemoStatuses().credentials.getValue("identity")
+        val future = render(CredentialStatusPresentationDto("FUTURE_STATUS", "NONE", "FRESH", "CHECK", "opaque",
+            lastKnown = false, coverage = "COMPLETE"))
+        assertTrue(future.hasIssue)
+        assertFalse(future.positive)
+
+        val unsupported = render(CredentialStatusPresentationDto("UNSUPPORTED", "UNSUPPORTED", "UNKNOWN", "NONE", "opaque",
+            lastKnown = false, references = listOf(CredentialStatusReferencePresentationDto("reference", method = "TOKEN_STATUS_LIST"))))
+        val reference = unsupported.references.single()
+        assertNull(reference.protocolName, "An unsupported method spelling is not a recognized protocol tag")
+        assertEquals("TOKEN_STATUS_LIST", reference.method)
+    }
+
+    @Test
+    fun overlappingStoreIdsCannotHideAnAdverseResultAndRefreshesKeepTheirScope() {
+        val checked = "2026-11-12T09:00:00Z"
+        val reference = CredentialStatusReferencePresentationDto("ref", protocolName = "BITSTRING_STATUS_LIST",
+            purpose = "revocation", result = "CLEAR", checkedAt = checked, freshUntil = "2026-11-12T11:00:00Z", freshness = "FRESH")
+        val clear = CredentialStatusPresentationDto("NOT_REVOKED", "NONE", "FRESH", "CHECK", "clear", lastKnown = false,
+            coverage = "COMPLETE", lastCheckedAt = checked, purposes = listOf("revocation"), references = listOf(reference))
+        val revoked = clear.copy(kind = "REVOKED", issue = "REVOKED", advisoryRevision = "revoked",
+            references = listOf(reference.copy(result = "REVOKED")))
+        val wire = CredentialStatusSnapshotDto(listOf(
+            CredentialStatusRecordDto(CredentialStatusReferenceDto(0, "same-id"), revoked),
+            CredentialStatusRecordDto(CredentialStatusReferenceDto(1, "same-id"), clear),
+        ))
+        val snapshot = wire.toDemoStatuses()
+        assertEquals("NEEDS_REVIEW", snapshot.credentials.getValue("same-id").issue)
+        assertEquals("AMBIGUOUS_CREDENTIAL_ID", snapshot.credentials.getValue("same-id").failure)
+        assertFailsWith<IllegalArgumentException> {
+            val duplicate = CredentialStatusRecordDto(CredentialStatusReferenceDto(0, "same-id"), revoked)
+            CredentialStatusSnapshotDto(listOf(duplicate, duplicate))
+        }
+        val context = CredentialStatusContextDto("active-review", "2026-11-12T10:05:00Z")
+        val active = wire.copy(statusContext = context)
+        val update = CredentialStatusRefreshResultDto(CredentialStatusReferenceDto(0, "same-id"), "COMPLETED",
+            revoked.copy(failure = CredentialStatusFailureDto("reason", "TRANSPORT")), checked, true, context)
+        val refreshed = active.withRefreshResults(listOf(update))
+        assertEquals(update.presentation, refreshed.credentials[0].presentation)
+        assertEquals(clear, refreshed.credentials[1].presentation, "A matching local ID in another store is a separate record")
+        assertEquals(listOf(wire.credentials[1]), active.withRefreshResults(listOf(update.copy(outcome = "REMOVED"))).credentials)
+        assertFailsWith<IllegalArgumentException> { active.withRefreshResults(listOf(update, update)) }
+        assertFailsWith<IllegalArgumentException> { active.withRefreshResults(listOf(update.copy(reference = CredentialStatusReferenceDto(2, "same-id")))) }
+        assertFailsWith<IllegalArgumentException> { active.withRefreshResults(listOf(update.copy(statusContext = context.copy(id = "foreign")))) }
+    }
+
     @Test
     fun preAuthorizedGrantWhenCodePresent() {
         val response = ResolveOfferDetailedResponseDto(
@@ -233,6 +321,39 @@ class WalletApi2MappingsTest {
 }
 
 class WalletDeepLinkSchemeWebTest {
+    @Test
+    fun pageLinkReadsCredentialOffer() {
+        val offer =
+            "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer%2Fa+b"
+        assertEquals(
+            offer,
+            incomingWalletPageLink("http://localhost:7106/?link=${offer.encodeURLParameter()}"),
+        )
+    }
+
+    @Test
+    fun pageLinkReadsPresentationRequest() {
+        val request = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"
+        assertEquals(
+            request,
+            incomingWalletPageLink("http://localhost:7106/?link=${request.encodeURLParameter()}"),
+        )
+    }
+
+    @Test
+    fun pageLinkIgnoresWalletRoutesAndOtherSchemes() {
+        assertEquals(
+            null,
+            incomingWalletPageLink("http://localhost:7106/api/siop/initiateIssuance?credential_offer=abc"),
+        )
+        assertEquals(null, incomingWalletPageLink("http://localhost:7106/?code=abc&state=1"))
+        assertEquals(
+            null,
+            incomingWalletPageLink("http://localhost:7106/?link=${"https://issuer.example/offer".encodeURLParameter()}"),
+        )
+        assertEquals(null, incomingWalletPageLink("not a url"))
+    }
+
     @Test
     fun httpsAuthorizationCallbackWithCode() {
         assertEquals(

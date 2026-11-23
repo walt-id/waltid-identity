@@ -58,6 +58,8 @@ class ItbNativeWalletDeviceTest {
             })
         }
         val provider = AndroidPlatformKeyProvider(activity) { activity }
+        val timed = args.getString("wallet.itb.biometricPolicy") == "timed"
+        require(args.getString("wallet.itb.biometricPolicy") in setOf(null, "per-use", "timed"))
         var generated: ManagedKey? = null
         try {
             withTimeout(30 * 60_000L) {
@@ -80,7 +82,8 @@ class ItbNativeWalletDeviceTest {
                         require(certificates.isNotEmpty())
                         val requirements = WalletKeyRequirements(
                             KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-                            KeyUseAuthorizationPolicy.BiometricCurrentSet, WalletKeyProtection.HardwareRequired,
+                            if (timed) KeyUseAuthorizationPolicy.BiometricTimedReuse(10) else KeyUseAuthorizationPolicy.BiometricCurrentSet,
+                            WalletKeyProtection.HardwareRequired,
                         )
                         check(provider.preflight(requirements) is KeyUseAuthorizationSupport.Supported)
                         val key = provider.generateManagedKey(WalletKeyCreationRequest(

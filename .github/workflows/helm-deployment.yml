@@ -28,7 +28,7 @@ jobs:
           ref: ${{ github.ref_name }}
 
       - uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4.0.1
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
       - name: Create kubeconfig file
         env:
           KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}

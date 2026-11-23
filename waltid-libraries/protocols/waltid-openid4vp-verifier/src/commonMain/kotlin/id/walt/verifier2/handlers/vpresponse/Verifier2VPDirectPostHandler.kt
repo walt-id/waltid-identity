@@ -297,6 +297,7 @@ object Verifier2VPDirectPostHandler {
         beforeRespond: suspend (rejected: Boolean) -> Unit = {},
         ephemeralDecryptionKey: DirectSerializedKey? = verificationSession?.ephemeralDecryptionKey,
         crypto2EphemeralDecryptionKey: String? = verificationSession?.crypto2EphemeralDecryptionKey,
+        presentationId: String = Uuid.random().toString(),
     ) {
         val call = this
 
@@ -325,6 +326,7 @@ object Verifier2VPDirectPostHandler {
                 policyContext = policyContext,
                 ephemeralDecryptionKey = ephemeralDecryptionKey,
                 crypto2EphemeralDecryptionKey = crypto2EphemeralDecryptionKey,
+                presentationId = presentationId,
             )
             val afterHandle = started.elapsedNow()
 
@@ -423,6 +425,7 @@ object Verifier2VPDirectPostHandler {
         ephemeralDecryptionKey: DirectSerializedKey? = verificationSession.ephemeralDecryptionKey,
         crypto2EphemeralDecryptionKey: String? = verificationSession.crypto2EphemeralDecryptionKey,
         verificationTime: Instant = Clock.System.now(),
+        presentationId: String = Uuid.random().toString(),
     ): Map<String, String> {
         suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
             updateSessionCallback.invoke(this, event, block)
@@ -437,7 +440,7 @@ object Verifier2VPDirectPostHandler {
         val responseMode = session.authorizationRequest.responseMode
 
         if (responseData is ErrorResponseDirectPost) {
-            return handleWalletErrorResponse(session, responseData, updateSessionCallback)
+            return handleWalletErrorResponse(session, responseData, updateSessionCallback, presentationId)
         }
 
         val (vpTokenString, receivedState) = parseResponseBody(
@@ -458,7 +461,7 @@ object Verifier2VPDirectPostHandler {
         val afterVpToken = phaseStart.elapsedNow()
         // Start the attempt before validation can emit any callback.
         session.updateSession(SessionEvent.attempted_presentation) {
-            resetPresentationAttempt()
+            resetPresentationAttempt(presentationId)
             status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
             presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
         }
@@ -604,8 +607,8 @@ object Verifier2VPDirectPostHandler {
     }
 
     /** Clear the previous attempt's evidence before publishing the new attempt's identifier. */
-    private fun Verification2Session.resetPresentationAttempt() {
-        presentationId = Uuid.random().toString()
+    private fun Verification2Session.resetPresentationAttempt(presentationId: String) {
+        this.presentationId = presentationId
         attempted = true
         statusReason = null
         failure = null
@@ -629,6 +632,7 @@ object Verifier2VPDirectPostHandler {
         session: Verification2Session,
         responseData: ErrorResponseDirectPost,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
+        presentationId: String,
     ): Map<String, String> {
         log.info { "Wallet returned OID4VP §8.5 error for session ${session.id}: error=${responseData.error}" }
 
@@ -637,7 +641,7 @@ object Verifier2VPDirectPostHandler {
             ?.let { Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError() }
 
         updateSessionCallback(session, SessionEvent.wallet_error_response_received) {
-            resetPresentationAttempt()
+            resetPresentationAttempt(presentationId)
             status = FAILED
             statusReason = "Wallet returned OID4VP error: ${responseData.error}"
             failure = SessionFailure.WalletErrorResponse(

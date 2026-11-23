@@ -26,6 +26,10 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.62.0-noble@sha256:baed2032d533817f3dbe6425de795788430ba345e819a1201337009ba17c9d07
       options: --init --ipc=host
+    env:
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -35,20 +39,35 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.15'
+      - name: Install browser certificate tooling
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends libnss3-tools
+      - name: Install controlled issuer dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/wallet-browser-python"
+          "$RUNNER_TEMP/wallet-browser-python/bin/pip" install --disable-pip-version-check cryptography pillow
       - name: Build the production browser host
         run: >-
           python3 .github/scripts/mobile-ci/run-ios-phase.py
           --output-dir waltid-applications/waltid-wallet-demo-compose/webApp/build/reports/browser-visual/timings
-          browser-build ./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDistribution
+          browser-build ./gradlew
+          :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDistribution
+          :waltid-services:waltid-wallet-api2:buildFatJar
           -PenableAndroidBuild=false -PenableIosBuild=false -PenableWalletDemoComposeWeb=true
           --max-workers=2 --console=plain
       - name: Install the pinned browser test tools
+        id: browser_test_tools
         working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
         run: npm ci
       - name: Run shared browser logic tests
         working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
         run: |
-          export CHROME_BIN="$(node -p "require('playwright').chromium.executablePath()")"
+          CHROME_BIN="$(node -p "require('playwright').chromium.executablePath()")"
+          export CHROME_BIN
           python3 ../../../../.github/scripts/mobile-ci/run-ios-phase.py \
             --output-dir ../build/reports/browser-visual/timings browser-logic-tests \
             ../../../../gradlew --project-dir ../../../.. :waltid-applications:waltid-wallet-demo-compose:sharedLogic:wasmJsBrowserTest \
@@ -56,13 +75,12 @@ jobs:
             --max-workers=2 --console=plain
       - name: Compare every browser catalogue state
         working-directory: waltid-applications/waltid-wallet-demo-compose/webApp/visual
-        env:
-          GIT_CONFIG_COUNT: '1'
-          GIT_CONFIG_KEY_0: safe.directory
-          GIT_CONFIG_VALUE_0: ${{ github.workspace }}
         run: >-
           python3 ../../../../.github/scripts/mobile-ci/run-ios-phase.py
           --output-dir ../build/reports/browser-visual/timings browser-compare npm test
+      - name: Run live-status.cjs real issuance, status, and verifier journey
+        if: ${{ !cancelled() && steps.browser_test_tools.outcome == 'success' }}
+        run: bash .github/scripts/mobile-ci/run-browser-live-status-e2e.sh
       - name: Retain browser comparisons and timings
         if: always()
         uses: actions/upload-artifact@v7
@@ -74,6 +92,14 @@ jobs:
             waltid-applications/waltid-wallet-demo-compose/sharedLogic/build/test-results/wasmJsBrowserTest
           if-no-files-found: error
           retention-days: 14
+      - name: Retain real browser journey evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wallet-browser-e2e-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/wallet-browser-e2e/evidence
+          if-no-files-found: warn
+          retention-days: 7
 
   wallet-visual-android:
     needs: macos-eligibility
@@ -137,9 +163,9 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v5
-      - name: Check ordinary and coordinated verification defaults
+      - name: Check build conventions
         run: >-
-          ./gradlew -p build-logic test --tests WalletVisualVerificationTest --max-workers=2
+          ./gradlew -p build-logic test --tests WalletVisualVerificationTest --tests KotlinWarningsPluginTest --max-workers=2
           -Dorg.gradle.jvmargs=-Xmx2g -Pkotlin.compiler.execution.strategy=in-process
       - name: Generate the PR reference gallery
         id: reference_gallery

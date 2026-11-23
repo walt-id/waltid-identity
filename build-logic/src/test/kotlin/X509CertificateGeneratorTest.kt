@@ -107,6 +107,36 @@ class X509CertificateGeneratorTest {
     }
 
     @Test
+    fun `mdoc reader authentication follows the ISO 18013-5 profile`() {
+        val readerCa = X509CertificateRequest("reader-ca", X509Profile.CA, "C=US,CN=Test Reader CA", pathLength = 0)
+        for (algorithm in listOf("P-256", "P-384", "P-521", "Ed25519")) {
+            for (issuer in listOf(readerCa, iaca)) {
+                val generated = X509CertificateGenerator.generate(listOf(issuer, X509CertificateRequest(
+                    "reader", X509Profile.MDOC_READER_AUTHENTICATION, "CN=Test Reader", issuer = issuer.name,
+                    keyAlgorithm = algorithm, crlDistributionPointUri = "https://reader.example.com/crl",
+                )))
+                val reader = generated.getValue("reader").certificate
+                val ca = generated.getValue(issuer.name).certificate
+                assertPkixValid(generated.getValue("reader").chain)
+
+                assertNull(reader.getExtension(Extension.basicConstraints))
+                assertEquals(KeyUsage(KeyUsage.digitalSignature), KeyUsage.fromExtensions(reader.extensions))
+                assertTrue(reader.getExtension(Extension.keyUsage).isCritical)
+                assertTrue(reader.getExtension(Extension.extendedKeyUsage).isCritical)
+                assertEquals("1.0.18013.5.1.6", ExtendedKeyUsage.fromExtensions(reader.extensions).usages.single().id)
+                assertEquals(
+                    SubjectKeyIdentifier.fromExtensions(ca.extensions).keyIdentifier.toList(),
+                    AuthorityKeyIdentifier.fromExtensions(reader.extensions).keyIdentifierOctets.toList(),
+                )
+                assertTrue(reader.getExtension(Extension.cRLDistributionPoints) != null)
+                // Only key usage and extended key usage may be critical.
+                assertEquals(setOf(Extension.keyUsage, Extension.extendedKeyUsage), reader.criticalExtensionOIDs.toSet(), algorithm)
+                assertNull(reader.getExtension(Extension.subjectAlternativeName))
+            }
+        }
+    }
+
+    @Test
     fun `JWK carries the certificate key, chain and RFC 7638 kid for every key algorithm`() {
         for (algorithm in KeyAlgorithm.entries) {
             val generated = X509CertificateGenerator.generate(listOf(
@@ -121,13 +151,12 @@ class X509CertificateGeneratorTest {
                 else -> listOf("kty", "n", "e") to listOf("d", "p", "q", "dp", "dq", "qi")
             }
 
-            assertEquals((publicMembers + privateMembers + listOf("kid", "alg", "x5c")).toSet(), private.keys, algorithm.id)
+            assertEquals((publicMembers + privateMembers + listOf("kid", "alg")).toSet(), private.keys, algorithm.id)
             assertEquals(private - privateMembers, public, algorithm.id)
             assertEquals(algorithm.jwsAlgorithm, public["alg"], algorithm.id)
             if (algorithm.isEc || algorithm == KeyAlgorithm.ED25519) {
                 assertEquals(algorithm.id, public["crv"], algorithm.id)
             }
-            assertEquals(generated.chain.map { Base64.getEncoder().encodeToString(it.encoded) }, public["x5c"], algorithm.id)
             assertEquals(thumbprint(public.filterKeys { it in publicMembers }.mapValues { it.value as String }), public["kid"], algorithm.id)
 
             // Rebuilding the JDK keys from the JWK members proves they encode the certificate's key pair.
@@ -164,6 +193,16 @@ class X509CertificateGeneratorTest {
         rejects("needs issuerAlternativeNameUri", iaca.copy(issuerAlternativeNameUri = null))
         rejects("needs crlDistributionPointUri", iaca, documentSigner.copy(crlDistributionPointUri = null))
         rejects("must not exceed 457 days", iaca, documentSigner.copy(validityDays = 500))
+        val reader = X509CertificateRequest("reader", X509Profile.MDOC_READER_AUTHENTICATION, "CN=Reader", issuer = "ca",
+            crlDistributionPointUri = "https://reader.example.com/crl")
+        rejects("need an issuer", reader.copy(issuer = null))
+        rejects("must have an EC key", ca.copy(keyAlgorithm = "RSA-2048"), reader)
+        rejects("or Ed25519 key", ca, reader.copy(keyAlgorithm = "RSA-2048"))
+        rejects("exactly one CN", ca, reader.copy(subject = "O=walt.id"))
+        rejects("needs crlDistributionPointUri", ca, reader.copy(crlDistributionPointUri = null))
+        rejects("must not exceed 1187 days", ca, reader.copy(validityDays = 1200))
+        rejects("extensions are fixed", ca, reader.copy(extendedKeyUsages = listOf("clientAuth")))
+        rejects("cannot sign", ca, reader, reader.copy(name = "child", issuer = "reader"))
         rejects("cannot sign", X509CertificateRequest("leaf", X509Profile.LEAF, "CN=a"),
             X509CertificateRequest("child", X509Profile.LEAF, "CN=b", issuer = "leaf"))
         rejects("after its issuer", ca, X509CertificateRequest("leaf", X509Profile.LEAF, "CN=a", issuer = "ca", validityDays = 4000))

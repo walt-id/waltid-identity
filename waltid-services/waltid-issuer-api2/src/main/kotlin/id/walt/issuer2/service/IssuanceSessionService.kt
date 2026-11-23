@@ -4,22 +4,30 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.openid4vci.deferred.DeferredIssuanceStore
+import id.walt.openid4vci.deferred.DeferredSessionSnapshot
+import id.walt.openid4vci.deferred.DeferredIssuanceState
+import id.walt.openid4vci.deferred.DeferredStatus
+import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationChange
 import io.ktor.server.plugins.NotFoundException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import java.util.UUID
 
 class IssuanceSessionService(
     private val repository: IssuanceSessionRepository,
 ) {
-    val deferredStore: id.walt.openid4vci.deferred.DeferredIssuanceStore = object : id.walt.openid4vci.deferred.DeferredIssuanceStore {
-        override suspend fun get(sessionId: String): id.walt.openid4vci.deferred.DeferredSessionSnapshot? =
-            repository.get(sessionId)?.let { id.walt.openid4vci.deferred.DeferredSessionSnapshot(it.sessionId, it.expiresAt, it.deferredState) }
+    val deferredStore: DeferredIssuanceStore = object : DeferredIssuanceStore {
+        override suspend fun get(id: String): DeferredSessionSnapshot? =
+            repository.get(id)?.let { DeferredSessionSnapshot(it.sessionId, it.expiresAt, it.deferredState) }
 
         override suspend fun compareAndSet(
-            expected: id.walt.openid4vci.deferred.DeferredSessionSnapshot,
-            replacement: id.walt.openid4vci.deferred.DeferredIssuanceState,
+            expected: DeferredSessionSnapshot,
+            replacement: DeferredIssuanceState,
         ): Boolean {
             val current = repository.get(expected.id) ?: return false
             if (current.deferredState != expected.state) return false
-            val denied = replacement.status == id.walt.openid4vci.deferred.DeferredStatus.DENIED
+            val denied = replacement.status == DeferredStatus.DENIED
             return repository.compareAndSet(current, current.copy(
                 deferredState = replacement, deferredStatus = replacement.status,
                 expiresAt = replacement.deadline ?: current.expiresAt,
@@ -37,7 +45,7 @@ class IssuanceSessionService(
             val results = current.issuanceResults + session.issuanceResults
             val selected = current.authorizedCredentialIdentifiers ?: session.authorizedCredentialIdentifiers
             val complete = !selected.isNullOrEmpty() && selected.all { it in results }
-            val denied = current.deferredStatus == id.walt.openid4vci.deferred.DeferredStatus.DENIED
+            val denied = current.deferredStatus == DeferredStatus.DENIED
             val updated = current.copy(
                 issuanceResults = results, authorizedCredentialIdentifiers = selected,
                 status = if (denied) IssuanceSessionStatus.UNSUCCESSFUL else if (complete) IssuanceSessionStatus.SUCCESSFUL else session.status,
@@ -50,19 +58,55 @@ class IssuanceSessionService(
 
     suspend fun createSession(session: IssuanceSession): IssuanceSession = repository.save(session)
 
+    internal suspend fun trySaveWalletNotification(
+        current: IssuanceSession,
+        change: IssuedCredentialNotificationChange,
+    ): IssuanceSession? {
+        val result = requireNotNull(current.issuanceResults[change.credentialIdentifier])
+        val updatedResult = result.copy(
+            walletNotification = requireNotNull(result.walletNotification).copy(
+                event = change.event,
+                eventDescription = change.eventDescription,
+            ),
+        )
+        val updated = current.copy(
+            issuanceResults = current.issuanceResults + (change.credentialIdentifier to updatedResult),
+        )
+        return if (repository.compareAndSet(current, updated)) updated else null
+    }
+
     suspend fun saveSession(session: IssuanceSession): IssuanceSession {
-        if (session.deferredState == null) return repository.save(session)
         while (true) {
+            currentCoroutineContext().ensureActive()
             val current = getSession(session.sessionId)
-            val state = requireNotNull(current.deferredState)
-            val denied = state.status == id.walt.openid4vci.deferred.DeferredStatus.DENIED
+            check(current.issuanceClaimId == null) { "Issuance session is being processed" }
+            val state = current.deferredState
+            val denied = state?.status == DeferredStatus.DENIED
             val replacement = session.copy(
-                deferredState = state, deferredStatus = state.status, expiresAt = current.expiresAt,
-                issuanceResults = current.issuanceResults + session.issuanceResults,
+                deferredState = state, deferredStatus = state?.status ?: session.deferredStatus,
+                expiresAt = if (state == null) session.expiresAt else current.expiresAt,
+                issuanceResults = session.issuanceResults + current.issuanceResults,
                 authorizedCredentialIdentifiers = current.authorizedCredentialIdentifiers ?: session.authorizedCredentialIdentifiers,
                 status = if (denied) IssuanceSessionStatus.UNSUCCESSFUL else session.status,
                 isClosed = denied || session.isClosed,
+                issuanceClaimId = null,
             )
+            if (repository.compareAndSet(current, replacement)) return replacement
+        }
+    }
+
+    internal suspend fun establishIssuanceSelection(sessionId: String, identifiers: List<String>): IssuanceSession {
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val current = getSession(sessionId)
+            current.authorizedCredentialIdentifiers?.let { selected ->
+                require(identifiers.all { it in selected }) { "Token exceeds the established issuance selection" }
+                return current
+            }
+            check(current.issuanceClaimId == null) { "Issuance session is being processed" }
+            val selected = current.issuanceRequests.map { it.credentialIdentifier }.filter { it in identifiers }
+            require(identifiers.all { it in selected }) { "Token exceeds the established issuance selection" }
+            val replacement = current.copy(authorizedCredentialIdentifiers = selected)
             if (repository.compareAndSet(current, replacement)) return replacement
         }
     }
@@ -74,7 +118,30 @@ class IssuanceSessionService(
 
     suspend fun removeSession(sessionId: String) = repository.remove(sessionId)
 
-    suspend fun claimSession(sessionId: String): IssuanceSession? = repository.take(sessionId)
+    internal suspend fun claimSession(sessionId: String): IssuanceSession? {
+        val claimId = UUID.randomUUID().toString()
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            val current = repository.get(sessionId) ?: return null
+            if (current.issuanceClaimId != null || current.isClosed) return null
+            val claimed = current.copy(issuanceClaimId = claimId)
+            if (repository.compareAndSet(current, claimed)) return claimed
+        }
+    }
+
+    /** [session] contains only newly issued results. Concurrent wallet reports remain in the live record. */
+    internal suspend fun finishClaimedSession(session: IssuanceSession): IssuanceSession {
+        val claimId = requireNotNull(session.issuanceClaimId)
+        while (true) {
+            val current = getSession(session.sessionId)
+            check(current.issuanceClaimId == claimId) { "Issuance session claim has changed" }
+            val replacement = session.copy(
+                issuanceResults = current.issuanceResults + session.issuanceResults,
+                issuanceClaimId = null,
+            )
+            if (repository.compareAndSet(current, replacement)) return replacement
+        }
+    }
 
     suspend fun listSessions(): List<IssuanceSession> = repository.list()
 

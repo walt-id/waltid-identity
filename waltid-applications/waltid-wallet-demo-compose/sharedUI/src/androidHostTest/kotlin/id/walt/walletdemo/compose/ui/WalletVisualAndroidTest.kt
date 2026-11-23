@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.v2.runAndroidComposeUiTest
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,7 +26,7 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "en-rUS-w393dp-h852dp-notnight-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class, ExperimentalRoborazziApi::class)
 class WalletVisualAndroidTest {
     private lateinit var previousTimeZone: java.util.TimeZone
     @org.junit.Before fun pinTimeZone() {
@@ -33,6 +34,26 @@ class WalletVisualAndroidTest {
         java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
     }
     @org.junit.After fun restoreTimeZone() { java.util.TimeZone.setDefault(previousTimeZone) }
+
+    @Test fun credentialStatusHome() = scenario { credentialStatusHome() }
+    @Test fun credentialStatusMixedArtwork() = scenario { credentialStatusMixedArtwork() }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
+    fun credentialStatusMixedArtworkRtl() = scenario(fontScale = 1.5f) { credentialStatusMixedArtwork(rtl = true) }
+    @Test fun credentialStatusDetailsClear() = scenario { credentialStatusDetails() }
+    @Test fun credentialStatusDetailsAdverse() = scenario { credentialStatusDetails(adverse = true) }
+    @Test fun credentialStatusDetailsExpanded() = scenario { credentialStatusDetails(adverse = true, expanded = true) }
+    @Test fun credentialStatusKinds() = scenario { credentialStatusKinds() }
+    @Test fun credentialStatusSharing() = scenario(sheetHost = true) { credentialStatusSharing() }
+    @Test fun credentialStatusConfirmation() = scenario(sheetHost = true) { credentialStatusConfirmation() }
+    @Test fun credentialStatusPaymentConfirmation() = scenario(sheetHost = true) { credentialStatusConfirmation(payment = true) }
+    @Test fun credentialStatusPayment() = scenario(sheetHost = true) { credentialStatusPayment() }
+    @Test fun credentialStatusSettingsPartial() = scenario { credentialStatusSettings() }
+    @Test fun credentialStatusSettingsChecking() = scenario { credentialStatusSettings(checking = true) }
+    @Test fun credentialStatusSettingsHelp() = scenario { credentialStatusSettings(helpExpanded = true) }
+    @Test
+    @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
+    fun credentialStatusCompactRtl() = scenario(fontScale = 1.5f) { credentialStatusKinds(compactRtl = true) }
 
     @Test fun walletOpening() = scenario { walletOpening() }
     @Test fun walletOpeningFailure() = scenario { walletOpening(failure = true) }

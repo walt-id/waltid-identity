@@ -284,7 +284,7 @@ internal data class OfferedCredentialMetadataDto(
 
 @Serializable
 internal data class OfferClaimMetadataDto(
-    val path: List<String> = emptyList(),
+    val path: List<JsonElement> = emptyList(),
     val mandatory: Boolean? = null,
     val displayName: String? = null,
 )
@@ -448,4 +448,13 @@ internal data class PollDeferredRequestDto(
 internal data class ResolveBatchOfferResponseDto(
     val offer: ResolveOfferDetailedResponseDto,
     val batchSize: Int? = null,
+)
+
+@Serializable
+internal data class RejectIssuedCredentialRequestDto(
+    val notificationId: String,
+    val accessToken: String,
+    val credentialIssuerBaseUrl: String? = null,
+    val notificationEndpoint: String? = null,
+    val eventDescription: String? = null,
 )

@@ -83,7 +83,13 @@ public class ProximitySharingPlan internal constructor(
      * Call only after deliberately showing and approving [submission]. No radio or key operation occurs here.
      * The returned approval is valid for 60 seconds, one wallet and one connection attempt. It is never persisted.
      */
-    public fun approve(submission: ProximitySubmission): ProximityPreparationResult {
+    public fun approve(submission: ProximitySubmission): ProximityPreparationResult = approveInternal(submission, null)
+
+    /** Captures the semantic warnings displayed for this one-use prepared selection. */
+    public fun approveStatusReviewed(submission: ProximitySubmission, reviewedStatus: Map<String, String>): ProximityPreparationResult =
+        approveInternal(submission, reviewedStatus.toMap())
+
+    private fun approveInternal(submission: ProximitySubmission, reviewedStatus: Map<String, String>?): ProximityPreparationResult {
         if (isExpired) return preparationRejected("sharing_plan_expired", "This request has expired. Connect to the reader again.")
         val owned = try { submission.snapshot() } catch (_: IllegalArgumentException) {
             return preparationRejected("invalid_prepared_submission", "Choose the data to share before preparing.")
@@ -96,7 +102,7 @@ public class ProximitySharingPlan internal constructor(
             return preparationRejected("portrait_required", "This identity request requires the portrait. Include it or decline sharing.")
         }
         return ProximityPreparationResult.Prepared(
-            ProximityPreparedSharing(this, owned, now(), timeSource.markNow()),
+            ProximityPreparedSharing(this, owned, now(), timeSource.markNow(), reviewedStatus),
         )
     }
 }
@@ -122,6 +128,7 @@ public class ProximityPreparedSharing internal constructor(
     submission: ProximitySubmission,
     approvedAt: Instant,
     private val approved: TimeMark,
+    internal val reviewedStatus: Map<String, String>? = null,
 ) {
     private val ownedSubmission = submission.snapshot()
     private val mutex = Mutex()
