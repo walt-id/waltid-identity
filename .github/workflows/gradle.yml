@@ -70,6 +70,16 @@ jobs:
   gradle:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
+    services:
+      redis:
+        image: ${{ github.event_name == 'pull_request' && 'redis:7-alpine' || '' }}
+        ports:
+          - 6379/tcp
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       # KLOGGING_MIN_* only affect Klogging internals / delivery path. Application TRACE comes
       # from test klogging.conf; this file is loaded first and keeps CI at INFO+.
@@ -194,6 +204,22 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
           KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+
+      - name: Test issuer2 with Redis
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.gradle-setup.outcome == 'success' }}
+        env:
+          ISSUER2_REDIS_HOST: 127.0.0.1
+          ISSUER2_REDIS_PORT: ${{ job.services.redis.ports[6379] }}
+          CI: "true"
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+        run: |
+          reports=waltid-identity/waltid-services/waltid-issuer-api2/build/test-results/redisTest
+          rm -rf "$reports"
+          gradle_status=0
+          ./gradlew :waltid-services:waltid-issuer-api2:redisTest --rerun --console=plain || gradle_status=$?
+          python3 waltid-identity/.github/scripts/mobile-ci/verify_test_results.py --reports "$reports/*.xml"
+          exit "$gradle_status"
 
       - name: Require public SD-JWT payment acceptance
         if: ${{ !cancelled() && inputs.run-payment-demo && steps.gradle-setup.outcome == 'success' }}
