@@ -405,11 +405,13 @@ object PresentationVerificationEngine {
             }
         val queryOptions = dcqlQuery.credentials.filter { it.id in selectedQueryIds }.map { query ->
             val claims = query.claims.orEmpty()
+            val queryPresentations = credentialsByQuery.getValue(query.id).filterIsInstance<MdocsCredential>()
+                .filter { it.document.issuerSigned.issuerAuth == issuerAuth }
             if (query.claimSets == null) listOf(claims.map { it.path }.toSet()) else {
                 query.claimSets.orEmpty().mapNotNull { option ->
                     val selected = claims.filter { it.id in option }
                     val alternative = query.copy(claims = selected, claimSets = null)
-                    if (credentialMismatch(alternative, listOf(credential), matchClaims = true, resolvedTypes = emptyMap()) == null) {
+                    if (credentialMismatch(alternative, queryPresentations, matchClaims = true, resolvedTypes = emptyMap()) == null) {
                         selected.map { it.path }.toSet()
                     } else null
                 }

@@ -42,6 +42,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.parseQueryString
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.http.formUrlEncode
@@ -126,12 +127,13 @@ class MdocSecurityMatrixHttpTest {
         usage: VerificationSessionUsage = VerificationSessionUsage.REUSABLE,
         dcql: DcqlQuery = DcqlQuery(listOf(query(listOf("age_over_18")))),
         queryIds: List<String> = listOf("mdoc"),
+        vcPolicies: VCPolicyList = VCPolicyList(listOf(schema)),
         mutate: suspend (DeviceResponse) -> DeviceResponse = { it },
     ): Presentation {
         val setup: VerificationSessionSetup = CrossDeviceFlowSetup(core = GeneralFlowConfig(
             dcqlQuery = dcql,
             sessionUsage = usage,
-            policies = Verification2Session.DefinedVerificationPolicies(vc_policies = VCPolicyList(listOf(schema))),
+            policies = Verification2Session.DefinedVerificationPolicies(vc_policies = vcPolicies),
         ))
         val created = http.post("/verification-session/create") { setBody(setup) }.body<VerificationSessionCreationResponse>()
         val request = http.get("/verification-session/${created.sessionId}/request").body<AuthorizationRequest>()
@@ -288,6 +290,27 @@ class MdocSecurityMatrixHttpTest {
             val presentation = prepare(http, credential, disclosed = listOf("age_over_18", "portrait"),
                 dcql = queries, queryIds = listOf("mdoc", "photo"))
             val result = submit(http, presentation, true)
+            assertEquals(setOf("mdoc", "photo"), result.presentedCredentials!!.keys)
+        }
+    }
+
+    @Test
+    fun separateSignedPresentationsSatisfyTheirOwnClaimAlternativeInEitherQueryOrder() = withVerifier {
+        val http = testHttpClient()
+        val credential = mdlFixtureCredential(data().toString())
+        val choice = query(listOf("age_over_18", "age_over_21")).let { query ->
+            query.copy(claims = query.claims!!.mapIndexed { index, claim -> claim.copy(id = "claim$index") },
+                claimSets = listOf(listOf("claim0"), listOf("claim1")))
+        }
+        val photo = query(listOf("portrait")).copy(id = "photo")
+        for (queries in listOf(listOf(choice, photo), listOf(photo, choice))) test("separate signed responses with query order ${queries.map { it.id }}") {
+            val presentation = prepare(http, credential, dcql = DcqlQuery(queries), vcPolicies = VCPolicyList(emptyList()))
+            val second = form(presentation.request, credential, listOf("portrait"), queryIds = listOf("photo"))
+            val tokens = listOf(presentation.form, second).flatMap { encoded ->
+                Json.parseToJsonElement(requireNotNull(parseQueryString(encoded)["vp_token"])).jsonObject.entries
+            }.associate { it.key to it.value }
+            val combined = listOf("state" to requireNotNull(presentation.request.state), "vp_token" to JsonObject(tokens).toString()).formUrlEncode()
+            val result = submit(http, presentation.copy(form = combined), true)
             assertEquals(setOf("mdoc", "photo"), result.presentedCredentials!!.keys)
         }
     }

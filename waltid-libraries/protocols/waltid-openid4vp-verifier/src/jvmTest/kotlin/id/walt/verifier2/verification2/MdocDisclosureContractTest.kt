@@ -185,6 +185,23 @@ class MdocDisclosureContractTest {
     }
 
     @Test
+    fun `separate presentations satisfy each query independently in either order`() {
+        val alternatives = query("choice", "family_name", "middle_name").let { query ->
+            query.copy(claims = query.claims!!.mapIndexed { index, claim -> claim.copy(id = "claim$index") },
+                claimSets = listOf(listOf("claim0"), listOf("claim1")))
+        }
+        val name = query("name", "given_name")
+        for (queries in listOf(listOf(alternatives, name), listOf(name, alternatives))) {
+            for (returned in listOf(linkedMapOf("choice" to listOf(credential("family_name")), "name" to listOf(credential("given_name"))),
+                linkedMapOf("name" to listOf(credential("given_name")), "choice" to listOf(credential("family_name"))))) {
+                assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(DcqlQuery(queries), returned, true).isSuccess)
+            }
+            assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(DcqlQuery(queries), mapOf(
+                "choice" to listOf(credential("family_name", "middle_name")), "name" to listOf(credential("given_name"))), true).isFailure)
+        }
+    }
+
+    @Test
     fun `unselected credential alternative cannot authorize an extra disclosure`() {
         val dcql = DcqlQuery(
             credentials = listOf(query("name", "family_name"), query("photo", "portrait")),
