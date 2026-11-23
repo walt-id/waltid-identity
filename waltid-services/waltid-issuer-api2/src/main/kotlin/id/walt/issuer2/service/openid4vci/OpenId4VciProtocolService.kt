@@ -2058,7 +2058,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         )
     }
 
-    /** A proof check could not run (for example, the key attestation trust source is down): a server fault, not the wallet's. */
+    /**
+     * A proof check could not run, for example because the key attestation trust source is down. That is a server
+     * fault, not the wallet's.
+     */
     private fun credentialProofVerificationUnavailable(
         cause: CredentialProofServiceException,
         requestId: String,

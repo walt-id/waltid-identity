@@ -195,9 +195,10 @@ class AttestationBasedClientAuthenticationMethod(
         }.getOrElse {
             return failure("Client attestation PoP algorithm is invalid")
         }
-        val confirmationAlgorithm = confirmationJwk["alg"]
-        if (confirmationAlgorithm != null && (confirmationAlgorithm as? JsonPrimitive)?.contentOrNull != popAlgorithm.identifier) {
-            return failure("Client attestation PoP algorithm does not match confirmation JWK alg")
+        confirmationJwk["alg"]?.let { confirmationAlgorithm ->
+            if ((confirmationAlgorithm as? JsonPrimitive)?.contentOrNull != popAlgorithm.identifier) {
+                return failure("Client attestation PoP algorithm does not match confirmation JWK alg")
+            }
         }
         val popSignatureValid = if (crypto2ClientInstanceKey != null) {
             try {

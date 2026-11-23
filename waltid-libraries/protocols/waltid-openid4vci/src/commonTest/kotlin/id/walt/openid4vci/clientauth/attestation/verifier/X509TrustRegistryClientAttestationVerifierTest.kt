@@ -202,12 +202,14 @@ class X509TrustRegistryClientAttestationVerifierTest {
         val pki = TestAttesterPki.create()
         val holder = generateTestP256Key("client-instance")
         val holderJwk = holder.exportPublicJwkObject()
-        val malformed = listOf(
-            JsonObject(holderJwk + ("kty" to buildJsonObject { put("kty", "EC") })),
-            JsonObject(holderJwk + ("crv" to JsonArray(listOf(JsonPrimitive("P-256"))))),
-            JsonObject(holderJwk + ("alg" to buildJsonObject { put("alg", "ES256") })),
+        val invalidKey = "Client attestation cnf.jwk is invalid"
+        // A kty object already fails the private-key check, so only its error code is asserted.
+        val malformed = mapOf(
+            JsonObject(holderJwk + ("kty" to buildJsonObject { put("kty", "EC") })) to null,
+            JsonObject(holderJwk + ("crv" to JsonArray(listOf(JsonPrimitive("P-256"))))) to invalidKey,
+            JsonObject(holderJwk + ("alg" to buildJsonObject { put("alg", "ES256") })) to invalidKey,
         )
-        for (confirmationKey in malformed) {
+        for ((confirmationKey, description) in malformed) {
             val failure = assertIs<ClientAuthenticationResult.Failure>(
                 authenticate(
                     RecordingTrustEvaluator { registryDecision() },
@@ -217,6 +219,7 @@ class X509TrustRegistryClientAttestationVerifierTest {
                 "$confirmationKey",
             )
             assertEquals("invalid_client", failure.error.error, "$confirmationKey")
+            description?.let { assertEquals(it, failure.error.description, "$confirmationKey") }
         }
     }
 
