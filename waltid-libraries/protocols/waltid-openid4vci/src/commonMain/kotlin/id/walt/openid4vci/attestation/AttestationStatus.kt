@@ -1,5 +1,7 @@
 package id.walt.openid4vci.attestation
 
+import id.walt.openid4vci.errors.ClientInputException
+import id.walt.openid4vci.errors.ensureClientInput
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.Jwk
@@ -77,16 +79,16 @@ internal fun captureAttestationStatus(
     now: Instant,
 ): VerifiedAttestationStatus {
     val reference = payload["status"]?.let { status ->
-        val objectValue = status as? JsonObject ?: error("Attestation status must be an object")
-        val list = objectValue["status_list"] as? JsonObject ?: error("Unsupported attestation status mechanism")
+        val objectValue = status as? JsonObject ?: throw ClientInputException("Attestation status must be an object")
+        val list = objectValue["status_list"] as? JsonObject ?: throw ClientInputException("Unsupported attestation status mechanism")
         val index = (list["idx"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
-            ?.takeIf { it >= 0 } ?: error("Attestation status idx must be a non-negative integer")
+            ?.takeIf { it >= 0 } ?: throw ClientInputException("Attestation status idx must be a non-negative integer")
         val uri = (list["uri"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-            ?.takeIf { it.isNotBlank() } ?: error("Attestation status uri must be a string")
+            ?.takeIf { it.isNotBlank() } ?: throw ClientInputException("Attestation status uri must be a string")
         parseAttestationStatusListUrl(uri)
         AttestationStatusReference(uri, index)
     }
-    require(!policy.requireStatusReference || reference != null) { "Attestation status reference is required" }
+    ensureClientInput(!policy.requireStatusReference || reference != null) { "Attestation status reference is required" }
     require(signer == null || !Jwk.containsPrivateMaterial(signer)) { "Attester context must contain only public material" }
     return VerifiedAttestationStatus(
         capturedAt = now.epochSeconds, policy = policy, reference = reference,
@@ -98,15 +100,15 @@ internal fun captureAttestationStatus(
 internal fun parseAttestationStatusListUrl(uri: String): Url {
     // Ktor supplies a localhost origin for relative references. Check the signed raw value first.
     val schemeEnd = uri.indexOf("://")
-    require(schemeEnd > 0 && uri.substring(0, schemeEnd).lowercase() in setOf("http", "https")) {
+    ensureClientInput(schemeEnd > 0 && uri.substring(0, schemeEnd).lowercase() in setOf("http", "https")) {
         "Attestation status requires an absolute HTTP(S) URI"
     }
     val authority = uri.substring(schemeEnd + 3).takeWhile { it != '/' && it != '?' && it != '#' }
-    require(authority.isNotBlank() && uri.none { it.isWhitespace() || it == '\\' || it == '#' }) {
+    ensureClientInput(authority.isNotBlank() && uri.none { it.isWhitespace() || it == '\\' || it == '#' }) {
         "Attestation status requires an authority and no whitespace, backslashes or fragment"
     }
     return Url(uri).also { url ->
-        require(url.protocol.name in setOf("http", "https") && url.host.isNotBlank()) {
+        ensureClientInput(url.protocol.name in setOf("http", "https") && url.host.isNotBlank()) {
             "Attestation status requires an absolute HTTP(S) URI"
         }
     }

@@ -6,16 +6,17 @@ import kotlin.uuid.Uuid
 private val log = KotlinLogging.logger {}
 
 /**
- * This exception's message, when it describes the client's own request and is therefore safe to return as an
- * OAuth `error_description` or to record on an issuance session or event; otherwise null.
+ * This exception's message, when it was written for the client and is therefore safe to return as an OAuth
+ * `error_description` or to record on an issuance session or event; otherwise null.
  *
- * An [IllegalArgumentException] (which includes kotlinx.serialization's `SerializationException`) is how this
- * library and its parsers reject a request, token or proof, and a [CredentialProtocolException] carries an
- * error the issuer wrote for the wallet. Anything else is an internal failure - a session store, KMS or network
- * error - whose message can name hosts, ports or driver state.
+ * Only explicit markers qualify: a [ClientInputException] (including `CredentialProofValidationException`), thrown
+ * by validators for checks on what the client sent, and a [CredentialProtocolException], which carries an error
+ * the issuer wrote for the wallet. Any other exception, including a plain [IllegalArgumentException] or a
+ * kotlinx.serialization `SerializationException`, may come from issuer configuration, key material, stored data
+ * or a session store, KMS or network client, and its message can name hosts, ports or resources.
  */
 fun Throwable.clientVisibleDescription(): String? = when (this) {
-    is IllegalArgumentException, is CredentialProtocolException -> message
+    is ClientInputException, is CredentialProtocolException -> message
     else -> null
 }
 
