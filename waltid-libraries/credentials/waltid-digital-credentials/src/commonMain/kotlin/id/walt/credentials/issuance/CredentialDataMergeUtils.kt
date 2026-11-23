@@ -61,7 +61,7 @@ object CredentialDataMergeUtils {
             functionHistory[cmd] = result
         }
 
-        log.debug { "Called function: $functionCall, got: $result" }
+        log.debug { "Evaluated mapping function $cmd" }
         return result
     }
 
@@ -165,7 +165,6 @@ object CredentialDataMergeUtils {
         val args: String?
     ) {
         fun fromContext(): JsonElement {
-            log.debug { "CONTEXT: $context" }
             return context[func] ?: throw IllegalArgumentException("Cannot find in context: $func")
         }
 
