@@ -1,5 +1,6 @@
 package id.walt.mdoc.objects.mso
 
+import id.walt.mdoc.encoding.requireSupportedMdocVersion
 import id.walt.mdoc.encoding.TransformingSerializerTemplate
 import id.walt.mdoc.objects.digest.ValueDigestList
 import io.ktor.http.*
@@ -57,7 +58,7 @@ data class MobileSecurityObject(
     val status: Status? = null
 ) {
     fun precheck() {
-        require(version == "1.0") { "Unsupported MSO version" }
+        requireSupportedMdocVersion(version)
         valueDigests.forEach { (namespace, digests) ->
             require(digests.entries.map { it.key }.distinct().size == digests.entries.size) {
                 "MSO contains duplicate DigestIDs for namespace $namespace"
