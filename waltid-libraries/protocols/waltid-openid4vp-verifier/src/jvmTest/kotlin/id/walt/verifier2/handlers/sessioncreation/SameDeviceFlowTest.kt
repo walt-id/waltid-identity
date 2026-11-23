@@ -78,6 +78,34 @@ class SameDeviceFlowTest {
     }
 
     @Test
+    fun `empty and error only redirects cannot create same device sessions`() {
+        for (redirects in listOf(VerificationSessionRedirects(), VerificationSessionRedirects(errorRedirectUri = Url("https://example.com/error")))) {
+            assertFailsWith<IllegalArgumentException> { SameDeviceFlowSetup(GeneralFlowConfig(), redirects = redirects) }
+        }
+    }
+
+    @Test
+    fun `completion code survives restart and is absent from every public view`() = runTest {
+        val session = VerificationSessionCreator.createVerificationSession(
+            SameDeviceFlowSetup(GeneralFlowConfig(), redirects = redirects), clientId = null,
+            urlPrefix = "https://verifier.example/verification-session", urlHost = "openid4vp://authorize",
+        ).apply {
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
+            responseCode = "wallet-browser-secret"
+            statusReason = "private outcome detail"
+        }
+        val restored = Json.decodeFromString<Verification2Session>(Json.encodeToString(session))
+        assertNull(restored.publicView().responseCode)
+        assertNull(restored.publicView().statusReason)
+        assertFailsWith<IllegalArgumentException> { restored.completionView(null) }
+        assertFailsWith<IllegalArgumentException> { restored.completionView("wrong") }
+        val completed = restored.completionView("wallet-browser-secret")
+        assertNull(completed.responseCode)
+        assertEquals("private outcome detail", completed.statusReason)
+        assertEquals("wallet-browser-secret", restored.responseCode)
+    }
+
+    @Test
     fun `same device requires a response URL prefix`() = runTest {
         val error = assertFailsWith<IllegalArgumentException> {
             VerificationSessionCreator.createVerificationSession(
