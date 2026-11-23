@@ -101,7 +101,9 @@ The library includes key resolution mechanisms to verify credentials:
 - **One engine** (`CredentialDataMergeUtils`) with a per-format `MergePolicy`: W3C and SD-JWT payloads append mapped
   arrays and copy templates inside them literally; mdoc namespaces replace arrays and evaluate templates everywhere.
 - **One context** (`issuanceTemplateContext`): `issuerId`, `issuerDid` (the issuer id, also when it is not a DID),
-  `subjectDid`, `display`.
+  `subjectDid`, `display`. In SD-JWT VC and W3C JWT VC issuance, `<subjectDid>` and `<context:subjectDid>`
+  use the wallet's verified DID when available. If an accepted proof supplies only a key, evaluating either
+  template asks the DID library to derive an identifier from that credential's public key. Its default is `did:jwk`.
 - **One clock**: `issuanceDataFunctions()` reads the issuance time set with `IssuanceClock`, so every timestamp of an
   issuance agrees. `dataFunctions` always uses the system clock.
 - `MergingIssuer.mergingJwtIssue` / `mergingSdJwtIssue` issue W3C credentials from merged data.

@@ -21,8 +21,8 @@ import kotlin.time.Instant
 
 /**
  * The template context of an issuance, as every format builds it: `issuerId`, `issuerDid`, `subjectDid` and
- * `display`, with [extra] on top. Absent and empty values are left out, so a mapping that names one fails clearly
- * instead of receiving an empty value.
+ * `display`, with [extra] on top. Absent and empty values are left out. When a mapping requests a missing
+ * `subjectDid`, it can derive one from the selected [IssuanceHolderKey].
  *
  * `issuerDid` is the issuer id even when that is not a DID, e.g. an issuer URL: mappings such as the example
  * profiles' `"issuer": {"id": "<issuerDid>"}` depend on it, and only producing it for DIDs would make their
