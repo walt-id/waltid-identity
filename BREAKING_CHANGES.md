@@ -3,7 +3,7 @@
 ## OpenID4VCI claim metadata paths
 
 - `ClaimDescription.path` now uses `List<JsonElement>` to preserve string keys, integer indexes/map keys, and JSON null wildcards (OpenID4VCI Appendix C). Consumers reading or copying paths must handle these segment types instead of assuming every segment is a string; rebuild callers against the updated model. The Wallet2 detailed-offer claim path response uses the same typed segments.
-- Existing construction with a collection of strings remains supported through a convenience constructor. String-only paths retain their existing JSON representation.
+- The string-only `ClaimDescription(path: Collection<String>, mandatory, display)` convenience constructor has been removed. Kotlin callers must construct typed paths explicitly, for example `ClaimDescription(path = listOf(JsonPrimitive("given_name")))`, or convert an existing string collection with `path.map { JsonPrimitive(it) }`. Use `JsonPrimitive(1)` for an integer segment and `JsonNull` for a wildcard. This is a source and binary API break: rebuild affected callers against the updated `waltid-openid4vci` library. JSON metadata and stored configuration formats are unchanged.
 - Repeated or contradictory claim descriptions (OpenID4VCI Appendix B.3), negative integers in paths of JSON-based credentials, and mdoc paths that do not start with a namespace and a data element identifier (Appendix C) are now rejected when issuer2 loads its configuration. Wallets ignore such claim descriptions for that credential configuration: offer previews and stored credentials carry no claim metadata for it, while issuance continues.
 
 ## waltid-sdjwt payload validation

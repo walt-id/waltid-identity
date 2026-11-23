@@ -177,7 +177,11 @@ Manager and `AndroidDigitalCredentialRegistry.registerCreationOptions` to
 advertise issuance capability separately from presentation registry replacement.
 
 The session contains typed issuer, credential-configuration, and transaction-code
-metadata for review UI. For an authorization-code offer, call
+metadata for review UI. After a failed acceptance, keep Accept available for the
+same offer only if `outcome.error.canRetryOffer` is true. The user can correct a
+rejected transaction code. A lost token response closes the offer.
+
+For an authorization-code offer, call
 `beginAuthorizationIssuance(session.id)` after the user accepts the reviewed
 offer, open the returned browser URL, and then continue with
 `continueAuthorizationIssuance`. Set `MobileWalletConfig.preferredLocales` to

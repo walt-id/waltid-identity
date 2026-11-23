@@ -1336,7 +1336,8 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
                 error: IssuanceFailure(
                     code: value.error.code.toSwiftIssuanceErrorCode(),
                     message: value.error.message,
-                    targetFailure: value.failure?.toSwiftTargetFailure()
+                    targetFailure: value.failure?.toSwiftTargetFailure(),
+                    canRetryOffer: value.error.canRetryOffer
                 ),
                 storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self),
                 deferredCredentials: swiftArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletIssuanceContinuation.self)

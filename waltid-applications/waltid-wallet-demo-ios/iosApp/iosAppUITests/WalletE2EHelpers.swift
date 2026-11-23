@@ -260,7 +260,6 @@ final class WalletE2EUI {
     }
 
     func returnToWallet() {
-        dismissKeyboardIfPresent()
         let home = app.buttons["wallet.scanButton"]
         for _ in 0..<6 {
             // Untouched successes can disappear between an AX lookup and a tap.
@@ -276,6 +275,10 @@ final class WalletE2EUI {
             } else if home.exists && home.isHittable {
                 return
             } else {
+                // Closing the foreground flow normally owns keyboard teardown. Discover a
+                // keyboard only when no usable Close/Back or Home action is available.
+                dismissKeyboardIfPresent()
+                if home.exists && home.isHittable { return }
                 tapNavigationBack()
             }
         }
