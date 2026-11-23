@@ -133,7 +133,7 @@ internal fun CredentialsTab(
         val checkedAt = LocalWalletTimeFormatter.current(Instant.parse(notice.checkedAt)).fullText
         stringResource(if (notice.historical) Res.string.credential_status_notice_historical
             else Res.string.credential_status_notice_current, title, kind, checkedAt)
-    } else transientStatusNotice.takeUnless { showingDetails || confirmDelete }
+    } else transientStatusNotice.takeUnless { confirmDelete }
     if (noticeMessage != null) {
         val action = if (notice != null) stringResource(Res.string.credential_status_notice_view) else null
         LaunchedEffect(notice?.version, noticeMessage) {
