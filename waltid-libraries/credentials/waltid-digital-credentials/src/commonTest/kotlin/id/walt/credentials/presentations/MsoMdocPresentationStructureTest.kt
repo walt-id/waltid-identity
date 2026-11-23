@@ -30,6 +30,12 @@ class MsoMdocPresentationStructureTest {
     }
 
     @Test
+    fun `compatible minor versions parse while malformed versions fail`() = runTest {
+        for (version in listOf("1.1", "1.23")) assertTrue(MsoMdocPresentation.parse(response(version = version)).isSuccess)
+        for (version in listOf("1", "1.", "1.x", "2.0", "01.0")) assertTrue(MsoMdocPresentation.parse(response(version = version)).isFailure)
+    }
+
+    @Test
     fun `error response with documents is rejected`() = runTest {
         assertTrue(MsoMdocPresentation.parse(response(status = 1u)).isFailure)
     }
