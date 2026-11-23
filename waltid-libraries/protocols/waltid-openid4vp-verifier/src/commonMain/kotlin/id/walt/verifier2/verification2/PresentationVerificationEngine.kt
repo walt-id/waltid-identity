@@ -391,9 +391,10 @@ object PresentationVerificationEngine {
         transactionData: List<String>,
     ): String? {
         val issuerAuth = credential.document.issuerSigned.issuerAuth
-        val selectedQueryIds = credentialsByQuery.filterValues { credentials ->
-            credentials.filterIsInstance<MdocsCredential>().any { it.document.issuerSigned.issuerAuth == issuerAuth }
-        }.keys
+        val presentationsByQuery = credentialsByQuery.mapValues { (_, credentials) ->
+            credentials.filterIsInstance<MdocsCredential>().filter { it.document.issuerSigned.issuerAuth == issuerAuth }
+        }.filterValues { it.isNotEmpty() }
+        val selectedQueryIds = presentationsByQuery.keys
         // Requested transaction binding is protocol data, not an extra credential claim.
         // Permit only the two hash fields in transaction types requested for this credential.
         val transactionPaths = decodeList(transactionData)
@@ -405,8 +406,7 @@ object PresentationVerificationEngine {
             }
         val queryOptions = dcqlQuery.credentials.filter { it.id in selectedQueryIds }.map { query ->
             val claims = query.claims.orEmpty()
-            val queryPresentations = credentialsByQuery.getValue(query.id).filterIsInstance<MdocsCredential>()
-                .filter { it.document.issuerSigned.issuerAuth == issuerAuth }
+            val queryPresentations = presentationsByQuery.getValue(query.id)
             if (query.claimSets == null) listOf(claims.map { it.path }.toSet()) else {
                 query.claimSets.orEmpty().mapNotNull { option ->
                     val selected = claims.filter { it.id in option }
@@ -417,13 +417,17 @@ object PresentationVerificationEngine {
                 }
             }
         }
-        val issuerPaths = credential.document.issuerSigned.namespaces.orEmpty().flatMap { (namespace, items) ->
-            items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.value.elementIdentifier)) }
-        }
-        val devicePaths = credential.document.deviceSigned?.namespaces?.value?.entries.orEmpty().flatMap { (namespace, items) ->
-            items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.key)) }
-        }
-        val requiredPaths = (issuerPaths + devicePaths.filterNot { it in transactionPaths }).toSet()
+        // A choice applies to the signed credential across all its presentations, not independently
+        // to each response. Otherwise different presentations can justify incompatible choices.
+        val requiredPaths = presentationsByQuery.values.flatten().flatMap { presentation ->
+            val issuerPaths = presentation.document.issuerSigned.namespaces.orEmpty().flatMap { (namespace, items) ->
+                items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.value.elementIdentifier)) }
+            }
+            val devicePaths = presentation.document.deviceSigned?.namespaces?.value?.entries.orEmpty().flatMap { (namespace, items) ->
+                items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.key)) }
+            }
+            issuerPaths + devicePaths.filterNot { it in transactionPaths }
+        }.toSet()
         // Select one satisfied option per query. Another selected query can justify the remaining claims.
         fun covered(index: Int, remaining: Set<List<JsonElement>>): Boolean {
             if (remaining.isEmpty()) return true
