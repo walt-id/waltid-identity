@@ -590,8 +590,12 @@ type = "redis"
 nodes = [{ host = "127.0.0.1", port = 6379 }]
 ```
 
-The standard issuer2 test task uses Testcontainers to start and stop Redis 7. Run it with Docker running.
-For a local run without Docker, pass `-PskipIssuer2RedisTests=true` to skip the Redis tests.
+The issuer2 `check` and `build` tasks run the Redis repository tests in a separate test JVM.
+Start Docker before running them. Testcontainers starts and stops Redis 7 for the suite.
+Run the Redis suite on its own with `./gradlew :waltid-services:waltid-issuer-api2:redisTest`.
+
+The standard `test` task runs without Docker. For a Docker-free `check` or `build`, pass
+`-PskipIssuer2RedisTests=true`.
 
 ## Building and Testing
 

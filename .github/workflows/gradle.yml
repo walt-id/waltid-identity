@@ -235,7 +235,7 @@ jobs:
           python3 waltid-identity/.github/scripts/mobile-ci/verify_platform_test_results.py --platform jvm
           python3 waltid-identity/.github/scripts/mobile-ci/verify_platform_test_results.py --platform js-node
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
-            reports=waltid-identity/waltid-services/waltid-issuer-api2/build/test-results/test
+            reports=waltid-identity/waltid-services/waltid-issuer-api2/build/test-results/redisTest
             python3 waltid-identity/.github/scripts/mobile-ci/verify_test_results.py \
               --reports "$reports/TEST-id.walt.issuer2.repository.ConfiguredRedisRepositoryTest.xml"
           fi
