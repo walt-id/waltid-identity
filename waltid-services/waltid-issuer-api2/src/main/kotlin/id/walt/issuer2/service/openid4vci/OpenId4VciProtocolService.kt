@@ -1212,6 +1212,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 return oauth2Provider.writeCredentialError(error)
             } catch (e: CredentialProtocolException) {
                 return oauth2Provider.writeDeferredCredentialError(e.error)
+            } catch (e: CredentialProofServiceException) {
+                return credentialProofVerificationUnavailable(e, requestId)
             }
         }
 
@@ -1225,13 +1227,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: CredentialProofServiceException) {
-                logger.error(e) { "Credential proof verification unavailable (requestId=$requestId)" }
-                return oauth2Provider.writeCredentialError(
-                    OAuthError(
-                        OAuthErrorCodes.SERVER_ERROR,
-                        "Credential proof verification unavailable"
-                    )
-                )
+                return credentialProofVerificationUnavailable(e, requestId)
             } catch (e: CredentialProofValidationException) {
                 return rejectCredentialRequest(
                     requestWithSession,
@@ -2059,6 +2055,17 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     request
                 }
             }
+        )
+    }
+
+    /** A proof check could not run (for example, the key attestation trust source is down): a server fault, not the wallet's. */
+    private fun credentialProofVerificationUnavailable(
+        cause: CredentialProofServiceException,
+        requestId: String,
+    ): CredentialResponseHttp {
+        logger.error(cause) { "Credential proof verification unavailable (requestId=$requestId)" }
+        return oauth2Provider.writeCredentialError(
+            OAuthError(OAuthErrorCodes.SERVER_ERROR, "Credential proof verification unavailable"),
         )
     }
 
