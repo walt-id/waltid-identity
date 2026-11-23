@@ -7,6 +7,10 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.document.MultibasePublicKeys
 import id.walt.did.utils.KeyMaterial
+import id.walt.webdatafetching.removeDotSegments
+import io.ktor.http.encodedPath
+import io.ktor.http.URLBuilder
+import io.ktor.http.takeFrom
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -23,9 +27,29 @@ fun interface Crypto2DidKeyResolver {
 class DidDocumentCrypto2KeyResolver(
     private val resolver: DidResolver,
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
-    private val verificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2DidKeyResolver {
-    private fun normalizeId(id: String, did: String): String = if (id.startsWith("#")) "$did$id" else id
+    private var verificationRelationship: VerificationRelationshipType? = null
+
+    constructor(
+        resolver: DidResolver,
+        runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+        verificationRelationship: VerificationRelationshipType?,
+    ) : this(resolver, runtime) {
+        this.verificationRelationship = verificationRelationship
+    }
+
+    private fun normalizeId(id: String, did: String): String {
+        if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(id)) return id
+        // DID Core 3.2.2 treats method-name:method-specific-id as the authority for RFC 3986 resolution.
+        val baseDid = did.substringBefore('/').substringBefore('?').substringBefore('#')
+        if (id.startsWith('#') || id.startsWith('?') || id.isEmpty()) return baseDid + id
+        val resolved = URLBuilder("https://did.invalid/").apply {
+            takeFrom(id)
+            encodedPath = removeDotSegments(encodedPath)
+        }.buildString()
+        return if (resolved.startsWith("https://did.invalid")) baseDid + resolved.removePrefix("https://did.invalid")
+        else "did:" + resolved.substringAfter("://")
+    }
 
     override suspend fun resolveToKeys(did: String): Set<Key> {
         val document = resolver.resolve(did).getOrElse { cause ->
