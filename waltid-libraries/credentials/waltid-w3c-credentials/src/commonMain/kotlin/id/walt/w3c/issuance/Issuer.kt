@@ -75,10 +75,15 @@ object Issuer {
         )
     }
 
+    @Deprecated("Use kidForIssuer with an id.walt.crypto2.keys.Key")
+    @JsExport.Ignore
+    suspend fun kidForIssuer(issuerKey: Key, issuerId: String): String =
+        getKidHeader(issuerKey, issuerDidOrNull(issuerId))
+
     /** Selects the signing key's public ID for an issuer URL or its verification method for an issuer DID. */
     @JsExport.Ignore
     suspend fun kidForIssuer(issuerKey: Crypto2Key, issuerId: String): String =
-        getKidHeader(issuerKey, issuerId.takeIf(DidUtils::isDidUrl))
+        getKidHeader(issuerKey, issuerDidOrNull(issuerId))
 
     @Deprecated("Use getKidHeader with a crypto2 Key")
     @JvmBlocking
@@ -105,6 +110,8 @@ object Issuer {
         }
         return qualifyDidKeyId(keyId, issuerDid)
     }
+
+    private fun issuerDidOrNull(issuerId: String): String? = issuerId.takeIf(DidUtils::isDidUrl)
 
     private suspend fun publicJwkThumbprint(issuerKey: Crypto2Key): String {
         val exported = requireNotNull(issuerKey.capabilities.publicKeyExporter) {
