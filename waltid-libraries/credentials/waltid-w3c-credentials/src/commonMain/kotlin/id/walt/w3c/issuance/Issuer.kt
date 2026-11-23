@@ -75,12 +75,16 @@ object Issuer {
         )
     }
 
+    /** For an issuer URL, uses the public key's ID, replacing an HTTP(S) key ID with its JWK thumbprint. */
     @Deprecated("Use kidForIssuer with an id.walt.crypto2.keys.Key")
     @JsExport.Ignore
     suspend fun kidForIssuer(issuerKey: Key, issuerId: String): String =
         getKidHeader(issuerKey, issuerDidOrNull(issuerId))
 
-    /** Selects the signing key's public ID for an issuer URL or its verification method for an issuer DID. */
+    /**
+     * For an issuer URL, `issuerKey.id.value` is copied into the credential's `kid` header.
+     * Choose a key ID suitable for publication. For an issuer DID, returns the verification method ID.
+     */
     @JsExport.Ignore
     suspend fun kidForIssuer(issuerKey: Crypto2Key, issuerId: String): String =
         getKidHeader(issuerKey, issuerDidOrNull(issuerId))
