@@ -1,14 +1,16 @@
 package id.walt.issuer2.controller
 
+import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
+import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferRequestBody
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.PublicIssuanceSession
-import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
+import id.walt.issuer2.models.withRedactedIssuerKey
 import id.walt.issuer2.notifications.IssuanceNotificationService
+import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
-import id.walt.issuer2.service.CredentialOfferService
 import id.walt.ktornotifications.SseNotifier
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
@@ -34,8 +36,9 @@ class Issuer2ManagementController(
             val profileExamples = Issuer2ManagementRoutesDocs.selectProfileExamples(profileService.listProfiles())
 
             get("profiles", Issuer2ManagementRoutesDocs.listProfiles(profileExamples)) {
+                val profiles = profileService.listProfiles().map(CredentialProfile::withRedactedIssuerKey)
                 call.respondText(
-                    text = Json.encodeToString(profileService.listProfiles()),
+                    text = Json.encodeToString(profiles),
                     contentType = ContentType.Application.Json,
                 )
             }
@@ -43,7 +46,7 @@ class Issuer2ManagementController(
             get("profiles/{profileId}", Issuer2ManagementRoutesDocs.getProfile(profileExamples)) {
                 val profileId = requireNotNull(call.parameters["profileId"]) { "Missing profileId" }
                 call.respondText(
-                    text = Json.encodeToString(profileService.getProfile(profileId)),
+                    text = Json.encodeToString(profileService.getProfile(profileId).withRedactedIssuerKey()),
                     contentType = ContentType.Application.Json,
                 )
             }

@@ -414,6 +414,9 @@ the first item's credential references index 94567 and the second item's credent
 
 ### Management API
 
+Profile and session reads and generated OpenAPI profile examples report signing keys as
+`{"type":"redacted"}`.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/issuer2/profiles` | List configured credential profiles |

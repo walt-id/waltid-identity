@@ -5,7 +5,7 @@ import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.domain.CredentialProfile
-import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.models.withRedactedIssuerKey
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import id.walt.issuer2.models.singleIssuanceSessionDescriptor
 import id.walt.issuer2.models.multiIssuanceSessionDescriptor
@@ -27,7 +27,8 @@ object Issuer2ManagementRoutesDocs {
             returned profileId in POST /issuer2/credential-offers. Runtime overrides may
             provide credential data, mappings, selective disclosure, mDoc namespace data
             mappings, authorized transaction data types, ID token claim mappings, x5 chains,
-            and webhook URLs for a single issuance session.
+            and webhook URLs for a single issuance session. Each profile reports its signing
+            key as `{"type":"redacted"}`.
         """.trimIndent()
         response {
             HttpStatusCode.OK to {
@@ -46,8 +47,7 @@ object Issuer2ManagementRoutesDocs {
         description = """
             Get one credential profile by profile ID.
 
-            The response is the exact profile loaded from issuer2-profiles.conf, including
-            issuer key material for this first OSS issuer2 version.
+            The profile reports its signing key as `{"type":"redacted"}`.
         """.trimIndent()
         request {
             pathParameter<String>("profileId") {
@@ -183,7 +183,7 @@ object Issuer2ManagementRoutesDocs {
 
     fun listSessions(): RouteConfig.() -> Unit = {
         summary = "List issuance sessions"
-        description = "List currently stored issuance sessions."
+        description = "List currently stored issuance sessions with issuer signing keys redacted."
         response {
             HttpStatusCode.OK to {
                 description = "Issuance sessions"
@@ -194,7 +194,7 @@ object Issuer2ManagementRoutesDocs {
 
     fun getSession(): RouteConfig.() -> Unit = {
         summary = "Get issuance session"
-        description = "Get one issuance session by session ID."
+        description = "Get one issuance session by session ID with issuer signing keys redacted."
         request {
             pathParameter<String>("sessionId")
         }
@@ -274,6 +274,7 @@ object Issuer2ManagementRoutesDocs {
         return (preferred + profiles.filterNot { it.profileId in preferredProfileExampleIds })
             .distinctBy { it.profileId }
             .take(MAX_PROFILE_EXAMPLES)
+            .map(CredentialProfile::withRedactedIssuerKey)
     }
 
     private val preferredProfileExampleIds = listOf(

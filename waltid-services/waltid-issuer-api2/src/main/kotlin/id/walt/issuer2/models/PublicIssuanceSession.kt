@@ -81,7 +81,8 @@ object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
 }
 
 fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
-    val encoded = JsonObject(json.encodeToJsonElement(this).jsonObject - buildSet {
+    val publicRequests = issuanceRequests.map { it.copy(issuerKey = REDACTED_ISSUER_KEY) }
+    val encoded = JsonObject(json.encodeToJsonElement(copy(issuanceRequests = publicRequests)).jsonObject - buildSet {
         add("deferredState")
         add("issuanceClaimId")
         add("credentialStatusIssuance")
@@ -92,10 +93,10 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
         return if (CredentialStatusConfiguration.isPreallocated(request.credentialStatus))
             JsonObject(value - "credentialStatus") else value
     }
-    if (issuanceRequests.size != 1) {
-        val publicRequests = JsonObject(encoded + ("issuanceRequests" to JsonArray(issuanceRequests.map(::publicRequest))))
-        val results = encoded["issuanceResults"] as? JsonObject ?: return publicRequests
-        return JsonObject(publicRequests + ("issuanceResults" to JsonObject(results.mapValues { (identifier, value) ->
+    if (publicRequests.size != 1) {
+        val publicSession = JsonObject(encoded + ("issuanceRequests" to JsonArray(publicRequests.map(::publicRequest))))
+        val results = encoded["issuanceResults"] as? JsonObject ?: return publicSession
+        return JsonObject(publicSession + ("issuanceResults" to JsonObject(results.mapValues { (identifier, value) ->
             val fields = (value.jsonObject - "walletNotification").toMutableMap()
             val notification = issuanceResults[identifier]?.walletNotification
             fun putNotificationField(name: String, value: String?) {
@@ -108,7 +109,7 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
             JsonObject(fields)
         })))
     }
-    val request = issuanceRequests.single()
+    val request = publicRequests.single()
     val fields = encoded.toMutableMap()
     fields.keys.removeAll(setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
     fields.putAll(
