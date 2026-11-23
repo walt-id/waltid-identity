@@ -329,9 +329,9 @@ object CredentialParser {
                         )
             }
 
-            payload.contains("@context") || payload.contains("type") || (payload.containsKey("vc") && (payload["vc"]?.jsonObject?.contains("@context") == true || payload["vc"]?.jsonObject?.contains(
+            !payload.contains("vct") && (payload.contains("@context") || payload.contains("type") || (payload.containsKey("vc") && (payload["vc"]?.jsonObject?.contains("@context") == true || payload["vc"]?.jsonObject?.contains(
                 "type"
-            ) == true)) -> {
+            ) == true))) -> {
                 val w3cPayload = if (payload.containsKey("vc")) payload["vc"]!!.jsonObject else payload
                 val w3cModelVersion = detectW3CDataModelVersion(w3cPayload)
                 val credential = when (w3cModelVersion) {
