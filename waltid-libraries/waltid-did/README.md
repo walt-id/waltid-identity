@@ -118,9 +118,6 @@ val didResult = DidService.registerByKey(
 
 `DidService.registerByKey` and `Crypto2DidService.registerByKey` accept crypto2 keys for built-in `did:key` and `did:jwk` registration. Registration uses only `publicKeyExporter`; private material and managed-provider identity remain with the original key. The default `did:key` encoding supports Ed25519, P-256/P-384/P-521, secp256k1, and RSA public representations. Other crypto2 specs require `DidKeyCreateOptions(useJwkJcsPub = true)`.
 
-`Crypto2DidService.registerByKey(key)` derives a `did:jwk` from the public key.
-Pass a method explicitly to select another registered method.
-
 #### DID Document Configuration
 Register a DID by having more fine-grained control over the contents of the DID Document that will be produced. This approach allows users to specify multiple keys (verification methods) for different purposes (verification relationships), define services and various use-case-specific (custom) properties.
 

@@ -43,8 +43,7 @@ class Crypto2DidRegistrarTest {
     fun `did jwk uses public material only and resolves back to the same key`() = runTest {
         val key = generate("private-ed25519", KeySpec.Edwards(EdwardsCurve.ED25519))
 
-        val result = Crypto2DidService.registerByKey(key)
-        assertEquals(Crypto2DidService.registerByKey("jwk", key, DidJwkCreateOptions()).did, result.did)
+        val result = Crypto2DidService.registerByKey("jwk", key, DidJwkCreateOptions())
         val documentJwk = result.didDocument.publicJwk()
         val identifierJwk = Json.parseToJsonElement(
             result.did.removePrefix("did:jwk:").decodeFromBase64Url().decodeToString()

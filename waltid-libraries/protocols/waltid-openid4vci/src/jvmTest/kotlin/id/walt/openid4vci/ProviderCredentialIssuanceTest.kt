@@ -93,7 +93,7 @@ class ProviderCredentialIssuanceTest {
         val payload = CompactJws.verify(signed, issuer, JwsAlgorithm.ES256).payload
         val vc = Json.parseToJsonElement(payload.decodeToString()).jsonObject.getValue("vc").jsonObject
         val reference = vc.getValue("credentialSubject").jsonObject.getValue("keyReference").jsonPrimitive.content
-        assertEquals(Crypto2DidService.registerByKey(holder).did, reference)
+        assertEquals(Crypto2DidService.registerByKey(method = "jwk", key = holder).did, reference)
     }
 
     @Test

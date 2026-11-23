@@ -42,7 +42,7 @@ class IssuanceHolderKey(private val holderKey: Key) : AbstractCoroutineContextEl
     internal suspend fun subjectDid(context: Map<String, JsonElement>): JsonElement =
         context["subjectDid"] ?: mutex.withLock {
             derivedDid ?: try {
-                val did = Crypto2DidService.registerByKey(holderKey).did
+                val did = Crypto2DidService.registerByKey(method = "jwk", key = holderKey).did
                 JsonPrimitive(did).also { derivedDid = it }
             } catch (e: CancellationException) {
                 throw e
