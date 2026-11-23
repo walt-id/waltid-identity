@@ -11,6 +11,10 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JweUtils
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.exportPublicJwk
+import id.walt.did.dids.Crypto2DidService
+import id.walt.did.dids.DidService
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.testsupport.Issuer2CredentialScenario
@@ -35,6 +39,7 @@ import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.proofs.Proofs
 import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
@@ -46,6 +51,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -66,6 +72,11 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.io.encoding.Base64
 
 class Issuer2CredentialProofValidationTest {
+
+    private val employeeMapping = buildJsonObject {
+        put("sub", "<subjectDid>")
+        put("holder", buildJsonObject { put("id", "<subjectDid>") })
+    }
 
     @AfterEach
     fun clearConfig() {
@@ -207,6 +218,52 @@ class Issuer2CredentialProofValidationTest {
         val session = flow.client.getSession(flow.sessionId)
         assertEquals(IssuanceSessionStatus.ACTIVE, session.status)
         assertFalse(session.isClosed)
+    }
+
+    @Test
+    fun `employee subject claims use the proven key for bare JWK and preserve a wallet DID`() = testApplication {
+        val scenario = Issuer2CredentialScenarios.identitySdJwt
+        installIssuer2WithConfigFiles(
+            configureProfilesConfig = { config ->
+                val profile = config.profiles.getValue(scenario.profileId)
+                val employee = profile.copy(mapping = JsonObject(profile.mapping.orEmpty() + employeeMapping))
+                config.copy(profiles = config.profiles + (scenario.profileId to employee))
+            },
+            configureMetadataConfig = { config ->
+                val type = Json.decodeFromString<SdJwtVcTypeMetadataDraft04>(
+                    """{"claims":[{"path":["sub"],"mandatory":true},{"path":["holder","id"],"mandatory":true}]}"""
+                )
+                config.copy(sdJwtVcTypeMetadataConfiguration = config.sdJwtVcTypeMetadataConfiguration +
+                    (scenario.credentialConfigurationId to type))
+            },
+        )
+        val client = apiClient()
+        val holder = JWKKey.generate(KeyType.secp256r1)
+        val didKey = DidService.registerByKey("key", holder).did
+        val didJwk = DidService.registerByKey("jwk", holder).did
+        for (kid in listOf(null, "$didKey#${didKey.substringAfterLast(':')}", "$didJwk#0")) {
+            val flow = prepareFlow(client, scenario)
+            val proofs = proof(holder, flow.nonce(), kid = kid, includeJwk = kid == null)
+            val response = flow.request(proofs)
+            assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+            val jwt = response.body<JsonObject>().getValue("credentials").jsonArray.single().jsonObject
+                .getValue("credential").jsonPrimitive.content
+            val subject = assertMappedHolder(SDJwtVC.parse(jwt), holder)
+            if (kid == null) assertTrue(subject.startsWith("did:jwk:")) else assertEquals(kid.substringBefore('#'), subject)
+        }
+    }
+
+    private suspend fun assertMappedHolder(credential: SDJwtVC, holder: Key): String {
+        val payload = credential.fullPayload
+        val subject = payload.getValue("sub").jsonPrimitive.content
+        assertEquals(subject, payload.getValue("holder").jsonObject.getValue("id").jsonPrimitive.content)
+        assertFalse('#' in subject)
+        val thumbprint = holder.getThumbprint()
+        val resolved = Crypto2DidService.resolveToKeys(subject).getOrThrow().single()
+        assertEquals(thumbprint, Jwk.sha256Thumbprint(resolved.exportPublicJwk()))
+        val cnf = requireNotNull(credential.holderKeyJWK)
+        assertEquals(thumbprint, JWKKey.importJWK(cnf.toString()).getOrThrow().getThumbprint())
+        return subject
     }
 
     @Test
