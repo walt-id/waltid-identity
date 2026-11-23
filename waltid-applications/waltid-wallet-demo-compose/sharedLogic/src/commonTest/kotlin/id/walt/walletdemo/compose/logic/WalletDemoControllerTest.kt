@@ -1970,6 +1970,72 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun rejectedTransactionCodeRetainsReviewAndCorrectedCodeIsSubmittedOnce() = runTest {
+        val wallet = FakeDemoWallet(
+            offerResolution = offerPreview(transactionCode = textTransactionCode()),
+            preAuthorizedOutcome = WalletDemoIssuanceOutcome.Failed("Incorrect transaction code", offerConsumed = false),
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://transaction-code")
+        controller.previewOffer()
+        runCurrent()
+        controller.updateTxCode("incorrect-code")
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals("Receive failed: Incorrect transaction code", (controller.state.value.operation as WalletOperationState.Failed).message)
+        assertNotNull(controller.state.value.offerPreview)
+        assertTrue(controller.state.value.acceptOfferEnabled)
+        assertFalse(controller.state.value.receiveCompleted)
+
+        controller.updateTxCode("corrected-code")
+        wallet.credentials = listOf(sampleCredential)
+        wallet.preAuthorizedOutcome = WalletDemoIssuanceOutcome.Stored(listOf(sampleCredential.id))
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals(listOf<String?>("incorrect-code", "corrected-code"), wallet.receivedTxCodes)
+        assertEquals(1, wallet.startIssuanceCalls)
+        assertTrue(controller.state.value.receiveCompleted)
+        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertNull(controller.state.value.offerPreview)
+        assertFalse(controller.state.value.acceptOfferEnabled)
+    }
+
+    @Test
+    fun lostTokenResponseClearsAcceptAndTransactionCodeBeforeASecondSubmission() = runTest {
+        val wallet = FakeDemoWallet(
+            offerResolution = offerPreview(transactionCode = textTransactionCode()),
+            preAuthorizedOutcome = WalletDemoIssuanceOutcome.Failed(
+                "The issuer could not be reached.",
+                offerConsumed = true,
+            ),
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://transport-error")
+        controller.previewOffer()
+        runCurrent()
+        controller.updateTxCode("valid-code")
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals(1, wallet.receiveCalls)
+        assertNull(controller.state.value.offerPreview)
+        assertEquals("", controller.state.value.requestDrafts.txCode)
+        assertFalse(controller.state.value.acceptOfferEnabled)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals("The issuer could not be reached.", controller.state.value.issuanceReceipt?.problem?.message)
+
+        controller.acceptOffer()
+        runCurrent()
+
+        assertEquals(1, wallet.receiveCalls)
+        assertEquals(listOf<String?>("valid-code"), wallet.receivedTxCodes)
+    }
+
+    @Test
     fun changingOfferResetsTransactionCodeState() = runTest {
         val wallet = FakeDemoWallet(offerResolution = offerPreview(transactionCode = textTransactionCode()))
         val controller = unlockedControllerWith(wallet, this)
@@ -4196,7 +4262,7 @@ private class FakeDemoWallet(
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
     private val offerResolution: WalletDemoOfferPreview = offerPreview(),
     private val issuanceGrant: WalletDemoIssuanceGrant = WalletDemoIssuanceGrant.PreAuthorizedCode,
-    private val preAuthorizedOutcome: WalletDemoIssuanceOutcome? = null,
+    var preAuthorizedOutcome: WalletDemoIssuanceOutcome? = null,
     private val authorizationOutcome: WalletDemoIssuanceOutcome =
         WalletDemoIssuanceOutcome.Failed("Authorization code is not configured"),
     private val deferredOutcome: WalletDemoIssuanceOutcome =
@@ -4237,7 +4303,8 @@ private class FakeDemoWallet(
     val preflightedSigningProtections = mutableListOf<WalletDemoSigningProtection>()
     var startIssuanceCalls = 0
     var resolvedOfferUrl: String? = null
-    var receivedTxCode: String? = null
+    val receivedTxCodes = mutableListOf<String?>()
+    val receivedTxCode: String? get() = receivedTxCodes.lastOrNull()
     var receiveCalls = 0
     val receivedIssuanceSelections = mutableListOf<List<WalletDemoCredentialSelection>>()
     var previewedRequestUrl: String? = null
@@ -4311,7 +4378,7 @@ private class FakeDemoWallet(
     ): WalletDemoIssuanceOutcome {
         receiveCalls += 1
         receivedIssuanceSelections += credentials
-        receivedTxCode = transactionCode
+        receivedTxCodes += transactionCode
         if (ignoreReceiveCancellation) {
             withContext(NonCancellable) { receiveGate?.await() }
         } else {

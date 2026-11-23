@@ -1098,6 +1098,7 @@ class WalletDemoController(
                     it.copy(
                         offerPreview = if (outcome.offerConsumed) null else it.offerPreview,
                         authorizationRequestUrl = null,
+                        requestDrafts = if (outcome.offerConsumed) it.requestDrafts.copy(txCode = "") else it.requestDrafts,
                         deferredCredentials = (it.deferredCredentials + outcome.deferredCredentials)
                             .associateBy(WalletDemoDeferredCredential::id).values.toList(),
                         lastReceivedCredentialIds = outcome.storedCredentialIds,
