@@ -2,6 +2,11 @@
 
 package id.walt.verifier2.verification2
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.decodeFromHexString
+import id.walt.mdoc.objects.document.Document
+import id.walt.credentials.CredentialParser
+import id.walt.cose.coseCompliantCbor
 import kotlin.time.TimeSource
 import id.walt.cose.protectedAlgorithm
 import id.walt.cose.Cose
@@ -301,7 +306,11 @@ object PresentationVerificationEngine {
         }
 
         return presentationsToUse.associateWith { (presentationString, credentialQuery) ->
-            parsePresentation(presentationString, credentialQuery.format)
+            if (session.setup is DcApiAnnexCFlowSetup && credentialQuery.format == CredentialFormat.MSO_MDOC) {
+                // Annex C has already validated and decrypted the DeviceResponse envelope.
+                val document = coseCompliantCbor.decodeFromHexString<Document>(presentationString)
+                MsoMdocPresentation(CredentialParser.handleMdocDocument(presentationString, document).second)
+            } else parsePresentation(presentationString, credentialQuery.format)
         }
     }
 
@@ -394,17 +403,34 @@ object PresentationVerificationEngine {
                     listOf(JsonPrimitive(decoded.transactionData.type), JsonPrimitive(name))
                 }
             }
-        val allowedPaths = dcqlQuery.credentials.filter { it.id in selectedQueryIds }
-            .flatMap { it.claims.orEmpty() }.map { it.path }.toSet()
+        val queryOptions = dcqlQuery.credentials.filter { it.id in selectedQueryIds }.map { query ->
+            val claims = query.claims.orEmpty()
+            if (query.claimSets == null) listOf(claims.map { it.path }.toSet()) else {
+                query.claimSets.orEmpty().mapNotNull { option ->
+                    val selected = claims.filter { it.id in option }
+                    val alternative = query.copy(claims = selected, claimSets = null)
+                    if (credentialMismatch(alternative, listOf(credential), matchClaims = true, resolvedTypes = emptyMap()) == null) {
+                        selected.map { it.path }.toSet()
+                    } else null
+                }
+            }
+        }
         val issuerPaths = credential.document.issuerSigned.namespaces.orEmpty().flatMap { (namespace, items) ->
             items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.value.elementIdentifier)) }
         }
         val devicePaths = credential.document.deviceSigned?.namespaces?.value?.entries.orEmpty().flatMap { (namespace, items) ->
             items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.key)) }
         }
-        val unrequested = issuerPaths.firstOrNull { it !in allowedPaths }
-            ?: devicePaths.firstOrNull { it !in allowedPaths && it !in transactionPaths }
-        return unrequested?.let { "mdoc contains an unrequested selectively disclosable claim" }
+        val requiredPaths = (issuerPaths + devicePaths.filterNot { it in transactionPaths }).toSet()
+        // Select one satisfied option per query. Another selected query can justify the remaining claims.
+        fun covered(index: Int, remaining: Set<List<JsonElement>>): Boolean {
+            if (remaining.isEmpty()) return true
+            if (index == queryOptions.size) return false
+            val possible = queryOptions.drop(index).flatten().flatten().toSet()
+            if (!possible.containsAll(remaining)) return false
+            return queryOptions[index].any { covered(index + 1, remaining - it) }
+        }
+        return "mdoc contains an unrequested selectively disclosable claim".takeUnless { covered(0, requiredPaths) }
     }
 
     private fun credentialMismatch(
@@ -532,7 +558,30 @@ object PresentationVerificationEngine {
             val parsedPresentations = parseAllPresentations(vpTokenContents, session)
             val afterParse = phaseStart.elapsedNow()
 
+            // Do not persist or publish selectively disclosable mdoc claims until disclosure limits pass.
+            val mdocsByQuery: Map<String, List<DigitalCredential>> = parsedPresentations.entries
+                .filter { it.value is MsoMdocPresentation }
+                .groupBy({ it.key.second.id }, { (it.value as MsoMdocPresentation).mdoc })
+            val query = session.authorizationRequest.dcqlQuery.takeUnless { session.setup is DcApiAnnexCFlowSetup }
+            val disclosureError = query?.let { dcql ->
+                mdocsByQuery.values.flatten().filterIsInstance<MdocsCredential>().firstNotNullOfOrNull {
+                    unrequestedMdocClaim(dcql, mdocsByQuery, it, session.authorizationRequest.transactionData.orEmpty())
+                }
+            }
+            if (disclosureError != null) {
+                val mismatch = matchCredentialsToQueries(
+                    requireNotNull(query), mdocsByQuery, matchClaims = true,
+                    transactionData = session.authorizationRequest.transactionData.orEmpty(),
+                ).exceptionOrNull() as DcqlFulfillmentChecker.DcqlFulfillmentException
+                session.updateSession(SessionEvent.dcql_fulfillment_check_failed) {
+                    status = Verification2Session.VerificationSessionStatus.FAILED
+                    failure = SessionFailure.DcqlFulfillment(disclosureError, mismatch.details)
+                }
+                throw PresentationRejectionException(disclosureError)
+            }
+
             session.updateSession(SessionEvent.parsed_presentation_available) {
+                presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, session.authorizationRequest.state)
                 // Byte arrays compacted before storage; see CompactStoredBytes.
                 presentedPresentations = presentationsByQuery(parsedPresentations).mapValues { (_, presentations) ->
                     presentations.map { it.withCompactByteArrays() }
