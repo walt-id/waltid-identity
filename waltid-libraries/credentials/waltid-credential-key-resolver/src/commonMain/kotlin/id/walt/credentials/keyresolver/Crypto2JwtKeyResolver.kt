@@ -43,19 +43,27 @@ fun interface Crypto2JwtVerificationKeyResolver {
  * [id.walt.credentials.keyresolver.resolvers.X5cTrustAnchors], before it is relied on.
  */
 class Crypto2JwtKeyResolver(
-    didResolver: Crypto2DidKeyResolver? = null,
+    private val didResolver: Crypto2DidKeyResolver = Crypto2DidKeyResolver { did ->
+        DidService.resolveToCrypto2Keys(did).getOrThrow()
+    },
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
     private val allowInlineJwk: Boolean = false,
-    verificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2JwtVerificationKeyResolver {
-    private val didResolver = didResolver ?: Crypto2DidKeyResolver { did ->
-        DidService.resolveToCrypto2Keys(did, verificationRelationship).getOrThrow()
-    }
+    constructor(
+        didResolver: Crypto2DidKeyResolver? = null,
+        runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+        allowInlineJwk: Boolean = false,
+        verificationRelationship: VerificationRelationshipType?,
+    ) : this(
+        didResolver ?: Crypto2DidKeyResolver { did ->
+            DidService.resolveToCrypto2Keys(did, verificationRelationship).getOrThrow()
+        }, runtime, allowInlineJwk,
+    )
 
     override suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey? {
-        val signerIdentifier = extractSignerIdentifier(jwtPayload)
         val kid = jwtHeader?.get("kid")?.jsonPrimitive?.contentOrNull
         return try {
+            val signerIdentifier = resolveJwtIssuer(jwtPayload)
             when {
                 // 1. DID resolution is authoritative for DID issuer identifiers.
                 signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) -> {
@@ -169,15 +177,6 @@ class Crypto2JwtKeyResolver(
             .filter(String::isNotBlank)
             .toSet()
 
-    private fun extractSignerIdentifier(payload: JsonObject): String? =
-        (payload["iss"] ?: payload["issuer"])?.let { element ->
-            when (element) {
-                is JsonNull -> null
-                is JsonPrimitive -> element.contentOrNull
-                is JsonObject -> element["id"]?.jsonPrimitive?.contentOrNull
-                else -> null
-            }
-        }
 
     companion object {
         private val log = KotlinLogging.logger { }
