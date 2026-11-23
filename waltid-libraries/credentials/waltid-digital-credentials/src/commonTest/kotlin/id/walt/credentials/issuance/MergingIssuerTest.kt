@@ -1,5 +1,7 @@
 package id.walt.credentials.issuance
 
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeWithMapping
 import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue
 import id.walt.credentials.issuance.MergingIssuer.mergingSdJwtIssue
 import id.walt.credentials.issuance.MergingIssuer.mergingToVc
@@ -80,7 +82,7 @@ class MergingIssuerTest {
     }
 
     @Test
-    fun `both subject DID lookups prefer the supplied DID and derive once on demand`() = runTest {
+    fun `both subject DID lookups prefer the supplied DID and derive once per merge on demand`() = runTest {
         val key = key()
         val publicKey = requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey()
         var exports = 0
@@ -89,6 +91,7 @@ class MergingIssuerTest {
             publicKey
         }
         val mapping = buildJsonObject {
+            put("jwt:sub", "<context:subjectDid>")
             put("reference", "<subjectDid>")
             put("holder", buildJsonObject { put("id", "<context:subjectDid>") })
         }
@@ -104,10 +107,20 @@ class MergingIssuerTest {
             assertEquals(mapped["reference"], mapped["holder"]?.jsonObject?.get("id"))
             assertEquals(0, exports)
 
-            val derived = credential.mergingToVc("issuer", "", mapping).w3cVc
-            assertTrue(derived.getValue("reference").jsonPrimitive.content.startsWith("did:jwk:"))
-            assertEquals(derived["reference"], derived["holder"]?.jsonObject?.get("id"))
+            val context = issuanceTemplateContext("issuer", null)
+            val functions = issuanceDataFunctions()
+            val w3c = credential.mergeWithMapping(mapping, context, functions)
+            val did = w3c.results.getValue("jwt:sub")
+            assertTrue(did.jsonPrimitive.content.startsWith("did:jwk:"))
+            assertEquals(did, w3c.vc.getValue("reference"))
+            assertEquals(did, w3c.vc.getValue("holder").jsonObject.getValue("id"))
             assertEquals(1, exports)
+
+            val sdJwt = JsonObject(emptyMap()).mergeSDJwtVCPayloadWithMapping(mapping, context, functions)
+            assertEquals(did, sdJwt.getValue("sub"))
+            assertEquals(did, sdJwt.getValue("holder").jsonObject.getValue("id"))
+            assertEquals(2, exports)
+            assertFalse("subjectDid" in context)
         }
     }
 
