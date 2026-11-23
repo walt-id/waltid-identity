@@ -71,6 +71,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api2"))
     testImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     testImplementation(identityLibs.junit.jupiter.api)
+    testImplementation(identityLibs.testcontainers.junit)
     testImplementation(identityLibs.playwright) {
         exclude(group = "org.junit.jupiter")
         exclude(group = "org.junit.platform")
@@ -161,7 +162,7 @@ tasks.register<Test>("browserTest") {
 }
 
 tasks.register<Test>("redisTest") {
-    description = "Runs issuer2 Redis-backed repository tests. Requires ISSUER2_REDIS_HOST."
+    description = "Runs issuer2 Redis-backed repository tests with Testcontainers. Requires Docker."
     group = "verification"
 
     testClassesDirs = sourceSets["test"].output.classesDirs

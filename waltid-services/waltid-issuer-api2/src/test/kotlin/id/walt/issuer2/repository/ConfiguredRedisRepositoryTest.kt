@@ -68,12 +68,24 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
+import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.wait.strategy.Wait
+import org.testcontainers.junit.jupiter.Container
+import org.testcontainers.junit.jupiter.Testcontainers
+import redis.clients.jedis.JedisPooled
 import redis.clients.jedis.util.JedisClusterCRC16
 
 @Tag("redis")
-@EnabledIfEnvironmentVariable(named = "ISSUER2_REDIS_HOST", matches = ".+")
+@Testcontainers
 class ConfiguredRedisRepositoryTest {
+    private companion object {
+        @Container
+        @JvmField
+        val redisContainer: GenericContainer<*> = GenericContainer("redis:7-alpine")
+            .withExposedPorts(6379)
+            .waitingFor(Wait.forSuccessfulCommand("redis-cli ping"))
+    }
+
     @Test
     fun statusReservationsAreAtomicPermanentAndRecoverAcrossRepositoryInstances() = runTest {
         withStatusLedger { redis, storage, keys ->
@@ -243,13 +255,11 @@ class ConfiguredRedisRepositoryTest {
     ) as CredentialStatusConfiguration.Preallocated).groups
 
     private suspend fun withStatusLedger(block: suspend (
-        redis.clients.jedis.JedisPooled,
+        JedisPooled,
         id.walt.commons.persistence.RedisPersistence<CredentialStatusConsumption>,
         CredentialStatusRedisKeys,
     ) -> Unit) {
-        val host = requireNotNull(System.getenv("ISSUER2_REDIS_HOST"))
-        val port = System.getenv("ISSUER2_REDIS_PORT")?.toInt() ?: 6379
-        redis.clients.jedis.JedisPooled(host, port).use { redis ->
+        JedisPooled(redisContainer.host, redisContainer.firstMappedPort).use { redis ->
             val namespace = "global-status-" + java.util.UUID.randomUUID()
             val keys = CredentialStatusRedisKeys(namespace)
             val storage = id.walt.commons.persistence.RedisPersistence(namespace, Duration.INFINITE,
@@ -264,9 +274,7 @@ class ConfiguredRedisRepositoryTest {
 
     @Test
     fun infiniteRedisExpiryDoesNotResetToFiniteOrOverflow() {
-        val host = requireNotNull(System.getenv("ISSUER2_REDIS_HOST"))
-        val port = System.getenv("ISSUER2_REDIS_PORT")?.toInt() ?: 6379
-        redis.clients.jedis.JedisPooled(host, port).use { redis ->
+        JedisPooled(redisContainer.host, redisContainer.firstMappedPort).use { redis ->
             val namespace = "permanent-status-" + java.util.UUID.randomUUID()
             val persistence = id.walt.commons.persistence.RedisPersistence<String>(
                 namespace, Duration.INFINITE, { it }, { it }, redis,
@@ -356,9 +364,7 @@ class ConfiguredRedisRepositoryTest {
 
     @Test
     fun redisRetentionDoesNotShortenExistingDeadline() = runTest {
-        val host = requireNotNull(System.getenv("ISSUER2_REDIS_HOST"))
-        val port = System.getenv("ISSUER2_REDIS_PORT")?.toInt() ?: 6379
-        redis.clients.jedis.JedisPooled(host, port).use { redis ->
+        JedisPooled(redisContainer.host, redisContainer.firstMappedPort).use { redis ->
             val namespace = "deferred-retention-${java.util.UUID.randomUUID()}"
             val persistence = id.walt.commons.persistence.RedisPersistence<String>(namespace, 5.minutes, { it }, { it }, redis)
             try {
@@ -485,18 +491,11 @@ class ConfiguredRedisRepositoryTest {
         ConfigManager.preclear()
         FeatureManager.preclear()
 
-        val host = requireNotNull(System.getenv("ISSUER2_REDIS_HOST"))
-        val port = System.getenv("ISSUER2_REDIS_PORT")?.toIntOrNull() ?: 6379
-        val user = System.getenv("ISSUER2_REDIS_USER")?.takeIf { it.isNotBlank() }
-        val password = System.getenv("ISSUER2_REDIS_PASSWORD")?.takeIf { it.isNotBlank() }
-
         ConfigManager.preloadAndRegisterConfig(
             "persistence",
             PersistenceConfiguration(
                 type = "redis",
-                nodes = listOf(PersistenceNode(host = host, port = port)),
-                user = user,
-                password = password,
+                nodes = listOf(PersistenceNode(host = redisContainer.host, port = redisContainer.firstMappedPort)),
             )
         )
         ConfigManager.loadConfigs()
