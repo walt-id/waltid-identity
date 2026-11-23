@@ -117,6 +117,7 @@ sealed interface CredentialStatusConfiguration {
                 "$field must be an absolute HTTP(S) URI"
             }
             require(uri.port <= 65535) { "$field must have a valid port" }
+            require(uri.rawFragment == null) { "$field must be a fragment-free URI" }
             return uri
         }
 
@@ -142,7 +143,6 @@ sealed interface CredentialStatusConfiguration {
                 if (uri.port != -1 && uri.port != defaultPort) append(':').append(uri.port)
                 append(canonicalStatusListPath(uri.rawPath))
                 uri.rawQuery?.let { append('?').append(normalizePercentEscapes(it)) }
-                uri.rawFragment?.let { append('#').append(normalizePercentEscapes(it)) }
             }
             return "list:" + JsonArray(listOf(JsonPrimitive(ownershipUri), JsonPrimitive(index))).toString()
         }

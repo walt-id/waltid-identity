@@ -78,6 +78,26 @@ class CredentialStatusConfigurationTest {
     }
 
     @Test
+    fun statusListUrisRejectFragments() {
+        for (uri in listOf("https://status.example.com/list#first", "https://status.example.com/list#")) {
+            val tokenInventory = JsonArray(listOf(tokenStatus(7, uri)))
+            val w3cEntry = JsonObject(w3cStatus(7) + ("statusListCredential" to JsonPrimitive(uri)))
+            val w3cInventory = JsonArray(listOf(JsonArray(listOf(w3cEntry))))
+            val configurations = listOf(
+                Triple(CredentialFormat.SD_JWT_VC, tokenInventory, "status_list.uri"),
+                Triple(CredentialFormat.MSO_MDOC, tokenInventory, "status_list.uri"),
+                Triple(CredentialFormat.JWT_VC_JSON, w3cInventory, "statusListCredential"),
+            )
+            for ((format, inventory, field) in configurations) {
+                val error = assertFailsWith<IllegalArgumentException>("$format: $uri") {
+                    CredentialStatusConfiguration.parse(inventory, format)
+                }
+                assertEquals("$field must be a fragment-free URI", error.message)
+            }
+        }
+    }
+
+    @Test
     fun statusOwnershipNormalizationPreservesTheMdocUriValue() {
         val uri = "https://status.example.com/unused/../list"
         assertEquals(uri, CredentialStatusConfiguration.tokenStatusList(tokenStatus(7, uri)).uri.string)

@@ -3,6 +3,7 @@ package id.walt.issuer2.openid4vci
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.commons.persistence.Persistence
+import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
@@ -200,16 +201,24 @@ class Issuer2SharedCredentialStatusTest {
 
     @Test
     fun malformedStatusGroupsAreRejectedBeforeCreatingAnOffer() = testApplication {
+        application { configureStatusPages() }
         val fixture = installStatusIssuer()
         val example = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS
-        val invalid = example.copy(runtimeOverrides = example.runtimeOverrides!!.copy(
-            credentialStatus = JsonArray(listOf(JsonArray(emptyList()))),
-        ))
-        val response = fixture.client.post("/issuer2/credential-offers") {
-            contentType(ContentType.Application.Json)
-            setBody(Json.encodeToString(invalid))
+        val overrides = requireNotNull(example.runtimeOverrides)
+        val invalidInventories = listOf(
+            JsonArray(listOf(JsonArray(emptyList()))) to "Each credentialStatus group must contain status objects",
+            JsonArray(listOf(tokenStatus(7, "https://status.example.com/list#first"))) to
+                "status_list.uri must be a fragment-free URI",
+        )
+        for ((inventory, message) in invalidInventories) {
+            val invalid = example.copy(runtimeOverrides = overrides.copy(credentialStatus = inventory))
+            val response = fixture.client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                setBody(Json.encodeToString(invalid))
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
+            assertEquals(message, response.body<JsonObject>()["message"]?.jsonPrimitive?.content)
         }
-        assertEquals(HttpStatusCode.BadRequest, response.status, response.bodyAsText())
         assertTrue(fixture.repository.list().isEmpty())
     }
 
