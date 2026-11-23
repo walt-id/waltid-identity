@@ -316,6 +316,32 @@ class MdocSecurityMatrixHttpTest {
     }
 
     @Test
+    fun combinedDisclosuresMustUseOneAlternativePerQueryAcrossPresentations() = withVerifier {
+        val http = testHttpClient()
+        val claims = data().getValue(namespace).jsonObject + ("age_over_21" to JsonPrimitive(true))
+        val credential = mdlFixtureCredential(JsonObject(data() + (namespace to JsonObject(claims))).toString())
+        fun choice(id: String, names: List<String>) = query(names).let { query ->
+            query.copy(id = id, claims = query.claims!!.mapIndexed { index, claim -> claim.copy(id = "claim$index") },
+                claimSets = listOf(listOf("claim0"), listOf("claim1")))
+        }
+        val first = choice("mdoc", listOf("age_over_18", "age_over_21"))
+        val second = choice("photo", listOf("age_over_21", "portrait"))
+        for (queries in listOf(listOf(first, second), listOf(second, first))) test("combined alternatives ${queries.map { it.id }}") {
+            // Each response alone can be covered by one choice from each query. All three fields
+            // together cannot be covered by the two choices the request permits.
+            val presentation = prepare(http, credential, disclosed = listOf("age_over_18", "age_over_21"),
+                dcql = DcqlQuery(queries), vcPolicies = VCPolicyList(emptyList()))
+            val other = form(presentation.request, credential, listOf("age_over_21", "portrait"), queryIds = listOf("photo"))
+            val tokens = listOf(presentation.form, other).flatMap { encoded ->
+                Json.parseToJsonElement(requireNotNull(parseQueryString(encoded)["vp_token"])).jsonObject.entries
+            }.associate { it.key to it.value }
+            val combined = listOf("state" to requireNotNull(presentation.request.state), "vp_token" to JsonObject(tokens).toString()).formUrlEncode()
+            val failed = submit(http, presentation.copy(form = combined), false)
+            assertNull(failed.presentedCredentials)
+        }
+    }
+
+    @Test
     fun failedSignedPresentationFollowsTheConfiguredSessionMode() = withVerifier {
         val http = testHttpClient()
         val credential = mdlFixtureCredential(data().toString())
