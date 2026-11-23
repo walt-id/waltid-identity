@@ -2,6 +2,7 @@
 
 package id.walt.verifier2.mdocs
 
+import kotlin.test.assertNull
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.cose.coseCompliantCbor
@@ -200,6 +201,10 @@ class MdocSecurityMatrixHttpTest {
         test("authentic extra portrait is rejected") {
             val result = submit(http, prepare(http, credential, disclosed = listOf("age_over_18", "portrait")), false)
             assertIs<SessionFailure.DcqlFulfillment>(result.failure)
+            assertNull(result.presentedRawData)
+            assertNull(result.presentedPresentations)
+            assertNull(result.presentedCredentials)
+            assertNull(result.policyResults)
         }
         test("issuer signature corruption is rejected") {
             submit(http, prepare(http, credential) { response ->
