@@ -302,6 +302,19 @@ actor MockWalletClient: WalletClient {
         statusSnapshot = snapshot
         for continuation in statusCollectors.values { continuation.yield(snapshot) }
     }
+    #if DEBUG
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
+        guard let snapshot = statusSnapshot else { return }
+        setCredentialStatusSnapshot(CredentialStatusSnapshot(
+            evaluatedAt: snapshot.evaluatedAt,
+            credentials: snapshot.credentials,
+            refreshingCredentialIDs: snapshot.refreshingCredentialIDs,
+            nextRefreshAt: snapshot.nextRefreshAt,
+            pendingNotices: snapshot.pendingNotices.filter { $0.credentialID != credentialID || $0.version != version }
+        ))
+    }
+    #endif
+
     func failCredentialStatusObservation() {
         for continuation in statusCollectors.values {
             continuation.finish(throwing: NSError(domain: "MockWalletStatusRead", code: 1))

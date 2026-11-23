@@ -289,18 +289,11 @@ class WalletDemoController(
                     val current = _state.value
                     if (current.auth != WalletAuthState.Unlocked || current.session !is WalletSessionState.Ready ||
                         walletResetJob?.isActive == true || current.isChangingSigningProtection) return@withLock
-                    val enrollment = wallet.backgroundStatusEnrollment()
-                    publishBackgroundStatus(when {
-                        enrollment == null -> null
-                        current.automaticCredentialStatusChecks && enrollment.preference == DemoBackgroundStatusPreference.PAUSED -> {
-                            // A pause committed before app preference persistence must stay paused after restart.
-                            applyAutomaticCredentialStatusChecks(false)
-                            enrollment
-                        }
-                        !current.automaticCredentialStatusChecks && enrollment.preference == DemoBackgroundStatusPreference.ENABLED ->
-                            wallet.setBackgroundStatusPreference(DemoBackgroundStatusPreference.PAUSED)
-                        else -> enrollment
-                    })
+                    val enrollment = wallet.reconcileBackgroundStatus(current.automaticCredentialStatusChecks)
+                    if (current.automaticCredentialStatusChecks && enrollment?.preference == DemoBackgroundStatusPreference.PAUSED) {
+                        applyAutomaticCredentialStatusChecks(false)
+                    }
+                    publishBackgroundStatus(enrollment)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -335,15 +328,10 @@ class WalletDemoController(
     fun setAutomaticCredentialStatusChecks(enabled: Boolean) {
         if (supportsBackgroundStatusChecks) {
             changeBackgroundStatus {
-                val current = wallet.backgroundStatusEnrollment()
-                val paused = if (!enabled) wallet.setBackgroundStatusPreference(DemoBackgroundStatusPreference.PAUSED) else current
-                if (!enabled) publishBackgroundStatus(paused)
-                applyAutomaticCredentialStatusChecks(enabled)
-                if (enabled) {
-                    publishBackgroundStatus(if (current?.preference == DemoBackgroundStatusPreference.PAUSED) {
-                        wallet.setBackgroundStatusPreference(DemoBackgroundStatusPreference.ENABLED)
-                    } else current)
-                }
+                if (enabled) applyAutomaticCredentialStatusChecks(true)
+                val enrollment = wallet.reconcileBackgroundStatus(automaticChecks = enabled, resumePaused = enabled)
+                if (!enabled) applyAutomaticCredentialStatusChecks(false)
+                publishBackgroundStatus(enrollment)
             }
         } else {
             try {

@@ -110,10 +110,8 @@ class WalletViewModel: ObservableObject {
     @Published var credentialStatusSummary: CredentialStatusRefreshSummary?
     @Published private(set) var credentialStatusBatchError: String?
     @Published var credentialStatusError: String?
-    @Published var credentialStatusNotice: String?
     @Published private(set) var walletStatusNotices: [PendingCredentialStatusNotice] = []
     @Published var statusNotificationOpened = false
-    private var usesWalletStatusNotices = false
     @Published var automaticCredentialStatusChecks = true {
         didSet {
             UserDefaults.standard.set(automaticCredentialStatusChecks, forKey: statusPreferenceKey)
@@ -145,15 +143,13 @@ class WalletViewModel: ObservableObject {
         let generation: Int
     }
     private var statusReviewOwner: StatusReviewOwner?
-    private var announcedCredentialStatuses: [String: String] = [:]
-    private var pendingCredentialStatusNotices: Set<String> = []
     @Published var isReady = false { didSet { if isReady { startCredentialStatusObservation() } else { cancelCredentialStatusWork() } } }
     @Published var did = ""
     @Published var keyID = ""
     @Published var publicJWK = ""
     @Published var credentials: [Credential] = [] { didSet { scheduleCredentialStatusCheck() } }
     @Published var statusMessage = WalletStatusText.startingWallet
-    @Published var isLoading = false { didSet { if !isLoading { presentDeferredCredentialStatusNotice() } } }
+    @Published var isLoading = false { didSet { if !isLoading { scheduleCredentialStatusCheck() } } }
     @Published var isError = false
     @Published private(set) var signingProtectionMode: WalletDemoSigningProtectionMode
     @Published var selectedSigningProtection: WalletDemoSigningProtection
@@ -181,7 +177,7 @@ class WalletViewModel: ObservableObject {
             paymentConsentTask?.cancel()
             paymentReview = .notRequired
             claimReview = .legacy
-            if presentationReview == nil { presentDeferredCredentialStatusNotice() }
+            if presentationReview == nil { scheduleCredentialStatusCheck() }
         }
     }
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
@@ -458,18 +454,10 @@ class WalletViewModel: ObservableObject {
             return
         }
         changeBackgroundStatus { model in
-            let enrollment = try await model.walletClient.backgroundStatusEnrollment()
-            if !enabled {
-                model.publishBackgroundStatus(try await model.walletClient.setBackgroundStatusPreference(.paused))
-            }
-            model.automaticCredentialStatusChecks = enabled
-            if enabled {
-                if enrollment?.preference == .paused {
-                    model.publishBackgroundStatus(try await model.walletClient.setBackgroundStatusPreference(.enabled))
-                } else {
-                    model.publishBackgroundStatus(enrollment)
-                }
-            }
+            if enabled { model.automaticCredentialStatusChecks = true }
+            let enrollment = try await model.walletClient.reconcileBackgroundStatus(automaticChecks: enabled, resumePaused: enabled)
+            if !enabled { model.automaticCredentialStatusChecks = false }
+            model.publishBackgroundStatus(enrollment)
         }
     }
 
@@ -495,17 +483,13 @@ class WalletViewModel: ObservableObject {
 
     private func reconcileBackgroundStatusEnrollment() {
         changeBackgroundStatus { model in
-            let enrollment = try await model.walletClient.backgroundStatusEnrollment()
-            switch (model.automaticCredentialStatusChecks, enrollment?.preference) {
-            case (true, .paused):
-                // Reconcile a process exit between pausing the grant and saving the app preference.
+            let enrollment = try await model.walletClient.reconcileBackgroundStatus(
+                automaticChecks: model.automaticCredentialStatusChecks, resumePaused: false
+            )
+            if model.automaticCredentialStatusChecks, enrollment?.preference == .paused {
                 model.automaticCredentialStatusChecks = false
-                model.publishBackgroundStatus(enrollment)
-            case (false, .enabled):
-                model.publishBackgroundStatus(try await model.walletClient.setBackgroundStatusPreference(.paused))
-            default:
-                model.publishBackgroundStatus(enrollment)
             }
+            model.publishBackgroundStatus(enrollment)
         }
     }
 
@@ -540,16 +524,6 @@ class WalletViewModel: ObservableObject {
                     for try await snapshot in try await client.credentialStatusUpdates() {
                         try Task.checkCancellation()
                         guard let self, credentialStatusGeneration == generation else { return }
-                        if let pending = try? await client.pendingCredentialStatusNotices() {
-                            try Task.checkCancellation()
-                            guard credentialStatusGeneration == generation, auth == .unlocked else { return }
-                            usesWalletStatusNotices = true
-                            credentialStatusNotice = nil
-                            walletStatusNotices = pending
-                            if pending.isEmpty, applicationForeground {
-                                WalletDemoCredentialStatusNotifications.shared.clear()
-                            }
-                        }
                         installCredentialStatuses(snapshot)
                         if initialRead {
                             initialRead = false
@@ -572,7 +546,7 @@ class WalletViewModel: ObservableObject {
         if backgroundStatusScheduler == nil && automaticCredentialStatusChecks { checkCredentialStatuses(force: false) }
     }
 
-    private func cancelCredentialStatusWork(preserveNotice: Bool = false) {
+    private func cancelCredentialStatusWork() {
         credentialStatusRefreshID = nil; statusReviewOwner = nil; presentationStatusRefresh = nil
         credentialStatusReadState = credentialStatusReadState.awaitingRead
         credentialStatusTimer?.cancel(); credentialStatusTimer = nil
@@ -580,8 +554,6 @@ class WalletViewModel: ObservableObject {
         credentialStatusObservationTask?.cancel(); credentialStatusObservationTask = nil
         credentialStatusRefreshTask?.cancel(); credentialStatusRefreshTask = nil
         checkingCredentialStatuses = false; refreshingCredentialIDs = []
-        if !preserveNotice { pendingCredentialStatusNotices.removeAll() }
-        credentialStatusNotice = nil
         walletStatusNotices = []
     }
 
@@ -699,40 +671,17 @@ class WalletViewModel: ObservableObject {
         if !credentialStatusAvailable { credentialStatusError = nil }
         credentialStatusStoreIndices = context.storeIndices
         credentialStatusReadState = .available
-        if usesWalletStatusNotices {
-            nextCredentialStatusRefreshAt = snapshot.nextRefreshAt
-            credentialStatuses = next
-            refreshingCredentialIDs = snapshot.refreshingCredentialIDs
-            scheduleCredentialStatusCheck()
-            return
-        }
-        announcedCredentialStatuses = announcedCredentialStatuses.filter { next[$0.key]?.presentation.hasAdverseStatus == true }
-        pendingCredentialStatusNotices = pendingCredentialStatusNotices.filter { next[$0]?.presentation.hasAdverseStatus == true }
-        let changed = next.filter { id, value in
-            value.presentation.hasAdverseStatus && credentialStatuses[id] != nil &&
-            value.presentation.issue != credentialStatuses[id]?.presentation.issue &&
-            value.presentation.issue.rawValue != announcedCredentialStatuses[id]
-        }
-        changed.forEach { announcedCredentialStatuses[$0.key] = $0.value.presentation.issue.rawValue }
-        pendingCredentialStatusNotices.formUnion(changed.keys)
         nextCredentialStatusRefreshAt = snapshot.nextRefreshAt
-        credentialStatuses = next; refreshingCredentialIDs = snapshot.refreshingCredentialIDs
-        presentDeferredCredentialStatusNotice()
-    }
-
-    func presentDeferredCredentialStatusNotice() {
-        scheduleCredentialStatusCheck()
-        guard applicationForeground, isReady, auth == .unlocked, !isLoading, presentationReview == nil,
-              !proximityPresentation.active, !pendingCredentialStatusNotices.isEmpty else { return }
-        let names = pendingCredentialStatusNotices.sorted().map { id in
-            credentials.first { $0.id == id }.map { CredentialDisplayNormalizer.details(for: $0).cardSummary.title }
-                ?? String(localized: "Credential")
+        credentialStatuses = next
+        refreshingCredentialIDs = snapshot.refreshingCredentialIDs
+        walletStatusNotices = snapshot.pendingNotices
+        if snapshot.pendingNotices.isEmpty, applicationForeground, auth == .unlocked {
+            WalletDemoCredentialStatusNotifications.shared.clear()
         }
-        pendingCredentialStatusNotices.removeAll()
-        credentialStatusNotice = String(localized: "Status changed: \(names.joined(separator: ", ")). Open the marked cards for details.")
+        scheduleCredentialStatusCheck()
     }
 
-    private func scheduleCredentialStatusCheck() {
+    func scheduleCredentialStatusCheck() {
         credentialStatusTimer?.cancel(); credentialStatusTimer = nil
         guard applicationForeground, automaticCredentialStatusChecks, isReady, auth == .unlocked,
               backgroundStatusScheduler == nil || credentialStatusReadState == .available,
@@ -754,11 +703,11 @@ class WalletViewModel: ObservableObject {
 
     func handleApplicationEnteredBackground() {
         applicationForeground = false
-        cancelCredentialStatusWork(preserveNotice: true)
+        cancelCredentialStatusWork()
     }
 
     func lock() {
-        cancelCredentialStatusWork(preserveNotice: true)
+        cancelCredentialStatusWork()
         externalFlow = nil
         selectedTab = .credentials
         access.cancelAttempt()
@@ -812,7 +761,7 @@ class WalletViewModel: ObservableObject {
 
     func handleApplicationBecameActive() {
         applicationForeground = true
-        presentDeferredCredentialStatusNotice()
+        scheduleCredentialStatusCheck()
         refreshBiometricAvailability()
         foregroundSequence += 1
         refreshBiometricSigningAvailability(warningSequence: foregroundSequence)

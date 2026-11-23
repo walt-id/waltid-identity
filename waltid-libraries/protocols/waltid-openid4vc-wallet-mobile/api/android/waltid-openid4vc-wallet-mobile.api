@@ -184,7 +184,6 @@ public final class id/walt/wallet2/mobile/MobileWallet {
 	public static synthetic fun keyUseAuthorizationPreflight$default (Lid/walt/wallet2/mobile/MobileWallet;Lid/walt/wallet2/mobile/MobileWalletKeyType;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun listDeferredIssuance (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun parseAnnexCDeviceRequest (Ljava/lang/String;)Lid/walt/wallet2/mobile/MobileWalletAnnexCParsedRequest;
-	public final fun pendingCredentialStatusNotices (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun prepareDigitalCredentialPaymentConsent (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun prepareDigitalCredentialPaymentConsent$default (Lid/walt/wallet2/mobile/MobileWallet;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun preparePaymentConsent (Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -196,6 +195,8 @@ public final class id/walt/wallet2/mobile/MobileWallet {
 	public final fun previewPresentation (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun proximityPresentationCapabilities (Lid/walt/wallet2/mobile/ProximityConfiguration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun proximityPresentationCapabilities$default (Lid/walt/wallet2/mobile/MobileWallet;Lid/walt/wallet2/mobile/ProximityConfiguration;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun reconcileCredentialStatusMaintenance (ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun reconcileCredentialStatusMaintenance$default (Lid/walt/wallet2/mobile/MobileWallet;ZZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun refreshCredentialStatuses (Ljava/util/List;Lid/walt/wallet2/status/CredentialStatusRefreshMode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun refreshCredentialStatuses$default (Lid/walt/wallet2/mobile/MobileWallet;Ljava/util/List;Lid/walt/wallet2/status/CredentialStatusRefreshMode;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun refreshDigitalCredentialRegistration (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

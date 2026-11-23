@@ -1,21 +1,17 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
 import id.walt.walletdemo.compose.ui.components.PresentationStatusRefreshActions
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -31,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationContinuation
@@ -161,12 +158,6 @@ internal fun WalletDemoAppHost(
                         serverSettingsContent = serverSettingsContent,
                     )
                 }
-                val statusSnackbar = remember { SnackbarHostState() }
-                LaunchedEffect(state.credentialStatusNotice) {
-                    state.credentialStatusNotice?.let { statusSnackbar.showSnackbar(it); controller.dismissCredentialStatusNotice() }
-                }
-                if (state.auth == WalletAuthState.Unlocked && state.presentationReview == null)
-                    SnackbarHost(statusSnackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp))
                 if (state.externalFlow != null && (state.auth != WalletAuthState.Unlocked || state.session !is WalletSessionState.Ready)) {
                     IconButton(onClick = { controller.closeExternalFlow() }, enabled = state.canDismissExternalFlow,
                         modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).testTag("wallet.external.close")) {

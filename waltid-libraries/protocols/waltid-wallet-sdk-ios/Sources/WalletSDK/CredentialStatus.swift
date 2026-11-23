@@ -256,10 +256,14 @@ public struct CredentialStatusSnapshot: Equatable, Sendable {
     public let refreshingCredentialIDs: Set<String>
     /// Earliest useful IfDue check; the app decides whether its foreground policy permits scheduling.
     public let nextRefreshAt: Date?
+    /// Pending adverse changes read with the same local evidence as the credential statuses.
+    public let pendingNotices: [PendingCredentialStatusNotice]
 
-    init(evaluatedAt: Date, credentials: [CredentialStatusRecord], refreshingCredentialIDs: Set<String>, nextRefreshAt: Date? = nil) {
+    init(evaluatedAt: Date, credentials: [CredentialStatusRecord], refreshingCredentialIDs: Set<String>,
+         nextRefreshAt: Date? = nil, pendingNotices: [PendingCredentialStatusNotice] = []) {
         self.evaluatedAt = evaluatedAt; self.credentials = credentials
         self.refreshingCredentialIDs = refreshingCredentialIDs; self.nextRefreshAt = nextRefreshAt
+        self.pendingNotices = pendingNotices
     }
 }
 
@@ -339,6 +343,16 @@ private struct StatusSnapshotWire: Decodable {
     let credentials: [Record]
     let refreshing: Set<CredentialStatusReference>
     let nextRefreshAt: Date?
+    let pendingNotices: [Notice]?
+
+    struct Notice: Decodable {
+        let reference: CredentialStatusReference
+        let version: String
+        let kind: CredentialStatusIssue
+        let checkedAt: Date
+        let historical: Bool
+    }
+
     struct Record: Decodable {
         let reference: CredentialStatusReference
         let status: CredentialStatusMetadata
@@ -351,8 +365,12 @@ func decodeCredentialStatusSnapshot(_ json: String) throws -> CredentialStatusSn
     guard Set(wire.credentials.map(\.reference)).count == wire.credentials.count else {
         throw WalletError.internalFailure("Invalid credential status data")
     }
+    let pending = (wire.pendingNotices ?? []).map {
+        PendingCredentialStatusNotice(credentialID: $0.reference.credentialID, version: $0.version,
+            kind: $0.kind, checkedAt: $0.checkedAt, historical: $0.historical)
+    }
     return CredentialStatusSnapshot(evaluatedAt: wire.evaluatedAt, credentials: wire.credentials.map {
         CredentialStatusRecord(credentialID: $0.reference.credentialID, storeIndex: $0.reference.storeIndex,
             value: CredentialStatus(status: $0.status, presentation: $0.presentation, evaluatedAt: wire.evaluatedAt))
-    }, refreshingCredentialIDs: Set(wire.refreshing.map(\.credentialID)), nextRefreshAt: wire.nextRefreshAt)
+    }, refreshingCredentialIDs: Set(wire.refreshing.map(\.credentialID)), nextRefreshAt: wire.nextRefreshAt, pendingNotices: pending)
 }

@@ -6,8 +6,11 @@ import id.walt.credentials.status.StatusMeaning
 import id.walt.credentials.status.StatusTestIssuer
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
+import id.walt.wallet2.status.CredentialStatusInput
+import id.walt.wallet2.status.CredentialStatusInventory
 import id.walt.wallet2.status.CredentialStatusRefreshMode
 import id.walt.wallet2.status.CredentialStatusRefreshOutcome
 import id.walt.wallet2.status.WalletCredentialStatusService
@@ -21,6 +24,7 @@ import java.nio.file.Files
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -31,6 +35,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class StatusMaintenanceIntegrationTest {
@@ -44,7 +49,7 @@ class StatusMaintenanceIntegrationTest {
         assertEquals(listOf(first.uri, second.uri), requests)
         assertNull(store.readCredentialStatus("a"))
         assertNotNull(store.readCredentialStatus("b"))
-        assertTrue(store.statusNotices().isEmpty())
+        assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
     }
 
     @Test
@@ -88,28 +93,28 @@ class StatusMaintenanceIntegrationTest {
         val issuer = add("a", value = 2u)
         assertTrue(assertIs<CredentialStatusMaintenanceResult.Finished>(wake()).hasNewNotice)
         service(managedCredentialStatusTrustPolicy()).use { foreground ->
-            val suspension = foreground.pendingNotices().single()
+            val suspension = foreground.snapshot().pendingNotices.single()
             assertEquals(StatusMeaning.SUSPENDED, suspension.kind)
             foreground.refresh(mode = CredentialStatusRefreshMode.FORCE)
-            assertEquals(suspension.version, foreground.pendingNotices().single().version)
+            assertEquals(suspension.version, foreground.snapshot().pendingNotices.single().version)
 
             setList(issuer, value = 1u)
             foreground.refresh(mode = CredentialStatusRefreshMode.FORCE)
-            val invalid = foreground.pendingNotices().single()
+            val invalid = foreground.snapshot().pendingNotices.single()
             assertEquals(StatusMeaning.INVALID, invalid.kind)
             assertNotEquals(suspension.version, invalid.version)
             foreground.acknowledgeNotice(suspension.reference, suspension.version)
-            assertEquals(invalid, foreground.pendingNotices().single())
+            assertEquals(invalid, foreground.snapshot().pendingNotices.single())
             foreground.acknowledgeNotice(invalid.reference, invalid.version)
-            assertTrue(foreground.pendingNotices().isEmpty())
+            assertTrue(foreground.snapshot().pendingNotices.isEmpty())
         }
         service(managedCredentialStatusTrustPolicy()).use { reopened ->
-            assertTrue(reopened.pendingNotices().isEmpty())
+            assertTrue(reopened.snapshot().pendingNotices.isEmpty())
             reopened.refresh(mode = CredentialStatusRefreshMode.FORCE)
-            assertTrue(reopened.pendingNotices().isEmpty())
+            assertTrue(reopened.snapshot().pendingNotices.isEmpty())
             setList(issuer, value = 0u)
             reopened.refresh(mode = CredentialStatusRefreshMode.FORCE)
-            assertTrue(store.statusNotices().isEmpty())
+            assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
         }
         assertFalse(assertIs<CredentialStatusMaintenanceResult.Finished>(wake()).hasNewNotice)
     }
@@ -119,15 +124,15 @@ class StatusMaintenanceIntegrationTest {
         add("a", cache = "no-store", value = 1u)
         service().use { foreground ->
             foreground.refresh()
-            val change = foreground.pendingNotices().single()
+            val change = foreground.snapshot().pendingNotices.single()
             assertEquals(StatusMeaning.INVALID, change.kind)
             foreground.acknowledgeNotice(change.reference, change.version)
             foreground.refresh(mode = CredentialStatusRefreshMode.FORCE)
-            assertTrue(foreground.pendingNotices().isEmpty())
+            assertTrue(foreground.snapshot().pendingNotices.isEmpty())
         }
-        service().use { assertTrue(it.pendingNotices().isEmpty()) }
+        service().use { assertTrue(it.snapshot().pendingNotices.isEmpty()) }
         assertNull(store.readCredentialStatus("a"))
-        assertTrue(store.statusNotices().isEmpty())
+        assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
     }
 
     @Test
@@ -136,7 +141,7 @@ class StatusMaintenanceIntegrationTest {
         val workerRequested = CompletableDeferred<Unit>()
         val releaseWorker = CompletableDeferred<Unit>()
         val requestCount = AtomicInteger()
-        beforeResponse = {
+        beforeResponse = { _ ->
             if (requestCount.incrementAndGet() == 1) {
                 workerRequested.complete(Unit)
                 releaseWorker.await()
@@ -148,10 +153,10 @@ class StatusMaintenanceIntegrationTest {
                 workerRequested.await()
                 service(managedCredentialStatusTrustPolicy()).use { foreground ->
                     assertEquals(CredentialStatusRefreshOutcome.COMPLETED, foreground.refresh().single().outcome)
-                    val notice = foreground.pendingNotices().single()
+                    val notice = foreground.snapshot().pendingNotices.single()
                     releaseWorker.complete(Unit)
                     assertFalse(assertIs<CredentialStatusMaintenanceResult.Finished>(worker.await()).hasNewNotice)
-                    assertEquals(notice.version, foreground.pendingNotices().single().version)
+                    assertEquals(notice.version, foreground.snapshot().pendingNotices.single().version)
                 }
             } finally {
                 releaseWorker.complete(Unit)
@@ -160,19 +165,98 @@ class StatusMaintenanceIntegrationTest {
         assertEquals(2, requestCount.get())
     }
 
+    @Test
+    fun replacementDuringTheLocalReadCannotInheritTheEarlierNotice() = withWallet {
+        add("a", value = 2u)
+        assertTrue(assertIs<CredentialStatusMaintenanceResult.Finished>(wake()).hasNewNotice)
+        val policy = managedCredentialStatusTrustPolicy()
+        service(policy).use { foreground ->
+            assertEquals(StatusMeaning.SUSPENDED, foreground.snapshot().pendingNotices.single().kind)
+        }
+        val replacement = StatusTestIssuer.create("https://status.example/replacement").credential()
+        val original = store
+        val replacing = object : WalletCredentialStore by original, CredentialStatusInventory by original {
+            override suspend fun statusPage(afterId: String?, limit: Int): List<CredentialStatusInput> {
+                // Replace at the credential-read boundary where a separate notice read went stale.
+                open().use { writer ->
+                    val other = SqlDelightCredentialStore(WalletPersistenceDatabase(writer).walletPersistenceQueries)
+                    other.addCredential(StoredCredential("a", replacement))
+                }
+                return original.statusPage(afterId, limit)
+            }
+        }
+        service(policy, replacing).use { foreground ->
+            val current = foreground.snapshot()
+            assertTrue(current.pendingNotices.isEmpty())
+            assertEquals(CredentialStatusFreshness.UNKNOWN, current.credentials.single().presentation.freshness)
+        }
+        assertEquals(replacement.signed, store.getCredential("a")?.credential?.signed)
+        assertNull(store.readCredentialStatus("a"))
+        assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+    }
+
+    @Test
+    fun budgetExpiryReportsCommittedNoticeAndDefersTheInterruptedCredential() = withWallet {
+        val suspended = add("a", value = 2u)
+        val delayed = add("b")
+        beforeResponse = { uri -> if (uri == delayed.uri) awaitCancellation() }
+
+        val result = wake(budget = 2.seconds)
+        assertEquals(CredentialStatusMaintenanceResult.Finished(1, 0, 1, hasNewNotice = true), result)
+        assertEquals(listOf(suspended.uri, delayed.uri), requests)
+        service(managedCredentialStatusTrustPolicy()).use { foreground ->
+            val notice = foreground.snapshot().pendingNotices.single()
+            assertEquals("a", notice.reference.credentialId)
+            assertEquals(StatusMeaning.SUSPENDED, notice.kind)
+            assertFalse(notice.historical)
+
+            beforeResponse = {}
+            assertFalse(assertIs<CredentialStatusMaintenanceResult.Finished>(wake()).hasNewNotice)
+            assertEquals(notice.version, foreground.snapshot().pendingNotices.single().version)
+        }
+    }
+
+    @Test
+    fun retiringTheGrantDuringAPartialPassSuppressesItsAlertSignal() = withWallet {
+        add("a", value = 2u)
+        val second = add("b")
+        val requested = CompletableDeferred<Unit>()
+        val resume = CompletableDeferred<Unit>()
+        beforeResponse = { uri ->
+            if (uri == second.uri) {
+                requested.complete(Unit)
+                resume.await()
+            }
+        }
+        coroutineScope {
+            val worker = async { wake() }
+            try {
+                requested.await()
+                enrollment.reconcile(automaticChecks = false, resumePaused = false)
+            } finally {
+                resume.complete(Unit)
+            }
+            assertEquals(CredentialStatusMaintenanceResult.Ineligible, worker.await())
+        }
+        service(managedCredentialStatusTrustPolicy()).use {
+            assertEquals("a", it.snapshot().pendingNotices.single().reference.credentialId)
+        }
+        assertNull(store.readCredentialStatus("b"))
+    }
+
     private class Fixture(val driver: JdbcSqliteDriver, val open: () -> JdbcSqliteDriver) {
         val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
         val store = SqlDelightCredentialStore(queries)
-        private val enrollment = StatusMaintenanceEnrollmentStore("review", queries) { "database" }
+        val enrollment = StatusMaintenanceEnrollmentStore("review", queries) { "database" }
         private val binding = requireNotNull(enrollment.set(CredentialStatusMaintenancePreference.ENABLED)?.binding)
         val requests = mutableListOf<String>()
         private val responses = mutableMapOf<String, Pair<String, String>>()
-        var beforeResponse: suspend () -> Unit = {}
+        var beforeResponse: suspend (String) -> Unit = {}
         val client = HttpClient(MockEngine { request ->
             val uri = request.url.toString()
             requests += uri
             val (list, cache) = responses.getValue(uri)
-            beforeResponse()
+            beforeResponse(uri)
             respond(list, headers = headersOf(
                 HttpHeaders.ContentType to listOf("application/statuslist+jwt"),
                 HttpHeaders.CacheControl to listOf(cache),
@@ -190,11 +274,11 @@ class StatusMaintenanceIntegrationTest {
             responses[issuer.uri] = issuer.list(value = value, ttl = 600, bits = 2) to cache
         }
 
-        fun service(policy: String? = null) =
-            WalletCredentialStatusService(Wallet("review", credentialStores = listOf(store)), client, trustPolicyId = policy)
+        fun service(policy: String? = null, credentials: WalletCredentialStore = store) =
+            WalletCredentialStatusService(Wallet("review", credentialStores = listOf(credentials)), client, trustPolicyId = policy)
 
-        suspend fun wake(maxItems: Int = 25) =
-            runCredentialStatusMaintenance(binding, maxItems, 10.seconds, open = { open() }, httpClient = client)
+        suspend fun wake(maxItems: Int = 25, budget: Duration = 10.seconds) =
+            runCredentialStatusMaintenance(binding, maxItems, budget, open = { open() }, httpClient = client)
     }
 
     private fun withWallet(test: suspend Fixture.() -> Unit) = runBlocking {

@@ -51,13 +51,21 @@ public final class WalletDemoCredentialStatusNotifications: NSObject, UNUserNoti
     public nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        guard response.notification.request.identifier == Self.identifier,
-              response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
-        await MainActor.run {
-            self.openRequested = true
-            NotificationCenter.default.post(name: Self.openHome, object: nil)
-        }
+        await handleResponse(identifier: response.notification.request.identifier, action: response.actionIdentifier)
     }
+
+    func handleResponse(identifier: String, action: String) {
+        guard identifier == Self.identifier, action == UNNotificationDefaultActionIdentifier else { return }
+        openRequested = true
+        NotificationCenter.default.post(name: Self.openHome, object: nil)
+    }
+
+    #if DEBUG
+    @_spi(WalletDemoTesting)
+    public func simulateTapForUITest() {
+        handleResponse(identifier: Self.identifier, action: UNNotificationDefaultActionIdentifier)
+    }
+    #endif
 
     public nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
         willPresent notification: UNNotification

@@ -53,8 +53,11 @@ class MobileCredentialStatusMaintenanceTest {
         }
         requested.await()
         assertEquals(CredentialStatusMaintenancePreference.PAUSED,
-            wallet.enrollment.set(CredentialStatusMaintenancePreference.PAUSED)?.preference)
-        val reenabled = assertNotNull(wallet.enrollment.set(CredentialStatusMaintenancePreference.ENABLED))
+            wallet.enrollment.reconcile(automaticChecks = false, resumePaused = false)?.preference)
+        val afterInterruptedDisable = wallet.enrollment.reconcile(automaticChecks = true, resumePaused = false)
+        assertEquals(CredentialStatusMaintenancePreference.PAUSED, afterInterruptedDisable?.preference)
+        assertNull(afterInterruptedDisable?.binding)
+        val reenabled = assertNotNull(wallet.enrollment.reconcile(automaticChecks = true, resumePaused = true))
         assertNotEquals(wallet.binding, reenabled.binding)
         resume.complete(Unit)
 
@@ -62,6 +65,11 @@ class MobileCredentialStatusMaintenanceTest {
         assertNull(wallet.store.readCredentialStatusRecord("credential"))
         assertEquals(CredentialStatusMaintenanceResult.Ineligible, wallet.refresh { error("Retired binding reached issuer I/O") })
         assertTrue(wallet.closed.get())
+
+        wallet.enrollment.set(CredentialStatusMaintenancePreference.OFF)
+        val optedOut = wallet.enrollment.reconcile(automaticChecks = true, resumePaused = true)
+        assertEquals(CredentialStatusMaintenancePreference.OFF, optedOut?.preference)
+        assertNull(optedOut?.binding)
     }
 
     @Test

@@ -94,11 +94,12 @@ From an authorized foreground wallet, enable maintenance with
 At background delivery, call ``Wallet/refreshDueStatusesForExistingWallet(binding:crossProcessAccess:maxItems:budget:)``
 with the binding and the original App Group and Keychain access group, if configured. The operation
 checks due records in existing managed storage and reports a flag when it commits a new retainable
-adverse change. The app owns consent, scheduling and mapping
+adverse change, including when its budget expires after a commit. The app owns consent, scheduling and mapping
 expiration to cancellation. Custom stores remain eligible for foreground refresh.
 
-Pause or retire the opt-in before cancelling the OS request. An old binding cannot commit after
-the opt-in is paused, revoked or deleted. On unlock, reload the local observation before requesting
-another check. Use ``Wallet/pendingCredentialStatusNotices()`` on unlocked Home and acknowledge
+Use ``Wallet/reconcileCredentialStatusMaintenance(automaticChecks:resumePaused:)`` to reconcile the
+app's automatic-check preference. Only an explicit re-enable resumes a paused opt-in. Pause or
+retire the grant before cancelling the OS request. On unlock, reload the local observation before
+requesting another check. Show ``CredentialStatusSnapshot/pendingNotices`` on Home and acknowledge
 the displayed version with ``Wallet/acknowledgeCredentialStatusNotice(credentialID:version:)``.
-A native notification can link to Home without including credential or wallet details.
+A generic alert can link to Home. Check that its binding is still current before posting it.

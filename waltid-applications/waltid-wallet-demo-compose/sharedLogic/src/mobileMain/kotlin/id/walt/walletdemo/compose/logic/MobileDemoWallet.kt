@@ -35,7 +35,7 @@ import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.status.CredentialStatusRefreshMode
 import id.walt.wallet2.status.CredentialStatusReviewChangedException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 
 internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
@@ -231,7 +231,9 @@ internal class MobileDemoWallet(
         }
     }
 
-    override suspend fun backgroundStatusEnrollment() = mobileWallet.credentialStatusMaintenanceEnrollment()?.toDemoEnrollment()
+    override suspend fun reconcileBackgroundStatus(automaticChecks: Boolean, resumePaused: Boolean) =
+        mobileWallet.reconcileCredentialStatusMaintenance(automaticChecks, resumePaused)?.toDemoEnrollment()
+
     override suspend fun setBackgroundStatusPreference(preference: DemoBackgroundStatusPreference) =
         mobileWallet.setCredentialStatusMaintenance(CredentialStatusMaintenancePreference.valueOf(preference.name))?.toDemoEnrollment()
 
@@ -241,15 +243,10 @@ internal class MobileDemoWallet(
     override suspend fun invalidateCredentialStatusSnapshot() = mobileWallet.invalidateCredentialStatusSnapshot()
 
     override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> =
-        flow { mobileWallet.credentialStatuses.collect { emit(it.toDemoStatuses().withStatusNotices()) } }
+        mobileWallet.credentialStatuses.map { it.toDemoStatuses() }
 
     override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses =
-        mobileWallet.credentialStatusSnapshot().toDemoStatuses().withStatusNotices()
-
-    private suspend fun WalletDemoCredentialStatuses.withStatusNotices(): WalletDemoCredentialStatuses =
-        copy(pendingNotices = mobileWallet.pendingCredentialStatusNotices().map {
-            WalletDemoCredentialStatusNotice(it.reference.credentialId, it.version, it.kind.name, it.checkedAt.toString(), it.historical)
-        })
+        mobileWallet.credentialStatusSnapshot().toDemoStatuses()
 
     override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) =
         mobileWallet.acknowledgeCredentialStatusNotice(credentialId, version)

@@ -6,7 +6,12 @@ import id.walt.wallet2.data.StoredCredential
 sealed interface CredentialStatusInput {
     val id: String
 
-    data class Signed(val credential: StoredCredential) : CredentialStatusInput {
+    /** Read the signed bytes, stored observation and notice from the same row snapshot. */
+    data class Signed(
+        val credential: StoredCredential,
+        val storedStatus: CredentialStatusStoredRecord? = null,
+        val notice: CredentialStatusNoticeState? = null,
+    ) : CredentialStatusInput {
         override val id: String get() = credential.id
     }
 

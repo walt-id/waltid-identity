@@ -22,23 +22,6 @@ internal fun CredentialStatusMaintenanceEnrollment?.toMaintenanceBridgeEnrollmen
     WalletBridgeStatusMaintenanceEnrollment(this?.preference?.name, this?.binding)
 
 /**
- * A versioned, wallet-local notice for unlocked UI.
- *
- * @property credentialId Credential to open from the authenticated wallet.
- * @property version Opaque acknowledgement version.
- * @property kind Issuer-reported adverse status meaning.
- * @property checkedAt Original observation time in ISO 8601 format.
- * @property historical Whether to display the observation as last reported.
- */
-public data class WalletBridgeCredentialStatusNotice(
-    public val credentialId: String,
-    public val version: String,
-    public val kind: String,
-    public val checkedAt: String,
-    public val historical: Boolean,
-)
-
-/**
  * Redacted result of a single maintenance pass.
  *
  * @property outcome Whether the pass finished, deferred, or found an ineligible wallet.

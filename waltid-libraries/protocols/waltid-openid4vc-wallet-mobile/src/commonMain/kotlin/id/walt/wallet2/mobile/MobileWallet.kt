@@ -764,11 +764,6 @@ public class MobileWallet internal constructor(
         wallet.credentialStatuses().snapshot()
     }
 
-    /** Pending adverse changes for presentation in the unlocked wallet. No issuer request is made. */
-    public suspend fun pendingCredentialStatusNotices(): List<id.walt.wallet2.status.PendingCredentialStatusNotice> = lifecycle.use {
-        wallet.credentialStatuses().pendingNotices()
-    }
-
     /** Acknowledges only the notice version presented to the holder. */
     public suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String): Unit = lifecycle.use {
         wallet.credentialStatuses().acknowledgeNotice(WalletCredentialReference(0, credentialId), version)
@@ -782,6 +777,16 @@ public class MobileWallet internal constructor(
     /** Reads the background opt-in for this managed wallet, or null for an unsupported store. */
     public suspend fun credentialStatusMaintenanceEnrollment(): CredentialStatusMaintenanceEnrollment? =
         lifecycle.use { statusMaintenance?.get() }
+
+    /**
+     * Reconciles maintenance with the host's automatic-check preference.
+     * Disabling automatic checks retires the grant while preserving consent. Set [resumePaused]
+     * only for an explicit re-enable. On startup a paused enrollment stays paused.
+     */
+    public suspend fun reconcileCredentialStatusMaintenance(
+        automaticChecks: Boolean,
+        resumePaused: Boolean = false,
+    ): CredentialStatusMaintenanceEnrollment? = lifecycle.use { statusMaintenance?.reconcile(automaticChecks, resumePaused) }
 
     /** Updates the existing wallet's opt-in. The app calls this from its authorized foreground flow. */
     public suspend fun setCredentialStatusMaintenance(

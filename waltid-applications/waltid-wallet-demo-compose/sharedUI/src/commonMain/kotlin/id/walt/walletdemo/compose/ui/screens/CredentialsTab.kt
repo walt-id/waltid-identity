@@ -78,6 +78,8 @@ internal fun CredentialsTab(
     onDetailsChromeChange: (CredentialDetailsChrome?) -> Unit = {},
     onDetailsOpened: suspend (String) -> Unit = {},
     statusNotices: List<WalletDemoCredentialStatusNotice> = emptyList(),
+    transientStatusNotice: String? = null,
+    onDismissTransientStatusNotice: () -> Unit = {},
     onAcknowledgeStatusNotice: (WalletDemoCredentialStatusNotice) -> Unit = {},
     openStatusNoticeOnHome: Boolean = false,
     onStatusNoticeOpenedOnHome: () -> Unit = {},
@@ -121,7 +123,7 @@ internal fun CredentialsTab(
     val statusSnackbar = remember { SnackbarHostState() }
     val notice = statusNotices.firstOrNull { entry -> cards.any { it.id == entry.credentialId } }
         ?.takeUnless { showingDetails || confirmDelete }
-    if (notice != null) {
+    val noticeMessage = if (notice != null) {
         val title = cards.first { it.id == notice.credentialId }.title
         val kind = stringResource(when (notice.kind) {
             "REVOKED" -> Res.string.credential_status_revoked
@@ -129,14 +131,22 @@ internal fun CredentialsTab(
             else -> Res.string.credential_status_invalid
         })
         val checkedAt = LocalWalletTimeFormatter.current(Instant.parse(notice.checkedAt)).fullText
-        val message = stringResource(if (notice.historical) Res.string.credential_status_notice_historical
+        stringResource(if (notice.historical) Res.string.credential_status_notice_historical
             else Res.string.credential_status_notice_current, title, kind, checkedAt)
-        val viewCredential = stringResource(Res.string.credential_status_notice_view)
-        LaunchedEffect(notice.version, message) {
-            val result = statusSnackbar.showSnackbar(message, viewCredential, withDismissAction = true,
-                duration = SnackbarDuration.Indefinite)
-            onAcknowledgeStatusNotice(notice)
-            if (result == SnackbarResult.ActionPerformed) expandedId = notice.credentialId
+    } else transientStatusNotice.takeUnless { showingDetails || confirmDelete }
+    if (noticeMessage != null) {
+        val action = if (notice != null) stringResource(Res.string.credential_status_notice_view) else null
+        LaunchedEffect(notice?.version, noticeMessage) {
+            val result = statusSnackbar.showSnackbar(
+                noticeMessage, action, withDismissAction = notice != null,
+                duration = if (notice != null) SnackbarDuration.Indefinite else SnackbarDuration.Short,
+            )
+            if (notice == null) {
+                onDismissTransientStatusNotice()
+            } else {
+                onAcknowledgeStatusNotice(notice)
+                if (result == SnackbarResult.ActionPerformed) expandedId = notice.credentialId
+            }
         }
     }
 
@@ -228,7 +238,7 @@ internal fun CredentialsTab(
                 }
             }
         }
-        if (notice != null) SnackbarHost(statusSnackbar, Modifier.align(Alignment.BottomCenter).padding(12.dp))
+        if (noticeMessage != null) SnackbarHost(statusSnackbar, Modifier.align(Alignment.BottomCenter).padding(12.dp))
     }
 
     if (confirmDelete) {

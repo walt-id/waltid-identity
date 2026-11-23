@@ -216,23 +216,14 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         try Self.maintenanceEnrollment(await bridge.setCredentialStatusMaintenance(preference: preference.rawValue))
     }
 
-    func invalidateCredentialStatusSnapshot() async throws {
-        _ = try Self.successAnyValue(try await bridge.invalidateCredentialStatusSnapshot(), operation: "reload local credential status")
+    func reconcileCredentialStatusMaintenance(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment? {
+        try Self.maintenanceEnrollment(await bridge.reconcileCredentialStatusMaintenance(
+            automaticChecks: automaticChecks, resumePaused: resumePaused
+        ))
     }
 
-    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice] {
-        let result = try await bridge.pendingCredentialStatusNotices()
-        guard let notices = try Self.successAnyValue(result, operation: "read credential status notices") as? [WalletBridgeCredentialStatusNotice] else {
-            throw WalletError.internalFailure("Unexpected credential status notices result")
-        }
-        return try notices.map { notice in
-            guard let checkedAt = parseWalletISO8601Date(notice.checkedAt),
-                  let kind = CredentialStatusIssue(rawValue: notice.kind) else {
-                throw WalletError.internalFailure("Unexpected credential status notice")
-            }
-            return PendingCredentialStatusNotice(credentialID: notice.credentialId, version: notice.version,
-                kind: kind, checkedAt: checkedAt, historical: notice.historical)
-        }
+    func invalidateCredentialStatusSnapshot() async throws {
+        _ = try Self.successAnyValue(try await bridge.invalidateCredentialStatusSnapshot(), operation: "reload local credential status")
     }
 
     func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {

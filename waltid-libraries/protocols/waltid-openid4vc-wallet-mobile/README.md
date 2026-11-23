@@ -130,17 +130,18 @@ Use an open, authorized managed wallet to call
 binding only in app-private preferences. When the platform delivers eligible work, call
 `refreshDueStatusesForExistingWallet` with that binding and the original storage namespace.
 The bounded call pages signed credentials using a grant-scoped cursor in existing SQLCipher storage.
-It returns aggregate outcomes and a flag when it committed a new retainable notice. Cancel it when
-the OS expires or stops the task.
+It returns aggregate progress and a flag when it committed a new retainable notice, including
+when its budget expires after a commit. Cancel it when the OS expires or stops the task.
 
-Use `PAUSED` when the host turns off automatic checks and `OFF` for explicit opt-out. Both retire
-the current binding before the host cancels its request. An enabled binding from before a pause
-must be replaced when resuming. Wallet deletion also retires it. Custom database key providers and
+Use `reconcileCredentialStatusMaintenance` when the app loads its automatic-check preference
+or the holder changes it. Pass `resumePaused` as true only after an explicit re-enable. Use
+`OFF` for explicit opt-out. Pausing or opting out retires the current binding before the host
+cancels its request. Resuming creates a new binding. Wallet deletion also retires it. Custom database key providers and
 credential stores use foreground refresh. The app owns the schedule and must get opt-in.
 
 On unlock or resume, read local status first. After a same-process wake,
 `invalidateCredentialStatusSnapshot()` prompts the existing observer to reread the managed
-snapshot. Read `pendingCredentialStatusNotices()` in the unlocked app and use
+snapshot. Show the snapshot’s `pendingNotices` in the unlocked app and use
 `acknowledgeCredentialStatusNotice(credentialId, version)` for the displayed notice.
 The app owns OS permission, local alert delivery and navigation after unlock.
 

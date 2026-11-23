@@ -7,8 +7,8 @@ protocol WalletCoreBridge: Sendable {
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot
     func credentialStatusMaintenanceEnrollment() async throws -> CredentialStatusMaintenanceEnrollment?
     func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment?
+    func reconcileCredentialStatusMaintenance(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment?
     func invalidateCredentialStatusSnapshot() async throws
-    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice]
     func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult]
     func close() async throws
@@ -311,7 +311,7 @@ extension WalletCoreBridge {
 extension WalletCoreBridge {
     func credentialStatusMaintenanceEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? { nil }
     func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func reconcileCredentialStatusMaintenance(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
     func invalidateCredentialStatusSnapshot() async throws {}
-    func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice] { [] }
     func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {}
 }

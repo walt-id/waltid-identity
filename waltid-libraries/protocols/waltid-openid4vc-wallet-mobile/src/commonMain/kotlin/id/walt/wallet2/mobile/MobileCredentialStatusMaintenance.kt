@@ -19,6 +19,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /** Foreground authorization for the managed wallet's automatic background status checks. */
 public enum class CredentialStatusMaintenancePreference {
@@ -44,7 +45,7 @@ public class CredentialStatusMaintenanceEnrollment internal constructor(
 /** Result of one due-only pass. It contains no wallet, credential, endpoint, or key identifiers. */
 public sealed interface CredentialStatusMaintenanceResult {
     /**
-     * Redacted totals from one pass.
+     * Redacted progress from one pass, including work committed before the SDK budget expired.
      *
      * @property checked Completed attempts, including attempts with per-credential errors.
      * @property unchanged Entries that required no new observation or lost a concurrent update.
@@ -72,7 +73,7 @@ internal data class StatusMaintenanceBinding(val walletId: String, val location:
 
 internal class StatusMaintenanceEnrollmentStore(
     private val walletId: String,
-    queries: WalletPersistenceQueries,
+    private val queries: WalletPersistenceQueries,
     private val location: () -> String?,
 ) {
     private val storage = SqlDelightStatusMaintenanceStore(queries, walletId)
@@ -91,6 +92,15 @@ internal class StatusMaintenanceEnrollmentStore(
         val binding = record?.grantId?.let { Json.encodeToString(StatusMaintenanceBinding(walletId, resolved, it)) }
         return CredentialStatusMaintenanceEnrollment(preference, binding)
     }
+
+    fun reconcile(automaticChecks: Boolean, resumePaused: Boolean): CredentialStatusMaintenanceEnrollment? =
+        queries.transactionWithResult {
+            if (!automaticChecks) storage.pause()
+            val enrollment = get()
+            if (automaticChecks && resumePaused && enrollment?.preference == CredentialStatusMaintenancePreference.PAUSED) {
+                set(CredentialStatusMaintenancePreference.ENABLED)
+            } else enrollment
+        }
 
     fun set(preference: CredentialStatusMaintenancePreference): CredentialStatusMaintenanceEnrollment? {
         when (preference) {
@@ -132,29 +142,46 @@ internal suspend fun runCredentialStatusMaintenance(
     if (!isValidMaintenanceWalletId(authorized.walletId) || authorized.grantId.isBlank()) {
         return CredentialStatusMaintenanceResult.Ineligible
     }
+    val started = TimeSource.Monotonic.markNow()
     return try {
-        withTimeoutOrNull(budget) {
-            withContext(Dispatchers.Default) {
-                val driver = open(authorized) ?: return@withContext CredentialStatusMaintenanceResult.Ineligible
-                try {
-                    currentCoroutineContext().ensureActive()
-                    val session = SqlDelightStatusMaintenanceStore.admit(driver, authorized.walletId, authorized.grantId)
-                        ?: return@withContext CredentialStatusMaintenanceResult.Ineligible
+        withContext(Dispatchers.Default) {
+            val driver = open(authorized) ?: return@withContext CredentialStatusMaintenanceResult.Ineligible
+            try {
+                currentCoroutineContext().ensureActive()
+                val session = SqlDelightStatusMaintenanceStore.admit(driver, authorized.walletId, authorized.grantId)
+                    ?: return@withContext CredentialStatusMaintenanceResult.Ineligible
+                var checked = 0
+                var unchanged = 0
+                var deferred = 0
+                var itemInProgress = false
+                var newNotice = false
+                val completed = withTimeoutOrNull(budget - started.elapsedNow()) {
                     MobileDidSupport.ensureInitialized()
-                    var newNotice = false
-                    val results = WalletCredentialStatusService.refreshMaintenancePage(
-                        session.inventory, session.cursor, maxItems, httpClient, ::managedCredentialStatusTrustPolicy, session::advance,
-                    ) { newNotice = true }
-                    if (!session.isAuthorized()) return@withContext CredentialStatusMaintenanceResult.Ineligible
-                    val checked = results.count { it.outcome == CredentialStatusRefreshOutcome.COMPLETED }
-                    val remaining = results.count { it.outcome == CredentialStatusRefreshOutcome.DEFERRED }
-                    CredentialStatusMaintenanceResult.Finished(checked, results.size - checked - remaining,
-                        remaining + session.remaining(), newNotice)
-                } finally {
-                    driver.close()
+                    WalletCredentialStatusService.refreshMaintenancePage(
+                        session.inventory, session.cursor, maxItems, httpClient, ::managedCredentialStatusTrustPolicy,
+                        advance = { id -> session.advance(id).also { itemInProgress = it } },
+                        onItem = {
+                            itemInProgress = false
+                            when (it) {
+                                CredentialStatusRefreshOutcome.COMPLETED -> checked++
+                                CredentialStatusRefreshOutcome.DEFERRED -> deferred++
+                                else -> unchanged++
+                            }
+                        },
+                        onNoticeCommitted = { newNotice = true },
+                    )
+                    true
+                } == true
+                if (!session.isAuthorized()) return@withContext CredentialStatusMaintenanceResult.Ineligible
+                if (!completed && checked == 0 && unchanged == 0 && deferred == 0 && !newNotice) {
+                    return@withContext CredentialStatusMaintenanceResult.Deferred
                 }
+                if (itemInProgress) deferred++
+                CredentialStatusMaintenanceResult.Finished(checked, unchanged, deferred + session.remaining(), newNotice)
+            } finally {
+                driver.close()
             }
-        } ?: CredentialStatusMaintenanceResult.Deferred
+        }
     } catch (_: WalletPersistenceException) {
         CredentialStatusMaintenanceResult.Deferred
     } catch (_: StatusMaintenanceStorageException) {

@@ -130,6 +130,9 @@ internal fun WalletScreen(
         return
     }
 
+    val showStatusNotices = !openingStatusNotice && !showingScanner && !showingFlow && presentationContent == null &&
+        state.externalFlow == null && state.presentationReview == null && state.offerPreview == null && !state.isBusy
+
     // Home remains mounted beneath scanner, review, result and nearby sheets.
     val collectionState = state.copy(selectedTab = WalletDemoTab.Credentials)
     Scaffold(
@@ -181,8 +184,9 @@ internal fun WalletScreen(
                 onDetailsChromeChange = { detailsChrome = it },
                 onDetailsOpened = controller::checkCredentialStatusOnDetails,
                 statusNotices = state.credentialStatuses.pendingNotices.orEmpty()
-                    .takeIf { state.credentialStatuses.available && !showingScanner && !showingFlow &&
-                        presentationContent == null && !state.isBusy }.orEmpty(),
+                    .takeIf { showStatusNotices && state.credentialStatuses.available }.orEmpty(),
+                transientStatusNotice = state.credentialStatusNotice.takeIf { showStatusNotices },
+                onDismissTransientStatusNotice = controller::dismissCredentialStatusNotice,
                 onAcknowledgeStatusNotice = controller::acknowledgeCredentialStatusNotice,
                 openStatusNoticeOnHome = openingStatusNotice && !showingFlow,
                 onStatusNoticeOpenedOnHome = controller::credentialStatusNotificationOpenedOnHome,

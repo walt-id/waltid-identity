@@ -3,6 +3,33 @@ import XCTest
 
 @MainActor
 final class MockWalletUITests: XCTestCase {
+    func testStatusNotificationOpensCredentialAfterUnlockAndAcknowledgesIt() {
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: [
+            "E2E_MOCK_WALLET": "1",
+            "E2E_MOCK_STATUS": "revoked_current",
+            "E2E_MOCK_STATUS_NOTIFICATION": "1",
+        ], unlock: false)
+
+        let viewCredential = app.buttons["View credential"]
+        let pin = ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        XCTAssertTrue(pin.waitForExistence(timeout: 10))
+        XCTAssertFalse(viewCredential.exists)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Travel credential")).firstMatch.exists)
+
+        ui.unlockWallet()
+        XCTAssertTrue(viewCredential.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Travel credential · Revoked")).firstMatch.exists)
+        viewCredential.tap()
+        ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
+        XCTAssertTrue(app.staticTexts["Travel credential"].exists)
+        ui.tapNavigationBack()
+        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10))
+        XCTAssertTrue(viewCredential.waitForNonExistence(timeout: 5))
+    }
+
     func testCredentialStatusSettingsToggleAndBatchReport() async {
         continueAfterFailure = false
         let app = XCUIApplication()

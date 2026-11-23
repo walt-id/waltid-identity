@@ -91,7 +91,7 @@ struct HomeView: View {
         }
         .environment(\.credentialStatusUI, viewModel.credentialStatusUIContext)
         .onReceive(viewModel.proximityPresentation.$active) { active in
-            if !active { Task { @MainActor in viewModel.presentDeferredCredentialStatusNotice() } }
+            if !active { Task { @MainActor in viewModel.scheduleCredentialStatusCheck() } }
         }
         .task(id: selectedCredentialDetailsID) {
             if let id = selectedCredentialDetailsID { await viewModel.checkCredentialStatusOnDetails(id) }
@@ -125,16 +125,6 @@ struct HomeView: View {
                 }
                 .padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
                 .accessibilityIdentifier("credential-status-notice")
-            } else if let notice = viewModel.credentialStatusNotice, canShowStatusNotice {
-                HStack {
-                    Text(notice).font(.footnote)
-                    Button(String(localized: "Dismiss")) { viewModel.credentialStatusNotice = nil }
-                }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
-                    .accessibilityIdentifier("credential-status-notice")
-                    .task(id: notice) {
-                        do { try await Task.sleep(nanoseconds: 6_000_000_000) } catch { return }
-                        if viewModel.credentialStatusNotice == notice { viewModel.credentialStatusNotice = nil }
-                    }
             }
         }
     }
@@ -148,7 +138,9 @@ struct HomeView: View {
     private var canShowStatusNotice: Bool {
         viewModel.isReady && viewModel.auth == .unlocked && !viewModel.isLoading &&
             viewModel.selectedTab == .credentials && viewModel.presentationReview == nil &&
-            !showingSettings && !showingTaskSheet && !nearbySheet.keepsHomeVisible && selectedCredentialDetailsID == nil
+            viewModel.externalFlow == nil && viewModel.offerPreview == nil && !viewModel.statusNotificationOpened &&
+            !showingSettings && !dismissingSettings && !showingTaskSheet && !nearbySheet.keepsHomeVisible &&
+            selectedCredentialDetailsID == nil
     }
 
     private func statusNoticeMessage(_ notice: PendingCredentialStatusNotice, name: String) -> String {

@@ -19,7 +19,8 @@ final class WalletE2EUI {
         button.tap()
     }
 
-    func launch(attestation: [String: String] = [:], environment: [String: String] = [:], initializeSigningIdentity: Bool = true) {
+    func launch(attestation: [String: String] = [:], environment: [String: String] = [:],
+                initializeSigningIdentity: Bool = true, unlock: Bool = true) {
         app.launchEnvironment["E2E_WALLET_ID"] = app.launchEnvironment["E2E_WALLET_ID"] ?? "e2e-\(UUID().uuidString)"
         app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
             app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
@@ -34,6 +35,7 @@ final class WalletE2EUI {
             addCredentialStatusFixture()
         }
         app.launch()
+        guard unlock else { return }
         unlockWallet()
         if initializeSigningIdentity && app.launchEnvironment["E2E_MOCK_WALLET"] != "1" {
             completeKeySetupIfNeeded()
@@ -54,8 +56,15 @@ final class WalletE2EUI {
                 ["reference": ["storeIndex": 0, "credentialId": id],
                  "status": try XCTUnwrap(value["status"]), "presentation": try XCTUnwrap(value["presentation"])]
             }
-            let data = try JSONSerialization.data(withJSONObject: ["evaluatedAt": try XCTUnwrap(value["evaluatedAt"]),
-                "credentials": records, "refreshing": []])
+            let evaluatedAt = try XCTUnwrap(value["evaluatedAt"])
+            var snapshot: [String: Any] = ["evaluatedAt": evaluatedAt, "credentials": records, "refreshing": []]
+            if app.launchEnvironment["E2E_MOCK_STATUS_NOTIFICATION"] == "1" {
+                snapshot["pendingNotices"] = [[
+                    "reference": ["storeIndex": 0, "credentialId": "cred-1"],
+                    "version": "revoked-v1", "kind": "REVOKED", "checkedAt": evaluatedAt, "historical": false,
+                ]]
+            }
+            let data = try JSONSerialization.data(withJSONObject: snapshot)
             app.launchEnvironment["E2E_MOCK_STATUS_JSON"] = String(decoding: data, as: UTF8.self)
         } catch { XCTFail("Could not load the shared credential status fixture: \(error)") }
     }

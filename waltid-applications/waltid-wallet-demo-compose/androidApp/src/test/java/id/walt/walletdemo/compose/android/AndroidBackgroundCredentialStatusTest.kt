@@ -74,12 +74,12 @@ class AndroidBackgroundCredentialStatusTest {
     }
 
     @Test
-    fun aCurrentRetainableChangePostsOnlyAGenericHomeNotificationWhenPermitted(): Unit = runBlocking {
+    fun aCommittedChangeFromPartialWorkPostsOnlyAGenericHomeNotificationWhenPermitted(): Unit = runBlocking {
         val old = enqueue("old-grant")
         val current = enqueue("current-grant")
         val manager = context.getSystemService(NotificationManager::class.java)
         val notices = shadowOf(manager)
-        val changed = CredentialStatusMaintenanceResult.Finished(1, 0, 0, hasNewNotice = true)
+        val changed = CredentialStatusMaintenanceResult.Finished(1, 0, 1, hasNewNotice = true)
 
         scheduler.recordOutcome(context, current, "current-grant", changed)
         assertTrue(notices.allNotifications.isEmpty(), "A denied alert must leave only the encrypted Home notice")

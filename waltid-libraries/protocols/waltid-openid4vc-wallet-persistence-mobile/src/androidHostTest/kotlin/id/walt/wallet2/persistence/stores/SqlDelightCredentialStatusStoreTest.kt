@@ -6,6 +6,7 @@ import id.walt.credentials.examples.MdocsExamples
 import id.walt.credentials.status.CredentialStatus
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.status.CredentialStatusInput
 import id.walt.wallet2.status.CredentialStatusStoredRecord
 import id.walt.wallet2.status.PersistedCredentialStatus
 import id.walt.wallet2.status.statusFingerprint
@@ -13,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -46,7 +48,7 @@ class SqlDelightCredentialStatusStoreTest {
             assertEquals("grant", enrolment.grant_id)
             assertNull(enrolment.cursor_id)
             assertEquals(original, store.readCredentialStatusRecord("resident"))
-            assertTrue(store.statusNotices().isEmpty())
+            assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("resident")).notice)
             val cleared = CredentialStatusStoredRecord("cleared", null)
             assertFalse(store.compareAndSetCredentialStatus(credential, null, CredentialStatusStoredRecord("stale", snapshot)))
             assertTrue(store.compareAndSetCredentialStatus(credential, original, cleared))

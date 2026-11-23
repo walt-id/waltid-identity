@@ -65,14 +65,18 @@ public final class id/walt/wallet2/persistence/db/Dids {
 }
 
 public final class id/walt/wallet2/persistence/db/FirstStatusPage {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/FirstStatusPage;
-	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/FirstStatusPage;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/FirstStatusPage;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/FirstStatusPage;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/FirstStatusPage;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/FirstStatusPage;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getId ()Ljava/lang/String;
+	public final fun getNotice ()Ljava/lang/String;
 	public final fun getSerialized_credential ()Ljava/lang/String;
+	public final fun getSnapshot ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -112,14 +116,18 @@ public final class id/walt/wallet2/persistence/db/Key_references {
 }
 
 public final class id/walt/wallet2/persistence/db/NextStatusPage {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/NextStatusPage;
-	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/NextStatusPage;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/NextStatusPage;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/NextStatusPage;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/NextStatusPage;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/NextStatusPage;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getId ()Ljava/lang/String;
+	public final fun getNotice ()Ljava/lang/String;
 	public final fun getSerialized_credential ()Ljava/lang/String;
+	public final fun getSnapshot ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -135,28 +143,19 @@ public final class id/walt/wallet2/persistence/db/SelectCredentialStatusNotice {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class id/walt/wallet2/persistence/db/SelectCredentialStatusNotices {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/SelectCredentialStatusNotices;
-	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/SelectCredentialStatusNotices;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/SelectCredentialStatusNotices;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCredential_id ()Ljava/lang/String;
-	public final fun getNotice ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
 public final class id/walt/wallet2/persistence/db/SelectStatusInput {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/SelectStatusInput;
-	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/SelectStatusInput;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/SelectStatusInput;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/persistence/db/SelectStatusInput;
+	public static synthetic fun copy$default (Lid/walt/wallet2/persistence/db/SelectStatusInput;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/persistence/db/SelectStatusInput;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getId ()Ljava/lang/String;
+	public final fun getNotice ()Ljava/lang/String;
 	public final fun getSerialized_credential ()Ljava/lang/String;
+	public final fun getSnapshot ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -187,7 +186,7 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app
 	public final fun deleteIdentityRecord (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun deleteIssuanceSessionRecordById (Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun firstStatusPage (J)Lapp/cash/sqldelight/Query;
-	public final fun firstStatusPage (JLkotlin/jvm/functions/Function2;)Lapp/cash/sqldelight/Query;
+	public final fun firstStatusPage (JLkotlin/jvm/functions/Function4;)Lapp/cash/sqldelight/Query;
 	public final fun insert (Ljava/lang/String;JLjava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun insertCredential (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun insertDid (Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
@@ -195,7 +194,7 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app
 	public final fun insertIssuanceSessionRecordIfAbsent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun issuanceSessionRecordChanges ()Lapp/cash/sqldelight/ExecutableQuery;
 	public final fun nextStatusPage (Ljava/lang/String;J)Lapp/cash/sqldelight/Query;
-	public final fun nextStatusPage (Ljava/lang/String;JLkotlin/jvm/functions/Function2;)Lapp/cash/sqldelight/Query;
+	public final fun nextStatusPage (Ljava/lang/String;JLkotlin/jvm/functions/Function4;)Lapp/cash/sqldelight/Query;
 	public final fun putIdentityRecord (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun saveCredentialStatusIfCurrent (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun selectActiveIdentity (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
@@ -217,8 +216,6 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app
 	public final fun selectCredentialStatusMaintenance (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lapp/cash/sqldelight/Query;
 	public final fun selectCredentialStatusNotice (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectCredentialStatusNotice (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lapp/cash/sqldelight/Query;
-	public final fun selectCredentialStatusNotices ()Lapp/cash/sqldelight/Query;
-	public final fun selectCredentialStatusNotices (Lkotlin/jvm/functions/Function2;)Lapp/cash/sqldelight/Query;
 	public final fun selectDidByDid (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectDidByDid (Ljava/lang/String;Lkotlin/jvm/functions/Function2;)Lapp/cash/sqldelight/Query;
 	public final fun selectIdentityRecord (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
@@ -228,7 +225,7 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app
 	public final fun selectIssuanceSessionRecordById (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectIssuanceSessionRecordById (Ljava/lang/String;Lkotlin/jvm/functions/Function5;)Lapp/cash/sqldelight/Query;
 	public final fun selectStatusInput (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
-	public final fun selectStatusInput (Ljava/lang/String;Lkotlin/jvm/functions/Function2;)Lapp/cash/sqldelight/Query;
+	public final fun selectStatusInput (Ljava/lang/String;Lkotlin/jvm/functions/Function4;)Lapp/cash/sqldelight/Query;
 	public final fun setActiveIdentity (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun setCredentialStatusMaintenance (Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
 	public final fun updateCredentialStatusNotice (Ljava/lang/String;Ljava/lang/String;)Lapp/cash/sqldelight/db/QueryResult;
@@ -523,7 +520,6 @@ public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore 
 	public fun readCredentialStatusRecord (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun readStatusInput (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun removeCredential (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public fun statusNotices (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun statusPage (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 

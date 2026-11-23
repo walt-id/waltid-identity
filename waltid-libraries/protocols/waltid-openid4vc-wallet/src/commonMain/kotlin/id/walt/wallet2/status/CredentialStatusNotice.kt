@@ -25,6 +25,7 @@ data class CredentialStatusNoticeState(
 }
 
 /** Holder-facing data, read after wallet unlock. The version fences acknowledgement. */
+@Serializable
 data class PendingCredentialStatusNotice(
     val reference: WalletCredentialReference,
     val version: String,
@@ -37,8 +38,6 @@ enum class CredentialStatusCommit { LOST, COMMITTED, NOTICE_CREATED }
 
 /** Stores the notice transition in the same guarded transaction as its permitted evidence. */
 interface CredentialStatusNoticeStore {
-    suspend fun statusNotices(): Map<String, CredentialStatusNoticeState>
-
     suspend fun acknowledgeStatusNotice(credentialId: String, version: String): Boolean
 
     suspend fun compareAndSetCredentialStatusAndNotice(

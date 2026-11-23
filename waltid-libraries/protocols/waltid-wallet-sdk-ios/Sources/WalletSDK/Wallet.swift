@@ -63,14 +63,20 @@ public actor Wallet {
         try await bridge.setCredentialStatusMaintenance(preference)
     }
 
+    /// Reconciles the current wallet's enrollment with the app's automatic-check setting.
+    /// - Parameters:
+    ///   - automaticChecks: Whether the holder enabled automatic status checks.
+    ///   - resumePaused: Pass true only after the holder explicitly re-enables automatic checks.
+    /// - Returns: The wallet's updated enrollment, or nil when the store cannot enroll.
+    public func reconcileCredentialStatusMaintenance(
+        automaticChecks: Bool, resumePaused: Bool = false
+    ) async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await bridge.reconcileCredentialStatusMaintenance(automaticChecks: automaticChecks, resumePaused: resumePaused)
+    }
+
     /// Asks active readers to reconcile observations another handle committed. This is a local read.
     public func invalidateCredentialStatusSnapshot() async throws {
         try await bridge.invalidateCredentialStatusSnapshot()
-    }
-
-    /// Reads pending changes from the authorized local wallet.
-    public func pendingCredentialStatusNotices() async throws -> [PendingCredentialStatusNotice] {
-        try await bridge.pendingCredentialStatusNotices()
     }
 
     /// Acknowledges the displayed version so a newer notice for the same credential stays pending.

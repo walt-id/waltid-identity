@@ -3,7 +3,11 @@ import SwiftUI
 import WalletDemoSharingUI
 import WalletSDK
 import UIKit
+#if DEBUG
+@_spi(WalletDemoTesting) import WalletDemoBackgroundStatus
+#else
 import WalletDemoBackgroundStatus
+#endif
 import WalletDemoIdentityDocumentSupport
 
 @main
@@ -56,16 +60,22 @@ private struct WalletForegroundRoot: View {
             }
             let imageCredential = Self.mockImageCredential(environment: env)
             let statusSnapshot = MockWalletClient.uiTestCredentialStatusSnapshot(env["E2E_MOCK_STATUS_JSON"])
+            let seededCredentials = env["E2E_MOCK_STATUS_NOTIFICATION"] == "1" ? [
+                Credential(id: "cred-1", format: "jwt_vc_json", issuer: "Example Issuer",
+                    subject: nil, label: "Travel credential", addedAt: nil, credentialDataJSON: #"{"given_name":"Ada"}"#)
+            ] : []
             let registrationUpdate: (@Sendable () async throws -> Void)? = {}
             #else
             let imageCredential: (dataJSON: String, portraitValueJSON: String)? = nil
             let statusSnapshot: CredentialStatusSnapshot? = nil
+            let seededCredentials: [Credential] = []
             let registrationUpdate: (@Sendable () async throws -> Void)? = nil
             #endif
             return WalletViewModel(
                 walletID: walletID,
                 signingProtectionMode: signingProtectionMode,
                 walletClient: MockWalletClient(
+                    storedCredentials: seededCredentials,
                     initialCredentialRead: initialCredentialRead,
                     operationDelayMilliseconds: delayMilliseconds,
                     verifierStyle: Self.mockVerifierStyle(environment: env),
@@ -213,6 +223,12 @@ private extension Notification.Name {
 private final class NativeBackgroundStatusDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         WalletDemoCredentialStatusNotifications.shared.register()
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        if environment["E2E_MOCK_WALLET"] == "1", environment["E2E_MOCK_STATUS_NOTIFICATION"] == "1" {
+            WalletDemoCredentialStatusNotifications.shared.simulateTapForUITest()
+        }
+        #endif
         WalletDemoBackgroundStatusScheduler.shared.register { binding, finish in
             let task = Task { @MainActor in
                 let namespace = IdentityDocumentNamespace.nativeDemo

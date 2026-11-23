@@ -37,9 +37,13 @@ internal class SqlDelightStatusInventory(
         }
     }
 
-    private data class SignedInput(val id: String, val serialized: String) {
+    private inner class SignedInput(val id: String, val serialized: String, val snapshot: String?, val notice: String?) {
         suspend fun parse(): CredentialStatusInput = try {
-            CredentialStatusInput.Signed(StoredCredential(id, CredentialParser.detectAndParse(serialized).second))
+            CredentialStatusInput.Signed(
+            StoredCredential(id, CredentialParser.detectAndParse(serialized).second),
+            snapshot?.let(::decodeStatusRecord),
+            decodeNotice(notice),
+        )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -52,11 +56,6 @@ internal class SqlDelightStatusInventory(
 
     private fun decodeNotice(raw: String?): CredentialStatusNoticeState? =
         raw?.let { runCatching { json.decodeFromString<CredentialStatusNoticeState>(it) }.getOrNull() }
-
-    override suspend fun statusNotices(): Map<String, CredentialStatusNoticeState> =
-        queries.selectCredentialStatusNotices().executeAsList().mapNotNull { row ->
-            decodeNotice(row.notice)?.let { row.credential_id to it }
-        }.toMap()
 
     override suspend fun acknowledgeStatusNotice(credentialId: String, version: String): Boolean = queries.transactionWithResult {
         val notice = decodeNotice(queries.selectCredentialStatusNotice(credentialId).executeAsOneOrNull()?.notice)

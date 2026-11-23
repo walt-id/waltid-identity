@@ -40,13 +40,19 @@ selectCredentialById:
 SELECT * FROM credentials WHERE id = ?;
 
 selectStatusInput:
-SELECT id, serialized_credential FROM credentials WHERE id = ?;
+SELECT credentials.id, credentials.serialized_credential, snapshots.snapshot, snapshots.notice
+FROM credentials LEFT JOIN credential_status_snapshots AS snapshots ON snapshots.credential_id = credentials.id
+WHERE credentials.id = ?;
 
 firstStatusPage:
-SELECT id, serialized_credential FROM credentials ORDER BY id LIMIT ?;
+SELECT credentials.id, credentials.serialized_credential, snapshots.snapshot, snapshots.notice
+FROM credentials LEFT JOIN credential_status_snapshots AS snapshots ON snapshots.credential_id = credentials.id
+ORDER BY credentials.id LIMIT ?;
 
 nextStatusPage:
-SELECT id, serialized_credential FROM credentials WHERE id > ? ORDER BY id LIMIT ?;
+SELECT credentials.id, credentials.serialized_credential, snapshots.snapshot, snapshots.notice
+FROM credentials LEFT JOIN credential_status_snapshots AS snapshots ON snapshots.credential_id = credentials.id
+WHERE credentials.id > ? ORDER BY credentials.id LIMIT ?;
 
 countStatusInputsAfter:
 SELECT count(*) FROM credentials WHERE id > ?;
@@ -67,9 +73,6 @@ CREATE TABLE credential_status_snapshots (
 
 selectCredentialStatus:
 SELECT snapshot FROM credential_status_snapshots WHERE credential_id = ?;
-
-selectCredentialStatusNotices:
-SELECT credential_id, notice FROM credential_status_snapshots WHERE notice IS NOT NULL;
 
 selectCredentialStatusNotice:
 SELECT notice FROM credential_status_snapshots WHERE credential_id = ?;

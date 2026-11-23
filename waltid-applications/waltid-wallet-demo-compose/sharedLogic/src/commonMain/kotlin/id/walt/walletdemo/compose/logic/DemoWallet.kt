@@ -11,7 +11,7 @@ class DemoBackgroundStatusEnrollment(
 )
 
 interface DemoWallet {
-    suspend fun backgroundStatusEnrollment(): DemoBackgroundStatusEnrollment? = null
+    suspend fun reconcileBackgroundStatus(automaticChecks: Boolean, resumePaused: Boolean = false): DemoBackgroundStatusEnrollment? = null
     suspend fun setBackgroundStatusPreference(preference: DemoBackgroundStatusPreference): DemoBackgroundStatusEnrollment? = null
     suspend fun invalidateCredentialStatusSnapshot() {}
     /** Releases host-owned resources when this wallet instance leaves its session. */

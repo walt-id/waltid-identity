@@ -13,13 +13,16 @@ final class CredentialStatusMaintenanceBridgeTests: XCTestCase {
             let finished = try await Wallet.refreshDueStatusesForExistingWallet(binding: original)
             XCTAssertEqual(finished, .finished(checked: 0, unchanged: 0, remaining: 0))
 
-            let paused = try await wallet.setCredentialStatusMaintenance(.paused)
+            let paused = try await wallet.reconcileCredentialStatusMaintenance(automaticChecks: false)
             XCTAssertEqual(paused?.preference, .paused)
             XCTAssertNil(paused?.binding)
             let retired = try await Wallet.refreshDueStatusesForExistingWallet(binding: original)
             XCTAssertEqual(retired, .ineligible)
 
-            let resumed = try await wallet.setCredentialStatusMaintenance(.enabled)
+            let interrupted = try await wallet.reconcileCredentialStatusMaintenance(automaticChecks: true)
+            XCTAssertEqual(interrupted?.preference, .paused)
+            XCTAssertNil(interrupted?.binding)
+            let resumed = try await wallet.reconcileCredentialStatusMaintenance(automaticChecks: true, resumePaused: true)
             let replacement = try XCTUnwrap(resumed?.binding)
             XCTAssertNotEqual(replacement, original)
             try await wallet.deleteLocalData()
