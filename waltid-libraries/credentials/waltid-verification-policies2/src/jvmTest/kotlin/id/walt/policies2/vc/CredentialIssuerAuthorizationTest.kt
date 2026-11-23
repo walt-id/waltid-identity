@@ -35,7 +35,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.net.URLClassLoader
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -142,6 +144,71 @@ class CredentialIssuerAuthorizationTest {
             signer = key.toCoseSigner(Cose.Algorithm.ES256),
         ).toTagged()
         return jwt to cwt
+    }
+
+    @Test
+    fun `W3C shaped SD JWTs bind the allowlist and signature to one issuer`() = runTest {
+        val key = key("assertion")
+        withDocument(document(key)) {
+            for (wrapped in listOf(false, true)) for (innerIssuer in listOf(null, did, "did:example:other")) {
+                val vc = buildJsonObject {
+                    put("@context", buildJsonArray { add(JsonPrimitive("https://www.w3.org/2018/credentials/v1")) })
+                    put("type", buildJsonArray { add(JsonPrimitive("VerifiableCredential")) })
+                    put("credentialSubject", buildJsonObject { put("id", "did:example:holder") })
+                    innerIssuer?.let { put("issuer", it) }
+                }
+                val payload = buildJsonObject {
+                    put("iss", did)
+                    if (wrapped) put("vc", vc) else vc.forEach { (name, value) -> put(name, value) }
+                }
+                val signed = CompactJws.sign(Json.encodeToString(payload).encodeToByteArray(), key, JwsAlgorithm.ES256,
+                    protectedHeader = buildJsonObject { put("kid", key.id.value); put("typ", "dc+sd-jwt") })
+                if (innerIssuer != null && innerIssuer != did) {
+                    assertFailsWith<IllegalArgumentException> { CredentialParser.parseOnly("$signed~") }
+                } else {
+                    val credential = CredentialParser.parseOnly("$signed~")
+                    assertEquals(did, credential.issuer)
+                    assertTrue(CredentialSignaturePolicy().verify(credential).isSuccess)
+                    assertTrue(AllowedIssuerPolicy(JsonPrimitive(did)).verify(credential).isSuccess)
+                    assertTrue(AllowedIssuerPolicy(JsonPrimitive("did:example:other")).verify(credential).isFailure)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `assertion relationship resolves relative paths queries and fragments`() = runTest {
+        val key = key("assertion")
+        for ((relative, absolute) in listOf(
+            "keys/assertion" to "$did/keys/assertion",
+            "/keys/../assertion" to "$did/assertion",
+            "?versionId=1#assertion" to "$did?versionId=1#assertion",
+            "#assertion" to "$did#assertion",
+        )) for (relativeMethod in listOf(false, true)) {
+            val method = JsonObject(method(key) + ("id" to JsonPrimitive(if (relativeMethod) relative else absolute)))
+            withDocument(buildJsonObject {
+                put("id", did)
+                put("verificationMethod", buildJsonArray { add(method) })
+                put("assertionMethod", buildJsonArray { add(JsonPrimitive(if (relativeMethod) absolute else relative)) })
+            }) {
+                assertTrue(CredentialSignaturePolicy().verify(credential(key, kid = absolute)).isSuccess,
+                    "relative=$relative, relativeMethod=$relativeMethod")
+            }
+        }
+    }
+
+    @Test
+    fun `consumer compiled against released v1_2_1 links without recompilation`() = runTest {
+        val signer = key("assertion")
+        withDocument(document(signer)) {
+            val jar = requireNotNull(javaClass.getResource("/abi/v1.2.1/released-consumer.jar"))
+            URLClassLoader(arrayOf(jar), javaClass.classLoader).use { loader ->
+                val consumer = loader.loadClass("compatibility.v121.ReleasedConsumer")
+                val count = consumer.getMethod("exercise", String::class.java, DidResolver::class.java)
+                    .invoke(null, did, DidService.resolverMethods.getValue("example"))
+                assertEquals(1, count)
+            }
+        }
     }
 
     private suspend fun key(id: String): Key = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
