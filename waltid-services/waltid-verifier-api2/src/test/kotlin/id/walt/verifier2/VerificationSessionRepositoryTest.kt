@@ -37,6 +37,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 
@@ -373,6 +374,37 @@ class VerificationSessionRepositoryTest {
             remaining.session.status,
             "the outcome is what is being kept",
         )
+    }
+
+    @Test
+    fun `purging an active attempt leaves the reusable session available and fenced from rollback`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+        for (admitted in listOf(false, true)) {
+            val id = "overlap-$admitted"
+            repository.create(session(id).copy(reattemptable = true))
+            val old = repository.claimForProcessingWithOriginal(id)
+            if (admitted) repository.update(id) {
+                attempted = true
+                status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
+            }
+
+            assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/$id/pii").status)
+            repository.restoreProcessingClaim(old)
+            val next = repository.claimForProcessingWithOriginal(id)
+            assertEquals(admitted, next.original.session.attempted)
+            assertEquals(
+                if (admitted) Verification2Session.VerificationSessionStatus.FAILED
+                else Verification2Session.VerificationSessionStatus.IN_USE,
+                next.original.session.status,
+            )
+            assertTrue(next.original.session.webhookGeneration > old.original.session.webhookGeneration)
+        }
     }
 
     @Test

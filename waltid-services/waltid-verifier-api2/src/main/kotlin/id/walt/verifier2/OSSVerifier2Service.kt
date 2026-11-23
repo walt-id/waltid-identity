@@ -23,6 +23,7 @@ import id.walt.verifier.openid.transactiondata.toResponse
 import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.data.Verifier2SessionUpdate
 import id.walt.verifier2.handlers.authrequest.Verifier2AuthorizationRequestHandler.respondAuthorizationRequest
@@ -278,6 +279,13 @@ object Verifier2Service {
                         // purge can finish first, so never replace a newer generation with this one.
                         repository.update(sessionId, shouldUpdate = { webhookGeneration < generation }) {
                             deletePII()
+                            // The old request loses its generation and cannot finish or roll back its claim.
+                            if (status == VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST ||
+                                status == VerificationSessionStatus.PROCESSING_FLOW
+                            ) {
+                                status = if (attempted) VerificationSessionStatus.FAILED else VerificationSessionStatus.IN_USE
+                                statusReason = if (attempted) "Presentation processing was interrupted by PII purge" else null
+                            }
                             webhookGeneration = generation
                         }
                         call.respond(HttpStatusCode.NoContent)
