@@ -7,8 +7,6 @@ import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.*
@@ -36,20 +34,13 @@ class IssuanceClock(val clock: Clock) : AbstractCoroutineContextElement(Issuance
 class IssuanceHolderKey(private val holderKey: Key) : AbstractCoroutineContextElement(IssuanceHolderKey) {
     companion object : CoroutineContext.Key<IssuanceHolderKey>
 
-    private val mutex = Mutex()
-    private var derivedDid: JsonPrimitive? = null
-
-    internal suspend fun subjectDid(context: Map<String, JsonElement>): JsonElement =
-        context["subjectDid"] ?: mutex.withLock {
-            derivedDid ?: try {
-                val did = Crypto2DidService.registerByKey(method = "jwk", key = holderKey).did
-                JsonPrimitive(did).also { derivedDid = it }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                throw IllegalArgumentException("Cannot find in context: subjectDid", e)
-            }
-        }
+    internal suspend fun deriveSubjectDid(): JsonPrimitive = try {
+        JsonPrimitive(Crypto2DidService.registerByKey(method = "jwk", key = holderKey).did)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        throw IllegalArgumentException("Cannot find in context: subjectDid", e)
+    }
 }
 
 suspend fun currentIssuanceClock(): Clock =
@@ -71,11 +62,11 @@ private fun dataFunctionsFor(
     holderKey: IssuanceHolderKey?,
 ): Map<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement> =
     mapOf(
-        "subjectDid" to { holderKey?.subjectDid(it.context) ?: it.fromContext() },
+        "subjectDid" to { if (holderKey != null) it.subjectDid(holderKey) else it.fromContext() },
         "issuerDid" to { it.fromContext() },
         "issuerId" to { it.fromContext() },
         "context" to {
-            if (it.args == "subjectDid" && holderKey != null) holderKey.subjectDid(it.context)
+            if (it.args == "subjectDid" && holderKey != null) it.subjectDid(holderKey)
             else it.context[it.args!!]!!
         },
         "display" to {

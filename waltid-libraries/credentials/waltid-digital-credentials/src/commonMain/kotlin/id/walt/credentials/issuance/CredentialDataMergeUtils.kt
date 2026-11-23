@@ -89,16 +89,26 @@ object CredentialDataMergeUtils {
         }
     }
 
+    /** Read-only template inputs and the DID derived during this merge. */
+    private class MergeContext(private val supplied: Map<String, JsonElement>) : AbstractMap<String, JsonElement>() {
+        override val entries get() = supplied.entries
+        override fun get(key: String) = supplied[key]
+        var derivedSubjectDid: JsonPrimitive? = null
+    }
+
     /** One merge: the policy, the template inputs, and the call history `<last:...>` reads, shared across it. */
     private class Merge(
-        val policy: MergePolicy,
-        val context: Map<String, JsonElement>,
-        val functions: Map<String, suspend (FunctionCall) -> JsonElement>,
+        private val policy: MergePolicy,
+        context: Map<String, JsonElement>,
+        private val functions: Map<String, suspend (FunctionCall) -> JsonElement>,
     ) {
-        val history = HashMap<String, JsonElement>()
+        private val context = MergeContext(context)
+        private val history = HashMap<String, JsonElement>()
 
-        suspend fun template(value: JsonPrimitive): JsonElement =
-            if (value.isString && value.isTemplate()) getTemplateData(value.content, functions, context, history) else value
+        suspend fun evaluate(functionCall: String): JsonElement = getTemplateData(functionCall, functions, context, history)
+
+        private suspend fun template(value: JsonPrimitive): JsonElement =
+            if (value.isString && value.isTemplate()) evaluate(value.content) else value
 
         /** Writes the [mapping] of [key] into [data]. */
         suspend fun into(data: MutableMap<String, JsonElement>, key: String, mapping: JsonElement) {
@@ -158,6 +168,12 @@ object CredentialDataMergeUtils {
             log.debug { "CONTEXT: $context" }
             return context[func] ?: throw IllegalArgumentException("Cannot find in context: $func")
         }
+
+        internal suspend fun subjectDid(holderKey: IssuanceHolderKey): JsonElement {
+            val merge = context as? MergeContext
+            return context["subjectDid"] ?: merge?.derivedSubjectDid
+                ?: holderKey.deriveSubjectDid().also { merge?.derivedSubjectDid = it }
+        }
     }
 
     @JvmBlocking
@@ -176,7 +192,7 @@ object CredentialDataMergeUtils {
             if (!k.startsWith("jwt:")) {
                 merge.into(vcm, k, v)
             } else {
-                results[k] = getTemplateData(v.jsonPrimitive.content, data, context, merge.history)
+                results[k] = merge.evaluate(v.jsonPrimitive.content)
             }
         }
         return MergeResult(W3CVC(vcm), results)
@@ -197,7 +213,7 @@ object CredentialDataMergeUtils {
             if (!k.startsWith("jwt:")) {
                 merge.into(vcm, k, v)
             } else {
-                vcm[k.removePrefix("jwt:")] = getTemplateData(v.jsonPrimitive.content, data, context, merge.history)
+                vcm[k.removePrefix("jwt:")] = merge.evaluate(v.jsonPrimitive.content)
             }
         }
         return vcm.toJsonObject()
