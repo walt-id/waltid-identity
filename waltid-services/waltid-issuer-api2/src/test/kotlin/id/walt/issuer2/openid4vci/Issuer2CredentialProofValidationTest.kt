@@ -17,6 +17,7 @@ import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
+import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.testsupport.Issuer2CredentialScenario
 import id.walt.issuer2.testsupport.Issuer2CredentialFamily
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
@@ -279,7 +280,7 @@ class Issuer2CredentialProofValidationTest {
                 KeyAttestationVerificationMethod.StaticJwk(attesterJwk),
             )) },
         )
-        val flow = prepareFlow(apiClient())
+        val flow = prepareFlow(apiClient(), runtimeOverrides = CredentialOfferRuntimeOverrides(mapping = employeeMapping))
         val nonce = flow.nonce()
         val now = Clock.System.now().epochSeconds
         val inner = attester.signJws(buildJsonObject {
@@ -307,10 +308,11 @@ class Issuer2CredentialProofValidationTest {
         val response = flow.request(Proofs(jwt = listOf(outer)))
         assertEquals(HttpStatusCode.OK, response.status)
         val credentials = response.body<JsonObject>().getValue("credentials").jsonArray
-        assertEquals(expected, credentials.map {
-            val jwt = it.jsonObject.getValue("credential").jsonPrimitive.content
-            JWKKey.importJWK(requireNotNull(SDJwtVC.parse(jwt).holderKeyJWK).toString()).getOrThrow().getThumbprint()
-        })
+        assertEquals(holders.size, credentials.size)
+        for ((entry, holder) in credentials.zip(holders)) {
+            val jwt = entry.jsonObject.getValue("credential").jsonPrimitive.content
+            assertTrue(assertMappedHolder(SDJwtVC.parse(jwt), holder).startsWith("did:jwk:"))
+        }
     }
 
     @Test
@@ -441,12 +443,14 @@ class Issuer2CredentialProofValidationTest {
     private suspend fun prepareFlow(
         client: HttpClient,
         scenario: Issuer2CredentialScenario = Issuer2CredentialScenarios.identitySdJwt,
+        runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
     ): ProofTestFlow {
         val walletFlow = Issuer2WalletFlowDriver(client)
         val createdOffer = client.createWalletFlowCredentialOffer(
             scenario = scenario,
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
             txCodeMode = Issuer2TxCodeMode.NONE,
+            runtimeOverrides = runtimeOverrides,
         )
         val resolvedOffer = walletFlow.resolve(createdOffer)
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
