@@ -2,11 +2,12 @@ package id.walt.openid4vci.handlers.credential
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.credentials.issuance.IssuanceHolderKey
+import id.walt.credentials.issuance.MergingIssuer.mergingToVc
 import id.walt.crypto.keys.Key
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.proofs.invalidCredentialProof
@@ -14,8 +15,7 @@ import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType
-import id.walt.credentials.issuance.MergingIssuer.mergingJwtIssue
-import id.walt.credentials.issuance.MergingIssuer.mergingSdJwtIssue
+import id.walt.w3c.issuance.Issuer.getKidHeader
 import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.w3c.vc.vcs.applyIssuedV2Context
 import kotlinx.coroutines.withContext
@@ -93,7 +93,7 @@ object W3cJwtVcCredentialSigner {
     ): String {
         val binding = verifiedBinding
             ?: throw invalidCredentialProof("W3C JWT VC issuance requires a verified credential binding")
-        val holderDid = binding.holderDid
+        val subjectDid = binding.holderDid.orEmpty()
 
         val additionalJwtHeaders = x5Chain?.let {
             mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert ->
@@ -108,93 +108,91 @@ object W3cJwtVcCredentialSigner {
         } ?: credentialData
 
         val vc = W3CVC(vcPayload)
-        return withContext(IssuanceHolderKey(binding.holderKey)) {
-            val builderType = w3cVersion?.let { version ->
-                val serialNameMap = mapOf(
-                    "W3CV11" to CredentialBuilderType.W3CV11CredentialBuilder,
-                    "W3CV2" to CredentialBuilderType.W3CV2CredentialBuilder,
+        val builderType = w3cVersion?.let { version ->
+            val serialNameMap = mapOf(
+                "W3CV11" to CredentialBuilderType.W3CV11CredentialBuilder,
+                "W3CV2" to CredentialBuilderType.W3CV2CredentialBuilder,
+            )
+            CredentialBuilderType.entries.firstOrNull { it.name == version }
+                ?: serialNameMap[version]
+                ?: CredentialBuilderType.entries.firstOrNull {
+                    it.name.equals(version, ignoreCase = true)
+                }
+                ?: serialNameMap.entries.firstOrNull {
+                    it.key.equals(version, ignoreCase = true)
+                }?.value
+                ?: throw IllegalArgumentException(
+                    "Unsupported w3cVersion: '$version'. Supported values: ${
+                        (CredentialBuilderType.entries.map { it.name } + serialNameMap.keys).joinToString { "'$it'" }
+                    }"
                 )
-                CredentialBuilderType.entries.firstOrNull { it.name == version }
-                    ?: serialNameMap[version]
-                    ?: CredentialBuilderType.entries.firstOrNull {
-                        it.name.equals(version, ignoreCase = true)
-                    }
-                    ?: serialNameMap.entries.firstOrNull {
-                        it.key.equals(version, ignoreCase = true)
-                    }?.value
-                    ?: throw IllegalArgumentException(
-                        "Unsupported w3cVersion: '$version'. Supported values: ${
-                            (CredentialBuilderType.entries.map { it.name } + serialNameMap.keys).joinToString { "'$it'" }
-                        }"
-                    )
+        }
+        val w3cVc = when (builderType) {
+            CredentialBuilderType.W3CV2CredentialBuilder -> W3CVC(vc.toMutableMap().applyIssuedV2Context())
+
+            else -> builderType?.let {
+                val builder = CredentialBuilder(it)
+                builder.useCredentialSubject(vcPayload)
+                builder.buildW3C()
+            } ?: vc
+        }
+        val (mappedVc, jwtOptions) = withContext(IssuanceHolderKey(binding.holderKey)) {
+            w3cVc.mergingToVc(
+                issuerId = issuerId,
+                subjectDid = subjectDid,
+                mappings = dataMapping ?: JsonObject(emptyMap()),
+                display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+            )
+        }
+
+        val issuerDid = issuerId.takeIf(DidUtils::isDidUrl)
+        val issuerKid = when (issuerSigningKey) {
+            is IssuerSigningKey.Legacy -> getKidHeader(issuerSigningKey.key, issuerDid)
+            is IssuerSigningKey.Crypto2 -> getKidHeader(issuerSigningKey.key, issuerDid)
+        }
+        if (selectiveDisclosure.isNullOrEmpty()) {
+            return when (issuerSigningKey) {
+                is IssuerSigningKey.Legacy -> mappedVc.signJws(
+                    issuerKey = issuerSigningKey.key,
+                    issuerId = issuerId,
+                    issuerKid = issuerKid,
+                    subjectDid = subjectDid,
+                    additionalJwtHeader = additionalJwtHeaders,
+                    additionalJwtOptions = jwtOptions,
+                )
+                is IssuerSigningKey.Crypto2 -> mappedVc.signJws(
+                    issuerKey = issuerSigningKey.key,
+                    algorithm = issuerSigningKey.algorithm,
+                    issuerId = issuerId,
+                    issuerKid = issuerKid,
+                    subjectDid = subjectDid,
+                    additionalJwtHeader = additionalJwtHeaders,
+                    additionalJwtOptions = jwtOptions,
+                )
             }
-            val w3cVc = when (builderType) {
-                CredentialBuilderType.W3CV2CredentialBuilder -> W3CVC(vc.toMutableMap().applyIssuedV2Context())
-
-                else -> builderType?.let {
-                    val builder = CredentialBuilder(it)
-                    builder.useCredentialSubject(vcPayload)
-                    builder.buildW3C()
-                } ?: vc
-            }
-            when (selectiveDisclosure.isNullOrEmpty()) {
-                true -> when (issuerSigningKey) {
-                    is IssuerSigningKey.Legacy -> w3cVc.mergingJwtIssue(
-                        issuerKey = issuerSigningKey.key,
-                        issuerId = issuerId,
-                        subjectDid = holderDid ?: "",
-                        mappings = dataMapping ?: JsonObject(emptyMap()),
-                        additionalJwtHeader = additionalJwtHeaders,
-                        display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                        additionalJwtOptions = emptyMap(),
-                    )
-
-                    is IssuerSigningKey.Crypto2 -> w3cVc.mergingJwtIssue(
-                        issuerKey = issuerSigningKey.key,
-                        algorithm = issuerSigningKey.algorithm,
-                        issuerId = issuerId,
-                        subjectDid = holderDid ?: "",
-                        mappings = dataMapping ?: JsonObject(emptyMap()),
-                        additionalJwtHeader = additionalJwtHeaders,
-                        display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                        additionalJwtOptions = emptyMap(),
-                    )
-                }
-
-                else -> {
-                    val type = when (builderType) {
-                        CredentialBuilderType.W3CV2CredentialBuilder -> SD_JWT_VC_TYPE_HEADER
-                        // Including CredentialBuilderType.W3CV11CredentialBuilder
-                        else -> "JWT"
-                    }
-                    when (issuerSigningKey) {
-                        is IssuerSigningKey.Legacy -> w3cVc.mergingSdJwtIssue(
-                            issuerKey = issuerSigningKey.key,
-                            issuerId = issuerId,
-                            subjectDid = holderDid ?: "",
-                            mappings = dataMapping ?: JsonObject(emptyMap()),
-                            additionalJwtHeaders = additionalJwtHeaders,
-                            additionalJwtOptions = emptyMap(),
-                            display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                            disclosureMap = selectiveDisclosure,
-                            type = type,
-                        )
-
-                        is IssuerSigningKey.Crypto2 -> w3cVc.mergingSdJwtIssue(
-                            issuerKey = issuerSigningKey.key,
-                            algorithm = issuerSigningKey.algorithm,
-                            issuerId = issuerId,
-                            subjectDid = holderDid ?: "",
-                            mappings = dataMapping ?: JsonObject(emptyMap()),
-                            additionalJwtHeaders = additionalJwtHeaders,
-                            additionalJwtOptions = emptyMap(),
-                            display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                            disclosureMap = selectiveDisclosure,
-                            type = type,
-                        )
-                    }
-                }
-            }
+        }
+        val type = if (builderType == CredentialBuilderType.W3CV2CredentialBuilder) SD_JWT_VC_TYPE_HEADER else "JWT"
+        val sdJwtHeaders = additionalJwtHeaders + ("typ" to JsonPrimitive(type))
+        return when (issuerSigningKey) {
+            is IssuerSigningKey.Legacy -> mappedVc.signSdJwt(
+                issuerKey = issuerSigningKey.key,
+                issuerId = issuerId,
+                issuerKid = issuerKid,
+                subjectDid = subjectDid,
+                disclosureMap = selectiveDisclosure,
+                additionalJwtHeaders = sdJwtHeaders,
+                additionalJwtOptions = jwtOptions,
+            )
+            is IssuerSigningKey.Crypto2 -> mappedVc.signSdJwt(
+                issuerKey = issuerSigningKey.key,
+                algorithm = issuerSigningKey.algorithm,
+                issuerId = issuerId,
+                issuerKid = issuerKid,
+                subjectDid = subjectDid,
+                disclosureMap = selectiveDisclosure,
+                additionalJwtHeaders = sdJwtHeaders,
+                additionalJwtOptions = jwtOptions,
+            )
         }
     }
 
