@@ -1,0 +1,267 @@
+package id.walt.issuer2.notifications
+
+import id.walt.commons.persistence.InMemoryPersistence
+import id.walt.issuer2.application.openid4vci.OpenId4VciModule
+import id.walt.issuer2.config.Issuer2MetadataConfig
+import id.walt.issuer2.config.Issuer2ProfilesConfig
+import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.issuer2.domain.IssuanceRequest
+import id.walt.issuer2.domain.IssuanceResult
+import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.issuer2.service.CredentialProfileService
+import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
+import id.walt.issuer2.service.openid4vci.MetadataService
+import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
+import id.walt.ktornotifications.SseNotifier
+import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.DefaultClient
+import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.deferred.DeferredIssuance
+import id.walt.openid4vci.deferred.DeferredIssuanceState
+import id.walt.openid4vci.deferred.DeferredStatus
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
+import id.walt.openid4vci.repository.par.InMemoryPARRepository
+import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
+import id.walt.openid4vci.requests.credential.AcceptedCredentialRequest
+import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
+import id.walt.openid4vci.requests.notification.*
+import id.walt.openid4vci.tokens.access.ProtectedResourceAccessTokenContext
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Instant
+import kotlinx.coroutines.*
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Test
+
+class WalletNotificationCommitTest {
+    private val singleCredentialGrant = Json.parseToJsonElement("""{"sub":"session","authorization_details":[{"type":"openid_credential","credential_configuration_id":"configuration","credential_identifiers":["credential"]}]}""").jsonObject
+    private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
+
+    @AfterEach
+    fun closeCatalogues() {
+        catalogues.forEach { it.close() }
+    }
+
+    @Test
+    fun `cancellation as committed save returns never restores the old snapshot`() = runTest {
+        val repository = RecordingRepository()
+        val service = protocolService(repository)
+        lateinit var request: Job
+        repository.afterSave = { request.cancel() }
+        request = launch {
+            service.processNotificationRequest(listOf("Bearer token"), emptyList(), "{}", "notification-cancel")
+        }
+        request.join()
+        assertEquals(true, request.isCancelled)
+        assertCommitted(repository)
+    }
+
+    @Test
+    fun `post commit event failure never restores the old snapshot`() = runTest {
+        val repository = RecordingRepository()
+        val service = protocolService(repository)
+        // The notifier rejects an empty request id after the changed record was saved.
+        assertFailsWith<IllegalArgumentException> {
+            service.processNotificationRequest(listOf("Bearer token"), emptyList(), "{}", "")
+        }
+        assertCommitted(repository)
+        val retry = service.processNotificationRequest(listOf("Bearer token"), emptyList(), "{}", "retry")
+        assertEquals(204, retry.status)
+        val events = SseNotifier.getSseFlow(IssuanceNotificationService.ISSUER_EVENT_STREAM_TARGET)
+        assertEquals(emptyList(), events.replayCache.filter { it.requestId == "retry" })
+    }
+
+    @Test
+    fun `deferred collection can checkpoint while another credential report is being saved`() = runTest {
+        val repository = RecordingRepository()
+        val session = assertNotNull(repository.current)
+        repository.current = session.copy(
+            issuanceRequests = session.issuanceRequests + session.issuanceRequests.single().copy(credentialIdentifier = "other"),
+            deferredState = DeferredIssuanceState(status = DeferredStatus.READY),
+            deferredStatus = DeferredStatus.READY,
+        )
+        val deferred = DeferredIssuance(IssuanceSessionService(repository).deferredStore)
+        val transaction = deferred.accept(
+            session.sessionId,
+            AcceptedCredentialRequest(
+                request = DefaultCredentialRequest(
+                    client = DefaultClient("wallet", emptyList(), emptySet(), emptySet()),
+                    credentialIdentifier = "other",
+                    credentialConfigurationId = null,
+                    proofs = null,
+                    credentialResponseEncryption = null,
+                    accessTokenClientId = "wallet",
+                ),
+                credentialIdentifier = "other",
+                credentialConfigurationId = "configuration",
+                configuration = CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "https://example.com/credential"),
+                bindings = emptyList(),
+            ),
+        )
+        val reportSaving = CompletableDeferred<Unit>()
+        val resumeReport = CompletableDeferred<Unit>()
+        repository.beforeSave = {
+            if (reportSaving.complete(Unit)) resumeReport.await()
+        }
+
+        val service = protocolService(repository, singleCredentialGrant)
+        val report = async {
+            val response = service.processNotificationRequest(
+                listOf("Bearer token"), emptyList(), "{}", "deferred-notification",
+            )
+            assertTrue(reportSaving.isCompleted, "Notification returned ${response.status} before saving")
+            response
+        }
+        reportSaving.await()
+        val progress = buildJsonObject { put("checkpoint", "saved") }
+        try {
+            val claim = assertIs<DeferredIssuance.Collection.Claimed>(
+                deferred.collect(session.sessionId, transaction.id, setOf("other"), "wallet"),
+            ).transaction
+            deferred.checkpointProgress(session.sessionId, claim, progress)
+        } finally {
+            resumeReport.complete(Unit)
+        }
+
+        assertEquals(204, report.await().status)
+        val saved = assertNotNull(repository.current)
+        assertEquals(progress, saved.deferredState?.transactions?.get(transaction.id)?.progress)
+        assertEquals(NotificationEvent.CREDENTIAL_ACCEPTED, saved.issuanceResults.getValue("credential").walletNotification?.event)
+    }
+
+    @Test
+    fun `batch notifications respect narrowed tokens and established selection`() = runTest {
+        for ((claims, selected, expectedStatus) in listOf(
+            Triple(buildJsonObject { put("sub", "session") }, listOf("credential"), 400),
+            Triple(singleCredentialGrant, listOf("other"), 400),
+            Triple(singleCredentialGrant, listOf("credential", "other"), 204),
+        )) {
+            val repository = RecordingRepository()
+            val original = assertNotNull(repository.current)
+            repository.current = original.copy(
+                issuanceRequests = original.issuanceRequests + original.issuanceRequests.single().copy(credentialIdentifier = "other"),
+                issuanceResults = original.issuanceResults + ("other" to IssuanceResult("dc+sd-jwt", IssuedCredentialNotification("other", "other-notification"))),
+                authorizedCredentialIdentifiers = selected,
+            )
+            val response = protocolService(repository, claims).processNotificationRequest(listOf("Bearer token"), emptyList(), "{}", "batch-notification")
+            assertEquals(expectedStatus, response.status)
+            val saved = assertNotNull(repository.current)
+            assertNull(saved.issuanceResults.getValue("other").walletNotification?.event)
+            assertEquals(if (expectedStatus == 204) NotificationEvent.CREDENTIAL_ACCEPTED else null,
+                saved.issuanceResults.getValue("credential").walletNotification?.event)
+        }
+    }
+
+    private fun assertCommitted(repository: RecordingRepository) {
+        assertEquals(1, repository.saves.size)
+        val saved = assertNotNull(repository.current)
+        assertEquals(NotificationEvent.CREDENTIAL_ACCEPTED, saved.issuanceResults.getValue("credential").walletNotification?.event)
+        assertEquals("stored", saved.issuanceResults.getValue("credential").walletNotification?.eventDescription)
+        assertEquals(IssuanceSessionStatus.SUCCESSFUL, saved.status)
+    }
+
+    private fun protocolService(
+        repository: IssuanceSessionRepository,
+        claims: JsonObject = buildJsonObject { put("sub", "session") },
+    ): OpenId4VciProtocolService {
+        val serviceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost")
+        val metadataConfig = Issuer2MetadataConfig()
+        val profileService = CredentialProfileService(
+            profilesConfig = Issuer2ProfilesConfig(),
+            metadataConfig = metadataConfig,
+        )
+        val sessionService = IssuanceSessionService(repository)
+        val typeMetadata = IssuerTypeMetadataCatalogue(
+            serviceConfig, metadataConfig, InMemoryPersistence("types", Duration.INFINITE),
+        ).also(catalogues::add)
+        val module = OpenId4VciModule.create(
+            config = serviceConfig,
+            authorizationCodeRepository = InMemoryAuthorizationCodeRepository(),
+            preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository(),
+            parRepository = InMemoryPARRepository(),
+            refreshTokenRepository = InMemoryRefreshTokenRepository(),
+            metadataResolver = typeMetadata,
+        )
+        val metadataService = MetadataService(
+            serviceConfig = serviceConfig,
+            metadataConfig = metadataConfig,
+            profileService = profileService,
+            sessionService = sessionService,
+            typeMetadata = typeMetadata,
+            preAuthorizedGrantAnonymousAccessSupported = module.preAuthorizedCodeIssuer.anonymousAccessSupported,
+        )
+        return OpenId4VciProtocolService(
+            oauth2Provider = object : OAuth2Provider by module.oauth2Provider {
+                override suspend fun createNotificationRequest(
+                    parameters: Map<String, List<String>>,
+                    accessTokenContext: ProtectedResourceAccessTokenContext,
+                ) = NotificationRequestResult.Success(
+                    DefaultNotificationRequest("notification", NotificationEvent.CREDENTIAL_ACCEPTED, "stored"),
+                    claims,
+                )
+            },
+            sessionService = sessionService,
+            profileService = profileService,
+            metadataService = metadataService,
+            notificationService = IssuanceNotificationService(),
+            credentialNonceService = module.credentialNonceService,
+        )
+    }
+
+    private class RecordingRepository : IssuanceSessionRepository {
+        var current: IssuanceSession? = IssuanceSession(
+            sessionId = "session",
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            issuanceRequests = listOf(IssuanceRequest(
+                credentialIdentifier = "credential", profileId = "profile", credentialConfigurationId = "configuration",
+                issuerKey = JsonObject(emptyMap()), credentialData = JsonObject(emptyMap()),
+            )),
+            issuanceResults = mapOf("credential" to IssuanceResult("dc+sd-jwt", IssuedCredentialNotification("credential", "notification"))),
+            expiresAt = Instant.DISTANT_FUTURE,
+            status = IssuanceSessionStatus.SUCCESSFUL,
+        )
+        val saves = mutableListOf<IssuanceSession>()
+        var beforeSave: suspend () -> Unit = {}
+        var afterSave: () -> Unit = {}
+
+        override suspend fun compareAndSet(expected: IssuanceSession, replacement: IssuanceSession): Boolean {
+            if (replacement.issuanceResults != expected.issuanceResults) beforeSave()
+            if (current != expected) return false
+            write(replacement)
+            return true
+        }
+
+        override suspend fun save(session: IssuanceSession): IssuanceSession {
+            beforeSave()
+            return write(session)
+        }
+
+        private fun write(session: IssuanceSession): IssuanceSession {
+            current = session
+            saves += session
+            afterSave()
+            return session
+        }
+        override suspend fun get(sessionId: String) = current
+        override suspend fun list() = listOfNotNull(current)
+        override suspend fun remove(sessionId: String) { current = null }
+        override suspend fun take(sessionId: String) = current.also { current = null }
+    }
+}

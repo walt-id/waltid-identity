@@ -397,7 +397,8 @@ class TokenEventTest {
     private class InMemorySessionRepository(initial: List<IssuanceSession>) : IssuanceSessionRepository {
         private val sessions = initial.associateBy { it.sessionId }.toMutableMap()
 
-        override suspend fun take(sessionId: String): IssuanceSession? = sessions.remove(sessionId)
+        override suspend fun compareAndSet(expected: IssuanceSession, replacement: IssuanceSession): Boolean =
+            sessions.replace(expected.sessionId, expected, replacement)
 
         override suspend fun save(session: IssuanceSession): IssuanceSession =
             session.also { sessions[it.sessionId] = it }

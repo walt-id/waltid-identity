@@ -405,6 +405,41 @@
         "waltid-applications/waltid-wallet-demo-compose/sharedLogic/src/wasmJsTest/kotlin/id/walt/walletdemo/compose/logic/walletapi2/WalletApi2ClientTest.kt"
       ],
       "lanes": ["enterprise", "visual-browser"]
+    },
+    {
+      "name": "credential status changes select the real browser journey",
+      "files": [
+        "waltid-libraries/credentials/waltid-credential-status/src/commonMain/kotlin/id/walt/credentials/status/CredentialStatusResolver.kt"
+      ],
+      "lanes": ["ios-simulator", "visual-android", "visual-browser", "visual-compose", "visual-native"]
+    },
+    {
+      "name": "Wallet API 2 service changes select the real browser journey",
+      "files": [
+        "waltid-services/waltid-wallet-api2/src/main/kotlin/id/walt/wallet2/OSSWallet2Service.kt"
+      ],
+      "lanes": ["visual-browser"]
+    },
+    {
+      "name": "wallet credential status route changes select the real browser journey",
+      "files": [
+        "waltid-libraries/protocols/waltid-openid4vc-wallet-server/src/main/kotlin/id/walt/wallet/server/routes/WalletCredentialStatusRoute.kt"
+      ],
+      "lanes": ["sdk-docs", "visual-browser"]
+    },
+    {
+      "name": "controlled status issuer changes select the real browser journey",
+      "files": [
+        "waltid-applications/mobile-e2e-fixtures/status/issuer.py"
+      ],
+      "lanes": ["visual-browser"]
+    },
+    {
+      "name": "real browser journey orchestration changes select browser execution",
+      "files": [
+        ".github/scripts/mobile-ci/run-browser-live-status-e2e.sh"
+      ],
+      "lanes": ["visual-browser"]
     }
   ]
 }

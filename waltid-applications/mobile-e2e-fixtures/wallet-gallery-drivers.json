@@ -36,6 +36,140 @@
         "native-ios-wallet-issuance-eudi-pid-mdoc-review",
         "native-ios-wallet-presentation-eudi-pid-mdoc-review"
       ]
+    },
+    {
+      "scenario": "wallet-credential-status",
+      "platform": "compose-android",
+      "test": "id.walt.walletdemo.compose.android.CredentialStatusBackendE2ETest#credentialStatusLifecycle",
+      "source": "waltid-applications/waltid-wallet-demo-compose/androidApp/src/androidTest/java/id/walt/walletdemo/compose/android/CredentialStatusBackendE2ETest.kt",
+      "captures": [
+        "android-status-multiple-real-credentials",
+        "android-status-public-demo-no-reference",
+        "android-status-authenticated-suspended",
+        "android-status-suspension-cleared",
+        "android-status-authenticated-clear",
+        "android-status-authenticated-revoked",
+        "android-status-outage-retained-evidence",
+        "android-status-home-adverse",
+        "android-status-mixed-sharing",
+        "android-status-sharing-refreshed",
+        "android-status-sharing-confirmation",
+        "android-status-sharing-result",
+        "android-status-unselected-adverse-alternative",
+        "android-status-clear-verifier-policy-result",
+        "android-status-revoked-verifier-policy-confirmation",
+        "android-status-revoked-verifier-policy-result",
+        "android-status-payment-main-terms",
+        "android-status-payment-selected-credentials",
+        "android-status-payment-refreshed",
+        "android-status-payment-confirmation",
+        "android-status-payment-result",
+        "android-status-root-settings",
+        "android-status-settings-manual",
+        "android-status-settings-completed",
+        "android-status-settings-help"
+      ],
+      "requires": [
+        "isolated-wallet",
+        "controlled-status-issuer",
+        "public-demo-issuer2-verifier2",
+        "serialized-fixture-access"
+      ]
+    },
+    {
+      "scenario": "wallet-credential-status-restart",
+      "platform": "compose-android",
+      "test": "id.walt.walletdemo.compose.android.CredentialStatusBackendE2ETest#credentialStatusAfterProcessRestart",
+      "source": "waltid-applications/waltid-wallet-demo-compose/androidApp/src/androidTest/java/id/walt/walletdemo/compose/android/CredentialStatusBackendE2ETest.kt",
+      "captures": [
+        "android-status-process-retained-evidence"
+      ],
+      "requires": [
+        "completed-credential-status-lifecycle",
+        "explicit-process-force-stop",
+        "controlled-status-issuer",
+        "serialized-fixture-access"
+      ]
+    },
+    {
+      "scenario": "wallet-credential-status",
+      "platform": "compose-ios",
+      "test": "iosAppUITests/PublicDemoBackendE2ETests/testCredentialStatusLifecycleWithPublicAndControlledIssuers",
+      "source": "waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/PublicDemoBackendE2ETests.swift",
+      "captures": [
+        "compose-ios-status-multiple-real-credentials",
+        "compose-ios-status-public-demo-no-reference",
+        "compose-ios-status-authenticated-suspended",
+        "compose-ios-status-suspension-cleared",
+        "compose-ios-status-authenticated-clear",
+        "compose-ios-status-authenticated-revoked",
+        "compose-ios-status-outage-retained-evidence",
+        "compose-ios-status-home-adverse",
+        "compose-ios-status-mixed-sharing",
+        "compose-ios-status-sharing-refreshed",
+        "compose-ios-status-sharing-confirmation",
+        "compose-ios-status-sharing-result",
+        "compose-ios-status-unselected-adverse-alternative",
+        "compose-ios-status-clear-verifier-policy-result",
+        "compose-ios-status-revoked-verifier-policy-confirmation",
+        "compose-ios-status-revoked-verifier-policy-result",
+        "compose-ios-status-payment-main-terms",
+        "compose-ios-status-payment-selected-credentials",
+        "compose-ios-status-payment-refreshed",
+        "compose-ios-status-payment-confirmation",
+        "compose-ios-status-payment-result",
+        "compose-ios-status-root-settings",
+        "compose-ios-status-settings-manual",
+        "compose-ios-status-settings-completed",
+        "compose-ios-status-settings-help"
+      ],
+      "requires": [
+        "isolated-wallet",
+        "controlled-status-issuer",
+        "public-demo-issuer2-verifier2",
+        "serialized-fixture-access"
+      ],
+      "captureHelper": "waltid-applications/mobile-e2e-fixtures/ios/WalletGalleryEvidence.swift"
+    },
+    {
+      "scenario": "wallet-credential-status",
+      "platform": "native-ios",
+      "test": "iosAppUITests/PublicDemoBackendE2ETests/testCredentialStatusLifecycleWithPublicAndControlledIssuers",
+      "source": "waltid-applications/waltid-wallet-demo-ios/iosApp/iosAppUITests/PublicDemoBackendE2ETests.swift",
+      "captures": [
+        "native-ios-status-multiple-real-credentials",
+        "native-ios-status-public-demo-no-reference",
+        "native-ios-status-authenticated-suspended",
+        "native-ios-status-suspension-cleared",
+        "native-ios-status-authenticated-clear",
+        "native-ios-status-authenticated-revoked",
+        "native-ios-status-outage-retained-evidence",
+        "native-ios-status-home-adverse",
+        "native-ios-status-mixed-sharing",
+        "native-ios-status-sharing-refreshed",
+        "native-ios-status-sharing-confirmation",
+        "native-ios-status-sharing-result",
+        "native-ios-status-unselected-adverse-alternative",
+        "native-ios-status-clear-verifier-policy-result",
+        "native-ios-status-revoked-verifier-policy-confirmation",
+        "native-ios-status-revoked-verifier-policy-result",
+        "native-ios-status-payment-main-terms",
+        "native-ios-status-payment-selected-credentials",
+        "native-ios-status-payment-refreshed",
+        "native-ios-status-payment-confirmation",
+        "native-ios-status-payment-result",
+        "native-ios-status-root-settings",
+        "native-ios-status-settings-manual",
+        "native-ios-status-settings-completed",
+        "native-ios-status-settings-help"
+      ],
+      "requires": [
+        "isolated-wallet",
+        "controlled-status-issuer",
+        "public-demo-issuer2-verifier2",
+        "serialized-fixture-access"
+      ],
+      "captureHelper": "waltid-applications/mobile-e2e-fixtures/ios/WalletGalleryEvidence.swift"
     }
   ]
 }

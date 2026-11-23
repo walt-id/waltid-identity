@@ -6,41 +6,39 @@ struct SettingsView: View {
     @ObservedObject var viewModel: WalletViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var confirmReset = false
+    @State private var destination: Destination?
+    private enum Destination { case walletAccess, signingKey, credentialStatus, technicalDetails, nearby, digitalCredentials }
 
     var body: some View {
         List {
             Section("Wallet") {
-                NavigationLink { WalletAccessSettingsView(viewModel: viewModel) } label: {
-                    SettingsDestinationLabel("Wallet access", systemImage: "lock", summary: String(localized: "PIN and biometric unlock"))
+                SettingsDestinationRow("Wallet access", systemImage: "lock", summary: String(localized: "PIN and biometric unlock"),
+                    identifier: "wallet.settingsWalletAccess") {
+                    destination = .walletAccess
                 }
-                .accessibilityIdentifier("wallet.settingsWalletAccess")
-                NavigationLink {
-                    if let model = viewModel.identityScreen {
-                        WalletIdentityView(biometricAvailability: viewModel.biometricSigningRecoveryAvailability,
-                            biometricKind: viewModel.access.biometricKind, model: model)
-                    }
-                    else { List { signingProtectionSection }.navigationTitle("Signing key").navigationBarTitleDisplayMode(.inline) }
-                } label: {
-                    SettingsDestinationLabel("Signing key", systemImage: "key", summary: String(localized: "Protection and key backup"))
+                SettingsDestinationRow("Signing key", systemImage: "key", summary: String(localized: "Protection and key backup"),
+                    identifier: "wallet.settingsSigningKey") {
+                    destination = .signingKey
                 }
-                .accessibilityIdentifier("wallet.settingsSigningKey")
-                NavigationLink { TechnicalDetailsView(viewModel: viewModel) } label: {
-                    SettingsDestinationLabel("Technical details", systemImage: "doc.text", summary: String(localized: "DID, key ID, and public key"))
+                SettingsDestinationRow("Credential status", systemImage: "checkmark.circle", summary: String(localized: "Checks and last-known results"),
+                    identifier: "settings-credential-status") {
+                    destination = .credentialStatus
                 }
-                .accessibilityIdentifier("wallet.settingsTechnicalDetails")
+                SettingsDestinationRow("Technical details", systemImage: "doc.text", summary: String(localized: "DID, key ID, and public key"),
+                    identifier: "wallet.settingsTechnicalDetails") {
+                    destination = .technicalDetails
+                }
             }
             Section {
-                NavigationLink { NearbySettingsView(viewModel: viewModel) } label: {
-                    SettingsDestinationLabel("Nearby sharing", systemImage: "antenna.radiowaves.left.and.right", summary: viewModel.proximityTransportProfile.title)
+                SettingsDestinationRow("Nearby sharing", systemImage: "antenna.radiowaves.left.and.right", summary: viewModel.proximityTransportProfile.title,
+                    identifier: WalletAccessibilityID.settingsProximityPresentation) {
+                    destination = .nearby
                 }
-                .accessibilityIdentifier(WalletAccessibilityID.settingsProximityPresentation)
-                NavigationLink {
-                    DigitalCredentialsSettingsView(showWalletReview: $viewModel.showDcApiPresentationPreview)
-                } label: {
-                    SettingsDestinationLabel("Digital Credentials API", systemImage: "person.text.rectangle",
-                                             summary: viewModel.showDcApiPresentationPreview ? String(localized: "Wallet review on") : String(localized: "Wallet review off"))
+                SettingsDestinationRow("Digital Credentials API", systemImage: "person.text.rectangle",
+                    summary: viewModel.showDcApiPresentationPreview ? String(localized: "Wallet review on") : String(localized: "Wallet review off"),
+                    identifier: "wallet.settingsDigitalCredentialsApi") {
+                    destination = .digitalCredentials
                 }
-                .accessibilityIdentifier("wallet.settingsDigitalCredentialsApi")
             } header: {
                 Text("Sharing").accessibilityIdentifier(WalletAccessibilityID.settingsCredentialSharing)
             }
@@ -58,6 +56,23 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity)
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Settings")
+        .walletDetailDestination(isPresented: Binding(get: { destination != nil }, set: { if !$0 { destination = nil } })) {
+            switch destination {
+            case .walletAccess: WalletAccessSettingsView(viewModel: viewModel)
+            case .signingKey:
+                if let model = viewModel.identityScreen {
+                    WalletIdentityView(biometricAvailability: viewModel.biometricSigningRecoveryAvailability,
+                        biometricKind: viewModel.access.biometricKind, model: model)
+                } else {
+                    List { signingProtectionSection }.navigationTitle("Signing key").navigationBarTitleDisplayMode(.inline)
+                }
+            case .credentialStatus: CredentialStatusSettingsView(viewModel: viewModel)
+            case .technicalDetails: TechnicalDetailsView(viewModel: viewModel)
+            case .nearby: NearbySettingsView(viewModel: viewModel)
+            case .digitalCredentials: DigitalCredentialsSettingsView(showWalletReview: $viewModel.showDcApiPresentationPreview)
+            case nil: EmptyView()
+            }
+        }
         .alert("Reset wallet?", isPresented: $confirmReset) {
             Button("Reset wallet", role: .destructive, action: viewModel.resetWallet)
                 .accessibilityIdentifier(WalletAccessibilityID.settingsResetConfirm)
@@ -168,5 +183,59 @@ struct SettingsView: View {
                 }
             }
         )
+    }
+}
+
+struct CredentialStatusSettingsView: View {
+    @ObservedObject var viewModel: WalletViewModel
+    var helpInitiallyExpanded = false
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Automatic checks", isOn: $viewModel.automaticCredentialStatusChecks)
+                    .accessibilityIdentifier("settings-credential-status-automatic")
+            } footer: { Text("While this wallet is open and unlocked.\nChecks contact the issuer’s status service.") }
+            Section {
+                Button { viewModel.checkCredentialStatuses() } label: {
+                    HStack {
+                        Text("Check statuses")
+                        Spacer()
+                        if viewModel.checkingCredentialStatuses { ProgressView().accessibilityHidden(true) }
+                        else { Image(systemName: "arrow.clockwise").accessibilityHidden(true) }
+                    }
+                }
+                .disabled(viewModel.checkingCredentialStatuses || !viewModel.isReady || viewModel.auth != .unlocked)
+                .accessibilityValue(viewModel.checkingCredentialStatuses ? String(localized: "Checking…") : "")
+                .accessibilityIdentifier("settings-credential-status-check-all")
+                if let summary = viewModel.credentialStatusSummary {
+                    countRow(String(localized: "Processed"), summary.completed)
+                    if summary.unchanged > 0 { countRow(String(localized: "Not refreshed"), summary.unchanged) }
+                    if summary.deferred > 0 { countRow(String(localized: "Deferred"), summary.deferred) }
+                    if summary.checkErrors > 0 {
+                        countRow(String(localized: "With check errors"), summary.checkErrors)
+                            .padding(.top, 8)
+                    }
+                }
+                if let error = viewModel.credentialStatusBatchError { Text(error).font(.footnote).foregroundStyle(.red) }
+            } footer: {
+                if viewModel.credentialStatusSummary?.deferred ?? 0 > 0 { Text("Some checks were deferred. Try again later.") }
+            }
+            Section {
+                MetadataDisclosure(title: String(localized: "How checks work"), initiallyExpanded: helpInitiallyExpanded,
+                    accessibilityIdentifier: "settings-credential-status-how") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Checks download status lists. The credential itself is not sent.")
+                        Text("List addresses and network metadata can correlate requests.")
+                        Text("Recipients verify credential status independently.")
+                        Text("“With check errors” counts credentials with failed checks, conflicting results or unreadable status information. These credentials are also included in the other counts.")
+                    }.font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+        }.navigationTitle("Credential status").navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func countRow(_ title: String, _ value: Int) -> some View {
+        HStack { Text(title); Spacer(); Text(value.formatted()).monospacedDigit() }
+            .foregroundStyle(Color.primary).accessibilityElement(children: .combine)
     }
 }
