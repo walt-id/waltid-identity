@@ -7,15 +7,18 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.PublicKeyExporter
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.vc.vcs.W3CVC
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -68,6 +71,42 @@ class MergingIssuerTest {
         val did = issuanceTemplateContext(issuerId = "did:key:z6Mk", subjectDid = null)
         assertEquals(JsonPrimitive("did:key:z6Mk"), did["issuerDid"])
         assertFalse("subjectDid" in did, "absent values are left out")
+    }
+
+    private class MappingKey(key: Key, exporter: PublicKeyExporter) : Key by key {
+        override val capabilities = key.capabilities.copy(publicKeyExporter = exporter)
+    }
+
+    @Test
+    fun `both subject DID lookups prefer the supplied DID and derive once on demand`() = runTest {
+        val key = key()
+        val publicKey = requireNotNull(key.capabilities.publicKeyExporter).exportPublicKey()
+        var exports = 0
+        val holder = MappingKey(key) {
+            exports++
+            publicKey
+        }
+        val mapping = buildJsonObject {
+            put("reference", "<subjectDid>")
+            put("holder", buildJsonObject { put("id", "<context:subjectDid>") })
+        }
+
+        withContext(IssuanceHolderKey(holder)) {
+            val literalArray = JsonArray(listOf(JsonPrimitive("<subjectDid>")))
+            val literal = credential.mergingToVc("issuer", "", buildJsonObject { put("tags", literalArray) })
+            assertEquals(literalArray, literal.w3cVc["tags"])
+
+            val supplied = "did:example:wallet"
+            val mapped = credential.mergingToVc("issuer", supplied, mapping).w3cVc
+            assertEquals(JsonPrimitive(supplied), mapped["reference"])
+            assertEquals(mapped["reference"], mapped["holder"]?.jsonObject?.get("id"))
+            assertEquals(0, exports)
+
+            val derived = credential.mergingToVc("issuer", "", mapping).w3cVc
+            assertTrue(derived.getValue("reference").jsonPrimitive.content.startsWith("did:jwk:"))
+            assertEquals(derived["reference"], derived["holder"]?.jsonObject?.get("id"))
+            assertEquals(1, exports)
+        }
     }
 
     @Test
