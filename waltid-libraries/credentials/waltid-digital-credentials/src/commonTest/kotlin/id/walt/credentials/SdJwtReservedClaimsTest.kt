@@ -1,6 +1,7 @@
 package id.walt.credentials
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.coroutines.test.runTest
@@ -64,6 +65,19 @@ class SdJwtReservedClaimsTest {
         assertEquals(JsonPrimitive("business value"), parsed.credentialData["custom"]?.jsonObject?.get("exp"))
         val reloaded = Json.decodeFromString(DigitalCredential.serializer(), Json.encodeToString(DigitalCredential.serializer(), parsed))
         assertEquals(parsed.credentialData, reloaded.credentialData)
+    }
+
+    @Test
+    fun `private vc object keeps business exp relative to the issuer payload`() = runTest {
+        val nested = SdJwtSelectiveDisclosure("salt", "exp", JsonPrimitive("business value"))
+        val payload = buildJsonObject {
+            put("vct", "https://example.com/credential")
+            put("vc", buildJsonObject { put("_sd", buildJsonArray { add(nested.asHashedFromEncoded()) }) })
+        }
+        val parsed = CredentialParser.parseOnly(token(payload, listOf(nested)))
+        assertEquals(JsonPrimitive("business value"), parsed.credentialData["vc"]?.jsonObject?.get("exp"))
+        val disclosure = (parsed as SelectivelyDisclosableVerifiableCredential).disclosures!!.single()
+        assertEquals(listOf(JsonPrimitive("vc"), JsonPrimitive("exp")), disclosure.location)
     }
 
     @Test
