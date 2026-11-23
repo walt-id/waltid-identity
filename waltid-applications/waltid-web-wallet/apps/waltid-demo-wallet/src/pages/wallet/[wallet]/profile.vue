@@ -49,11 +49,13 @@ const userStore = useUserStore();
 const { user } = storeToRefs(userStore);
 
 const currentWallet = useCurrentWallet();
+const apiBase = useRuntimeConfig().public.walletApiBaseUrl;
 const dids = ref("");
 
 async function loadDids() {
   const response = await useFetch(
-    `/wallet-api/wallet/${currentWallet.value}/dids`,
+    `${apiBase}/wallet-api/wallet/${currentWallet.value}/dids`,
+    { credentials: 'include' },
   );
   if (response.data.value && Array.isArray(response.data.value)) {
     dids.value = response.data.value;
