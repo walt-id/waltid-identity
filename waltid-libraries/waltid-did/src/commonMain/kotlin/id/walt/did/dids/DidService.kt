@@ -192,9 +192,16 @@ object DidService {
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
+    suspend fun resolveToCrypto2Keys(did: String): Result<Set<Crypto2Key>> =
+        resolveToCrypto2Keys(did, verificationRelationship = null)
+
+    @JvmBlocking
+    @JvmAsync
+    @JsPromise
+    @JsExport.Ignore
     suspend fun resolveToCrypto2Keys(
         did: String,
-        verificationRelationship: VerificationRelationshipType? = null,
+        verificationRelationship: VerificationRelationshipType?,
     ): Result<Set<Crypto2Key>> = try {
         Result.success(DidDocumentCrypto2KeyResolver(
             getResolverForDid(did), verificationRelationship = verificationRelationship,
