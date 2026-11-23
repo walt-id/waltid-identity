@@ -42,6 +42,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.Json
@@ -240,6 +242,13 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                     setBody(JsonObject(missingRedirects).toString())
                 }
                 assertEquals(HttpStatusCode.BadRequest, rejected.status)
+                for (redirects in listOf(JsonObject(emptyMap()), JsonObject(mapOf("error_redirect_uri" to JsonPrimitive("https://example.com/error"))))) {
+                    val invalid = JsonObject(missingRedirects + ("redirects" to redirects))
+                    assertEquals(HttpStatusCode.BadRequest, http.post("/verification-session/create") {
+                        contentType(ContentType.Application.Json)
+                        setBody(invalid.toString())
+                    }.status)
+                }
             }
             assertEquals(reattemptable ?: true, info1.reattemptable)
             assertNull(info1.presentationId)
@@ -288,8 +297,21 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 assertTrue(redirectUri.contains("response_code="))
             }
 
+            val redirect = Url(presentationResult.getOrThrow().verifierResponse!!.jsonObject.getValue("redirect_uri").jsonPrimitive.content)
+            val completionCode = assertNotNull(redirect.parameters["response_code"])
+            val infoPath = "/verification-session/$sessionId/info"
+            if (sameDevice) {
+                assertEquals(HttpStatusCode.BadRequest, http.get(infoPath).status)
+                assertEquals(HttpStatusCode.BadRequest, http.get("$infoPath?response_code=wrong").status)
+                assertTrue(webhook.received().all { update ->
+                    val view = update.session
+                    view["response_code"]?.jsonPrimitive?.contentOrNull == null &&
+                        view["presented_credentials"] == null && view["presented_raw_data"] == null
+                })
+            }
+            val resultPath = if (sameDevice) "$infoPath?response_code=$completionCode" else infoPath
             val info2 = testAndReturn("View presented session") {
-                http.get("/verification-session/$sessionId/info")
+                http.get(resultPath)
                     .body<Verification2Session>()
             }
 
@@ -306,8 +328,7 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 assertTrue { info2.policyResults!!.overallSuccess }
                 assertEquals(1, info2.policyResults!!.vcPolicies.size)
                 assertEquals("my_pid", info2.policyResults!!.vcPolicies.single().queryId)
-                assertNotNull(info2.responseCode)
-                assertTrue(info2.responseCode!!.isNotBlank())
+                assertNull(info2.responseCode)
             }
 
             test("Emit successful verification callback events") {
@@ -334,7 +355,16 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 },
             )
             assertEquals(if (reattemptable == false) HttpStatusCode.Conflict else HttpStatusCode.OK, repeated.status)
-            val latest = http.get("/verification-session/$sessionId/info").body<Verification2Session>()
+            val nextCode = if (reattemptable == false) completionCode else {
+                val body = repeated.body<JsonObject>()
+                Url(body.getValue("redirect_uri").jsonPrimitive.content).parameters["response_code"]!!
+            }
+            val latestPath = if (sameDevice) "$infoPath?response_code=$nextCode" else infoPath
+            if (sameDevice && reattemptable != false) {
+                assertNotEquals(completionCode, nextCode)
+                assertEquals(HttpStatusCode.BadRequest, http.get(resultPath).status)
+            }
+            val latest = http.get(latestPath).body<Verification2Session>()
             assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, latest.status)
             if (reattemptable == false) {
                 assertEquals(originalId, latest.presentationId)
@@ -348,7 +378,7 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                     http.submitForm("/verification-session/$sessionId/request").status,
                     "Unsigned sessions stay on GET; request_uri POST requires a signed Request Object",
                 )
-                val afterRequest = http.get("/verification-session/$sessionId/info").body<Verification2Session>()
+                val afterRequest = http.get(latestPath).body<Verification2Session>()
                 assertEquals(latest.presentationId, afterRequest.presentationId)
                 assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, afterRequest.status)
                 val attemptUpdates = webhook.received().filter {
