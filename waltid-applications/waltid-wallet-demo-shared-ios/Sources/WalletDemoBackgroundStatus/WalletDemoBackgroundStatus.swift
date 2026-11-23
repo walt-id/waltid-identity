@@ -49,20 +49,21 @@ public final class WalletDemoBackgroundStatusScheduler {
     /// The wallet transaction has already committed the preference and retired any previous grant.
     public func reconcile(binding: String?) {
         let previous = defaults.string(forKey: bindingKey)
-        defaults.set(binding, forKey: bindingKey)
-        if previous != binding || binding == nil {
+        if previous != binding {
+            defaults.set(binding, forKey: bindingKey)
             request?.cancel()
             running?.finish(success: false, cancel: true)
             running = nil
-            cancelRequest(identifier)
+            if previous != nil { cancelRequest(identifier) }
         }
-        if binding != nil { WalletDemoCredentialStatusNotifications.shared.requestPermissionIfNeeded() }
+        guard registered, binding != nil else { return }
+        WalletDemoCredentialStatusNotifications.shared.requestPermissionIfNeeded()
         requestNext()
     }
 
     private func requestNext() {
         request?.cancel()
-        guard canSchedule, let binding = defaults.string(forKey: bindingKey) else { return }
+        guard let binding = defaults.string(forKey: bindingKey), canSchedule else { return }
         request = Task { @MainActor [weak self] in
             guard let self else { return }
             let pending = await BGTaskScheduler.shared.pendingTaskRequests()

@@ -39,6 +39,21 @@ final class BackgroundStatusCompletionTests: XCTestCase {
 
 @MainActor
 final class BackgroundStatusSchedulerTests: XCTestCase {
+    func testReconciliationDoesNotCancelWithoutAPreviousBinding() throws {
+        var cancelledRequests = 0
+        let scheduler = try makeScheduler { _ in cancelledRequests += 1 }
+
+        scheduler.reconcile(binding: nil)
+        XCTAssertEqual(cancelledRequests, 0, "A wallet that has never enrolled has no request to cancel")
+        scheduler.reconcile(binding: "grant")
+        XCTAssertEqual(cancelledRequests, 0, "The first enrollment has no previous request to cancel")
+
+        scheduler.reconcile(binding: nil)
+        XCTAssertEqual(cancelledRequests, 1, "Retiring the enrollment cancels its request")
+        scheduler.reconcile(binding: nil)
+        XCTAssertEqual(cancelledRequests, 1, "Reopening a wallet after retirement does not cancel again")
+    }
+
     func testDeferralRetainsTheScheduleAndIneligibilityRetiresIt() throws {
         var cancelledRequests = 0
         let scheduler = try makeScheduler { _ in cancelledRequests += 1 }
