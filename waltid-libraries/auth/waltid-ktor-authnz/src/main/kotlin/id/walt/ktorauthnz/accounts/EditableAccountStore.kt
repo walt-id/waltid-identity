@@ -20,12 +20,12 @@ interface EditableAccountStore : AccountStore {
     suspend fun addAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String, data: AuthMethodStoredData)
     suspend fun addAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData)
     suspend fun updateAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String, data: AuthMethodStoredData)
-    /** Persist a login-time upgrade. Concurrent stores should replace only the credential that was verified. */
-    suspend fun upgradePasswordHash(identifier: AccountIdentifier, verified: PasswordStoredData, replacement: PasswordHash) {
-        updateAccountIdentifierStoredData(identifier, verified.authMethod().id, verified.withPasswordHash(replacement))
-    }
-
     suspend fun updateAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData)
     suspend fun deleteAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String)
     suspend fun deleteAccountStoredData(accountId: String, method: String)
+}
+
+/** Stores supporting login-time migration atomically replace only the credential that was verified. */
+interface PasswordHashUpgradeStore : EditableAccountStore {
+    suspend fun upgradePasswordHash(identifier: AccountIdentifier, verified: PasswordStoredData, replacement: PasswordHash)
 }

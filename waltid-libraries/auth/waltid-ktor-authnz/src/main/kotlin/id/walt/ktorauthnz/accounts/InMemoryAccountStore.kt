@@ -18,7 +18,7 @@ import kotlin.uuid.Uuid
  * [currentAuthnzTenant]), so `alice` of one tenant is not `alice` of another. Outside a scope it works on the accounts
  * of no tenant. Set accounts up for a tenant with `inAuthnzTenant("org1") { store.addAccount(...) }`.
  */
-class InMemoryAccountStore : EditableAccountStore {
+class InMemoryAccountStore : PasswordHashUpgradeStore {
 
     private data class Scoped<T>(val tenant: String?, val key: T)
 

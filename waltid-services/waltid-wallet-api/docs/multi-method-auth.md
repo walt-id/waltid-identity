@@ -28,7 +28,7 @@ requireHttps = false
 pepper = "waltid"
 
 # Hash algorithm to use for passwords for signing.
-# You can choose from algorithms like: ARGON2, PBKDF2, PBKDF2_COMPRESSED, BCRYPT, SCRYPT, BALLON_HASHING, MESSAGE_DIGEST, NONE
+# For new passwords choose ARGON2, BCRYPT, SCRYPT or PBKDF2_COMPRESSED.
 hashAlgorithm = ARGON2
 
 # Configure the Auth Flow (refer to: waltid-ktor-authnz)

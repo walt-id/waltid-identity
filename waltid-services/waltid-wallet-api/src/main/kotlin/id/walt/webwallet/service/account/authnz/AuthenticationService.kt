@@ -1,6 +1,7 @@
 package id.walt.webwallet.service.account.authnz
 
 import id.walt.ktorauthnz.accounts.EditableAccountStore
+import id.walt.ktorauthnz.accounts.PasswordHashUpgradeStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
@@ -21,7 +22,7 @@ import java.util.UUID
 
 class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispatchers.IO) {
 
-    val editableAccountStore = object : EditableAccountStore {
+    val editableAccountStore: EditableAccountStore = object : PasswordHashUpgradeStore {
         override suspend fun addAccountIdentifierToAccount(
             accountId: String,
             newAccountIdentifier: AccountIdentifier

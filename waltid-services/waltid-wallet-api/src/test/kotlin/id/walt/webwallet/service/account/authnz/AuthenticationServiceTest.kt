@@ -1,5 +1,6 @@
 package id.walt.webwallet.service.account.authnz
 
+import id.walt.ktorauthnz.accounts.PasswordHashUpgradeStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.methods.EmailPass
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.TestInstance
 import java.io.File
 import java.util.*
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -150,7 +152,7 @@ class AuthenticationServiceTest {
     @Test
     fun `a stale login upgrade preserves the newer SQL credential`() = runBlocking {
         val identifier = EmailIdentifier("migration@example.test")
-        val store = authenticationService.editableAccountStore
+        val store = assertIs<PasswordHashUpgradeStore>(authenticationService.editableAccountStore)
         store.addAccountIdentifierToAccount(UUID.randomUUID().toString(), identifier)
         val original = EmailPassStoredData(passwordHash = PasswordHashing.hash("fixture").toString())
         store.addAccountIdentifierStoredData(identifier, EmailPass.id, original)

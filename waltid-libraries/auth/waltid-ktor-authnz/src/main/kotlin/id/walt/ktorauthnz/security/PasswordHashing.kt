@@ -3,6 +3,7 @@ package id.walt.ktorauthnz.security
 import com.password4j.Argon2Function
 import com.password4j.BcryptFunction
 import com.password4j.CompressedPBKDF2Function
+import com.password4j.HashingFunction
 import com.password4j.Password
 import com.password4j.ScryptFunction
 import id.walt.ktorauthnz.KtorAuthnzManager.passwordHashingConfig as config
@@ -13,6 +14,9 @@ object PasswordHashing {
     fun hash(password: String): PasswordHash = hash(password, config.selectedPwHashAlgorithm, config.pepper)
 
     private fun hash(password: String, algorithm: PasswordHashingAlgorithm, pepper: String): PasswordHash {
+        require(!algorithm.needsSeparateSalt) {
+            "$algorithm cannot store its salt in the password record. Choose ARGON2, BCRYPT, SCRYPT or PBKDF2_COMPRESSED."
+        }
         val builder = Password.hash(password).addPepper(pepper)
         // Bcrypt generates its own versioned salt when none is supplied.
         if (algorithm == PasswordHashingAlgorithm.BCRYPT) {
@@ -23,9 +27,19 @@ object PasswordHashing {
         return PasswordHash(builder.with(algorithm.algorithmInstance.value).result, algorithm)
     }
 
-    fun needsEvolving(storedHash: PasswordHash) =
-        config.selectedHashConversions.containsKey(storedHash.algorithm) ||
-                (config.selectedHashConversions.containsKey(null) && config.selectedHashConversions[null] != storedHash.algorithm)
+    private val PasswordHashingAlgorithm.needsSeparateSalt: Boolean
+        get() = this == PasswordHashingAlgorithm.PBKDF2 || this == PasswordHashingAlgorithm.MESSAGE_DIGEST ||
+                this == PasswordHashingAlgorithm.BALLON_HASHING
+
+    fun needsEvolving(storedHash: PasswordHash) = migrationTarget(storedHash) != null
+
+    private fun migrationTarget(stored: PasswordHash, verifier: HashingFunction? = null): PasswordHashingAlgorithm? {
+        val rules = config.selectedHashConversions
+        val target = rules[stored.algorithm] ?: rules[null]?.takeUnless { it == stored.algorithm } ?: return null
+        if (target.needsSeparateSalt || target == PasswordHashingAlgorithm.NONE) return null
+        if (target == stored.algorithm && (verifier ?: verifierFor(stored)) == target.algorithmInstance.value) return null
+        return target
+    }
 
     fun evolvesTo(storedHashAlgorithm: PasswordHashingAlgorithm): PasswordHashingAlgorithm =
         config.selectedHashConversions[storedHashAlgorithm] ?: config.selectedHashConversions[null]
@@ -37,24 +51,26 @@ object PasswordHashing {
         val updatedHash: PasswordHash? = null,
     )
 
-    fun check(passwordToCheck: String, storedHash: PasswordHash): CheckResult {
-        val pepper = config.pepper
-        val verifier = when (storedHash.algorithm) {
+    private fun verifierFor(storedHash: PasswordHash): HashingFunction =
+        when (storedHash.algorithm) {
             PasswordHashingAlgorithm.BCRYPT -> BcryptFunction.getInstanceFromHash(storedHash.hash)
             PasswordHashingAlgorithm.ARGON2 -> Argon2Function.getInstanceFromHash(storedHash.hash)
             PasswordHashingAlgorithm.PBKDF2_COMPRESSED -> CompressedPBKDF2Function.getInstanceFromHash(storedHash.hash)
             PasswordHashingAlgorithm.SCRYPT -> ScryptFunction.getInstanceFromHash(storedHash.hash)
             else -> storedHash.algorithm.algorithmInstance.value
         }
+
+    fun check(passwordToCheck: String, storedHash: PasswordHash): CheckResult =
+        check(passwordToCheck, storedHash, allowUpgrade = true)
+
+    internal fun check(passwordToCheck: String, storedHash: PasswordHash, allowUpgrade: Boolean): CheckResult {
+        val pepper = config.pepper
+        val verifier = verifierFor(storedHash)
         val valid = Password.check(passwordToCheck, storedHash.hash)
             .addPepper(pepper)
             .with(verifier)
-        if (!valid || !needsEvolving(storedHash)) return CheckResult(valid, false)
-
-        val target = evolvesTo(storedHash.algorithm)
-        // These Password4j results keep the salt separately. The existing record stores only the result.
-        if (target == PasswordHashingAlgorithm.PBKDF2 || target == PasswordHashingAlgorithm.MESSAGE_DIGEST ||
-            target == PasswordHashingAlgorithm.BALLON_HASHING) return CheckResult(true, false)
+        if (!valid || !allowUpgrade) return CheckResult(valid, false)
+        val target = migrationTarget(storedHash, verifier) ?: return CheckResult(true, false)
 
         // Only migrate when both algorithms authenticate the entire submitted secret.
         val usesBcrypt = target == PasswordHashingAlgorithm.BCRYPT || storedHash.algorithm == PasswordHashingAlgorithm.BCRYPT

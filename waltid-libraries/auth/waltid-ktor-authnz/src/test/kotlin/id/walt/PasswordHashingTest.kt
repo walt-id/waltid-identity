@@ -81,12 +81,24 @@ class PasswordHashingTest {
     }
 
     @Test
-    fun `migration preserves the credential if the target cannot store its salt`() {
+    fun `explicit bcrypt parameter refresh stops after the first upgrade`() {
+        config.selectedHashConversions = mapOf(BCRYPT to BCRYPT)
+        val old = Password.hash("fixture").addPepper(config.pepper).with(BcryptFunction.getInstance(Bcrypt.Y, 5))
+        val upgraded = assertNotNull(PasswordHashing.check("fixture", PasswordHash(old.result, BCRYPT)).updatedHash)
+        assertEquals(PasswordHashing.CheckResult(true, false), PasswordHashing.check("fixture", upgraded))
+    }
+
+    @Test
+    fun `password writes require a usable encoded salt and migration never writes plaintext`() {
         val legacy = PasswordHashing.hash("fixture")
         for (target in listOf(PBKDF2, MESSAGE_DIGEST, BALLON_HASHING)) {
             config.selectedHashConversions = mapOf(ARGON2 to target)
             assertEquals(PasswordHashing.CheckResult(true, false), PasswordHashing.check("fixture", legacy))
+            config.selectedPwHashAlgorithm = target
+            assertFailsWith<IllegalArgumentException> { PasswordHashing.hash("new credential") }
         }
+        config.selectedHashConversions = mapOf(ARGON2 to NONE)
+        assertEquals(PasswordHashing.CheckResult(true, false), PasswordHashing.check("fixture", legacy))
     }
 
     @Test

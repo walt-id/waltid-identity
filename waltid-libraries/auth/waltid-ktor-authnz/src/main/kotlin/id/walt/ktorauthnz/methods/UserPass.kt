@@ -1,16 +1,11 @@
 package id.walt.ktorauthnz.methods
 
-import id.walt.ktorauthnz.exceptions.InvalidCredentialsException
 import id.walt.ktorauthnz.AuthContext
-import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.UsernameIdentifier
 import id.walt.ktorauthnz.amendments.AuthMethodFunctionAmendments
-import id.walt.ktorauthnz.exceptions.authCheck
 import id.walt.ktorauthnz.methods.requests.UserPassCredentials
 import id.walt.ktorauthnz.methods.storeddata.UserPassStoredData
-import id.walt.ktorauthnz.security.PasswordHash
-import id.walt.ktorauthnz.security.PasswordHashing
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import io.github.smiley4.ktoropenapi.post
@@ -29,22 +24,8 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
 
     override fun storedDataFor(password: String) = UserPassStoredData(password = password)
 
-    override suspend fun verifyPassword(name: String, password: String): AccountIdentifier {
-        val identifier = UsernameIdentifier(name)
-
-        val storedData: UserPassStoredData = lookupAccountIdentifierStoredData(identifier)
-
-        val passwordHash = PasswordHash.fromString(storedData.passwordHash ?: error("Missing password hash"))
-        val check = PasswordHashing.check(password, passwordHash)
-
-        authCheck(check.valid, InvalidCredentialsException())
-
-        check.updatedHash?.let { upgraded ->
-            KtorAuthnzManager.accountStore.upgradePasswordHash(identifier, storedData, upgraded)
-        }
-
-        return identifier
-    }
+    override suspend fun verifyPassword(name: String, password: String): AccountIdentifier =
+        verifyStoredPassword<UserPassStoredData>(identifierFor(name), password)
 
     override suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier =
         verifyPassword(credential.name, credential.password)
