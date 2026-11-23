@@ -2,6 +2,19 @@
 
 package id.walt.verifier2.verification2
 
+import id.walt.mdoc.parser.MdocParser
+import id.walt.credentials.examples.MdocsExamples
+import id.walt.verifier2.data.SessionEvent
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertFailsWith
+import kotlinx.coroutines.test.runTest
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
+import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
+import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseKey
@@ -37,6 +50,7 @@ import kotlin.time.Instant
 
 /** Exercises query matching only; cryptographic presentation checks run separately before this step. */
 class MdocDisclosureContractTest {
+    private val certificateHeaders = MdocParser.parseToDocument(MdocsExamples.mdocsExampleBase64Url).issuerSigned.issuerAuth.unprotected
     private val namespace = "example.namespace"
     private val docType = "example.document"
     private val time = Instant.parse("2026-01-01T00:00:00Z")
@@ -44,7 +58,7 @@ class MdocDisclosureContractTest {
         DeviceKeyInfo(CoseKey(kty = Cose.KeyTypes.OKP)), docType, ValidityInfo(time, time, time))
 
     private fun credential(vararg names: String, signature: Byte = 1, deviceFields: Map<String, String> = emptyMap()): MdocsCredential {
-        val issuerAuth = CoseSign1(byteArrayOf(), CoseHeaders(),
+        val issuerAuth = CoseSign1(byteArrayOf(), certificateHeaders,
             coseCompliantCbor.encodeToByteArray(ByteArraySerializer(), coseCompliantCbor.encodeToByteArray(mso)).wrapInCborTag(24),
             byteArrayOf(signature))
         val document = Document(docType, IssuerSigned.fromIssuerSignedItems(
@@ -71,6 +85,36 @@ class MdocDisclosureContractTest {
     fun `requested claims are accepted`() {
         assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
             DcqlQuery(listOf(query("q", "family_name"))), mapOf("q" to listOf(credential("family_name"))), true).isSuccess)
+    }
+
+    @Test
+    fun `rejected disclosures never reach stored snapshots or notifications`() = runTest {
+        val dcql = DcqlQuery(listOf(query("q", "family_name")))
+        val session = VerificationSessionCreator.createVerificationSession(
+            CrossDeviceFlowSetup(GeneralFlowConfig(dcqlQuery = dcql)), clientId = null,
+            urlPrefix = "https://verifier.example/verification-session", urlHost = "openid4vp://authorize",
+        )
+        val response = Base64.UrlSafe.encode(coseCompliantCbor.encodeToByteArray(
+            DeviceResponse("1.0", arrayOf(credential("family_name", "portrait").document), status = 0u),
+        ))
+        val events = mutableListOf<SessionEvent>()
+        assertFailsWith<PresentationRejectionException> {
+            PresentationVerificationEngine.executeAllVerification(
+                mapOf("q" to listOf(response)), session,
+                updateSessionCallback = { stored, event, block ->
+                    stored.block()
+                    events += event
+                    val view = stored.publicView()
+                    assertNull(view.presentedRawData)
+                    assertNull(view.presentedPresentations)
+                    assertNull(view.presentedCredentials)
+                },
+                failSessionCallback = { stored, event, update -> update(stored, event) { status = Verification2Session.VerificationSessionStatus.FAILED } },
+            )
+        }
+        assertEquals(1, events.count { it == SessionEvent.dcql_fulfillment_check_failed })
+        assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
+        assertNull(session.presentedRawData)
     }
 
     @Test
@@ -120,10 +164,24 @@ class MdocDisclosureContractTest {
                 claimSets = listOf(listOf("claim0"), listOf("claim1")),
             )
         }
+        assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
+            DcqlQuery(listOf(alternatives)), mapOf("q" to listOf(credential("family_name", "portrait"))), true).isFailure)
         for (name in listOf("family_name", "portrait")) {
             assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
                 DcqlQuery(listOf(alternatives)), mapOf("q" to listOf(credential(name))), true).isSuccess)
         }
+    }
+
+    @Test
+    fun `claim option selection accounts for other queries selecting the same credential`() {
+        val alternatives = query("choice", "family_name", "portrait").let { query ->
+            query.copy(claims = query.claims!!.mapIndexed { index, claim -> claim.copy(id = "claim$index") },
+                claimSets = listOf(listOf("claim0"), listOf("claim1")))
+        }
+        val document = credential("family_name", "portrait")
+        assertTrue(PresentationVerificationEngine.matchCredentialsToQueries(
+            DcqlQuery(listOf(alternatives, query("name", "family_name"))),
+            mapOf("choice" to listOf(document), "name" to listOf(document)), true).isSuccess)
     }
 
     @Test
