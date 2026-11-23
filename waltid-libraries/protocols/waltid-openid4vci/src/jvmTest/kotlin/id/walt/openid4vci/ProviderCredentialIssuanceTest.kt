@@ -11,16 +11,21 @@ import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.defaultJwsAlgorithm
+import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.toStoredSoftwareKey
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.did.dids.Crypto2DidService
+import id.walt.did.dids.resolver.DidDocumentCrypto2KeyResolver
+import id.walt.did.dids.resolver.LocalResolver
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
@@ -73,11 +78,8 @@ class ProviderCredentialIssuanceTest {
 
     @Test
     fun `W3C signer exposes the selected holder key to a mapped claim`() = runBlocking {
-        suspend fun key(id: String) = crypto2Runtime.generateSoftwareKey(
-            GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
-        )
-        val holder = key("wallet")
-        val issuer = key("issuer")
+        val holder = p256Key("wallet")
+        val issuer = p256Key("issuer")
         val signed = W3cJwtVcCredentialSigner.generateW3CJwtVC(
             verifiedBinding = VerifiedCredentialBinding(holderKey = holder),
             credentialData = buildJsonObject {
@@ -94,6 +96,40 @@ class ProviderCredentialIssuanceTest {
         val vc = Json.parseToJsonElement(payload.decodeToString()).jsonObject.getValue("vc").jsonObject
         val reference = vc.getValue("credentialSubject").jsonObject.getValue("keyReference").jsonPrimitive.content
         assertEquals(Crypto2DidService.registerByKey(method = "jwk", key = holder).did, reference)
+    }
+
+    @Test
+    fun `selectively disclosed W3C credential binds sub to the holder key and conceals the name`() = runBlocking {
+        val holderJwk = p256Key("wallet").exportPublicJwk()
+        val holderThumbprint = Jwk.sha256Thumbprint(holderJwk)
+        val holder = crypto2Runtime.restore(holderJwk.toStoredSoftwareKey(KeyId(holderThumbprint), setOf(KeyUsage.VERIFY)))
+        val issuer = p256Key("issuer")
+        val signed = W3cJwtVcCredentialSigner.generateW3CJwtVC(
+            verifiedBinding = VerifiedCredentialBinding(holderKey = holder),
+            credentialData = buildJsonObject {
+                putJsonArray("@context") { add("https://www.w3.org/ns/credentials/v2") }
+                putJsonArray("type") { add("VerifiableCredential") }
+                putJsonObject("credentialSubject") { put("name", "Alice") }
+            },
+            issuerKey = issuer,
+            algorithm = JwsAlgorithm.ES256,
+            issuerId = "https://issuer.example",
+            dataMapping = buildJsonObject { put("jwt:sub", "<subjectDid>") },
+            selectiveDisclosure = SDMap.generateSDMap(listOf("credentialSubject.name")),
+            w3cVersion = "W3CV2",
+        )
+
+        val credential = SDJwt.parse(signed)
+        CompactJws.verify(credential.jwt, issuer, JwsAlgorithm.ES256)
+        val payload = credential.undisclosedPayload
+        val subjectDid = payload.getValue("sub").jsonPrimitive.content
+        assertTrue(subjectDid.startsWith("did:jwk:"))
+        assertFalse('#' in subjectDid)
+        val resolver = DidDocumentCrypto2KeyResolver(LocalResolver(), crypto2Runtime)
+        val subjectKey = resolver.resolveToKeys(subjectDid).single()
+        assertEquals(holderThumbprint, Jwk.sha256Thumbprint(subjectKey.exportPublicJwk()))
+        assertFalse("name" in payload.getValue("credentialSubject").jsonObject)
+        assertEquals(JsonPrimitive("Alice"), credential.fullPayload.getValue("credentialSubject").jsonObject["name"])
     }
 
     @Test
@@ -563,6 +599,10 @@ class ProviderCredentialIssuanceTest {
         }
     }
 
+    private suspend fun p256Key(id: String) = crypto2Runtime.generateSoftwareKey(
+        GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
+    )
+
     private fun ordinaryInputs(count: Int = 1) = List(count) {
         CredentialIssuanceInput(buildJsonObject { put("given_name", "Jane") })
     }
@@ -579,9 +619,6 @@ class ProviderCredentialIssuanceTest {
         loadDocument: suspend (String) -> ByteArray = { error("Inline schemas need no transport") },
     ): CredentialResponseResult {
         require(inputs.isNotEmpty())
-        suspend fun key(id: String) = crypto2Runtime.generateSoftwareKey(
-            GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
-        )
         val configuration = CredentialConfiguration(CredentialFormat.SD_JWT_VC, vct = "https://issuer.example/identity")
         val request = DefaultCredentialRequest(
             client = DefaultClient("test-client", emptyList(), emptySet(), emptySet()),
@@ -591,7 +628,7 @@ class ProviderCredentialIssuanceTest {
         val batch = CredentialIssuanceBatch(
             inputs = inputs,
             bindings = List(inputs.size) { index ->
-                VerifiedJwtProof("", "ES256", buildJsonObject {}, buildJsonObject {}, key("holder-$index"), null, null, null).binding(index)
+                VerifiedJwtProof("", "ES256", buildJsonObject {}, buildJsonObject {}, p256Key("holder-$index"), null, null, null).binding(index)
             },
         )
         var clockReads = 0
@@ -611,7 +648,7 @@ class ProviderCredentialIssuanceTest {
             // Any accidental per-credential clock read would move the batch into another day.
             Instant.parse(time) + (clockReads++).days
         })
-        val actual = key("issuer")
+        val actual = p256Key("issuer")
         val issuer = object : Crypto2Key by actual {
             override val capabilities = actual.capabilities.copy(signer = Signer { bytes, algorithm ->
                 signatures += Unit
