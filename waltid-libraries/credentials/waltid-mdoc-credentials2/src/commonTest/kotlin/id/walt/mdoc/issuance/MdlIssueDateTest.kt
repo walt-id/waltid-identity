@@ -1,13 +1,15 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 package id.walt.mdoc.issuance
 
+import kotlin.ExperimentalUnsignedTypes
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import kotlinx.serialization.cbor.CborString
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class MdlIssueDateTest {
 

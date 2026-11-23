@@ -1,19 +1,20 @@
 package id.walt.x509
 
 import kotlinx.cinterop.COpaquePointer
+import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArrayOf
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.value
 import platform.CoreFoundation.CFArrayCreate
 import platform.CoreFoundation.CFArrayRef
 import platform.CoreFoundation.CFRelease
 import platform.CoreFoundation.kCFAllocatorDefault
 import platform.CoreFoundation.kCFTypeArrayCallBacks
-import platform.CoreFoundation.CFDataRef
 import platform.Foundation.CFBridgingRelease
 import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSData
@@ -152,7 +153,7 @@ actual fun validateCertificateChain(
     }
 }
 
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 private fun CertificateDer.toSecCertificate(description: String): SecCertificateRef {
     val byteArray = bytes.toByteArray()
     val data = CFBridgingRetain(
@@ -161,7 +162,7 @@ private fun CertificateDer.toSecCertificate(description: String): SecCertificate
         }
     ) ?: throw X509ValidationException("Certificate validation failed: could not create certificate data.")
     return try {
-        SecCertificateCreateWithData(kCFAllocatorDefault, data as CFDataRef)
+        SecCertificateCreateWithData(kCFAllocatorDefault, data.reinterpret())
             ?: throw X509ValidationException(
                 "Certificate chain validation failed: invalid X.509 DER in $description."
             )

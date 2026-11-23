@@ -198,7 +198,7 @@ class MobileDigitalCredentialSharingReviewTest {
         assertEquals(metadataJson, option.metadataJson)
         assertEquals(
             "https://issuer.example/pid-bg.png",
-            option.toCredentialDetails().toCardDisplayData().backgroundImageUri,
+            option.toSharingInformation(includeDisclosures = false).summary.backgroundImageUri,
         )
     }
 

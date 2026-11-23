@@ -38,9 +38,12 @@ import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
 import kotlin.test.*
+import kotlinx.coroutines.withContext
 
 /** Independent Nimbus signature/decryption checks. All authentication in these tests is simulated. */
 class ScaPresentationInteropTest {
+    private val prettyJson = Json { prettyPrint = true }
+
     private val factors = ScaAuthenticationMethods.KnowledgeAndPossession(
         ScaAuthenticationMethods.Knowledge.PIN_6_OR_MORE_DIGITS,
         ScaAuthenticationMethods.Possession.KEY_IN_LOCAL_NATIVE_WSCD,
@@ -55,6 +58,27 @@ class ScaPresentationInteropTest {
         "sca-user" to mapOf("masked_psu_id" to "user***"),
         "sca-card-dpc" to mapOf("credential_id" to "synthetic-card", "network" to "synthetic", "card_id" to "card***"),
     )
+
+    @Test
+    fun `changed host review after authorization prevents proof signing`() = runTest {
+        val fixture = fixture("sca-iban", OpenID4VPResponseMode.DIRECT_POST)
+        var current = true
+        var signatures = 0
+        val authorizer = object : ScaPresentationAuthorizer {
+            override suspend fun authorize(presentation: ScaPresentation) = factors
+            override suspend fun withAuthorizedSigner(
+                presentation: ScaPresentation, signer: Signer,
+                operation: suspend (ScaAuthenticationMethods, Signer) -> String,
+            ): String {
+                current = false // Simulated native prompt completed after the warning changed.
+                return operation(factors, Signer { bytes, algorithm -> signatures++; signer.sign(bytes, algorithm) })
+            }
+        }
+        assertFailsWith<IllegalStateException> {
+            withContext(PresentationReviewGuard { check(current) { "Review changed" } }) { present(fixture, authorizer) }
+        }
+        assertEquals(0, signatures)
+    }
 
     @Test
     fun `three payment credentials bind all four response modes and decrypt independently`() = runTest {
@@ -75,14 +99,14 @@ class ScaPresentationInteropTest {
             assertEquals("sha-256", payload["transaction_data_hashes_alg"]?.jsonPrimitive?.content)
             assertEquals(listOf(hash(fixture.transaction)), payload.getValue("transaction_data_hashes").jsonArray.map { it.jsonPrimitive.content })
             assertEquals(fixture.transaction, assertNotNull(observed).transactionData.single())
-            assertEquals(proofId, observed!!.proofId)
-            assertEquals("ES256", observed!!.signingAlgorithm)
-            assertEquals(payload["sd_hash"]?.jsonPrimitive?.content, observed!!.sdHash)
-            assertEquals("stored-$type", observed!!.credentialId)
-            assertEquals(fixture.keyId, observed!!.holderKeyId)
-            assertEquals(fixture.audience, observed!!.audience)
-            assertEquals(fixture.request.nonce, observed!!.nonce)
-            assertEquals(mode, observed!!.responseMode)
+            assertEquals(proofId, observed.proofId)
+            assertEquals("ES256", observed.signingAlgorithm)
+            assertEquals(payload["sd_hash"]?.jsonPrimitive?.content, observed.sdHash)
+            assertEquals("stored-$type", observed.credentialId)
+            assertEquals(fixture.keyId, observed.holderKeyId)
+            assertEquals(fixture.audience, observed.audience)
+            assertEquals(fixture.request.nonce, observed.nonce)
+            assertEquals(mode, observed.responseMode)
 
             val delivered = deliver(fixture, vp)
             assertEquals(Json.parseToJsonElement(vp), delivered["vp_token"])
@@ -108,7 +132,7 @@ class ScaPresentationInteropTest {
     fun `display-equivalent payment JSON keeps its original encoded hash input`() = runTest {
         val fixture = fixture(mode = OpenID4VPResponseMode.DC_API)
         val decoded = Json.parseToJsonElement(String(Base64.getUrlDecoder().decode(fixture.transaction)))
-        val pretty = Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), decoded)
+        val pretty = prettyJson.encodeToString(JsonElement.serializer(), decoded)
         val reencoded = encode(pretty.encodeToByteArray())
         assertEquals(decoded, Json.parseToJsonElement(pretty))
         assertNotEquals(fixture.transaction, reencoded)

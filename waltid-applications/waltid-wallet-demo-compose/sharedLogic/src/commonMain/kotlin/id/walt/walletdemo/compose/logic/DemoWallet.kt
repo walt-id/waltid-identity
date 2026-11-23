@@ -1,6 +1,34 @@
 package id.walt.walletdemo.compose.logic
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+
 interface DemoWallet {
+    /** Releases host-owned resources when this wallet instance leaves its session. */
+    suspend fun close() {}
+    fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = emptyFlow()
+    suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = WalletDemoCredentialStatuses()
+    suspend fun refreshCredentialStatuses(ids: Set<String>? = null, force: Boolean = false): WalletDemoStatusRefreshSummary =
+        WalletDemoStatusRefreshSummary(0, 0, 0, 0)
+    suspend fun submitStatusReviewedPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        reviewedStatus: Map<String, String>,
+        did: String? = null,
+        paymentConsentRevision: String? = null,
+        statusReviewEpoch: Long? = null,
+    ): WalletDemoOperationResult {
+        val snapshot = credentialStatusSnapshot()
+        if (statusReviewEpoch != null && statusReviewEpoch != snapshot.reviewEpoch) throw WalletDemoStatusReviewChanged()
+        val latest = snapshot.credentials
+        if (selectedCredentialOptions.any {
+                val revision = reviewedStatus[it.credentialId]
+                revision.isNullOrBlank() || latest[it.credentialId]?.advisoryRevision != revision
+            }) throw WalletDemoStatusReviewChanged()
+        return submitPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did, paymentConsentRevision)
+    }
+
     /** Returns null only when this wallet does not support identity management. */
     suspend fun identityDetails(): WalletDemoIdentityDetails? = null
     suspend fun identitySetup(): WalletDemoIdentitySetup? = null
@@ -31,8 +59,27 @@ interface DemoWallet {
         callbackUri: String,
     ): WalletDemoIssuanceOutcome
     suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome
+    /**
+     * Posts OpenID4VCI `credential_deleted` for a credential fetched but not stored.
+     * Session-based offer decline has no `notification_id` yet and can leave this unimplemented.
+     */
+    suspend fun rejectIssuedCredential(
+        notificationId: String,
+        accessToken: String,
+        credentialIssuerBaseUrl: String? = null,
+        notificationEndpoint: String? = null,
+        eventDescription: String? = null,
+    ) {
+    }
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome
     suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult
+    val supportsClaimReview: Boolean get() = false
+    suspend fun reviewPresentation(
+        previewHandle: WalletDemoPresentationPreviewHandle,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ): WalletDemoPreparedClaimReview = error("Selection-aware claim review is unavailable on this wallet")
     /** Only requested for a preview identified as an SD-JWT TS-12 payment by the mobile adapter. */
     suspend fun preparePaymentConsent(
         previewHandle: WalletDemoPresentationPreviewHandle,

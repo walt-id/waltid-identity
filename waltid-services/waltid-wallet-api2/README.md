@@ -25,13 +25,27 @@
 **Key differences from waltid-wallet-api (v1):**
 - Built on the new `waltid-openid4vc-wallet` library (multiplatform core).
 - Clean separation: all route logic lives in `waltid-openid4vc-wallet-server`, and is similar to Enterprise to allow for easy later upgrading.
-- Pluggable stores: in-memory by default, SQLite/Postgres via the `wallet2-persistence` feature flag.
+- Pluggable stores: the standalone sample enables SQLite via `wallet2-persistence`; PostgreSQL is also supported. Wallet data is in memory when the feature is disabled.
 - Auth is opt-in: enable the `auth` feature for account registration, JWT-based login, and wallet ownership enforcement.
 
 ---
 
 For runnable examples of all four Issuer2 offer contracts, both grants, explicit copies and
 deferred resumption, see [Issuer2 offers through Wallet2](examples/issuer2-batch.md).
+
+## Production deployment
+
+Wallet API v2 ships with email/password authentication, JWT sessions, and wallet ownership checks. Docker Compose enables `auth` with a demo signing key; the standalone sample leaves `auth` disabled. If using built-in accounts, enable `auth`, provision a JWT signing key through your secret manager, and set a short `tokenExpiry`. The built-in logout does not invalidate issued JWTs; add server-side revocation if you need immediate invalidation.
+
+Apply the [shared deployment controls](../README.md#production-deployment) and complete these wallet-specific steps:
+
+- **Persist accounts as well as wallet data.** The built-in account store is in memory, even when wallet persistence is enabled. A restart can leave wallets on disk while their owners can no longer sign in. Before using built-in login with real users, integrate a durable account store that preserves the account IDs used for wallet ownership. Use shared account state across replicas and test login and wallet access after a restart.
+- **Protect wallet data and keys.** Keep `wallet2-persistence` enabled. Use a durable volume for SQLite on a single node, or a protected PostgreSQL database for multiple replicas. Encrypt storage and backups, restrict database access, and test restores of keys, credentials, DIDs, and ownership links together with accounts. Software private keys can be stored in the wallet database. If non-exportable keys are required, integrate a compatible managed key backend for wallet keys; the JWT signing configuration is separate.
+- **Control signup and sensitive operations.** Decide whether to expose `/auth/register`. Apply rate limits and abuse protection to registration, login, and costly wallet operations. Provide account recovery and deletion procedures. If you use your own authentication layer, enforce wallet ownership there and keep global named-store routes private.
+- **Configure trust and outbound access.** Set `publicBaseUrl` in [`wallet-service.conf`](config/wallet-service.conf) to the deployed HTTPS URL. In `clientIdTrust`, configure the verifier trust anchors or registered clients your ecosystem uses and remove demo trust material. The wallet follows URLs in offers and presentation requests, so keep the [outbound fetch guard](config/network-fetch-guard.conf) restrictive. Review the origins and redirects used by your wallet frontend.
+- **Protect holders' data.** Have your frontend show what will be shared and get the holder's approval before sending a presentation. Keep credentials, private key material, and login tokens out of logs and traces. Define how to export or delete wallet data and how long backups retain it.
+
+Before launch, test account isolation and a complete receive-and-present flow, including access to the same wallet and credentials after a restart or restore.
 
 ## Features
 
@@ -41,7 +55,7 @@ deferred resumption, see [Issuer2 offers through Wallet2](examples/issuer2-batch
 | **Key management**               | Generate (Ed25519, secp256r1, secp256k1, RSA), import from JWK, list, get, delete                                    |
 | **DID management**               | Create (`did:key`, `did:jwk`, `did:web`, …), import, list, get, delete                                               |
 | **OID4VCI 1.0 - full flow**      | Single `POST /credentials/receive` call: resolve offer → token → proof-of-possession → credential                    |
-| **OID4VCI 1.0 - isolated steps** | `resolve-offer`, `request-token`, `sign-proof`, `fetch-credential`, `authorization-url`, `exchange-code`, `deferred` |
+| **OID4VCI 1.0 - isolated steps** | `resolve-offer`, `request-token`, `sign-proof`, `fetch-credential`, `reject`, `authorization-url`, `exchange-code`, `deferred` |
 | **OID4VP 1.0 / DCQL**            | `POST /credentials/present` (full flow); isolated `resolve-request`, `match-credentials-from-store`                  |
 | **Credential store**             | Import raw credentials, list (metadata), get, delete; formats: SD-JWT VC, JWT VC JSON, mdoc                          |
 | **Named stores**                 | Create independently-named key/credential/DID stores, reference them when creating wallets                           |
@@ -326,6 +340,15 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/fetc
     \"accessToken\": \"$ACCESS_TOKEN\",
     \"credentialConfigurationId\": \"pid_sd_jwt\",
     \"proofJwt\": \"$PROOF_JWT\"
+  }"
+
+# Optional: reject a credential fetched with storeInWallet=false
+curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/reject \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"notificationId\": \"$NOTIFICATION_ID\",
+    \"accessToken\": \"$ACCESS_TOKEN\",
+    \"credentialIssuerBaseUrl\": \"https://issuer.example.com\"
   }"
 ```
 

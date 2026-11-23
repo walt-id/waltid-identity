@@ -1,5 +1,8 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package id.walt.mdoc.encoding
 
+import kotlin.ExperimentalUnsignedTypes
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException

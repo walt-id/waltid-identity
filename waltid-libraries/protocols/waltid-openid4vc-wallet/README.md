@@ -69,6 +69,28 @@ selected wallet bindings and existing polling behavior; this does not add deferr
 - **Format-specific presenters** — JWT VP, SD-JWT KB, mdoc DeviceResponse
 - **Holder policies** — Configurable policies for presentation consent
 
+Retained previews support selection-aware claim review with `reviewPresentation` (URL requests) and
+`reviewDcApiPresentation` (Digital Credentials API). Both reuse the resolved, wallet-bound request,
+validate the chosen options, and prepare effective claims without signing, sending or consuming the
+preview. The returned contributions remain separate per query and credential; a partial array in one
+presentation must not be merged with another presentation by its received indexes. Typed source and
+received paths preserve original control and metadata identities after array compaction. Each node
+also identifies the SDK claim choices carrying it, or marks it as intrinsically carried. A clear
+sibling inside a disclosed parent is attributed to the selecting claim rather than labelled as
+always shared. These are presentation consequences, not additional per-leaf selection controls.
+
+Apps must invalidate a displayed review when selections change, block confirmation while preparation
+is pending or failed, and submit the same selection snapshot that was displayed. Claim review does
+not bind submission to a protocol revision. Request expiry, wallet ownership, cancellation and
+consumption follow the existing preview session. Prepare claim review and payment consent sequentially
+for the same choices; they share the preview's exclusive lease. Review never extends its lifetime.
+
+The mobile facade exposes string-based claim JSON and typed path JSON via `reviewPresentation` and
+`reviewDigitalCredentialPresentation`. Submit through the existing `submitPresentation` or
+`submitDigitalCredentialPresentation` methods. Payment consent retains its separate revision checks.
+The stateless HTTP preview contract is unchanged. A reliable projection must be available for the
+selected format; unsupported formats fail instead of guessing shared data.
+
 ### Wallet Architecture
 
 - **Multi-store support** — Multiple key stores, credential stores per wallet
@@ -238,6 +260,42 @@ data class StoredCredential(
     val addedAt: Instant               // Storage timestamp
 )
 ```
+
+## Credential status
+
+`readCredentialsWithStatus()` and `readCredentialWithStatus(id)` return composed reads without
+changing stored credential constructors. `credentialStatuses().snapshot()` and `.observe()` expose
+local, deadline-aware status-only state. Reads and observation perform no issuer requests.
+Explicit `.refresh(references, mode)` uses stored, store-scoped references and returns partial
+per-credential outcomes. Use `IF_DUE` for an app-owned foreground check and `FORCE` for manual
+revalidation. The service owns cancellation, coalescing and conditional snapshot commits, not scheduling.
+
+Managed stores persist minimal metadata under the signed-credential fingerprint and trust-policy
+identity. Custom stores can implement `CredentialStatusSnapshotStore` without changing the base store
+interface. Unknown or changed trust-policy identities restore historical evidence as stale.
+Configure `WalletCredentialStatusService` with explicit limits/reference/signer authorization and a
+stable `trustPolicyId`, then `attachCredentialStatusService` before first status access when embedding
+custom policy. Closing the service releases work; `closeCredentialStatusService()` does not initialize
+an unused service or delete wallet data.
+
+Long-lived services reconcile changed managed evidence on local reads and guard checks. Retained
+no-store observations keep their storage restriction after failed or conflicting refreshes; a new
+cacheable observation can replace that evidence. Request-scoped hosts can use `captureReviewState()`
+and `restoreReviewState()` with a stable, non-null `trustPolicyId` to retain detached evidence for an
+explicit bounded review. Bind that opaque, non-serializable state to the same authorized tenant,
+wallet lifecycle and store configuration. It contains no service, credential store or list body;
+restore checks signed-byte identity and reconciles current managed evidence without issuer I/O.
+This is transient host state, not a persistence format. The [HTTP adapter](../waltid-openid4vc-wallet-server/README.md#credential-status)
+provides bounded, expiring browser contexts instead of retaining an authorized service.
+
+Shared presentation semantics distinguish clear, adverse, stale, partial, unchecked, unsupported and
+unavailable. Domain reads derive presentation from evidence and evaluation time; HTTP responses use
+the separate presentation DTO and `WalletCredentialStatusSnapshotResponse`. Decoded transport values
+never override local service assessment. They do not replace verifier acceptance. Status-reviewed submission paths compare
+only the selected credentials' displayed semantic revisions before signing and delivery; existing
+public submission paths retain their behavior. Capture the request, selection and displayed revisions
+when starting a UI confirmation; do not rebuild an acknowledgement at its final button. See the [status module](../../credentials/waltid-credential-status/README.md)
+for supported profiles, trust, network bounds, no-store and batch-session rules.
 
 ## Session Events
 

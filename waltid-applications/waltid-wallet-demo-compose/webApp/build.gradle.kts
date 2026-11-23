@@ -11,6 +11,10 @@ plugins {
 group = "id.walt.walletdemo.compose"
 
 kotlin {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+
     wasmJs {
         outputModuleName = "walletDemoCompose"
         browser()

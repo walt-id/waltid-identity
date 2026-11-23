@@ -273,7 +273,7 @@ class CredentialIssuerMetadataSerializationTest {
                     CredentialDisplay(name = "University Credential", locale = "en-US"),
                 ),
                 claims = listOf(
-                    ClaimDescription(path = listOf("credentialSubject", "given_name")),
+                    ClaimDescription(path = listOf(JsonPrimitive("credentialSubject"), JsonPrimitive("given_name"))),
                 ),
             ),
         )
@@ -296,8 +296,8 @@ class CredentialIssuerMetadataSerializationTest {
                     CredentialDisplay(name = "Mobile Driving License", locale = "en-US"),
                 ),
                 claims = listOf(
-                    ClaimDescription(path = listOf("org.iso.18013.5.1", "given_name")),
-                    ClaimDescription(path = listOf("org.iso.18013.5.1", "family_name")),
+                    ClaimDescription(path = listOf(JsonPrimitive("org.iso.18013.5.1"), JsonPrimitive("given_name"))),
+                    ClaimDescription(path = listOf(JsonPrimitive("org.iso.18013.5.1"), JsonPrimitive("family_name"))),
                 ),
             ),
         )

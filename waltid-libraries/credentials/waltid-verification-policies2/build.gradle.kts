@@ -41,10 +41,12 @@ val generateJsonSchemaTestFixtures = tasks.register("generateJsonSchemaTestFixtu
 kotlin {
 
     sourceSets {
+        commonTest.get().kotlin.srcDir("../../sdjwt/waltid-sdjwt/src/typeMetadataTestFixtures/kotlin")
         commonTest {
             kotlin.srcDir(generateJsonSchemaTestFixtures.map { it.outputs.files })
         }
         commonMain.dependencies {
+            api(project(":waltid-libraries:credentials:waltid-credential-status"))
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
 

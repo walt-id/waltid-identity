@@ -1,18 +1,34 @@
 import Foundation
 import SwiftUI
 import UIKit
+import WalletSDK
 
 public let id1AspectRatio: CGFloat = 1.586
 public let credentialCardPeek: CGFloat = 56
+public let credentialCardMaxWidth: CGFloat = 360
+private let credentialStatusBadgeSize: CGFloat = 20
 public let defaultWaltCardBlue = Color(red: 27 / 255, green: 79 / 255, blue: 219 / 255)
+
+/// One physical bottom-left accessory slot, shared by status and issuance information.
+struct CredentialCardAccessory<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+    var body: some View {
+        content().frame(width: 48, height: 48)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .padding(2)
+            .environment(\.layoutDirection, .leftToRight)
+    }
+}
 
 public struct CredentialCardView: View {
     public let details: CredentialDetails
     public var compact: Bool = false
+    private let statusDecoration: CredentialStatusDisplay?
 
-    public init(details: CredentialDetails, compact: Bool = false) {
+    public init(details: CredentialDetails, compact: Bool = false, statusDecoration: CredentialStatusDisplay? = nil) {
         self.details = details
         self.compact = compact
+        self.statusDecoration = statusDecoration
     }
 
     public var body: some View {
@@ -20,7 +36,7 @@ public struct CredentialCardView: View {
             if compact {
                 CredentialSummaryRow(summary: details.cardSummary)
             } else {
-                CredentialCardArtView(summary: details.cardSummary)
+                CredentialCardArtView(summary: details.cardSummary, credentialID: details.id, statusDecoration: statusDecoration)
             }
         }.accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
     }
@@ -28,14 +44,19 @@ public struct CredentialCardView: View {
 
 public struct CredentialCardArtView: View {
     public let summary: CredentialCardSummary
+    private let credentialID: String?
     public var compact: Bool = false
+    private let statusDecoration: CredentialStatusDisplay?
     @State private var loadedMetadataArt: UIImage?
     @State private var loadedMetadataArtURI: String?
     @State private var metadataArtFailed = false
 
-    public init(summary: CredentialCardSummary, compact: Bool = false) {
+    public init(summary: CredentialCardSummary, compact: Bool = false, credentialID: String? = nil,
+                statusDecoration: CredentialStatusDisplay? = nil) {
+        self.credentialID = credentialID
         self.summary = summary
         self.compact = compact
+        self.statusDecoration = statusDecoration
     }
 
     public var body: some View {
@@ -65,18 +86,29 @@ public struct CredentialCardArtView: View {
                     hasLoadedMetadataArt: loadedMetadataArtURI == artURI && loadedMetadataArt != nil,
                     metadataArtFailed: metadataArtFailed
                 ) {
-                    if !compact { Text(summary.title)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(label)
-                        .lineLimit(2)
-                        .padding(padding)
+                    if !compact {
+                        Text(summary.title)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(label)
+                                .lineLimit(2)
+                                .padding(padding)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                                    alignment: .topLeading)
                     }
                     credentialLogo()
                         .frame(width: logoSize, height: logoSize)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: compact ? .center : .bottomTrailing)
-                        .padding(padding)
+                        .position(x: compact ? proxy.size.width / 2 : proxy.size.width - padding - logoSize / 2,
+                                  y: compact ? proxy.size.height / 2 : proxy.size.height - padding - logoSize / 2)
                 }
             }
+            .overlay {
+                if !compact, statusDecoration?.hasStatusIssue == true {
+                    CredentialCardAccessory { statusMark }
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(summary.title)
+            .accessibilityValue(!compact && statusDecoration?.hasStatusIssue == true ? statusDecoration?.statusTitle ?? "" : "")
             .clipShape(RoundedRectangle(cornerRadius: corner, style: .continuous))
             .shadow(color: .black.opacity(compact ? 0 : 0.34), radius: compact ? 0 : 16, y: compact ? 0 : 6)
         }
@@ -90,6 +122,13 @@ public struct CredentialCardArtView: View {
             loadedMetadataArt = image
             loadedMetadataArtURI = artURI
             metadataArtFailed = image == nil && artURI != nil
+        }
+    }
+
+    @ViewBuilder private var statusMark: some View {
+        if !compact, let statusDecoration, statusDecoration.hasStatusIssue {
+            CredentialStatusIcon(statusDecoration, contrast: true, size: credentialStatusBadgeSize)
+                .accessibilityIdentifier("credential-status-icon-\(credentialID ?? "")")
         }
     }
 
@@ -143,7 +182,7 @@ public struct CredentialCardButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 CredentialCardView(details: details, compact: compact)
-                if compact { Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.secondary) }
+                if compact { Image(systemName: "chevron.forward").font(.footnote).foregroundStyle(.tint) }
             }
             .frame(minHeight: 44)
             .contentShape(Rectangle())
@@ -157,6 +196,7 @@ public struct CredentialCardButton: View {
 
 public struct CredentialCardStackView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.credentialStatusUI) private var statusUI
     public let cards: [CredentialCardItem]
     public let onOpenDetails: (String) -> Void
     public var expandedID: String? = nil
@@ -186,7 +226,8 @@ public struct CredentialCardStackView: View {
         ZStack(alignment: .topLeading) {
             ForEach(Array(cards.enumerated()), id: \.element.id) { index, item in
                 let isSelected = item.id == expandedID
-                CredentialCardArtView(summary: item.summary)
+                CredentialCardArtView(summary: item.summary, credentialID: item.id,
+                    statusDecoration: statusUI.displayStatus(for: item.id))
                 .contentShape(Rectangle())
                 .onTapGesture { onOpenDetails(item.id) }
                 .accessibilityElement(children: .combine)

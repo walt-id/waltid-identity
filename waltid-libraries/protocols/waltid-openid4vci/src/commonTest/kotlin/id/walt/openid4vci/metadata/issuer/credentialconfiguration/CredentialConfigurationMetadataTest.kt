@@ -11,6 +11,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialMetadata
 import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -163,7 +164,7 @@ class CredentialConfigurationMetadataTest {
             format = CredentialFormat.SD_JWT_VC,
             credentialMetadata = CredentialMetadata(
                 claims = listOf(
-                    ClaimDescription(path = listOf("credentialSubject", "given_name"))
+                    ClaimDescription(path = listOf(JsonPrimitive("credentialSubject"), JsonPrimitive("given_name")))
                 ),
             ),
         )
@@ -180,7 +181,7 @@ class CredentialConfigurationMetadataTest {
     fun `claim display must not be empty when present`() {
         assertFailsWith<IllegalArgumentException> {
             ClaimDescription(
-                path = listOf("credentialSubject", "given_name"),
+                path = listOf(JsonPrimitive("credentialSubject"), JsonPrimitive("given_name")),
                 display = emptyList(),
             )
         }
@@ -190,7 +191,7 @@ class CredentialConfigurationMetadataTest {
     fun `claim display locales must be unique`() {
         assertFailsWith<IllegalArgumentException> {
             ClaimDescription(
-                path = listOf("credentialSubject", "given_name"),
+                path = listOf(JsonPrimitive("credentialSubject"), JsonPrimitive("given_name")),
                 display = listOf(
                     ClaimDisplay(name = "Given Name", locale = "en"),
                     ClaimDisplay(name = "Given Name 2", locale = "en"),
@@ -203,7 +204,7 @@ class CredentialConfigurationMetadataTest {
     fun `claim display name must not be blank`() {
         assertFailsWith<IllegalArgumentException> {
             ClaimDescription(
-                path = listOf("credentialSubject", "given_name"),
+                path = listOf(JsonPrimitive("credentialSubject"), JsonPrimitive("given_name")),
                 display = listOf(
                     ClaimDisplay(name = " "),
                 ),
@@ -215,7 +216,7 @@ class CredentialConfigurationMetadataTest {
     fun `claim display locale must not be blank`() {
         assertFailsWith<IllegalArgumentException> {
             ClaimDescription(
-                path = listOf("credentialSubject", "given_name"),
+                path = listOf(JsonPrimitive("credentialSubject"), JsonPrimitive("given_name")),
                 display = listOf(
                     ClaimDisplay(name = "Given Name", locale = " "),
                 ),
@@ -242,36 +243,36 @@ class CredentialConfigurationMetadataTest {
                 ),
                 claims = listOf(
                     ClaimDescription(
-                        path = listOf("given_name"),
+                        path = listOf(JsonPrimitive("given_name")),
                         display = listOf(
                             ClaimDisplay(name = "Given Name", locale = "en-US"),
                             ClaimDisplay(name = "Vorname", locale = "de-DE"),
                         ),
                     ),
                     ClaimDescription(
-                        path = listOf("family_name"),
+                        path = listOf(JsonPrimitive("family_name")),
                         display = listOf(
                             ClaimDisplay(name = "Surname", locale = "en-US"),
                             ClaimDisplay(name = "Nachname", locale = "de-DE"),
                         ),
                     ),
-                    ClaimDescription(path = listOf("email")),
-                    ClaimDescription(path = listOf("phone_number")),
+                    ClaimDescription(path = listOf(JsonPrimitive("email"))),
+                    ClaimDescription(path = listOf(JsonPrimitive("phone_number"))),
                     ClaimDescription(
-                        path = listOf("address"),
+                        path = listOf(JsonPrimitive("address")),
                         display = listOf(
                             ClaimDisplay(name = "Place of residence", locale = "en-US"),
                             ClaimDisplay(name = "Wohnsitz", locale = "de-DE"),
                         ),
                     ),
-                    ClaimDescription(path = listOf("address", "street_address")),
-                    ClaimDescription(path = listOf("address", "locality")),
-                    ClaimDescription(path = listOf("address", "region")),
-                    ClaimDescription(path = listOf("address", "country")),
-                    ClaimDescription(path = listOf("birthdate")),
-                    ClaimDescription(path = listOf("is_over_18")),
-                    ClaimDescription(path = listOf("is_over_21")),
-                    ClaimDescription(path = listOf("is_over_65")),
+                    ClaimDescription(path = listOf(JsonPrimitive("address"), JsonPrimitive("street_address"))),
+                    ClaimDescription(path = listOf(JsonPrimitive("address"), JsonPrimitive("locality"))),
+                    ClaimDescription(path = listOf(JsonPrimitive("address"), JsonPrimitive("region"))),
+                    ClaimDescription(path = listOf(JsonPrimitive("address"), JsonPrimitive("country"))),
+                    ClaimDescription(path = listOf(JsonPrimitive("birthdate"))),
+                    ClaimDescription(path = listOf(JsonPrimitive("is_over_18"))),
+                    ClaimDescription(path = listOf(JsonPrimitive("is_over_21"))),
+                    ClaimDescription(path = listOf(JsonPrimitive("is_over_65"))),
                 ),
             ),
         )

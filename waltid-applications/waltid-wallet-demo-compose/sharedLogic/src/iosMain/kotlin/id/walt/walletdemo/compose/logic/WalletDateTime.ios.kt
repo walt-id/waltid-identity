@@ -31,7 +31,7 @@ internal actual fun platformFormatWalletInstant(instant: Instant, timeZoneId: St
     val hour = when (use24HourClock) { true -> "H"; false -> "h"; null -> "j" }
     val seconds = if (local.second != 0 || instant.nanosecondsOfSecond != 0) "ss" else ""
     formatter.setLocalizedDateFormatFromTemplate("${hour}mm$seconds")
-    formatter.dateFormat = withSecondFraction(formatter.dateFormat, if (digits.isEmpty()) "" else (number.decimalSeparator ?: ".") + digits)
+    formatter.dateFormat = withSecondFraction(formatter.dateFormat, if (digits.isEmpty()) "" else number.decimalSeparator + digits)
     val time = formatter.stringFromDate(date)
     val hasLocation = '/' in zone.id && !zone.id.startsWith("Etc/")
     formatter.dateFormat = "VVV"

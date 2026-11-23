@@ -5,7 +5,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorization
 import id.walt.openid4vci.tokens.access.AccessTokenAuthorizationScheme
-import id.walt.openid4vci.tokens.access.CredentialAccessTokenContext
+import id.walt.openid4vci.tokens.access.ProtectedResourceAccessTokenContext
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
 import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
@@ -238,7 +238,7 @@ class TokenIssuerTest {
                 "credential_configuration_id" to listOf("test-credential")
             ),
             session = null,
-            accessTokenContext = CredentialAccessTokenContext(
+            accessTokenContext = ProtectedResourceAccessTokenContext(
                 authorization = AccessTokenAuthorization(
                     scheme = AccessTokenAuthorizationScheme.BEARER,
                     token = token,
@@ -277,7 +277,7 @@ class TokenIssuerTest {
                 "credential_configuration_id" to listOf("test-credential")
             ),
             session = null,
-            accessTokenContext = CredentialAccessTokenContext(
+            accessTokenContext = ProtectedResourceAccessTokenContext(
                 authorization = AccessTokenAuthorization(
                     scheme = AccessTokenAuthorizationScheme.BEARER,
                     token = token,

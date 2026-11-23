@@ -41,6 +41,8 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
 class VPCreateCmd : CliktCommand(name = "create") {
+    private val outputJson = Json { prettyPrint = true }
+
     override fun help(context: Context) = """Create Final OpenID4VP jwt_vc_json presentations selected by DCQL.
 
         Example usage:
@@ -150,7 +152,7 @@ class VPCreateCmd : CliktCommand(name = "create") {
             throw UsageError(cause.message ?: cause::class.simpleName ?: "Could not create presentation")
         }
 
-        vpOutputFilePath.writeText(Json { prettyPrint = true }.encodeToString(output))
+        vpOutputFilePath.writeText(outputJson.encodeToString(output))
         print.greenb("Done.")
         print.plain("VP token saved at file \"${vpOutputFilePath.absolutePathString()}\".")
     }

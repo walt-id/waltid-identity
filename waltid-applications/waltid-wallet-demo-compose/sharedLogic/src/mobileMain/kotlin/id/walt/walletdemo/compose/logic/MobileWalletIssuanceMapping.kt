@@ -79,9 +79,7 @@ fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOutcome =
             deferredCredentials = deferredCredentials.map { it.toDemoDeferredCredential() },
             failedTargetCount = if (failure == null) 0 else 1,
             notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
-            offerConsumed = failure != null || storedCredentialIds.isNotEmpty() || deferredCredentials.isNotEmpty() ||
-                error.code in setOf(WalletIssuanceErrorCode.INVALID_SESSION, WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN,
-                    WalletIssuanceErrorCode.STORAGE_OUTCOME_UNCERTAIN),
+            offerConsumed = !error.canRetryOffer,
             kind = when (error.code) {
                 WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN -> WalletDemoIssuanceFailureKind.RemoteOutcomeUncertain
                 WalletIssuanceErrorCode.STORAGE_OUTCOME_UNCERTAIN -> WalletDemoIssuanceFailureKind.StorageOutcomeUncertain

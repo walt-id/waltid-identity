@@ -97,7 +97,7 @@ internal class ProximitySessionOwner(
                     return MdocConsentDecision.Deny(prompt.bindingToken)
                 }
                 if (submission != null) {
-                    requestProcessor.accept(prompt, review.reviewId, submission)?.let {
+                    requestProcessor.accept(prompt, review.reviewId, submission, prepared.reviewedStatus)?.let {
                         publishLocked(ProximityState.Failed(it))
                         return MdocConsentDecision.Deny(prompt.bindingToken)
                     }
@@ -130,7 +130,7 @@ internal class ProximitySessionOwner(
         }
     }
 
-    suspend fun dispatch(action: ProximityAction): ProximityActionResult {
+    suspend fun dispatch(action: ProximityAction, reviewedStatus: Map<String, String>? = null): ProximityActionResult {
         // This must precede even lock acquisition: the caller can mutate a submitted collection while suspended.
         val owned = try {
             if (action is ProximityAction.Approve) action.copy(submission = action.submission.snapshot()) else action
@@ -176,7 +176,7 @@ internal class ProximitySessionOwner(
                     val processor = requireNotNull(processor)
                     val decision = when (owned) {
                         is ProximityAction.Approve -> {
-                            processor.accept(waiting.prompt, id, owned.submission)?.let {
+                            processor.accept(waiting.prompt, id, owned.submission, reviewedStatus)?.let {
                                 return@withLock ProximityActionResult.Rejected(it)
                             }
                             val authorization = processor.holderAuthorization(id)

@@ -7,9 +7,37 @@ import XCTest
 /// and keep received credentials across app restart.
 @MainActor
 final class PublicDemoBackendE2ETests: XCTestCase {
+    func testCredentialStatusLifecycleWithPublicAndControlledIssuers() async throws {
+        guard ProcessInfo.processInfo.environment["WALLET_STATUS_CONTROL_URL"] != nil else {
+            throw XCTSkip("Run explicitly with the isolated controlled status issuer")
+        }
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        try await runCredentialStatusLifecycle(app, capturePrefix: "compose-ios", openWalletLink: ui.openWalletLink,
+            returnToWallet: ui.returnToWallet, relaunch: {
+                ui.launch(initializeSigningIdentity: false)
+                XCTAssertEqual(ui.waitUntilWalletReady(timeout: self.walletReadyTimeout), "Wallet ready")
+            })
+    }
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
+    }
+
+    func testControlledStatusIssuanceAndRevocation() async throws {
+        guard ProcessInfo.processInfo.environment["WALLET_STATUS_CONTROL_URL"] != nil else {
+            throw XCTSkip("Run explicitly with the isolated controlled status issuer")
+        }
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: isolatedWalletEnvironment())
+        XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
+        try await runControlledStatusIssuanceAndRevocation(app, capturePrefix: "compose-ios", openWalletLink: ui.openWalletLink)
     }
 
 
@@ -41,6 +69,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let ui = WalletE2EUI(app: app)
         let environment = isolatedWalletEnvironment()
         ui.launch(environment: environment)
+        var previousCards = Set<String>()
         for index in 0..<2 {
             if index == 1 {
                 app.terminate()
@@ -56,15 +85,25 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             }
             ui.replaceText(in: input, value: offer.txCode)
             ui.tapButton(identifier: "wallet.offerAcceptButton", fallbackLabel: "Accept")
-            XCTAssertTrue(app.buttons["issuance-done"].waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
-            let saved = app.descendants(matching: .any)
-                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "issuance-saved-")).firstMatch
-            XCTAssertTrue(saved.waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
+            // The untouched receipt can dismiss between separate accessibility queries.
+            let receipt = app.windows.containing(.button, identifier: "issuance-done")
+                .containing(NSPredicate(format: "identifier BEGINSWITH %@", "issuance-saved-")).firstMatch
+            XCTAssertTrue(receipt.waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
             waitForIdleResultDismissal(app)
             let cards = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier BEGINSWITH %@", "wallet.credentialCard."))
             XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 20))
-            XCTAssertEqual(Set(cards.allElementsBoundByIndex.map(\.identifier)).count, index + 1)
+            let currentCards = Set(cards.allElementsBoundByIndex.map(\.identifier))
+            XCTAssertEqual(currentCards.count, index + 1)
+            let added = currentCards.subtracting(previousCards)
+            XCTAssertEqual(added.count, 1, "EUDI issuance must add exactly one stored credential")
+            let card = try XCTUnwrap(added.first)
+            let element = app.descendants(matching: .any).matching(identifier: card).firstMatch
+            XCTAssertTrue(element.isHittable, app.debugDescription)
+            element.tap()
+            await assertEudiStatusRefresh(app, card: card)
+            ui.returnToWallet()
+            previousCards = currentCards
         }
     }
 
@@ -109,8 +148,29 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         completePinOnlySetup(app, ui: ui)
         XCTAssertEqual(ui.waitUntilWalletReady(timeout: walletReadyTimeout), "Wallet ready")
         ui.tapButton(identifier: "wallet.proximityStartButton", fallbackLabel: "Share nearby")
-        XCTAssertTrue(app.descendants(matching: .any)["wallet.proximityScreen"].waitForExistence(timeout: 10))
+        let nearby = app.descendants(matching: .any)["wallet.proximityScreen"]
+        let progress = app.descendants(matching: .any)["wallet.proximityStatus"]
+        let options = app.buttons["proximity-connection-options"]
         let sheet = app.descendants(matching: .any)["wallet.screen.title"]
+        var previousTop: CGFloat?
+        var stableSince = Date()
+        // Capability loading can replace the initial progress content with choices or
+        // prerequisites. Record the compact baseline after that content and resize settle.
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            guard nearby.exists && options.exists && options.isHittable && !progress.exists else {
+                previousTop = nil
+                return false
+            }
+            let top = sheet.frame.minY
+            if let previousTop, abs(top - previousTop) <= 2 {
+                return Date().timeIntervalSince(stableSince) >= 0.5
+            }
+            previousTop = top
+            stableSince = Date()
+            return false
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 10), .completed,
+            "Nearby capability content and compact geometry did not settle")
         let compactTop = sheet.frame.minY
         XCTAssertGreaterThan(compactTop, app.frame.height / 5, "Nearby choices must start compact")
         captureHost("Nearby compact choices")
@@ -119,20 +179,23 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             sheet.frame.minY < compactTop - 40
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed,
+            "Nearby options did not expand from the compact position y=\(compactTop)")
         captureHost("Nearby connection options")
         ui.tapButton(identifier: "wallet.settingsBack", fallbackLabel: "Back")
         XCTAssertTrue(app.descendants(matching: .any)["wallet.proximityScreen"].waitForExistence(timeout: 10))
         let collapsed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             abs(sheet.frame.minY - compactTop) <= 2
         }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [collapsed], timeout: 5), .completed,
+            "Nearby choices did not return to the compact position y=\(compactTop)")
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
         captureHost("Nearby options return")
         ui.tapButton(identifier: "wallet.proximityCancelButton", fallbackLabel: "Close nearby sharing")
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"),
             object: app.descendants(matching: .any)["wallet.proximityScreen"])
-        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 10), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 10), .completed,
+            "Nearby sharing did not close after its Close action")
         assertHome(app)
     }
 
@@ -492,6 +555,11 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertFalse(submitStatus.starts(with: "Receive failed"), "Receive failed during presentation: \(submitStatus)")
         XCTAssertFalse(submitStatus.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(submitStatus)")
 
+        let presentationDone = app.buttons["wallet.presentationDone"]
+        XCTAssertTrue(presentationDone.waitForExistence(timeout: credentialOperationTimeout))
+        // Retain the receipt before remote verification can consume its idle-dismissal window.
+        app.otherElements["wallet.review.content"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
         try await backend.waitForVerifierSuccess(
             sessionID: session.sessionID,
             timeoutSeconds: presentationOperationTimeout
@@ -505,9 +573,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             XCTAssertFalse(presentStatus.starts(with: "Receive failed"), "Receive failed during presentation: \(presentStatus)")
             XCTAssertFalse(presentStatus.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(presentStatus)")
         }
-        XCTAssertTrue(app.buttons["wallet.presentationDone"].waitForExistence(timeout: credentialOperationTimeout))
-        // Touching the blank receipt content keeps it open for explicit completion.
-        app.otherElements["wallet.review.content"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(presentationDone.exists, "The touched sharing result must remain open until Done")
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
         captureHost("Sharing result")
         ui.tapButton(identifier: "wallet.presentationDone", fallbackLabel: "Done")

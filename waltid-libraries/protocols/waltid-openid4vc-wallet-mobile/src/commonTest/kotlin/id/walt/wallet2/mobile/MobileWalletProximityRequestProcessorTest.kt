@@ -116,7 +116,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, ExperimentalUnsignedTypes::class)
 class ProximityRequestProcessorTest {
     @Test
     fun `Appendix holder use-case matrix preserves request consent portrait and offline boundaries`() = runTest {

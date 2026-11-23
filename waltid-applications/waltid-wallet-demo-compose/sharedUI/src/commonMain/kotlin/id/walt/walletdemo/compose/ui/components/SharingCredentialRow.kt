@@ -1,6 +1,7 @@
 package id.walt.walletdemo.compose.ui.components
 
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.*
@@ -14,16 +15,18 @@ internal fun SharingCredentialRow(
     readOnly: Boolean,
     onToggleCredential: (WalletDemoPresentationCredentialSelection) -> Unit,
     hasAlternatives: Boolean = false,
+    showAdditionalInformationHint: Boolean = true,
 ) {
     val option = information.option
     val summary = information.summary
     val extra = information.additionalInformationLabels
+    Column {
     ReviewCredentialChoice(
         selected = option.selection in selectedCredentialOptions,
         multiple = option.multiple || !hasAlternatives,
         enabled = enabled,
         readOnly = readOnly,
-        hint = extra.takeIf { it.isNotEmpty() }?.let {
+        hint = extra.takeIf { showAdditionalInformationHint && it.isNotEmpty() }?.let {
             "Also shares ${it.take(2).joinToString()}" + if (it.size > 2) " and ${it.size - 2} more" else ""
         },
         modifier = Modifier.testTag(WalletUiTestTags.presentationCredentialToggle(option.selection.id)),
@@ -33,5 +36,7 @@ internal fun SharingCredentialRow(
     ) {
         CredentialSummaryRow(summary.toCardArt(), summary.issuer,
             Modifier.testTag(WalletUiTestTags.presentationCredential(option.selection.id)))
+    }
+    CredentialStatusSection(option.credentialId, compact = true)
     }
 }

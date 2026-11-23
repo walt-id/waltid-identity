@@ -24,9 +24,23 @@ Issuer API 2 is the modern walt.id issuer service for OpenID for Verifiable Cred
 
 Use this service for new issuer integrations that need OpenID4VCI 1.0 support. The original `waltid-issuer-api` remains available for draft-based and legacy flows, but is planned for deprecation.
 
+## Production deployment
+
+**Issuer API 2 does not authenticate or authorize management API callers.** The OpenID4VCI token and proof checks, and the external login configured in `authentication-service.conf`, apply to credential exchange. They do not protect `/issuer2/*`.
+
+Apply the [shared deployment controls](../README.md#production-deployment) and complete these issuer-specific steps:
+
+- **Separate management from credential exchange.** Keep `/issuer2/*` on a private ingress behind an authenticated backend or gateway. Authorize offer creation and deferred issuance operations separately from profile reads, session inspection, and event streams. On the wallet-facing HTTPS ingress, allow only the metadata and OpenID4VCI routes and methods needed for your flows. Keep their protocol checks intact. Set `baseUrl` in [`issuer-service.conf`](config/issuer-service.conf) to the wallet-reachable HTTPS URL.
+- **Control what gets issued.** Replace demo profiles, metadata, and sample claims. Use trusted sources for credential claims and check recipient eligibility before creating offers. Allow only approved profiles and runtime overrides, especially for claims and signing keys. For authorization code flows, replace the test identity provider and [require PKCE](#issuer2-pkce-requirement). For pre-authorized flows, deliver short-lived offers securely and send any transaction code through a separate channel.
+- **Replace and protect keys.** Provision your own credential signing keys and any keys or certificates used for token signing, credential encryption, and signed metadata. Store secrets outside source control, limit access, and plan rotation. Use a managed key backend where supported and required by your deployment.
+- **Plan for session continuity.** Sessions and grant state are in memory by default. For flows that must survive a restart or span replicas, enable Redis as described in [Persistence](#persistence) and protect access to it. Use the same securely provisioned token signing key and compatible configuration across replicas. Test in-flight issuance and SSE or webhook delivery across your actual routing and restart behavior.
+- **Own credential status and session data.** If your credentials use status lists, allocate entries, publish the lists, and operate revocation. Restrict webhook destinations to approved receivers and keep the [outbound fetch guard](config/network-fetch-guard.conf) restrictive. Limit retention of issuance data and keep offers, transaction codes, and claims out of routine logs.
+
+Before launch, verify that unauthenticated callers cannot create offers or read sessions, and that an authorized backend can issue a credential to a wallet through the public routes.
+
 ## Features
 
-- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, and credential endpoints
+- **OpenID4VCI 1.0** — Credential offer, authorization, token, nonce, credential, and notification endpoints
 - **Credential profiles** — Configurable issuance profiles in `issuer2-profiles.conf`
 - **Metadata endpoints** — Credential issuer, authorization server, JWT VC issuer, JWKS, and VCT metadata
 - **Grant types** — Pre-authorized code and authorization code flows
@@ -57,7 +71,7 @@ Configuration files live in `config/`:
 | `credential-issuer-metadata.conf` | OpenID4VCI issuer and authorization server metadata |
 | `issuer2-profiles.conf` | Credential profiles exposed by the management API |
 | `persistence.conf` | In-memory or Redis-backed repository configuration |
-| `authentication-service.conf` | Optional external OAuth authentication configuration |
+| `authentication-service.conf` | External OAuth login for credential subjects in authorization code flows |
 
 Set `KEYCLOAK_CLIENT_SECRET` to the Keycloak client secret when using
 external OAuth authentication. The service and Docker Compose configuration files
@@ -67,6 +81,8 @@ deployments read this variable from the `client-secret` key of the
 `issuer2-keycloak` Secret in their namespace.
 
 The default `issuer-service.conf` uses `http://localhost:7005` as `baseUrl`. Update this value when deploying behind a public host or reverse proxy so generated metadata and credential offers contain externally reachable URLs.
+
+Issuer metadata always advertises `notification_endpoint`, and successful credential responses that contain credentials include `notification_id`. `POST /openid4vci/notification` accepts `credential_accepted`, `credential_failure`, and `credential_deleted` with the same access token. The session stores a notification ID and the latest wallet event for each issued credential.
 
 `ciTokenStoredKey` optionally carries an encoded crypto2 `StoredKey` sidecar for `ciTokenKey` and takes precedence at startup. The service validates that both values identify the same signing and verification key. If the sidecar is absent, a legacy JWK is migrated only in memory; the configuration file is never rewritten. A malformed or mismatched sidecar fails startup without falling back to `ciTokenKey`.
 
@@ -319,6 +335,7 @@ the first item's credential references index 94567 and the second item's credent
 | `POST` | `/openid4vci/token` | Token endpoint |
 | `POST` | `/openid4vci/nonce` | Nonce endpoint |
 | `POST` | `/openid4vci/credential` | Credential endpoint |
+| `POST` | `/openid4vci/notification` | Wallet notification endpoint |
 
 ## Issuance Lifecycle Events
 
@@ -339,6 +356,9 @@ Issuer sessions publish the same `KtorSessionUpdate` envelope to SSE and to an o
 | W3C VC credential request | `credential_request_w3c_vc_succeeded`, `credential_request_w3c_vc_failed` |
 | mdoc credential request | `credential_request_mso_mdoc_succeeded`, `credential_request_mso_mdoc_failed` |
 | Session lifecycle | `issuance_status_changed` |
+| Wallet result | `wallet_credential_accepted`, `wallet_credential_failure`, `wallet_credential_deleted` |
+
+A wallet notification is published on the offer webhook and the issuer SSE stream only when the stored event or description changes. It does not change the issuance status. `credential_request_*_succeeded` still means the issuer issued the credential.
 
 Kotlin enum constants are `SCREAMING_SNAKE_CASE`; webhook and SSE payloads use the lowercase `value` strings above.
 
@@ -461,7 +481,7 @@ The default persistence configuration is in-memory:
 type = "memory"
 ```
 
-Redis-backed repositories can be enabled in `persistence.conf`:
+To use Redis-backed repositories, enable `persistence` in [`_features.conf`](config/_features.conf) and set the backend in [`persistence.conf`](config/persistence.conf):
 
 ```hocon
 type = "redis"
