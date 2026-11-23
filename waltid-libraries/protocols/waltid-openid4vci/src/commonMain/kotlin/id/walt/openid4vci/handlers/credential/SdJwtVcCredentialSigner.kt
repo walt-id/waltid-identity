@@ -10,7 +10,6 @@ import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.exportPublicJwkObject
-import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.proofs.invalidCredentialProof
@@ -21,7 +20,6 @@ import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
-import id.walt.w3c.issuance.Issuer.getKidHeader
 import id.walt.w3c.issuance.Issuer.kidForIssuer
 import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
 import id.walt.credentials.issuance.IssuanceHolderKey
@@ -160,7 +158,7 @@ object SdJwtVcCredentialSigner {
         )
 
         val issuerKid = when (issuerSigningKey) {
-            is IssuerSigningKey.Legacy -> getKidHeader(issuerSigningKey.key, issuerId.takeIf(DidUtils::isDidUrl))
+            is IssuerSigningKey.Legacy -> kidForIssuer(issuerSigningKey.key, issuerId)
             is IssuerSigningKey.Crypto2 -> kidForIssuer(issuerSigningKey.key, issuerId)
         }
         val headers = mapOf(

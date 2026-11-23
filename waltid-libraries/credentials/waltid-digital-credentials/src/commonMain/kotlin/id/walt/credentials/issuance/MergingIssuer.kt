@@ -5,7 +5,6 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.did.dids.DidUtils
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.JwtClaims
 import id.walt.w3c.VcClaims
@@ -76,11 +75,10 @@ object MergingIssuer {
         completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
         context = context
     ).run {
-        val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signJws(
             issuerKey = issuerKey,
             issuerId = issuerId,
-            issuerKid = Issuer.getKidHeader(issuerKey, issuerDid),
+            issuerKid = Issuer.kidForIssuer(issuerKey, issuerId),
             subjectDid = subjectDid,
             additionalJwtHeader = additionalJwtHeader,
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
@@ -147,11 +145,10 @@ object MergingIssuer {
         completeJwtWithDefaultCredentialData,
         context = context
     ).run {
-        val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signSdJwt(
             issuerKey = issuerKey,
             issuerId = issuerId,
-            issuerKid = Issuer.getKidHeader(issuerKey, issuerDid),
+            issuerKid = Issuer.kidForIssuer(issuerKey, issuerId),
             subjectDid = subjectDid,
             disclosureMap = disclosureMap,
             additionalJwtHeaders = additionalJwtHeaders.toMutableMap().apply {
