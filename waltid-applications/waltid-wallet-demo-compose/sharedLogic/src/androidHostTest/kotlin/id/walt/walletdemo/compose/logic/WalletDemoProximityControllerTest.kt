@@ -1024,9 +1024,14 @@ class WalletDemoProximityControllerTest {
         val controller = controller(FakeBackend(session))
         startExchange(controller)
         advanceUntilIdle()
-        session.mutableState.value = ProximityState.NoData(2)
+        val summary = id.walt.wallet2.mobile.ProximityUnsatisfiedRequest(listOf(
+            id.walt.wallet2.mobile.ProximityUnsatisfiedDocument(0, "org.example.photoid", listOf(
+                id.walt.wallet2.mobile.ProximityRequestedElement("org.example.identity", "portrait", true),
+            )),
+        ))
+        session.mutableState.value = ProximityState.NoData(2, summary)
         advanceUntilIdle()
-        assertEquals(ProximityState.NoData(2), controller.state.value.sessionState)
+        assertEquals(ProximityState.NoData(2, summary), controller.state.value.sessionState)
         assertTrue(controller.state.value.isTerminal)
         controller.dismiss()
         advanceUntilIdle()

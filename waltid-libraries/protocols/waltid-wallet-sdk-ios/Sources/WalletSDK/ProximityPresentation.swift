@@ -1229,6 +1229,43 @@ public struct ProximityRequestedElement: Sendable, Equatable {
     public let satisfiesRequestedElements: [ProximityElementReference]
 }
 
+/// Original request context when the final request cannot be satisfied overall.
+/// No credential values are included and reader authentication has not been evaluated.
+public struct ProximityUnsatisfiedRequest: Sendable, Equatable {
+    /// All requested documents in original order, including repeated document types.
+    public let documents: [ProximityUnsatisfiedDocument]
+
+    /// Creates a request summary without retaining credential or cryptographic data.
+    /// - Parameter documents: Nonempty list of original requested documents.
+    public init(documents: [ProximityUnsatisfiedDocument]) throws {
+        try requireProximityInput(!documents.isEmpty)
+        self.documents = documents
+    }
+}
+
+/// One original requested document; its presence does not mean it individually had no match.
+public struct ProximityUnsatisfiedDocument: Sendable, Equatable {
+    /// Original zero-based document request index.
+    public let requestIndex: Int
+    /// Requested mdoc document type.
+    public let documentType: String
+    /// Original requested fields and reader-declared retention intent.
+    public let requestedElements: [ProximityRequestedElement]
+
+    /// Creates one document's request context.
+    /// - Parameters:
+    ///   - requestIndex: Original nonnegative document index.
+    ///   - documentType: Nonblank document type, unchanged from the request.
+    ///   - requestedElements: Nonempty list of original requested fields, without disclosure alternatives.
+    public init(requestIndex: Int, documentType: String, requestedElements: [ProximityRequestedElement]) throws {
+        try requireProximityInput(requestIndex >= 0 && isProximityNonBlank(documentType))
+        try requireProximityInput(!requestedElements.isEmpty && requestedElements.allSatisfy { $0.satisfiesRequestedElements.isEmpty })
+        self.requestIndex = requestIndex
+        self.documentType = documentType
+        self.requestedElements = requestedElements
+    }
+}
+
 /// One holder credential that can satisfy a document request.
 public struct ProximityCredentialOption: Sendable, Equatable, Identifiable {
     /// Stable identity equal to ``credentialID``.
@@ -1487,8 +1524,9 @@ public enum ProximityState: Sendable, Equatable {
     case terminating(exchange: Int)
     /// The session completed normally.
     case completed(exchanges: Int, declined: Bool, receipt: ProximitySharingReceipt? = nil)
-    /// The final request ended without credential data; earlier exchanges may have shared data.
-    case noData(exchange: Int)
+    /// Matching could not satisfy the final request; its original requested information is always included.
+    /// No credential data was shared for this request. Earlier exchanges may already have shared data.
+    case noData(exchange: Int, unsatisfiedRequest: ProximityUnsatisfiedRequest)
     /// The host cancelled the session.
     case cancelled
     /// The session failed with a display-safe typed error.

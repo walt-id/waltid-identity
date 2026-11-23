@@ -501,9 +501,10 @@ class ProximityRequestProcessorTest {
             )
 
             val failure = assertFailsWith<ProximityException> {
-                processor.preview(requestContext(fixture.readerEphemeralKey))
+                processor.prepare(requestContext(fixture.readerEphemeralKey))
             }
 
+            assertNull(processor.takeUnsatisfiedRequest(1))
             assertEquals("holder_key_unavailable", failure.error.code)
         }
     }
@@ -802,13 +803,15 @@ class ProximityRequestProcessorTest {
     fun `no-data terminal state rejects late observations and holder actions`() = runTest {
         withFixture { fixture ->
             val owner = owner(fixture, processor(fixture))
+            val summary = ProximityUnsatisfiedRequest(listOf(ProximityUnsatisfiedDocument(0, "org.example.photoid",
+            listOf(ProximityRequestedElement("org.example.identity", "portrait", true)))))
             owner.publish(ProximityState.AwaitingRequest(2))
-            owner.publish(ProximityState.NoData(1))
+            owner.publish(ProximityState.NoData(1, summary))
             assertIs<ProximityState.AwaitingRequest>(owner.state.value)
-            owner.publish(ProximityState.NoData(2))
+            owner.publish(ProximityState.NoData(2, summary))
             owner.publish(ProximityState.Completed(2, false))
             owner.publish(ProximityState.AwaitingRequest(3))
-            assertEquals(ProximityState.NoData(2), owner.state.value)
+            assertEquals(ProximityState.NoData(2, summary), owner.state.value)
             assertIs<ProximityActionResult.Rejected>(owner.dispatch(ProximityAction.Cancel))
         }
     }
@@ -1107,7 +1110,106 @@ class ProximityRequestProcessorTest {
                 assertEquals(0, result.consentCalls, id)
                 assertEquals(0u, result.response.status, id)
                 assertEquals(null, result.response.documents, id)
+                val document = assertNotNull(result.unsatisfiedRequest, id).documents.single()
+                assertEquals(0, document.requestIndex, id)
+                assertEquals(if (id.endsWith("07")) "unknown.document" else "org.iso.18013.5.1.mDL", document.docType, id)
+                assertEquals(listOf(ProximityRequestedElement(
+                    if (id.endsWith("07")) "org.iso.18013.5.1" else "unknown.namespace", "given_name", false,
+                )), document.requestedElements, id)
             }
+        }
+    }
+
+    @Test
+    fun `unsatisfied context preserves repeated document types namespaces and retention without evaluating trust`() = runTest {
+        withFixture { fixture ->
+            val processor = processor(fixture, ProximityConfiguration(
+                readerTrustEvaluator = ProximityReaderTrustEvaluator { error("No-match must not evaluate trust") },
+            ))
+            // This signature covers a different request. No-match must not start authentication/trust work.
+            val authentication = signedWholeRequestContext(fixture).request.value.readerAuthAll
+            val request = DeviceRequest(version = DeviceRequest.VERSION_WITH_SIGNING, docRequests = listOf(
+                DocRequest.fromValues("missing.document", linkedMapOf("first.namespace" to listOf("名", "age")), intentToRetain = true),
+                DocRequest.fromValues("missing.document", linkedMapOf("second.namespace" to listOf("portrait"), "third.namespace" to listOf("address")), intentToRetain = false),
+            ), readerAuthAll = authentication)
+            assertEquals(id.walt.mdoc.proximity.MdocRequestPreparation.NoData,
+                processor.prepare(requestContext(request, transcript(), fixture.readerEphemeralKey, exchange = 2)))
+            assertNull(processor.takeUnsatisfiedRequest(1))
+            val summary = assertNotNull(processor.takeUnsatisfiedRequest(2))
+            assertEquals(listOf(0, 1), summary.documents.map { it.requestIndex })
+            assertEquals(listOf("missing.document", "missing.document"), summary.documents.map { it.docType })
+            assertEquals(listOf(
+                ProximityRequestedElement("first.namespace", "名", true),
+                ProximityRequestedElement("first.namespace", "age", true),
+            ), summary.documents[0].requestedElements)
+            assertEquals(listOf(
+                ProximityRequestedElement("second.namespace", "portrait", false),
+                ProximityRequestedElement("third.namespace", "address", false),
+            ), summary.documents[1].requestedElements)
+            assertNull(processor.takeUnsatisfiedRequest(2))
+            processor.cancel()
+            assertEquals(2, summary.documents.size) // Terminal consumers retain the owned summary after cleanup.
+        }
+    }
+
+    @Test
+    fun `mandatory no match retains individually satisfiable documents and survives terminal cleanup`() = runTest {
+        withFixture { fixture ->
+            val processor = processor(fixture)
+            val request = DeviceRequest(version = DeviceRequest.VERSION_WITH_SIGNING,
+                docRequests = requestWithNames("given_name", "family_name").docRequests + DocRequest.fromValues("missing.document", mapOf("namespace" to listOf("name"))),
+                deviceRequestInfo = ByteStringWrapper(DeviceRequestInfo(useCases = listOf(UseCase(
+                    mandatory = true, documentSets = listOf(listOf(0u, 1u)),
+                )))))
+            val context = requestContext(request, transcript(), fixture.readerEphemeralKey, exchange = 2)
+            assertEquals(id.walt.mdoc.proximity.MdocRequestPreparation.NoData, processor.prepare(context))
+            val owner = owner(fixture, processor)
+            val summary = assertNotNull(processor.takeUnsatisfiedRequest(2))
+            owner.publish(ProximityState.NoData(2, summary))
+            assertNull(processor.takeUnsatisfiedRequest(2))
+            val terminal = assertIs<ProximityState.NoData>(owner.state.value)
+            assertEquals(2, terminal.exchange)
+            assertEquals(listOf("org.iso.18013.5.1.mDL", "missing.document"),
+                terminal.unsatisfiedRequest.documents.map { it.docType })
+            assertTrue(terminal.legalActions.isEmpty())
+            owner.cancel()
+            assertIs<ProximityState.NoData>(owner.state.value)
+        }
+    }
+
+    @Test
+    fun `new requests and cancellation clear unmatched request context`() = runTest {
+        withFixture { fixture ->
+            val unmatched = requestContext(DeviceRequest("missing.document", mapOf("namespace" to listOf("name"))),
+                transcript(), fixture.readerEphemeralKey)
+            val processor = processor(fixture)
+            processor.prepare(unmatched)
+            assertIs<id.walt.mdoc.proximity.MdocRequestPreparation.Review>(processor.prepare(requestContext(fixture.readerEphemeralKey)))
+            assertNull(processor.takeUnsatisfiedRequest(1))
+            processor.cancel()
+            val cancelled = processor(fixture)
+            cancelled.prepare(unmatched)
+            cancelled.cancel()
+            assertNull(cancelled.takeUnsatisfiedRequest(1))
+        }
+    }
+
+    @Test
+    fun `unmatched second request terminates without erasing the first approved encrypted response`() = runTest {
+        withFixture { fixture ->
+            val second = DeviceRequest("org.example.photoid", mapOf("org.example.identity" to listOf("portrait")), intentToRetain = true)
+            val result = wireExchange(fixture, requestWithNames("given_name", "family_name"), followupRequest = second)
+            assertEquals(2, assertIs<MdocHolderSessionResult.NoData>(result.result).exchange)
+            assertEquals(1, result.consentCalls)
+            val first = result.priorResponses.single()
+            assertEquals(0u, first.status)
+            val returned = first.documents!!.single().issuerSigned.namespaces!!.getValue("org.iso.18013.5.1").entries
+            assertEquals(setOf("given_name", "family_name"), returned.map { it.value.elementIdentifier }.toSet())
+            assertEquals(0u, result.response.status)
+            assertNull(result.response.documents)
+            val document = assertNotNull(result.unsatisfiedRequest).documents.single()
+            assertEquals("org.example.photoid", document.docType)
+            assertEquals(listOf(ProximityRequestedElement("org.example.identity", "portrait", true)), document.requestedElements)
         }
     }
 
@@ -1583,13 +1685,20 @@ class ProximityRequestProcessorTest {
         return request.copy(docRequests = listOf(doc.copy(readerAuth = auth)))
     }
 
-    private data class WireOutcome(val result: MdocHolderSessionResult, val response: DeviceResponse, val consentCalls: Int)
+    private data class WireOutcome(
+        val result: MdocHolderSessionResult,
+        val response: DeviceResponse,
+        val consentCalls: Int,
+        val unsatisfiedRequest: ProximityUnsatisfiedRequest?,
+        val priorResponses: List<DeviceResponse> = emptyList(),
+    )
 
     private suspend fun wireExchange(
         fixture: Fixture,
         request: DeviceRequest,
         configuration: ProximityConfiguration = ProximityConfiguration(),
         denyFamilyName: Boolean = false,
+        followupRequest: DeviceRequest? = null,
         authenticate: suspend (DeviceRequest, SessionTranscript) -> DeviceRequest = { value, _ -> value },
     ): WireOutcome = withContext(Dispatchers.Default) {
         // Ktor and platform crypto use real dispatchers; virtual time must not expire their session.
@@ -1615,7 +1724,7 @@ class ProximityRequestProcessorTest {
                 consentCalls++
                 val review = processor.review(prompt)
                 val option = review.documents.single().credentialOptions.first()
-                val all = submissionFor(review, option)
+                val all = submissionFor(review, option).copy(continueAfterResponse = followupRequest != null)
                 val submission = if (!denyFamilyName) all else all.copy(documents = all.documents.map { document ->
                     document.copy(disclosedElements = document.disclosedElements.filterNot { it.elementIdentifier == "family_name" }.toSet())
                 })
@@ -1626,12 +1735,20 @@ class ProximityRequestProcessorTest {
             loopback.reader.send(ByteString(coseCompliantCbor.encodeToByteArray(SessionEstablishment(
                 ByteStringWrapper(readerPublic, readerBytes), cipher.encrypt(coseCompliantCbor.encodeToByteArray(authenticate(request, transcript))),
             ))))
+            followupRequest?.let { next ->
+                loopback.reader.send(ByteString(coseCompliantCbor.encodeToByteArray(SessionData(
+                    data = cipher.encrypt(coseCompliantCbor.encodeToByteArray(next)),
+                ))))
+            }
             val result = engine.run()
             val messages = mutableListOf<SessionData>()
             while (true) messages += coseCompliantCbor.decodeFromByteArray<SessionData>((loopback.reader.receive() ?: break).toByteArray())
             assertEquals(20u, messages.lastOrNull()?.status, "Session result: $result")
-            val encrypted = messages.mapNotNull { it.data }.single()
-            WireOutcome(result, coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(encrypted)), consentCalls)
+            val responses = messages.mapNotNull { it.data }.map {
+                coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(it))
+            }
+            WireOutcome(result, responses.last(), consentCalls,
+                (result as? MdocHolderSessionResult.NoData)?.let { processor.takeUnsatisfiedRequest(it.exchange) }, responses.dropLast(1))
         } finally {
             cipher.close()
             processor.cancel()

@@ -75,6 +75,27 @@ final class KMPProximitySessionBridgeTests: XCTestCase {
 #endif
 
 final class KMPProximityProjectionTests: XCTestCase {
+    func testUnsatisfiedRequestProjectionPreservesDocumentIndicesNamespacesAndRetention() throws {
+        let summary = WalletCore.ProximityUnsatisfiedRequest(documents: [
+            WalletCore.ProximityUnsatisfiedDocument(requestIndex: 0, docType: "photo.id", requestedElements: [
+                WalletCore.ProximityRequestedElement(namespace: "first.namespace", elementIdentifier: "portrait", intentToRetain: true, satisfiesRequestedElements: []),
+            ]),
+            WalletCore.ProximityUnsatisfiedDocument(requestIndex: 1, docType: "photo.id", requestedElements: [
+                WalletCore.ProximityRequestedElement(namespace: "second.namespace", elementIdentifier: "名", intentToRetain: false, satisfiesRequestedElements: []),
+            ]),
+        ])
+        let state = try WalletCore.ProximityStateNoData(exchange: 2, unsatisfiedRequest: summary).toSwiftState()
+        guard case let .noData(exchange, request) = state else { return XCTFail("Missing no-data state") }
+        XCTAssertEqual(exchange, 2)
+        XCTAssertTrue(state.legalActions.isEmpty)
+        let projected = request
+        XCTAssertEqual(projected.documents.map(\.requestIndex), [0, 1])
+        XCTAssertEqual(projected.documents.map(\.documentType), ["photo.id", "photo.id"])
+        XCTAssertEqual(projected.documents.flatMap { $0.requestedElements.map(\.namespace) }, ["first.namespace", "second.namespace"])
+        XCTAssertEqual(projected.documents.flatMap { $0.requestedElements.map(\.elementIdentifier) }, ["portrait", "名"])
+        XCTAssertEqual(projected.documents.flatMap { $0.requestedElements.map(\.intentToRetain) }, [true, false])
+    }
+
     func testReaderCAImportUsesSuppliedDateForValidity() async throws {
         // Public WAL-1349 test CA, valid from 2026-09-01 to 2036-08-29.
         let certificate = try XCTUnwrap(Data(base64Encoded: Self.readerCaDerBase64))
