@@ -29,6 +29,24 @@ final class WalletAPITests: XCTestCase {
         } catch let error as WalletError { XCTAssertEqual(error, .invalidInput("Stale review")) }
     }
 
+    func testStatusFacadeForwardsSelectionAndCloseAndPreservesStreamFailures() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        _ = try await wallet.refreshCredentialStatuses(ids: ["identity"], force: true)
+        XCTAssertEqual(bridge.statusRefreshIDs, ["identity"])
+        XCTAssertEqual(bridge.statusRefreshForce, true)
+        bridge.statusUpdates = AsyncThrowingStream { $0.finish(throwing: WalletError.credentialStatusReviewChanged) }
+        var updates = await wallet.credentialStatuses.makeAsyncIterator()
+        do {
+            _ = try await updates.next()
+            XCTFail("A bridge failure must not become an empty clear snapshot")
+        } catch let error as WalletError {
+            XCTAssertEqual(error, .credentialStatusReviewChanged)
+        }
+        try await wallet.close()
+        XCTAssertEqual(bridge.statusCloseCalls, 1)
+    }
+
     func testTypedPaymentFailuresRemainActionableThroughFacade() async throws {
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
@@ -979,6 +997,23 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(String(describing: handle), "PresentationPreviewHandle(<redacted>)")
     }
 
+    func testRejectIssuedCredentialForwardsNotificationTarget() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        let issuer = URL(string: "https://issuer.example")!
+
+        try await wallet.rejectIssuedCredential(
+            notificationID: "notification-id",
+            accessToken: "access-token",
+            credentialIssuerBaseURL: issuer
+        )
+
+        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.count, 1)
+        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.first?.notificationID, "notification-id")
+        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.first?.accessToken, "access-token")
+        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.first?.credentialIssuerBaseURL, issuer)
+    }
+
     func testDigitalCredentialCapabilitiesReflectBridgeRuntimeSupport() async {
         let bridge = FakeWalletCoreBridge()
         bridge.digitalCredentialCapabilitiesResult = .init(
@@ -1255,6 +1290,14 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         let errorDescription: String?
     }
 
+    struct RejectIssuedCredentialCall {
+        let notificationID: String
+        let accessToken: String
+        let credentialIssuerBaseURL: URL?
+        let notificationEndpoint: URL?
+        let eventDescription: String?
+    }
+
     struct AnnexCPreviewCall {
         let parsedRequest: AnnexCParsedRequest
         let verifiedOrigin: String
@@ -1268,6 +1311,19 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         let encryptionInfoBase64URL: String
         let selectedCredentialOptions: [PresentationCredentialSelection]
     }
+
+    var statusUpdates: AsyncThrowingStream<CredentialStatusSnapshot, Error> = AsyncThrowingStream { $0.finish() }
+    var credentialStatuses: AsyncThrowingStream<CredentialStatusSnapshot, Error> { statusUpdates }
+    var statusRefreshIDs: [String]?
+    var statusRefreshForce = false
+    var statusCloseCalls = 0
+    func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot {
+        CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [], refreshingCredentialIDs: [])
+    }
+    func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] {
+        statusRefreshIDs = ids; statusRefreshForce = force; return []
+    }
+    func close() async throws { statusCloseCalls += 1 }
 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
@@ -1331,6 +1387,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var preAuthorizedIssuanceCalls: [(String, String?)] = []
     private(set) var authorizationIssuanceCalls: [(String, URL)] = []
     private(set) var cancelledIssuanceSessionIDs: [String] = []
+    private(set) var rejectedIssuedCredentialCalls: [RejectIssuedCredentialCall] = []
     private(set) var resumedDeferredCredentialIDs: [String] = []
     private(set) var credentialsCallCount = 0
     private(set) var deleteLocalDataCallCount = 0
@@ -1426,6 +1483,25 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         if let error { throw error }
         cancelledIssuanceSessionIDs.append(sessionID)
         return issuanceOutcomeResult
+    }
+
+    func rejectIssuedCredential(
+        notificationID: String,
+        accessToken: String,
+        credentialIssuerBaseURL: URL?,
+        notificationEndpoint: URL?,
+        eventDescription: String?
+    ) async throws {
+        if let error { throw error }
+        rejectedIssuedCredentialCalls.append(
+            RejectIssuedCredentialCall(
+                notificationID: notificationID,
+                accessToken: accessToken,
+                credentialIssuerBaseURL: credentialIssuerBaseURL,
+                notificationEndpoint: notificationEndpoint,
+                eventDescription: eventDescription
+            )
+        )
     }
 
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
@@ -1605,6 +1681,9 @@ private final class FakeProximityPresentationSessionBridge: ProximitySessionBrid
 
     func presentNfc() async { presentNfcCalls += 1 }
 
+    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult {
+        throw WalletError.internalFailure("Fixture does not support reviewed approval")
+    }
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult {
         dispatches.append(action)
         return .accepted
@@ -1636,6 +1715,9 @@ private struct TerminalProximityStreamBridge: ProximitySessionBridge {
         states = pair.stream
         continuation = pair.continuation
     }
+    func dispatchStatusReviewed(_ action: ProximityAction, reviewedStatus: [String: String]) async throws -> ProximityActionResult {
+        throw WalletError.internalFailure("Fixture does not support reviewed approval")
+    }
     func dispatch(_ action: ProximityAction) async throws -> ProximityActionResult { .accepted }
     func close() async { continuation.finish() }
     func presentNfc() async {}
@@ -1643,6 +1725,9 @@ private struct TerminalProximityStreamBridge: ProximitySessionBridge {
 
 private struct DisplayOnlySharingPlanBridge: ProximitySharingPlanBridge {
     var isExpired: Bool { false }
+    func approveStatusReviewed(_ submission: ProximitySubmission, reviewedStatus: [String: String]) throws -> ProximityPreparationResult {
+        throw WalletError.internalFailure("Display fixture does not support reviewed approval")
+    }
     func approve(_ submission: ProximitySubmission) throws -> ProximityPreparationResult {
         .rejected(.init(category: .policy, code: "display_fixture", message: "Display fixture only", recovery: .none))
     }
