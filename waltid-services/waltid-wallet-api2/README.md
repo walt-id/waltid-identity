@@ -25,7 +25,7 @@
 **Key differences from waltid-wallet-api (v1):**
 - Built on the new `waltid-openid4vc-wallet` library (multiplatform core).
 - Clean separation: all route logic lives in `waltid-openid4vc-wallet-server`, and is similar to Enterprise to allow for easy later upgrading.
-- Pluggable stores: the standalone sample enables SQLite via `wallet2-persistence`; PostgreSQL is also supported. Wallet data is in memory when the feature is disabled.
+- Pluggable stores: the standalone sample enables SQLite via `wallet2-persistence` and Docker Compose uses PostgreSQL. Wallet and account data are in memory when persistence is disabled.
 - Auth is opt-in: enable the `auth` feature for account registration, JWT-based login, and wallet ownership enforcement.
 
 ---
@@ -39,13 +39,14 @@ Wallet API v2 ships with email/password authentication, JWT sessions, and wallet
 
 Apply the [shared deployment controls](../README.md#production-deployment) and complete these wallet-specific steps:
 
-- **Persist accounts as well as wallet data.** The built-in account store is in memory, even when wallet persistence is enabled. A restart can leave wallets on disk while their owners can no longer sign in. Before using built-in login with real users, integrate a durable account store that preserves the account IDs used for wallet ownership. Use shared account state across replicas and test login and wallet access after a restart.
 - **Protect wallet data and keys.** Keep `wallet2-persistence` enabled. Use a durable volume for SQLite on a single node, or a protected PostgreSQL database for multiple replicas. Encrypt storage and backups, restrict database access, and test restores of keys, credentials, DIDs, and ownership links together with accounts. Software private keys can be stored in the wallet database. If non-exportable keys are required, integrate a compatible managed key backend for wallet keys; the JWT signing configuration is separate.
 - **Control signup and sensitive operations.** Decide whether to expose `/auth/register`. Apply rate limits and abuse protection to registration, login, and costly wallet operations. Provide account recovery and deletion procedures. If you use your own authentication layer, enforce wallet ownership there and keep global named-store routes private.
 - **Configure trust and outbound access.** Set `publicBaseUrl` in [`wallet-service.conf`](config/wallet-service.conf) to the deployed HTTPS URL. In `clientIdTrust`, configure the verifier trust anchors or registered clients your ecosystem uses and remove demo trust material. The wallet follows URLs in offers and presentation requests, so keep the [outbound fetch guard](config/network-fetch-guard.conf) restrictive. Review the origins and redirects used by your wallet frontend.
 - **Protect holders' data.** Have your frontend show what will be shared and get the holder's approval before sending a presentation. Keep credentials, private key material, and login tokens out of logs and traces. Define how to export or delete wallet data and how long backups retain it.
 
 Before launch, test account isolation and a complete receive-and-present flow, including access to the same wallet and credentials after a restart or restore.
+
+With `auth` and `wallet2-persistence` enabled, Wallet2 stores account IDs, email identifiers, and password hashes in the same database as wallet ownership. Startup adds the account tables to an existing database and preserves its wallet ownership records. Older versions held accounts only in memory, so upgrading cannot recover their credentials or account IDs from an email address. Registering that email creates a new account with its own wallets.
 
 ## Features
 

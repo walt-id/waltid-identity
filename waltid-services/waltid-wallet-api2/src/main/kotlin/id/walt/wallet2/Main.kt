@@ -42,12 +42,7 @@ suspend fun main(args: Array<String>) {
             init = {
                 applyNetworkFetchGuardConfig()
                 DidService.minimalInit()
-                // If persistence is enabled, swap in the Exposed-backed wallet store
-                if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.persistenceFeature)) {
-                    val config = ConfigManager.getConfig<Wallet2PersistenceConfig>()
-                    val db = initWallet2Database(config)
-                    OSSWallet2Service.configurePersistence(db)
-                }
+                configureWallet2Storage()
             },
             run = WebService {
                 val authConfig = if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
@@ -57,6 +52,15 @@ suspend fun main(args: Array<String>) {
             }.run()
         )
     ).main(args)
+}
+
+internal fun configureWallet2Storage() {
+    if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.persistenceFeature)) {
+        val config = ConfigManager.getConfig<Wallet2PersistenceConfig>()
+        OSSWallet2Service.configurePersistence(initWallet2Database(config))
+    } else {
+        OSSWallet2Service.configureInMemory()
+    }
 }
 
 /**

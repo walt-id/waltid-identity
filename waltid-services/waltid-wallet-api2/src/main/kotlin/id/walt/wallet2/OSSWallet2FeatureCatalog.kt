@@ -19,12 +19,12 @@ object OSSWallet2FeatureCatalog : ServiceFeatureCatalog {
     val devModeFeature = OptionalFeature("dev-mode", "Development mode", DevModeConfig::class, default = false)
 
     /**
-     * When enabled, wallet data is persisted to a SQL database (SQLite by default, Postgres optional).
+     * When enabled, wallet and auth account data are persisted to SQL (SQLite by default, Postgres optional).
      * Configure via the `wallet2-persistence` HOCON block.
      * When disabled (default), an in-memory store is used - data is lost on restart.
      */
     val persistenceFeature =
-        OptionalFeature("wallet2-persistence", "SQL persistence for wallets, credentials, keys and DIDs", Wallet2PersistenceConfig::class, default = false)
+        OptionalFeature("wallet2-persistence", "SQL persistence for wallets, credentials, keys, DIDs and auth accounts", Wallet2PersistenceConfig::class, default = false)
 
     val transactionDataProfilesFeature = OptionalFeature(
         name = "transaction-data-profiles",

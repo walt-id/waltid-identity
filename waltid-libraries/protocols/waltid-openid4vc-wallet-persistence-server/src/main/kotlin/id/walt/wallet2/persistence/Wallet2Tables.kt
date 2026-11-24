@@ -1,5 +1,6 @@
 package id.walt.wallet2.persistence
 
+import org.jetbrains.exposed.v1.core.ReferenceOption
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.javatime.timestamp
 
@@ -123,11 +124,32 @@ object Wallet2Tables {
         override val primaryKey = PrimaryKey(storeId, did)
     }
 
-    /** Account ↔ wallet ownership mapping (used when auth is enabled). */
+    /** Account ↔ wallet ownership. Existing account IDs can predate the auth tables. */
     object AccountWallets : Table("wallet2_account_wallets") {
         val accountId = varchar("account_id", 256)
         val walletId = reference("wallet_id", Wallets.id)
         override val primaryKey = PrimaryKey(accountId, walletId)
+    }
+
+    /** Account IDs and the identities that can authenticate as them. */
+    object AuthIdentifiers : Table("wallet2_auth_identifiers") {
+        val identifier = text("identifier")
+        val accountId = varchar("account_id", 256).index()
+        override val primaryKey = PrimaryKey(identifier)
+    }
+
+    object IdentifierAuthData : Table("wallet2_identifier_auth_data") {
+        val identifier = reference("identifier", AuthIdentifiers.identifier, onDelete = ReferenceOption.CASCADE)
+        val method = varchar("method", 128)
+        val data = text("data")
+        override val primaryKey = PrimaryKey(identifier, method)
+    }
+
+    object AccountAuthData : Table("wallet2_account_auth_data") {
+        val accountId = varchar("account_id", 256)
+        val method = varchar("method", 128)
+        val data = text("data")
+        override val primaryKey = PrimaryKey(accountId, method)
     }
 
     /** Private, wallet-scoped issuance continuations; not a user-addressable named store. */
@@ -147,6 +169,6 @@ object Wallet2Tables {
         KeyStores, CredentialStores, DidStores,
         WalletKeyStores, WalletCredentialStores, WalletDidStores,
         Keys, Credentials, Dids,
-        AccountWallets, IssuanceSessions
+        AccountWallets, AuthIdentifiers, IdentifierAuthData, AccountAuthData, IssuanceSessions
     )
 }
