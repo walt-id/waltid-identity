@@ -188,6 +188,7 @@ class ItbCaseRunner(
                 is ItbWalletRejection -> error.code
                 is ItbVerifierRejection -> error.code
                 is ItbPortalStepTimeout -> error.step.name.lowercase()
+                is ItbPortalDefinitionFailure -> "test_definition_http_${error.status}"
                 is ItbPortalInputError -> error.reason.name.lowercase()
                 is ItbRestClient.HttpFailure -> "itb_${error.operation}_${error.statusCode}"
                 is ItbRestClient.TransportFailure -> "itb_${error.operation}_transport"

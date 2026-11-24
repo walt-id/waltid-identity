@@ -100,8 +100,10 @@ and portal steps, it retries a transient status or report read up to twice
 within the case timeout. Cleanup stops
 only that owned session. A stopped ITB session can
 have `UNDEFINED` rather than `FAILURE`; the separate wallet outcome is preserved.
-Reports contain identities, timestamps and error types/codes, not credentials,
-raw protocol messages, browser state or ITB service logs.
+Reports contain identities, timestamps and error types/codes. A stalled test
+definition read appears as `test_definition`. A failed HTTP response for that
+read appears as `test_definition_http_<status>`. The report excludes response
+bodies, credentials, browser state and ITB service logs.
 
 The public login form gets 30 seconds to appear, then one reload and up to 60
 seconds more before credentials are entered. The runner waits up to 60 seconds

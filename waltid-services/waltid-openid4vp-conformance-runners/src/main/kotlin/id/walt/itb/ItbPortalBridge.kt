@@ -2,6 +2,8 @@ package id.walt.itb
 
 import com.microsoft.playwright.Locator
 import com.microsoft.playwright.Page
+import com.microsoft.playwright.Request
+import com.microsoft.playwright.Response
 import com.microsoft.playwright.TimeoutError
 import com.microsoft.playwright.options.AriaRole
 import com.microsoft.playwright.options.ElementState
@@ -10,6 +12,7 @@ import io.ktor.http.Url
 import java.net.URI
 import java.net.URISyntaxException
 import java.nio.file.Files
+import java.util.function.Consumer
 import java.util.regex.Pattern
 
 /** The owned session started, but the portal displayed its generic execution error. */
@@ -34,10 +37,13 @@ internal class ItbPortalInputError(val reason: Reason) : IllegalArgumentExceptio
 internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The ITB portal timed out at $step") {
     enum class Step {
         LOGIN_NAVIGATION, LOGIN_FORM, LOGIN_SUBMIT, LOGIN_HOME,
-        NAVIGATION, SYSTEM, STATEMENT, ACTOR, EXECUTION_MODE, CASE,
+        NAVIGATION, SYSTEM, STATEMENT, ACTOR, EXECUTION_MODE, CASE, TEST_DEFINITION,
         SESSION, START, INTERACTION, DIALOG, CONFIRMATION, DOWNLOAD_CONTROL, DOWNLOAD_EVENT,
     }
 }
+
+internal class ItbPortalDefinitionFailure(val status: Int) :
+    IllegalStateException("ITB test definition returned HTTP $status")
 
 internal enum class PortalAttachment(vararg names: String, val usesDcApi: Boolean = false) {
     OFFER("Credential QR code", "VCI request QR code", "Credential Offer QR code", "QR code"),
@@ -86,6 +92,10 @@ class ItbPortalBridge(
     private val statementsUrl: String,
     private val systemName: String,
 ) : ItbInteractionBridge {
+    private val definitionUrl = Regex(
+        "${Regex.escape(statementsUrl.substringBefore('#').removeSuffix("/app"))}/api/tests/[0-9]+/definitionByStatement",
+    )
+
     override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbSession {
         // A fresh document discards old dialogs and pending session-list updates while retaining login cookies.
         step(ItbPortalStepTimeout.Step.NAVIGATION) {
@@ -115,7 +125,7 @@ class ItbPortalBridge(
             )).click()
             page.getByRole(AriaRole.BUTTON, Page.GetByRoleOptions().setName("Interactive execution").setExact(true)).click()
         }
-        step(ItbPortalStepTimeout.Step.CASE) {
+        val runButton = step(ItbPortalStepTimeout.Step.CASE) {
             if (suite.statement == "Reference Implementations") {
                 val menu = page.locator("button:visible").filter(
                     Locator.FilterOptions().setHasText(Pattern.compile("^\\s*Show test suite")),
@@ -129,13 +139,49 @@ class ItbPortalBridge(
             ))
             suiteRow.locator(".mainLine").filter(Locator.FilterOptions().setHas(
                 page.getByText(case.name, Page.GetByTextOptions().setExact(true)),
-            )).locator("button[ngbtooltip=Run]").click()
+            )).locator("button[ngbtooltip=Run]")
         }
-        val id = step(ItbPortalStepTimeout.Step.SESSION) {
-            page.waitForCondition { page.locator(".session-table-title-value .value").count() == 1 && sessionId().isNotBlank() }
-            sessionId()
+        return ItbSession(suite.id, case.id, prepareSession(runButton))
+    }
+
+    private fun prepareSession(runButton: Locator): String {
+        // The portal reads the test definition before creating an interactive session.
+        // Observe this read without delaying or repeating Run after an uncertain start.
+        var definition: Request? = null
+        var definitionFailure: ItbPortalDefinitionFailure? = null
+        val onRequest = Consumer<Request> { request ->
+            if (request.method() == "GET" && definitionUrl.matches(request.url().substringBefore('?'))) {
+                definition = request
+            }
         }
-        return ItbSession(suite.id, case.id, id)
+        val onResponse = Consumer<Response> { response ->
+            if (response.request() == definition) {
+                definition = null
+                if (response.status() >= 400) {
+                    definitionFailure = ItbPortalDefinitionFailure(response.status())
+                }
+            }
+        }
+        page.onRequest(onRequest)
+        page.onResponse(onResponse)
+        try {
+            step(ItbPortalStepTimeout.Step.CASE) { runButton.click() }
+            try {
+                page.waitForCondition {
+                    definitionFailure != null ||
+                        (page.locator(".session-table-title-value .value").count() == 1 && sessionId().isNotBlank())
+                }
+            } catch (_: TimeoutError) {
+                val step = if (definition == null) ItbPortalStepTimeout.Step.SESSION
+                    else ItbPortalStepTimeout.Step.TEST_DEFINITION
+                throw ItbPortalStepTimeout(step)
+            }
+            definitionFailure?.let { throw it }
+            return sessionId()
+        } finally {
+            page.offRequest(onRequest)
+            page.offResponse(onResponse)
+        }
     }
 
     private fun startButton(): Locator = page.getByRole(

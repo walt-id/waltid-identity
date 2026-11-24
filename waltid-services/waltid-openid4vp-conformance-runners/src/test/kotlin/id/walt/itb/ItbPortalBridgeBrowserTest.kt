@@ -175,6 +175,35 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
+    fun distinguishesAPendingTestDefinitionFromWaitingForASessionId() = runBlocking<Unit> {
+        for ((definition, expectedStep) in listOf(
+            DefinitionResponse.PENDING to ItbPortalStepTimeout.Step.TEST_DEFINITION,
+            DefinitionResponse.OK to ItbPortalStepTimeout.Step.SESSION,
+        )) {
+            withPage(definition = definition) { page ->
+                page.setDefaultTimeout(1_000.0)
+                val failure = assertFailsWith<ItbPortalStepTimeout> {
+                    ItbPortalBridge(page, statementsUrl, catalogue.systemName).prepare(suite, case)
+                }
+                assertEquals(expectedStep, failure.step)
+                assertEquals(1, page.evaluate("window.runCount"))
+            }
+        }
+    }
+
+    @Test
+    fun reportsTheDefinitionHttpStatusWithoutItsBodyOrSubmittingAgain() = runBlocking<Unit> {
+        withPage(definition = DefinitionResponse.SERVER_ERROR) { page ->
+            val failure = assertFailsWith<ItbPortalDefinitionFailure> {
+                ItbPortalBridge(page, statementsUrl, catalogue.systemName).prepare(suite, case)
+            }
+            assertEquals(500, failure.status)
+            assertFalse(failure.toString().contains("private portal details"))
+            assertEquals(1, page.evaluate("window.runCount"))
+        }
+    }
+
+    @Test
     fun newSessionDiscardsThePreviousDialogAndCannotStartUsingItsIdentity() = runBlocking<Unit> {
         withPage { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
@@ -370,6 +399,8 @@ class ItbPortalBridgeBrowserTest {
         }
     }
 
+    private enum class DefinitionResponse(val status: Int?) { PENDING(null), OK(200), SERVER_ERROR(500) }
+
     private suspend fun withPage(
         systemName: String = catalogue.systemName,
         applicationDelayMillis: Int = 0,
@@ -385,6 +416,7 @@ class ItbPortalBridgeBrowserTest {
         failStart: Boolean = false,
         startNeverEnabled: Boolean = false,
         actorVisible: Boolean = false,
+        definition: DefinitionResponse? = null,
         block: suspend (Page) -> Unit,
     ) {
         Playwright.create().use { playwright ->
@@ -398,9 +430,13 @@ class ItbPortalBridgeBrowserTest {
                                 session, systemName, interactionDelayMillis, downloadDelayMillis, failStart,
                                 startNeverEnabled, actorVisible, applicationDelayMillis, inlineInteraction,
                                 interactionLabel, attachmentLabel, otherLabel, Base64.getEncoder().encodeToString(attachment),
-                                transactionCode, referenceSuite,
+                                transactionCode, referenceSuite, definition != null,
                             )
                             route.fulfill(Route.FulfillOptions().setContentType("text/html").setBody(html))
+                        } else if (route.request().url() == "https://itb.example/api/tests/42/definitionByStatement?system=18") {
+                            definition?.status?.let { status ->
+                                route.fulfill(Route.FulfillOptions().setStatus(status).setBody("private portal details"))
+                            }
                         } else route.abort()
                     }
                     val page = context.newPage()
@@ -416,6 +452,7 @@ class ItbPortalBridgeBrowserTest {
         startNeverEnabled: Boolean, actorVisible: Boolean, applicationDelayMillis: Int, inlineInteraction: String?,
         interactionLabel: String, attachmentLabel: String, otherLabel: String, attachmentBase64: String,
         transactionCode: String?, referenceSuite: Boolean,
+        requestDefinition: Boolean,
     ): String {
         val statement = if (referenceSuite) "Reference Implementations" else suite.statement
         val suiteName = if (referenceSuite) "reconi.nl Reference Implementation Test Suite" else suite.name
@@ -448,6 +485,7 @@ class ItbPortalBridgeBrowserTest {
         window.otherDownloads = 0;
         window.suiteFiltered = false;
         window.interactive = false;
+        window.runCount = 0;
         function selectStatement() {
             if ($actorVisible) document.querySelector('#actors').innerHTML = '<button onclick="showTests()">User</button>';
             else showTests();
@@ -472,7 +510,12 @@ class ItbPortalBridgeBrowserTest {
             document.body.append(option);
         }
         function prepare(selected) {
+            window.runCount++;
             window.selectedSuite = selected;
+            if ($requestDefinition) {
+                fetch('/api/tests/42/definitionByStatement?system=18');
+                return;
+            }
             document.body.innerHTML = `<div class="session-table-title-value"><div class="value">$session</div></div>
               <button id="start" disabled onclick="start()">Start</button>`;
             if (!$startNeverEnabled) setTimeout(() => document.querySelector('#start').disabled = false, 30);
