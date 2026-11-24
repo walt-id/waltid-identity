@@ -343,6 +343,7 @@ Issuer2 identifies a used entry by its normalized HTTP(S) list URI and index acr
 per-copy inventories sharing the same Redis store. For example, `https://status.example.com:443/list`
 and `https://status.example.com/list` identify the same list. Invalid list URLs and
 duplicate references within an inventory are rejected at profile load or offer creation.
+List URLs must omit user information and fragments.
 For per-copy mdoc status, issuer2 also writes the normalized URI into the signed credential.
 Publish the Status List Token with that exact URI as its subject. For example, use
 `https://status.example.com/list` as the subject when the configured URL explicitly includes port 443.

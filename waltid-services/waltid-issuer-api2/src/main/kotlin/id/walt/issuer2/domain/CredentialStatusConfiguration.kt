@@ -118,6 +118,7 @@ sealed interface CredentialStatusConfiguration {
             }
             require(uri.port <= 65535) { "$field must have a valid port" }
             require(uri.rawFragment == null) { "$field must be a fragment-free URI" }
+            require(uri.rawUserInfo == null) { "$field must be a URI without user information" }
             return uri
         }
 
@@ -138,7 +139,6 @@ sealed interface CredentialStatusConfiguration {
             // Use raw components so query order and reserved delimiters remain significant.
             val ownershipUri = buildString {
                 append(scheme).append("://")
-                uri.rawUserInfo?.let { append(normalizePercentEscapes(it)).append('@') }
                 append(uri.host.lowercase())
                 if (uri.port != -1 && uri.port != defaultPort) append(':').append(uri.port)
                 append(canonicalStatusListPath(uri.rawPath))

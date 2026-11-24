@@ -78,8 +78,14 @@ class CredentialStatusConfigurationTest {
     }
 
     @Test
-    fun statusListUrisRejectFragments() {
-        for (uri in listOf("https://status.example.com/list#first", "https://status.example.com/list#")) {
+    fun statusListUrisRejectFragmentsAndUserInfo() {
+        val invalidUris = listOf(
+            "https://status.example.com/list#first" to "must be a fragment-free URI",
+            "https://status.example.com/list#" to "must be a fragment-free URI",
+            "https://alice@status.example.com/list" to "must be a URI without user information",
+            "https://@status.example.com/list" to "must be a URI without user information",
+        )
+        for ((uri, message) in invalidUris) {
             val tokenInventory = JsonArray(listOf(tokenStatus(7, uri)))
             val w3cEntry = JsonObject(w3cStatus(7) + ("statusListCredential" to JsonPrimitive(uri)))
             val w3cInventory = JsonArray(listOf(JsonArray(listOf(w3cEntry))))
@@ -92,7 +98,7 @@ class CredentialStatusConfigurationTest {
                 val error = assertFailsWith<IllegalArgumentException>("$format: $uri") {
                     CredentialStatusConfiguration.parse(inventory, format)
                 }
-                assertEquals("$field must be a fragment-free URI", error.message)
+                assertEquals("$field $message", error.message)
             }
         }
     }

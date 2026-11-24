@@ -209,6 +209,8 @@ class Issuer2SharedCredentialStatusTest {
             JsonArray(listOf(JsonArray(emptyList()))) to "Each credentialStatus group must contain status objects",
             JsonArray(listOf(tokenStatus(7, "https://status.example.com/list#first"))) to
                 "status_list.uri must be a fragment-free URI",
+            JsonArray(listOf(tokenStatus(7, "https://alice@status.example.com/list"))) to
+                "status_list.uri must be a URI without user information",
         )
         for ((inventory, message) in invalidInventories) {
             val invalid = example.copy(runtimeOverrides = overrides.copy(credentialStatus = inventory))
