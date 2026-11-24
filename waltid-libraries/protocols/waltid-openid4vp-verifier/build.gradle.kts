@@ -37,6 +37,8 @@ kotlin {
              * walt.id:
              */
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
+            // Shared client-facing error types (SelfIssuedIdTokenValidationException extends ClientRequestException)
+            api(project(":waltid-libraries:waltid-library-commons"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             api(project(":waltid-libraries:credentials:waltid-mdoc-proximity"))

@@ -1,5 +1,6 @@
 package id.walt.verifier2.verification2
 
+import id.walt.errors.ClientRequestException
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
@@ -193,7 +194,7 @@ object SelfIssuedIdTokenValidator {
  * Extends [IllegalArgumentException] so callers that caught that type keep working.
  */
 class SelfIssuedIdTokenValidationException(message: String, cause: Throwable? = null) :
-    IllegalArgumentException(message, cause)
+    ClientRequestException(message, cause)
 
 /** [require] that throws [SelfIssuedIdTokenValidationException]. */
 private inline fun ensure(condition: Boolean, message: () -> String) {

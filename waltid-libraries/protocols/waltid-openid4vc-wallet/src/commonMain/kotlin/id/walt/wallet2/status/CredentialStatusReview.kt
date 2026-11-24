@@ -1,11 +1,12 @@
 package id.walt.wallet2.status
 
+import id.walt.errors.ClientFacingError
 import id.walt.errors.HttpStatusError
 import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
 
 /** The selected credential's semantic warning changed since the host rendered its confirmation. */
 class CredentialStatusReviewChangedException : IllegalStateException("Credential status changed. Review the updated information before sharing."),
-    HttpStatusError {
+    HttpStatusError, ClientFacingError {
     override val status: Int get() = 409
 }
 

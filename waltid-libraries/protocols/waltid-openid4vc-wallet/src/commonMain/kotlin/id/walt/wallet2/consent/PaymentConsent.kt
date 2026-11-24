@@ -1,5 +1,6 @@
 package id.walt.wallet2.consent
 
+import id.walt.errors.ClientFacingError
 import id.walt.errors.HttpStatusError
 
 /** Why the wallet cannot prepare authoritative payment consent. */
@@ -28,7 +29,7 @@ class PaymentConsentException(val reason: PaymentConsentFailure) : IllegalStateE
     PaymentConsentFailure.MISSING_TRANSLATION -> "Required payment instructions are unavailable in your preferred languages."
     PaymentConsentFailure.CONSENT_REQUIRED -> "Review the payment before authorizing it."
     PaymentConsentFailure.STALE_CONSENT -> "The payment selection changed. Review it again before authorizing."
-}), HttpStatusError {
+}), HttpStatusError, ClientFacingError {
     override val status: Int
         get() = when (reason) {
             // The payment must be reviewed (again) before it can be authorized.

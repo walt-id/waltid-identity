@@ -1,7 +1,7 @@
 package id.walt.wallet2.handlers
 
-import id.walt.wallet2.WalletStateConflictException
-import id.walt.wallet2.WalletRequestException
+import id.walt.errors.ClientStateConflictException
+import id.walt.errors.ClientRequestException
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
@@ -491,7 +491,7 @@ class WalletIssuanceSessionService(
         val keyMaterial = resolveIssuanceKeyMaterial(request.key, request.keyId)
         val resolved = resolve(request, preferredLocales, keyMaterial)
         val grant = resolved.grantType
-            ?: throw WalletRequestException("Credential offer does not contain a supported grant")
+            ?: throw ClientRequestException("Credential offer does not contain a supported grant")
         val sessionId = Uuid.random().toString()
         val publicSession = WalletIssuanceSession(
             id = sessionId,
@@ -573,10 +573,10 @@ class WalletIssuanceSessionService(
         onCredentialsAccepted: () -> Unit,
     ): WalletIssuanceAuthorization {
         if (loadActive(sessionId)?.public?.offer?.grant != WalletIssuanceGrant.AUTHORIZATION_CODE) {
-            throw WalletStateConflictException("Issuance session does not use the authorization-code grant")
+            throw ClientStateConflictException("Issuance session does not use the authorization-code grant")
         }
         val active = beginTransition(sessionId, SessionState.AWAITING_ACCEPTANCE)
-            ?: throw WalletStateConflictException("Issuance session is not awaiting acceptance")
+            ?: throw ClientStateConflictException("Issuance session is not awaiting acceptance")
         try {
             acceptSelections(active, prepareCredentials(active.toBatchSession(), active.selections?.map { it.selection }))
             onCredentialsAccepted()
@@ -584,7 +584,7 @@ class WalletIssuanceSessionService(
             val authorization = buildAuthorization(active)
             mutex.withLock {
                 if (sessions[sessionId] !== active || active.state != SessionState.PROCESSING) {
-                    throw WalletStateConflictException("Issuance session changed while authorization was being built")
+                    throw ClientStateConflictException("Issuance session changed while authorization was being built")
                 }
                 active.authorization = authorization
                 active.state = SessionState.AWAITING_CALLBACK
@@ -778,7 +778,7 @@ class WalletIssuanceSessionService(
                     return@withLock
                 }
                 if (pollingDeferred.isNotEmpty() || sessions.values.any { it.state == SessionState.PROCESSING }) {
-                    throw WalletStateConflictException("Cannot clear issuance sessions while issuance is in progress")
+                    throw ClientStateConflictException("Cannot clear issuance sessions while issuance is in progress")
                 }
                 destroyBackingWallet?.let { destroy ->
                     destroy()
@@ -1510,7 +1510,7 @@ class WalletIssuanceSessionService(
             grant = when (grant) {
                 is GrantType.AuthorizationCode -> WalletIssuanceGrant.AUTHORIZATION_CODE
                 is GrantType.PreAuthorizedCode -> WalletIssuanceGrant.PRE_AUTHORIZED_CODE
-                else -> throw WalletRequestException("Unsupported credential offer grant")
+                else -> throw ClientRequestException("Unsupported credential offer grant")
             },
             issuer = WalletIssuanceIssuerPreview(
                 identifier = issuerMetadata.metadata.credentialIssuer,

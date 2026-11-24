@@ -29,7 +29,7 @@ import id.walt.openid4vci.responses.challenge.AttestationChallengeResponseHttp
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.errors.ClientInputException
+import id.walt.errors.ClientRequestException
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.CredentialProtocolException
@@ -396,13 +396,13 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val parameters = envelope.decodeExternalLoginAuthorizationParameters()
         val sessionId = parameters[INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER]?.singleOrNull()
             ?: throw IllegalArgumentException("Missing issuance session id in internal authorization request")
-        val session = sessionService.getSessionOrNull(sessionId) ?: throw ClientInputException("Invalid login reference")
-        if (!session.isActiveAuthorizationCodeSession()) throw ClientInputException("Expired or invalid login reference")
+        val session = sessionService.getSessionOrNull(sessionId) ?: throw ClientRequestException("Invalid login reference")
+        if (!session.isActiveAuthorizationCodeSession()) throw ClientRequestException("Expired or invalid login reference")
         val stored = requireNotNull(session.authorizationRequest) { "Missing stored authorization request" }
         if (parameters[INTERNAL_AUTHORIZATION_REQUEST_ID_PARAMETER]?.singleOrNull() != stored.id ||
             parameters.withoutInternalAuthorizationSession() != stored.requestForm.withoutInternalAuthorizationSession()
         ) {
-            throw ClientInputException("Authorization parameters do not match the accepted request")
+            throw ClientRequestException("Authorization parameters do not match the accepted request")
         }
         return session
     }
@@ -414,7 +414,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     ) {
         val session = try {
             val session = resolveExternalLoginSession(requireNotNull(authorizationRequestEnvelope))
-            if (session.externalAuthorizationState != null) throw ClientInputException("Login reference has already been used")
+            if (session.externalAuthorizationState != null) throw ClientRequestException("Login reference has already been used")
             session
         } catch (e: CancellationException) {
             throw e
@@ -431,7 +431,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         }
 
         try {
-            if (!session.isActiveAuthorizationCodeSession()) throw ClientInputException("issuer_state is invalid")
+            if (!session.isActiveAuthorizationCodeSession()) throw ClientRequestException("issuer_state is invalid")
 
             val externalState = externalAuthorizationRequest
                 ?.substringAfter("?", missingDelimiterValue = "")
@@ -1870,7 +1870,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
     ): IssuanceSession =
         authorizationRequest.issuerState
             ?.let { sessionId ->
-                sessionService.getSessionOrNull(sessionId) ?: throw ClientInputException("issuer_state is invalid")
+                sessionService.getSessionOrNull(sessionId) ?: throw ClientRequestException("issuer_state is invalid")
             }
             ?: createAuthorizationCodeSessionFromProfile(authorizationRequest, parameters)
 
@@ -1928,7 +1928,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         val scopeMatches = metadataService.credentialConfigurationIdsForScopes(authorizationRequest.requestedScopes)
         val matches = authorizationDetailsMatches + scopeMatches
 
-        if (matches.isEmpty()) throw ClientInputException(
+        if (matches.isEmpty()) throw ClientRequestException(
             "No credential configuration could be resolved from authorization_details or requested scopes: " +
                     authorizationRequest.requestedScopes
         )
@@ -1954,12 +1954,12 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     private fun parseAuthorizationDetails(raw: String): List<JsonObject> {
         val element = runCatching { json.parseToJsonElement(raw) }
-            .getOrElse { throw ClientInputException("Invalid authorization_details JSON", it) }
+            .getOrElse { throw ClientRequestException("Invalid authorization_details JSON", it) }
 
         return when (element) {
             is JsonArray -> element.map { it.jsonObject }
             is JsonObject -> listOf(element)
-            else -> throw ClientInputException("authorization_details must be a JSON object or array")
+            else -> throw ClientRequestException("authorization_details must be a JSON object or array")
         }
     }
 
@@ -2009,7 +2009,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 ),
             ),
         )
-        if (verifiedProofs.bindings.isEmpty()) throw ClientInputException("Credential request has no credential proof")
+        if (verifiedProofs.bindings.isEmpty()) throw ClientRequestException("Credential request has no credential proof")
         // The verified holder key is a crypto2 key since the crypto updates, so the public JWK comes
         // from its public key exporter rather than the legacy getPublicKey().exportJWKObject().
         return verifiedProofs.bindings.map { verifiedProof ->

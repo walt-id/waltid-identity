@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.data
 
+import id.walt.errors.ClientFacingError
 import id.walt.errors.HttpStatusError
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
@@ -103,7 +104,7 @@ class HolderKeyBindingException(
     val credentialId: String,
     message: String,
     cause: Throwable? = null,
-) : IllegalStateException(message, cause), HttpStatusError {
+) : IllegalStateException(message, cause), HttpStatusError, ClientFacingError {
     /**
      * Most codes mean the credential cannot be used with the wallet's current keys (409), which the caller can act
      * on. A persisted binding that cannot be read ([HolderKeyBindingErrorCode.BINDING_INVALID]) is corrupt stored

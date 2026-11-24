@@ -13,6 +13,9 @@ kotlin {
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
 
+            // Shared client-facing error types (ClientRequestException is part of this library's public API)
+            api(project(":waltid-libraries:waltid-library-commons"))
+
             // walt.id
             implementation(project(":waltid-libraries:credentials:waltid-status-list"))
             api(project(":waltid-libraries:web:waltid-web-data-fetching"))

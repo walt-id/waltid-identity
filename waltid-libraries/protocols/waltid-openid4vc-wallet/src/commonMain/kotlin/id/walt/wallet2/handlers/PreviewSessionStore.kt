@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import id.walt.errors.ClientFacingError
 import id.walt.errors.HttpStatusError
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -35,7 +36,7 @@ public enum class PreviewSessionFailureReason {
 public class PreviewSessionException(
     public val reason: PreviewSessionFailureReason,
     message: String,
-) : IllegalStateException(message), HttpStatusError {
+) : IllegalStateException(message), HttpStatusError, ClientFacingError {
     override val status: Int
         get() = when (reason) {
             PreviewSessionFailureReason.CONSUMED, PreviewSessionFailureReason.IN_USE -> 409

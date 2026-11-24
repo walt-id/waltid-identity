@@ -1,7 +1,8 @@
 package id.walt.wallet2.handlers
 
+import id.walt.errors.ClientFacingError
 import id.walt.errors.HttpStatusError
-import id.walt.wallet2.WalletRequestException
+import id.walt.errors.ClientRequestException
 import id.walt.wallet2.consent.PaymentConsentException
 import id.walt.wallet2.consent.PaymentConsentFailure
 import id.walt.wallet2.data.HolderKeyBindingErrorCode
@@ -39,7 +40,7 @@ class WalletClientErrorsTest {
 
     @Test
     fun `naming a key the wallet does not hold is a client error`() = runTest {
-        val failure = assertFailsWith<WalletRequestException> {
+        val failure = assertFailsWith<ClientRequestException> {
             WalletIssuanceHandler.receiveCredential(
                 Wallet(id = "wallet-without-keys"),
                 ReceiveCredentialRequest(offerJson = batchTestOffer(), keyId = "missing-key"),
@@ -53,7 +54,7 @@ class WalletClientErrorsTest {
 
     @Test
     fun `an offer given both as URL and JSON is a client error`() {
-        val failure = assertFailsWith<WalletRequestException> {
+        val failure = assertFailsWith<ClientRequestException> {
             ReceiveCredentialRequest(offerUrl = Url("openid-credential-offer://?credential_offer_uri=x"), offerJson = batchTestOffer())
         }
 
@@ -100,7 +101,7 @@ class WalletClientErrorsTest {
     }
 
     @Test
-    fun `status-carrying wallet errors stay IllegalStateExceptions for existing callers`() {
+    fun `caller-fixable wallet errors are client-facing with their status`() {
         listOf<Throwable>(
             WalletSigningKeyUnavailableException("x"),
             HolderKeyBindingException(HolderKeyBindingErrorCode.KEY_NOT_FOUND, "credential", "x"),
@@ -109,8 +110,10 @@ class WalletClientErrorsTest {
             MissingPresentationPreviewException(),
             WalletInstanceAttestationRequiredException(),
         ).forEach {
-            assertIs<IllegalStateException>(it)
+            assertIs<ClientFacingError>(it)
             assertIs<HttpStatusError>(it)
         }
+        // A request the caller can fix is an invalid argument, which the mobile bridge reports as invalid input.
+        assertIs<IllegalArgumentException>(WalletSigningKeyUnavailableException("x"))
     }
 }

@@ -2,7 +2,7 @@ package id.walt.openid4vci.tokens.jwt
 
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.openid4vci.errors.ClientInputException
+import id.walt.errors.ClientRequestException
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -24,20 +24,20 @@ internal class JwtTokenVerifier private constructor(
             } catch (cause: CancellationException) {
                 throw cause
             } catch (cause: Throwable) {
-                throw ClientInputException("Invalid ${tokenName.lowercase()} signature", cause)
+                throw ClientRequestException("Invalid ${tokenName.lowercase()} signature", cause)
             }
             return Json.parseToJsonElement(verified.payload.decodeToString(throwOnInvalidSequence = true)) as? JsonObject
-                ?: throw ClientInputException("$tokenName payload must be a JSON object")
+                ?: throw ClientRequestException("$tokenName payload must be a JSON object")
         }
 
         val decoded = decodeClientToken(tokenName) { token.decodeJws() }
         val verificationKey = requireNotNull(resolver).resolveVerificationKey(decoded.header)
         val verifiedPayload = verificationKey.verifyJws(token).getOrElse { cause ->
-            throw ClientInputException("Invalid ${tokenName.lowercase()} signature", cause)
+            throw ClientRequestException("Invalid ${tokenName.lowercase()} signature", cause)
         }
 
         return verifiedPayload as? JsonObject
-            ?: throw ClientInputException("$tokenName payload must be a JSON object")
+            ?: throw ClientRequestException("$tokenName payload must be a JSON object")
     }
 }
 
@@ -46,5 +46,5 @@ private inline fun <T> decodeClientToken(tokenName: String, decode: () -> T): T 
 } catch (cause: CancellationException) {
     throw cause
 } catch (cause: Exception) {
-    throw ClientInputException("Malformed ${tokenName.lowercase()}", cause)
+    throw ClientRequestException("Malformed ${tokenName.lowercase()}", cause)
 }

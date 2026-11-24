@@ -2,9 +2,10 @@
 
 package id.walt.wallet2.handlers
 
+import id.walt.errors.ClientFacingError
 import id.walt.errors.HttpStatusError
-import id.walt.wallet2.WalletStateConflictException
-import id.walt.wallet2.WalletRequestException
+import id.walt.errors.ClientStateConflictException
+import id.walt.errors.ClientRequestException
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.signatures.sdjwt.locatedDisclosures
 import id.walt.dcql.models.meta.SdJwtVcMeta
@@ -367,7 +368,7 @@ data class SubmitDcApiPresentationRequest(
 
 class MissingPresentationPreviewException :
     IllegalStateException("Presentation request preview expired or was not found; preview the request again before responding."),
-    HttpStatusError {
+    HttpStatusError, ClientFacingError {
     override val status: Int get() = 404
 }
 
@@ -746,7 +747,7 @@ object WalletPresentationHandler {
             results.map { result ->
                 val raw = result.credential as RawDcqlCredential
                 val stored = storedById[raw.id]
-                    ?: throw WalletStateConflictException("Credential '${raw.id}' disappeared while building presentation preview")
+                    ?: throw ClientStateConflictException("Credential '${raw.id}' disappeared while building presentation preview")
                 val credential = stored.credential
                 PresentationCredentialOption(
                     queryId = queryId,
@@ -847,7 +848,7 @@ object WalletPresentationHandler {
         val credentialOptions = matched.flatMap { (queryId, results) ->
             results.map { result ->
                 val raw = result.credential as RawDcqlCredential
-                val stored = storedById[raw.id] ?: throw WalletStateConflictException("Credential '${raw.id}' disappeared while building presentation preview")
+                val stored = storedById[raw.id] ?: throw ClientStateConflictException("Credential '${raw.id}' disappeared while building presentation preview")
                 val credential = stored.credential
                 PresentationCredentialOption(
                     queryId = queryId,
@@ -967,7 +968,7 @@ object WalletPresentationHandler {
             results.map { result ->
                 val raw = result.credential as RawDcqlCredential
                 val stored = storedById[raw.id]
-                    ?: throw WalletStateConflictException("Credential '${raw.id}' disappeared while building DC API presentation preview")
+                    ?: throw ClientStateConflictException("Credential '${raw.id}' disappeared while building DC API presentation preview")
                 PresentationCredentialOption(
                     queryId = queryId,
                     credentialId = stored.id,
@@ -1083,7 +1084,7 @@ object WalletPresentationHandler {
         require(preview is PreviewedPresentation.Ready) { "Cannot prepare an invalid presentation" }
         require(request.keyId == null || request.keyId == preview.keyId) { "The signing key must match the reviewed key" }
         val authorization = preview.resolvedAuthorizationRequest.authorizationRequest
-        val key = wallet.resolveKeyMaterial(preview.keyId, setOf(KeyUsage.SIGN)) ?: throw WalletStateConflictException("Reviewed signing key is unavailable")
+        val key = wallet.resolveKeyMaterial(preview.keyId, setOf(KeyUsage.SIGN)) ?: throw ClientStateConflictException("Reviewed signing key is unavailable")
         val selected = selectReviewedCredentials(wallet, requireNotNull(authorization.dcqlQuery),
             request.selectedCredentialOptions, request.selectedDisclosureOptions)
         validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
@@ -1194,7 +1195,7 @@ object WalletPresentationHandler {
             val resolvedAuthorizationRequest = ready.resolvedAuthorizationRequest
             // Sign with exactly the key the request was validated against during preview.
             val keyMaterial = wallet.resolveKeyMaterial(ready.keyId, setOf(KeyUsage.SIGN))
-                ?: throw WalletStateConflictException("Key '${ready.keyId}' selected while previewing is no longer available")
+                ?: throw ClientStateConflictException("Key '${ready.keyId}' selected while previewing is no longer available")
             val did = request.did ?: wallet.defaultDid()
             val selectedQueryIds = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.queryId }
             validateSelectedTransactionDataCredentials(
@@ -1836,7 +1837,7 @@ object WalletPresentationHandler {
         metadataHttpClient: HttpClient? = null,
     ): CredentialSelection {
         if (wallet.credentialStores.isEmpty()) {
-            throw WalletRequestException("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
+            throw ClientRequestException("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
         }
 
         val candidates = storedCredentials.filter { stored ->
@@ -1960,7 +1961,7 @@ object WalletPresentationHandler {
             results.filter { result ->
                 val raw = result.credential as RawDcqlCredential
                 val stored = storedById[raw.id]
-                    ?: throw WalletStateConflictException("Credential '${raw.id}' disappeared while checking holder-key eligibility")
+                    ?: throw ClientStateConflictException("Credential '${raw.id}' disappeared while checking holder-key eligibility")
                 if (allowedCredentialIds != null && stored.id !in allowedCredentialIds) {
                     false
                 } else if (stored.credential !is id.walt.credentials.formats.MdocsCredential) {
@@ -2180,7 +2181,7 @@ object WalletPresentationHandler {
             formatCapabilities = formatCapabilities,
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
-            throw WalletRequestException(
+            throw ClientRequestException(
                 "Presentation request is invalid (${validation.error.code.code}): ${validation.error.message}"
             )
         }

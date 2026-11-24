@@ -1,7 +1,7 @@
 package id.walt.openid4vci
 
 import id.walt.openid4vci.core.buildOAuth2Provider
-import id.walt.openid4vci.errors.ClientInputException
+import id.walt.errors.ClientRequestException
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.CredentialProtocolException
@@ -46,7 +46,7 @@ class ClientErrorDescriptionTest {
 
     @Test
     fun `a rejection of the client's request keeps its reason`() {
-        assertEquals("Access token expired", clientErrorDescription(ClientInputException("Access token expired"), "x"))
+        assertEquals("Access token expired", clientErrorDescription(ClientRequestException("Access token expired"), "x"))
         assertEquals(
             "Proof nonce is stale",
             clientErrorDescription(
@@ -92,7 +92,7 @@ class ClientErrorDescriptionTest {
 
     @Test
     fun `an invalid access token keeps its reason`() = runTest {
-        val failure = createCredentialRequestWith { throw ClientInputException("Access token expired") }
+        val failure = createCredentialRequestWith { throw ClientRequestException("Access token expired") }
 
         assertEquals(OAuthErrorCodes.INVALID_TOKEN, failure.error.error)
         assertEquals("Access token expired", failure.error.description)

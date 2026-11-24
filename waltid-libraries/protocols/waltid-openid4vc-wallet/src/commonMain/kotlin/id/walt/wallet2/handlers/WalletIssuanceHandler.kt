@@ -2,8 +2,9 @@
 
 package id.walt.wallet2.handlers
 
+import id.walt.errors.ClientFacingError
 import id.walt.errors.HttpStatusError
-import id.walt.wallet2.WalletRequestException
+import id.walt.errors.ClientRequestException
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.DirectSerializedKey
@@ -116,8 +117,8 @@ interface CredentialOfferSource {
 
 /** Validates the mutual exclusivity of [offerUrl] and [offerJson]. Call from `init {}` blocks. */
 fun CredentialOfferSource.checkOfferSource() {
-    if (offerUrl == null && offerJson == null) throw WalletRequestException("Either offerUrl or offerJson must be provided")
-    if (offerUrl != null && offerJson != null) throw WalletRequestException("Only one of offerUrl or offerJson may be provided, not both")
+    if (offerUrl == null && offerJson == null) throw ClientRequestException("Either offerUrl or offerJson must be provided")
+    if (offerUrl != null && offerJson != null) throw ClientRequestException("Only one of offerUrl or offerJson may be provided, not both")
 }
 
 // ---------------------------------------------------------------------------
@@ -1105,7 +1106,7 @@ data class ExchangeCodeRequest(
  * an inline key or a keyId, or add a signing key to the wallet. A 400 whose message is returned to the caller,
  * who owns the wallet, so they can fix the request rather than read an opaque internal error.
  */
-class WalletSigningKeyUnavailableException(message: String) : WalletRequestException(message)
+class WalletSigningKeyUnavailableException(message: String) : ClientRequestException(message)
 
 /**
  * Thrown when an issuer's only token authentication method is a wallet instance attestation
@@ -1116,7 +1117,7 @@ class WalletSigningKeyUnavailableException(message: String) : WalletRequestExcep
  */
 public class WalletInstanceAttestationRequiredException(
     message: String = "This issuer requires a wallet instance attestation, and no wallet provider is configured",
-) : IllegalStateException(message), HttpStatusError {
+) : IllegalStateException(message), HttpStatusError, ClientFacingError {
     override val status: Int get() = 400
 }
 
@@ -1362,7 +1363,7 @@ object WalletIssuanceHandler {
 
         // 3. Pre-authorized code grant only (auth-code handled by separate flow)
         val preAuthGrant = offer.grants?.preAuthorizedCode
-            ?: throw WalletRequestException("This operation supports only offers with a pre-authorized code grant")
+            ?: throw ClientRequestException("This operation supports only offers with a pre-authorized code grant")
         log.trace { "Using pre-authorized code grant" }
 
         // 4. Request token
@@ -1821,7 +1822,7 @@ object WalletIssuanceHandler {
         val issuerMetadata = IssuerMetadataResolver(httpClient)
             .resolveCredentialIssuerMetadata(request.issuerUrl.toString()).metadata
         val configuration = issuerMetadata.credentialConfigurationsSupported[request.credentialConfigurationId]
-            ?: throw WalletRequestException(
+            ?: throw ClientRequestException(
                 "Unknown credential configuration '${request.credentialConfigurationId}' " +
                         "for issuer '${issuerMetadata.credentialIssuer}'"
             )
@@ -2678,7 +2679,7 @@ object WalletIssuanceHandler {
         parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val httpClient = httpClient
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
-            ?: throw WalletRequestException("credentialIssuerBaseUrl must be provided")
+            ?: throw ClientRequestException("credentialIssuerBaseUrl must be provided")
         val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient).metadata
         return exchangeCodeDetailed(
             request = request,
@@ -2708,7 +2709,7 @@ object WalletIssuanceHandler {
     ): RequestTokenDetailedResult {
         val manualAttestation = parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
-            ?: throw WalletRequestException("credentialIssuerBaseUrl must be provided")
+            ?: throw ClientRequestException("credentialIssuerBaseUrl must be provided")
         val asResolution = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
         val asMetadata = asResolution.metadata
         val tokenEndpoint = asMetadata.tokenEndpoint

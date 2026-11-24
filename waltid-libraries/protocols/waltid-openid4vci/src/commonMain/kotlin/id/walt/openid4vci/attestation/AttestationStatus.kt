@@ -1,6 +1,6 @@
 package id.walt.openid4vci.attestation
 
-import id.walt.openid4vci.errors.ClientInputException
+import id.walt.errors.ClientRequestException
 import id.walt.openid4vci.errors.ensureClientInput
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -79,12 +79,12 @@ internal fun captureAttestationStatus(
     now: Instant,
 ): VerifiedAttestationStatus {
     val reference = payload["status"]?.let { status ->
-        val objectValue = status as? JsonObject ?: throw ClientInputException("Attestation status must be an object")
-        val list = objectValue["status_list"] as? JsonObject ?: throw ClientInputException("Unsupported attestation status mechanism")
+        val objectValue = status as? JsonObject ?: throw ClientRequestException("Attestation status must be an object")
+        val list = objectValue["status_list"] as? JsonObject ?: throw ClientRequestException("Unsupported attestation status mechanism")
         val index = (list["idx"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
-            ?.takeIf { it >= 0 } ?: throw ClientInputException("Attestation status idx must be a non-negative integer")
+            ?.takeIf { it >= 0 } ?: throw ClientRequestException("Attestation status idx must be a non-negative integer")
         val uri = (list["uri"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-            ?.takeIf { it.isNotBlank() } ?: throw ClientInputException("Attestation status uri must be a string")
+            ?.takeIf { it.isNotBlank() } ?: throw ClientRequestException("Attestation status uri must be a string")
         parseAttestationStatusListUrl(uri)
         AttestationStatusReference(uri, index)
     }
