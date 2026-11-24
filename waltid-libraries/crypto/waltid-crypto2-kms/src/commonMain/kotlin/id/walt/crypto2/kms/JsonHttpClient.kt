@@ -15,6 +15,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.coroutines.CancellationException
 
+internal class JsonHttpResponse(val status: Int, val body: JsonObject?)
+
 internal suspend fun HttpClient.executeJson(
     provider: String,
     endpoint: String,
@@ -22,7 +24,17 @@ internal suspend fun HttpClient.executeJson(
     headers: Map<String, String> = emptyMap(),
     contentType: ContentType? = null,
     body: String? = null,
-): JsonObject? {
+): JsonObject? = executeJsonResponse(provider, endpoint, method, headers, contentType, body).body
+
+/** Like [executeJson], but also returns the success status, for APIs that give 200 and 202 different meanings. */
+internal suspend fun HttpClient.executeJsonResponse(
+    provider: String,
+    endpoint: String,
+    method: HttpMethod,
+    headers: Map<String, String> = emptyMap(),
+    contentType: ContentType? = null,
+    body: String? = null,
+): JsonHttpResponse {
     val response = try {
         request(endpoint) {
             this.method = method
@@ -39,13 +51,14 @@ internal suspend fun HttpClient.executeJson(
         throw KmsProviderException("$provider request failed", cause)
     }
     if (!response.status.isSuccess()) {
-        throw KmsProviderException("$provider request failed with HTTP ${response.status.value}")
+        throw KmsProviderException("$provider request failed with HTTP ${response.status.value}", null, response.status.value)
     }
     val responseBody = response.body<String>()
-    if (responseBody.isBlank()) return null
-    return try {
+    if (responseBody.isBlank()) return JsonHttpResponse(response.status.value, null)
+    val json = try {
         Json.parseToJsonElement(responseBody).jsonObject
     } catch (cause: Exception) {
         throw KmsProviderException("$provider returned an invalid JSON response", cause)
     }
+    return JsonHttpResponse(response.status.value, json)
 }

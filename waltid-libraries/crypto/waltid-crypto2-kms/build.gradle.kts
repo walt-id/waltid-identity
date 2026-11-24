@@ -48,6 +48,11 @@ kotlin {
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)
         }
+        // CSC parses certificates with waltid-x509: no Linux, macOS or Windows targets, and Node's crypto module on JS.
+        // x509 builds for iOS, but CSC on iOS needs an iOS ABI dump generated on macOS.
+        getByName("jvmAndroidMain").dependencies {
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
+        }
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
