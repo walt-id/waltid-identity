@@ -141,11 +141,13 @@ class HttpTrustDecisionEvaluatorTest {
     }
 
     @Test
-    fun answerThatIsNotADecisionIsProcessingError() = runTest {
-        val decision = evaluator { json("""{"decision":"MAYBE"}""") }
-            .evaluate(request(TrustedEntityType.WALLET_PROVIDER))
+    fun answerThatIsNotADecisionIsUnknown() = runTest {
+        // The resolver gave no usable decision; PROCESSING_ERROR would blame the subject.
+        for (body in listOf("""{"decision":"MAYBE"}""", "<html>gateway</html>")) {
+            val decision = evaluator { json(body) }.evaluate(request(TrustedEntityType.WALLET_PROVIDER))
 
-        assertEquals(TrustDecisionCode.PROCESSING_ERROR, decision.decision)
+            assertEquals(TrustDecisionCode.UNKNOWN, decision.decision, body)
+        }
     }
 
     @Test
