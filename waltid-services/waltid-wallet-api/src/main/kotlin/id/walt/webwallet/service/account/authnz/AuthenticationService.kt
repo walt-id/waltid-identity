@@ -1,9 +1,13 @@
 package id.walt.webwallet.service.account.authnz
 
 import id.walt.ktorauthnz.accounts.EditableAccountStore
+import id.walt.ktorauthnz.accounts.VersionedPasswordPepperStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.PasswordStoredData
+import id.walt.ktorauthnz.security.PasswordHash
+import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers.userId
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData
@@ -17,9 +21,17 @@ import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.UUID
 
-class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispatchers.IO) {
+class AuthenticationService internal constructor(
+    private val legacyPasswordWrites: Boolean,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
+    constructor(dispatcher: CoroutineDispatcher = Dispatchers.IO) : this(false, dispatcher)
 
-    val editableAccountStore = object : EditableAccountStore {
+    val editableAccountStore: EditableAccountStore = object : VersionedPasswordPepperStore {
+        // Pre-1.3 Wallet v1 used the library's public default for unmarked credentials.
+        override val unmarkedPasswordPepper = PasswordHashingConfiguration.DEFAULT_PEPPER
+        override val writeUnmarkedPasswords = legacyPasswordWrites
+
         override suspend fun addAccountIdentifierToAccount(
             accountId: String,
             newAccountIdentifier: AccountIdentifier
@@ -97,6 +109,22 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             data: AuthMethodStoredData
         ) {
             throw NotImplementedError("updateAccountIdentifierStoredData")
+        }
+
+        override suspend fun upgradePasswordHash(identifier: AccountIdentifier, verified: PasswordStoredData, replacement: PasswordHash) {
+            withContext(dispatcher) {
+                transaction {
+                    val userId = getAccountIdByAccountIdentifier(identifier) ?: return@transaction
+                    val row = AuthnzStoredData.select(AuthnzStoredData.id, AuthnzStoredData.data)
+                        .where { (AuthnzStoredData.accountId eq userId) and (AuthnzStoredData.method eq verified.authMethod().id) }
+                        .forUpdate().singleOrNull() ?: return@transaction
+                    if (row[AuthnzStoredData.data] == verified) {
+                        AuthnzStoredData.update({ AuthnzStoredData.id eq row[AuthnzStoredData.id] }) {
+                            it[AuthnzStoredData.data] = verified.withPasswordHash(replacement)
+                        }
+                    }
+                }
+            }
         }
 
         override suspend fun updateAccountStoredData(
