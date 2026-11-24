@@ -16,6 +16,25 @@ import id.walt.did.dids.resolver.DidResolver
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.SameDeviceFlowSetup
+import id.walt.verifier2.data.SessionFailure
+import id.walt.verifier2.data.SessionEvent
+import id.walt.verifier2.events.Verifier2WebhookRecorder
+import id.walt.ktornotifications.SseNotifier
+import id.walt.ktornotifications.core.KtorSessionUpdate
+import io.ktor.client.plugins.sse.SSE as ClientSSE
+import io.ktor.client.plugins.sse.sseSession
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlin.time.Duration.Companion.seconds
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.data.Verification2Session
@@ -33,6 +52,7 @@ import io.ktor.http.Parameters
 import io.ktor.http.Url
 import io.ktor.server.application.Application
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -52,10 +72,11 @@ internal data class W3cPolicyHttpCase(
     val signingKeyId: String = "assertion",
     val notBeforeOffset: Long? = -10,
     val expirationOffset: Long? = 3600,
+    val sameDevice: Boolean = false,
 )
 
 /** Runs real service startup and signed wallet HTTP presentations against the configured policies. */
-internal fun runW3cPolicyHttpCases(cases: List<W3cPolicyHttpCase>, port: Int = 0) {
+internal fun runW3cPolicyHttpCases(cases: List<W3cPolicyHttpCase>, port: Int = 0, webhook: Verifier2WebhookRecorder? = null) {
     E2ETest("127.0.0.1", port, true).testBlock(
         features = listOf(OSSVerifier2FeatureCatalog),
         preload = { ConfigManager.preloadConfig("verifier-service", OSSVerifier2ServiceConfig(
@@ -94,11 +115,16 @@ internal fun runW3cPolicyHttpCases(cases: List<W3cPolicyHttpCase>, port: Int = 0
         })
         try {
             for (case in cases) testAndReturn(case.name) {
-                val created = http.post("/verification-session/create") { setBody<VerificationSessionSetup>(CrossDeviceFlowSetup(core = GeneralFlowConfig(
+                val core = GeneralFlowConfig(
                     dcqlQuery = DcqlQuery(listOf(CredentialQuery("credential", CredentialFormat.JWT_VC_JSON,
                         meta = JwtVcJsonMeta(typeValues = listOf(listOf("VerifiableCredential")))))),
-                    policies = case.policies,
-                ))) }.body<VerificationSessionCreationResponse>()
+                    policies = case.policies, notifications = webhook?.notifications(),
+                )
+                val setup: VerificationSessionSetup = if (case.sameDevice) SameDeviceFlowSetup(core,
+                    redirects = Verification2Session.VerificationSessionRedirects(successRedirectUri = Url("https://example.com/success")))
+                    else CrossDeviceFlowSetup(core = core)
+                val created = http.post("/verification-session/create") { setBody(setup) }.body<VerificationSessionCreationResponse>()
+                if (case.sameDevice) SseNotifier.getSseFlow(created.sessionId)
                 val uri = Url(requireNotNull(created.bootstrapAuthorizationRequestUrl).toString()).parameters["request_uri"]!!
                 val request = http.get(uri).body<JsonObject>()
                 val now = Clock.System.now().epochSeconds
@@ -126,9 +152,44 @@ internal fun runW3cPolicyHttpCases(cases: List<W3cPolicyHttpCase>, port: Int = 0
                     append("vp_token", buildJsonObject { put("credential", JsonArray(listOf(JsonPrimitive(vp)))) }.toString())
                 })
                 assertEquals(if (case.accepted) HttpStatusCode.OK else HttpStatusCode.BadRequest, response.status, response.bodyAsText())
-                val session = http.get("/verification-session/${created.sessionId}/info").body<Verification2Session>()
+                val sessionJson = http.get("/verification-session/${created.sessionId}/info").body<JsonObject>()
+                val session = Json.decodeFromJsonElement<Verification2Session>(sessionJson)
                 assertEquals(if (case.accepted) Verification2Session.VerificationSessionStatus.SUCCESSFUL else Verification2Session.VerificationSessionStatus.FAILED, session.status)
                 assertEquals(case.accepted, assertNotNull(session.policyResults).overallSuccess)
+                if (case.sameDevice && !case.accepted) {
+                    assertIs<SessionFailure.VcPolicyViolations>(session.failure)
+                    assertNotNull(session.statusReason)
+                    assertNull(session.presentedCredentials)
+                    assertNull(session.presentedRawData)
+                    assertNull(session.responseCode)
+                    assertEquals(sessionJson,
+                        http.get("/verification-session/${created.sessionId}/info?response_code=wrong").body<JsonObject>())
+                    assertFalse(vp in Json.encodeToString(session))
+                    assertFalse(credential in Json.encodeToString(session))
+                    webhook?.let { recorder ->
+                        val terminal = recorder.received().last { it.target == created.sessionId && it.event == SessionEvent.credential_policy_results_available.name }
+                        val notified = Json.decodeFromJsonElement<Verification2Session>(terminal.session)
+                        assertEquals(session.statusReason, notified.statusReason)
+                        assertEquals(Json.encodeToJsonElement(session.failure), Json.encodeToJsonElement(notified.failure))
+                        assertEquals(Json.encodeToJsonElement(session.policyResults), Json.encodeToJsonElement(notified.policyResults))
+                        assertEquals(Json.encodeToJsonElement(session.presentationValidationResults), Json.encodeToJsonElement(notified.presentationValidationResults))
+                        assertNull(notified.presentedCredentials)
+                        assertNull(notified.presentedRawData)
+                        assertNull(notified.responseCode)
+                        val eventsClient = http.config { install(ClientSSE) }
+                        try {
+                            val streamed = withTimeout(5.seconds) {
+                                val stream = eventsClient.sseSession("/verification-session/${created.sessionId}/events")
+                                try {
+                                    stream.incoming.filter { it.data != null && it.data != "{}" }
+                                        .map { Json.decodeFromString<KtorSessionUpdate>(requireNotNull(it.data)) }
+                                        .first { it.event == SessionEvent.credential_policy_results_available.name }
+                                } finally { stream.cancel() }
+                            }
+                            assertEquals(terminal, streamed)
+                        } finally { eventsClient.close() }
+                    }
+                }
             }
         } finally {
             if (previous == null) DidService.resolverMethods.remove("example") else DidService.registerResolverForMethod("example", previous)
