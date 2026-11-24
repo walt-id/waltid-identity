@@ -161,15 +161,27 @@ class JwkStoredKeyTest {
 
     @Test
     fun `secp256k1 JWK requires ES256K when alg is present`() {
-        val coordinate = base64Url.encode(ByteArray(32))
-
-        fun jwk(curve: String, algorithm: String) = EncodedKey.Jwk(
-            BinaryData(
-                """{"kty":"EC","crv":"$curve","x":"$coordinate","y":"$coordinate","alg":"$algorithm"}"""
-                    .encodeToByteArray(),
-            ),
-            privateMaterial = false,
+        // Each curve's base point, so only the algorithm binding can make these fail.
+        val basePoints = mapOf(
+            "secp256k1" to (
+                "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798" to
+                    "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8"
+                ),
+            "P-256" to (
+                "6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296" to
+                    "4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5"
+                ),
         )
+
+        fun jwk(curve: String, algorithm: String): EncodedKey.Jwk {
+            val (x, y) = basePoints.getValue(curve).let { (x, y) ->
+                base64Url.encode(x.hexToByteArray()) to base64Url.encode(y.hexToByteArray())
+            }
+            return EncodedKey.Jwk(
+                BinaryData("""{"kty":"EC","crv":"$curve","x":"$x","y":"$y","alg":"$algorithm"}""".encodeToByteArray()),
+                privateMaterial = false,
+            )
+        }
 
         assertEquals(
             KeySpec.Ec(EcCurve.SECP256K1),
