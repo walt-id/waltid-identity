@@ -160,6 +160,9 @@ This is where the Wallet POSTs the `vp_token`. This is where validation happens 
 
 When the Wallet POSTs the presentation, the verifier parses the `vp_token`, runs the configured VP policies for each presentation format, checks DCQL fulfillment, and finally applies the configured VC policies. The built-in direct-post flow in this library delegates that work to `Verifier2VPDirectPostHandler` and `PresentationVerificationEngine`.
 
+Verifier2 defaults to `vc_policies: ["signature", "credential-status"]`. Status checking detects IETF Token Status Lists (including mdoc status lists) and supported W3C `credentialStatus` entries, accepting status value `0`. All declared entries must pass; unsupported, malformed, unavailable, or invalidly signed status lists fail verification. Credentials with no status information remain acceptable and report `policy_available: false`. Supplying `vc_policies` replaces these defaults, so keep both policies when customizing them. Explicit status arguments remain supported; omitted `discriminator` selects detection and omitted `value` defaults to `0`.
+
+
 ```kotlin
 post("/api/v2/verification/{sessionId}/response") {
     val sessionId = call.parameters["sessionId"] ?: error("Missing sessionId")
