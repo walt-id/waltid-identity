@@ -357,7 +357,13 @@ class ExternalReaderVerificationTest {
         routes(repository)
         val http = createClient { install(ClientContentNegotiation) { json() }; install(ClientSSE) }
         val request = fixture()
-        val invalid = listOf(
+        val encoded = Base64.decode(request.deviceResponse)
+        val end = if (encoded[0] == 0xbf.toByte()) encoded.lastIndex else encoded.size
+        val duplicateVersions = listOf("6776657273696f6e63312e30", "d9d9f76776657273696f6e63312e30").map { key ->
+            request.copy(deviceResponse = Base64.encode(byteArrayOf(0xbf.toByte()) + encoded.copyOfRange(1, end) +
+                key.hexToByteArray() + byteArrayOf(0xff.toByte())))
+        }
+        val invalid = duplicateVersions + listOf(
             request.copy(deviceResponse = "not base64"),
             request.copy(deviceResponse = Base64.encode(coseCompliantCbor.encodeToByteArray(mapOf("data" to "encrypted", "status" to "0")))),
             request.copy(deviceResponse = Base64.encode(byteArrayOf(0xff.toByte()))),
@@ -370,7 +376,7 @@ class ExternalReaderVerificationTest {
             assertEquals(HttpStatusCode.BadRequest, http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(body) }.status)
         }
         // A rejection of the submission itself keeps the verifier's reason, so the reader can fix it.
-        val privateKeyRejection = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(invalid[3]) }.bodyAsText()
+        val privateKeyRejection = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(invalid[duplicateVersions.size + 3]) }.bodyAsText()
         assertTrue("eReaderKey must contain public key material only" in privateKeyRejection, privateKeyRejection)
         assertNull(repository.get("must-not-exist"))
         assertEquals(0, repository.size)

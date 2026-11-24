@@ -200,4 +200,8 @@
     <string name="biometric_signing_separate">Continuing with your PIN changes wallet unlock only. Signing approval is configured separately.</string>
     <string name="setup_approval_unavailable">The selected signing approval is unavailable for this configuration. Check device settings or explicitly choose another signing approval.</string>
     <string name="setup_key_retained">Your existing signing key has not been changed. Restore its availability and try again.</string>
+    <string name="proximity_unsatisfied_title">Request could not be satisfied</string>
+    <string name="proximity_reader_not_evaluated">Reader authentication was not evaluated for this request.</string>
+    <string name="proximity_more_requested_fields">Show more requested fields</string>
+    <string name="proximity_more_requested_documents">Show more requested documents</string>
 </resources>

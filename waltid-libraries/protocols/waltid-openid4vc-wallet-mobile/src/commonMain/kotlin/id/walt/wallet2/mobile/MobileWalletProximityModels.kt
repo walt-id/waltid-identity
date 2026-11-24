@@ -989,6 +989,48 @@ public data class ProximityRequestedElement(
 }
 
 /**
+ * Original requested-document context when the final request cannot be satisfied overall.
+ * This does not imply that every document was individually unmatched. Reader authentication
+ * has not been evaluated on this path. No wallet credential values or identifiers are retained.
+ *
+ * @param documents Requested documents in their original order, including repeated document types.
+ */
+public class ProximityUnsatisfiedRequest(documents: List<ProximityUnsatisfiedDocument>) {
+    private val ownedDocuments = documents.toList()
+
+    init { require(ownedDocuments.isNotEmpty()) }
+
+    /** Requested documents. The returned collection can be changed without altering this summary. */
+    public val documents: List<ProximityUnsatisfiedDocument> get() = ownedDocuments.toList()
+}
+
+/**
+ * One document in the original reader request, without credential or raw cryptographic data.
+ *
+ * @property requestIndex Original zero-based document request index.
+ * @property docType Requested mdoc document type, unchanged from the request.
+ * @param requestedElements Requested namespace/element pairs and reader-declared retention intent.
+ */
+public class ProximityUnsatisfiedDocument(
+    public val requestIndex: Int,
+    public val docType: String,
+    requestedElements: List<ProximityRequestedElement>,
+) {
+    private val ownedElements = requestedElements.map { it.copy(satisfiesRequestedElements = it.satisfiesRequestedElements.toList()) }
+
+    init {
+        require(requestIndex >= 0 && docType.isNotBlank())
+        require(ownedElements.isNotEmpty())
+        require(ownedElements.all { it.satisfiesRequestedElements.isEmpty() }) {
+            "An unsatisfied request contains original requested elements, not disclosure alternatives"
+        }
+    }
+
+    /** Original requested elements. The returned collection does not expose owned mutable state. */
+    public val requestedElements: List<ProximityRequestedElement> get() = ownedElements.toList()
+}
+
+/**
  * Dependency-free namespace and element identifier.
  *
  * @property namespace Namespace containing the element.
@@ -1389,12 +1431,14 @@ public sealed interface ProximityState {
     }
 
     /**
-     * The session ended without sharing data for its final request.
-     * Earlier exchanges may already have sent holder-approved data.
+     * Matching could not satisfy the final request; its original requested information is retained.
+     * No credential data was shared for this request. Earlier exchanges may already have shared data.
      */
     public data class NoData(
         /** One-based final request exchange number. */
         public val exchange: Int,
+        /** Required original requested-document context for this unmatched request. */
+        public val unsatisfiedRequest: ProximityUnsatisfiedRequest,
     ) : ProximityState {
         init { require(exchange > 0) }
     }

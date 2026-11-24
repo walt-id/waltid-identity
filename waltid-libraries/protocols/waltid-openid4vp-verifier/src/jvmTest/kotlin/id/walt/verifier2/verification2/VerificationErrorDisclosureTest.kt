@@ -185,23 +185,25 @@ class VerificationErrorDisclosureTest {
     }
 
     @Test
-    fun `a 400 rejection keeps its specific description`() = runTest {
-        // Guards against over-sanitising: the wallet needs a real rejection's own reason.
-        val (status, body) = postDirect(presentation(expiresInDays = -1), fixture.session(), workingStore)
+    fun `a 400 rejection answers the wallet neutrally and keeps its reason on the session`() = runTest {
+        // The wallet gets one constant description; the verifier operator reads the specific reason on the session.
+        val session = fixture.session()
+        val (status, body) = postDirect(presentation(expiresInDays = -1), session, workingStore)
 
         assertEquals(HttpStatusCode.BadRequest, status)
         assertEquals("invalid_request", body.field("error"))
-        assertEquals("Credential policy verification failed. Failed VC policies: expiration", body.field("error_description"))
+        assertEquals("Invalid presentation response", body.field("error_description"))
+        assertEquals("1 credential policy violation(s)", session.failure!!.reason)
     }
 
     @Test
-    fun `an unparseable presentation is rejected naming the query and format`() = runTest {
+    fun `an unparseable presentation is recorded naming the query and format`() = runTest {
         val session = fixture.session()
         val (status, body) = postDirect("not-a-jwt", session, workingStore)
 
         val expected = "Presentation for 'ids' could not be parsed as jwt_vc_json"
         assertEquals(HttpStatusCode.BadRequest, status)
-        assertEquals(expected, body.field("error_description"))
+        assertEquals("Invalid presentation response", body.field("error_description"))
         assertEquals(expected, session.failure!!.reason)
     }
 }

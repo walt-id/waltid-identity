@@ -139,12 +139,29 @@ internal class ProximityRequestProcessor(
     private val readerFingerprints = mutableMapOf<ReaderTrustKey, String>()
     private var currentSnapshot: Snapshot? = null
     private var approved: Approved? = null
+    private var unsatisfiedRequest: Pair<Int, ProximityUnsatisfiedRequest>? = null
 
     override suspend fun prepare(context: MdocHolderRequestContext): MdocRequestPreparation = try {
         MdocRequestPreparation.Review(preview(context))
     } catch (failure: ProximityException) {
         when (failure.error.code) {
-            "request_unsatisfied" -> MdocRequestPreparation.NoData
+            "request_unsatisfied" -> {
+                val summary = ProximityUnsatisfiedRequest(context.request.value.docRequests.mapIndexed { index, document ->
+                    val items = document.itemsRequest.value
+                    ProximityUnsatisfiedDocument(
+                        requestIndex = index,
+                        docType = items.docType,
+                        requestedElements = items.namespaces.flatMap { (namespace, elements) ->
+                            elements.entries.map { ProximityRequestedElement(namespace, it.key, it.value) }
+                        },
+                    )
+                })
+                stateMutex.withLock {
+                    check(!closed) { "The proximity processor is closed" }
+                    unsatisfiedRequest = context.exchange to summary
+                }
+                MdocRequestPreparation.NoData
+            }
             "invalid_reader_authentication", "reader_revoked", "trusted_reader_required" ->
                 MdocRequestPreparation.Rejected(failure.error)
             else -> throw failure
@@ -152,6 +169,10 @@ internal class ProximityRequestProcessor(
     }
 
     override suspend fun preview(context: MdocHolderRequestContext): MdocRequestPreview {
+        stateMutex.withLock {
+            check(!closed) { "The proximity processor is closed" }
+            unsatisfiedRequest = null
+        }
         val snapshot = buildSnapshot(context)
         stateMutex.withLock {
             check(!closed) { "The proximity processor is closed" }
@@ -159,6 +180,13 @@ internal class ProximityRequestProcessor(
             currentSnapshot = snapshot
         }
         return snapshot.lowerPreview
+    }
+
+    /** Consumed only after the engine has completed its empty response and closed the bearer. */
+    suspend fun takeUnsatisfiedRequest(exchange: Int): ProximityUnsatisfiedRequest? = stateMutex.withLock {
+        val retained = unsatisfiedRequest?.takeIf { it.first == exchange } ?: return@withLock null
+        unsatisfiedRequest = null
+        retained.second
     }
 
     suspend fun review(prompt: MdocConsentPrompt): ProximityReview = stateMutex.withLock {
@@ -176,6 +204,7 @@ internal class ProximityRequestProcessor(
 
     suspend fun cancel() = stateMutex.withLock {
         closed = true
+        unsatisfiedRequest = null
         approved = null
         currentSnapshot = null
     }

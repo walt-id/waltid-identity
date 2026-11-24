@@ -2,6 +2,8 @@
 
 package id.walt.mdoc.objects.document
 
+import kotlinx.serialization.decodeFromByteArray
+import id.walt.cose.decodeTaggedCbor
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
@@ -61,7 +63,9 @@ data class IssuerSigned private constructor(
      * @throws Exception if the payload cannot be decoded.
      */
     fun decodeMobileSecurityObject() = runCatching {
-        issuerAuth.decodeIsoPayload<MobileSecurityObject>()
+        val encoded = decodeTaggedCbor(requireNotNull(issuerAuth.payload) { "MSO payload is missing" })
+        require(encoded.isNotEmpty() && (encoded[0].toInt() and 0xff) shr 5 == 5) { "MSO must be a CBOR map" }
+        coseCompliantCbor.decodeFromByteArray<MobileSecurityObject>(encoded)
     }.getOrElse { ex ->
         log.trace(ex) { "Unable to parse MSO with decodeMobileSecurityObject(), MSO is: ${issuerAuth.payload?.toHexString()}" }
         throw IllegalArgumentException("Unable to parse MSO (mobile security object) of IssuerSigned: ${ex.message}", ex)

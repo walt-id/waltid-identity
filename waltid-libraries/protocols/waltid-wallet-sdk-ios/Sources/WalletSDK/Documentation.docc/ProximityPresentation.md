@@ -33,8 +33,8 @@ for await state in session.states {
         showPreparationReview(plan, reason: reason)
     case .completed(let exchanges, _, _):
         showCompletion(exchanges: exchanges)
-    case .noData(let exchange):
-        showNoData(exchange: exchange)
+    case .noData(let exchange, let request):
+        showNoData(exchange: exchange, request: request)
     case .failed(let error):
         showFailure(error)
     default:
@@ -310,7 +310,13 @@ in every non-terminal state where the SDK reports it as legal. Call
 the journey. Closing is idempotent, and a new session always creates fresh
 engagement identifiers and ephemeral key material.
 
-A final request with no returnable data ends in `ProximityState.noData(exchange:)`. No credential
+An unmatched final request ends in `ProximityState.noData(exchange:unsatisfiedRequest:)`.
+Its required summary preserves every original requested document, index, namespace, field and retention
+intent. It contains no credential values or identifiers; reader authentication was not evaluated.
+Construct it as `.noData(exchange: exchange, unsatisfiedRequest: request)` and destructure it
+as `.noData(let exchange, let request)`. Holder decline and sharing failures use their existing
+completion/failure states.
+ No credential
 data was sent for that request; earlier exchanges in the same session may have
 shared approved data. Render `ProximityReview.readerAuthenticationSummary` for
 the request summary: it accounts for document and whole-request authentication coverage.

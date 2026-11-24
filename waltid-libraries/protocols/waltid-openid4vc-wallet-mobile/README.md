@@ -350,7 +350,7 @@ try {
             is ProximityState.PreparationRequired -> showPreparationReview(state.plan, state.reason)
             is ProximityState.AuthorizingHolderKey -> showHolderAuthorization(state.authorization)
             is ProximityState.Completed -> showCompletion(state.exchanges, state.declined)
-            is ProximityState.NoData -> showNoData(state.exchange)
+            is ProximityState.NoData -> showNoData(state.exchange, state.unsatisfiedRequest)
             is ProximityState.Failed -> showProximityError(state.error)
             ProximityState.Cancelled -> showCancelled()
             is ProximityState.Preparing,
@@ -645,9 +645,17 @@ Only one proximity session may be active per wallet. Always call `close()` when
 the journey leaves the screen; closing and cancellation are idempotent and every
 new session creates fresh engagement identifiers and ephemeral key material.
 
-A request with no returnable data ends in `ProximityState.NoData` without holder
+An unmatched request ends in `ProximityState.NoData` without holder
 consent or key authorization. Its `exchange` identifies the final request;
-earlier exchanges may already have shared approved data. Use
+earlier exchanges may already have shared approved data. Its required
+`state.unsatisfiedRequest` contains the original requested documents, their zero-based indices,
+namespace/element identifiers and reader-declared retention intent. It contains all requested
+documents, including individually satisfiable ones, without wallet values or credential identifiers.
+Reader authentication was not evaluated on this path. Holder decline and sharing failures
+use their existing completion/failure states.
+The summary remains available after session cleanup; the SDK does not persist a history entry.
+
+Use
 `ProximityReview.readerAuthenticationSummary` for the collapsed reader summary.
 The shared SDK accounts for whole-request coverage while preserving malformed,
 invalid, and revoked authentication warnings. Raw authentication entries remain

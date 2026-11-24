@@ -359,7 +359,7 @@ object Verifier2Service {
                                 policyContext = policyContextFactory(),
                                 updateSessionCallback = updateSessionCallback,
                                 failSessionCallback = failSessionCallback,
-                                beforeRespond = {
+                                beforeRespond = { _: Boolean ->
                                     repository.restoreProcessingClaim(claim)
                                 },
                             )
