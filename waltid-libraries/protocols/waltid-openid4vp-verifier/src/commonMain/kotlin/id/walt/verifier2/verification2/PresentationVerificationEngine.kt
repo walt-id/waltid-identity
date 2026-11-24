@@ -2,6 +2,11 @@
 
 package id.walt.verifier2.verification2
 
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.decodeFromHexString
+import id.walt.mdoc.objects.document.Document
+import id.walt.credentials.CredentialParser
+import id.walt.cose.coseCompliantCbor
 import kotlin.time.TimeSource
 import id.walt.cose.protectedAlgorithm
 import id.walt.cose.Cose
@@ -31,6 +36,7 @@ import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.HolderBindingJwtVcJsonVPPolicy
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.DcqlFulfillmentFailure
@@ -308,7 +314,11 @@ object PresentationVerificationEngine {
         }
 
         return presentationsToUse.associateWith { (presentationString, credentialQuery) ->
-            parsePresentation(presentationString, credentialQuery.format)
+            if (session.setup is DcApiAnnexCFlowSetup && credentialQuery.format == CredentialFormat.MSO_MDOC) {
+                // Annex C has already validated and decrypted the DeviceResponse envelope.
+                val document = coseCompliantCbor.decodeFromHexString<Document>(presentationString)
+                MsoMdocPresentation(CredentialParser.handleMdocDocument(presentationString, document).second)
+            } else parsePresentation(presentationString, credentialQuery.format)
         }
     }
 
@@ -340,16 +350,23 @@ object PresentationVerificationEngine {
      * jwt_vc_json presentation can carry several. `trusted_authorities` is left to the caller's own check.
      * With [matchClaims] false only format and `meta` are matched, for ISO/IEC 18013-7 Annex C, whose query is
      * built from the requested elements and where a holder may withhold some of them.
+     * [enforceMdocDisclosure] applies OpenID4VP disclosure rules; external readers own their DeviceRequest.
      */
     internal fun matchCredentialsToQueries(
         dcqlQuery: DcqlQuery,
         credentialsByQuery: Map<String, List<DigitalCredential>>,
         matchClaims: Boolean,
         resolvedTypes: Map<DigitalCredential, Set<String>> = emptyMap(),
+        transactionData: List<String> = emptyList(),
+        enforceMdocDisclosure: Boolean = true,
     ): Result<Set<String>> {
         val mismatches = credentialsByQuery.mapNotNull { (queryId, credentials) ->
             val credentialQuery = dcqlQuery.credentials.single { it.id == queryId }
-            credentialMismatch(credentialQuery, credentials, matchClaims, resolvedTypes)?.let { queryId to it }
+            val mismatch = credentialMismatch(credentialQuery, credentials, matchClaims, resolvedTypes)
+                ?: if (matchClaims && enforceMdocDisclosure) credentials.filterIsInstance<MdocsCredential>().firstNotNullOfOrNull {
+                    unrequestedMdocClaim(dcqlQuery, credentialsByQuery, it, transactionData)
+                } else null
+            mismatch?.let { queryId to it }
         }.toMap()
         val matched = credentialsByQuery.keys - mismatches.keys
         if (mismatches.isEmpty()) return Result.success(matched)
@@ -368,6 +385,66 @@ object PresentationVerificationEngine {
                 ),
             )
         )
+    }
+
+    /**
+     * ISO mdoc elements are selectively disclosable. OpenID4VP 1.0 section 6.4 permits additional
+     * claims when the same credential is selected by another query in this request. Compare the
+     * issuer authentication, not just docType: another credential cannot authorize this one's claims.
+     */
+    private fun unrequestedMdocClaim(
+        dcqlQuery: DcqlQuery,
+        credentialsByQuery: Map<String, List<DigitalCredential>>,
+        credential: MdocsCredential,
+        transactionData: List<String>,
+    ): String? {
+        val issuerAuth = credential.document.issuerSigned.issuerAuth
+        val presentationsByQuery = credentialsByQuery.mapValues { (_, credentials) ->
+            credentials.filterIsInstance<MdocsCredential>().filter { it.document.issuerSigned.issuerAuth == issuerAuth }
+        }.filterValues { it.isNotEmpty() }
+        val selectedQueryIds = presentationsByQuery.keys
+        // Requested transaction binding is protocol data, not an extra credential claim.
+        // Permit only the two hash fields in transaction types requested for this credential.
+        val transactionPaths = decodeList(transactionData)
+            .filter { it.transactionData.credentialIds.any(selectedQueryIds::contains) }
+            .flatMap { decoded ->
+                listOf("transaction_data_hash", "transaction_data_hash_alg").map { name ->
+                    listOf(JsonPrimitive(decoded.transactionData.type), JsonPrimitive(name))
+                }
+            }
+        val queryOptions = dcqlQuery.credentials.filter { it.id in selectedQueryIds }.map { query ->
+            val claims = query.claims.orEmpty()
+            val queryPresentations = presentationsByQuery.getValue(query.id)
+            if (query.claimSets == null) listOf(claims.map { it.path }.toSet()) else {
+                query.claimSets.orEmpty().mapNotNull { option ->
+                    val selected = claims.filter { it.id in option }
+                    val alternative = query.copy(claims = selected, claimSets = null)
+                    if (credentialMismatch(alternative, queryPresentations, matchClaims = true, resolvedTypes = emptyMap()) == null) {
+                        selected.map { it.path }.toSet()
+                    } else null
+                }
+            }
+        }
+        // A choice applies to the signed credential across all its presentations, not independently
+        // to each response. Otherwise different presentations can justify incompatible choices.
+        val requiredPaths = presentationsByQuery.values.flatten().flatMap { presentation ->
+            val issuerPaths = presentation.document.issuerSigned.namespaces.orEmpty().flatMap { (namespace, items) ->
+                items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.value.elementIdentifier)) }
+            }
+            val devicePaths = presentation.document.deviceSigned?.namespaces?.value?.entries.orEmpty().flatMap { (namespace, items) ->
+                items.entries.map { listOf(JsonPrimitive(namespace), JsonPrimitive(it.key)) }
+            }
+            issuerPaths + devicePaths.filterNot { it in transactionPaths }
+        }.toSet()
+        // Select one satisfied option per query. Another selected query can justify the remaining claims.
+        fun covered(index: Int, remaining: Set<List<JsonElement>>): Boolean {
+            if (remaining.isEmpty()) return true
+            if (index == queryOptions.size) return false
+            val possible = queryOptions.drop(index).flatten().flatten().toSet()
+            if (!possible.containsAll(remaining)) return false
+            return queryOptions[index].any { covered(index + 1, remaining - it) }
+        }
+        return "mdoc contains an unrequested selectively disclosable claim".takeUnless { covered(0, requiredPaths) }
     }
 
     private fun credentialMismatch(
@@ -495,7 +572,30 @@ object PresentationVerificationEngine {
             val parsedPresentations = parseAllPresentations(vpTokenContents, session)
             val afterParse = phaseStart.elapsedNow()
 
+            // Do not persist or publish selectively disclosable mdoc claims until disclosure limits pass.
+            val mdocsByQuery: Map<String, List<DigitalCredential>> = parsedPresentations.entries
+                .filter { it.value is MsoMdocPresentation }
+                .groupBy({ it.key.second.id }, { (it.value as MsoMdocPresentation).mdoc })
+            val query = session.authorizationRequest.dcqlQuery.takeUnless { session.setup is DcApiAnnexCFlowSetup }
+            val disclosureError = query?.let { dcql ->
+                mdocsByQuery.values.flatten().filterIsInstance<MdocsCredential>().firstNotNullOfOrNull {
+                    unrequestedMdocClaim(dcql, mdocsByQuery, it, session.authorizationRequest.transactionData.orEmpty())
+                }
+            }
+            if (disclosureError != null) {
+                val mismatch = matchCredentialsToQueries(
+                    requireNotNull(query), mdocsByQuery, matchClaims = true,
+                    transactionData = session.authorizationRequest.transactionData.orEmpty(),
+                ).exceptionOrNull() as DcqlFulfillmentChecker.DcqlFulfillmentException
+                session.updateSession(SessionEvent.dcql_fulfillment_check_failed) {
+                    status = Verification2Session.VerificationSessionStatus.FAILED
+                    failure = SessionFailure.DcqlFulfillment(disclosureError, mismatch.details)
+                }
+                throw PresentationRejectionException(disclosureError)
+            }
+
             session.updateSession(SessionEvent.parsed_presentation_available) {
+                presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, session.authorizationRequest.state)
                 // Byte arrays compacted before storage; see CompactStoredBytes.
                 presentedPresentations = presentationsByQuery(parsedPresentations).mapValues { (_, presentations) ->
                     presentations.map { it.withCompactByteArrays() }
@@ -639,6 +739,7 @@ object PresentationVerificationEngine {
                     dcqlQuery = dcqlQuery,
                     credentialsByQuery = allSuccessfullyValidatedAndProcessedData,
                     matchClaims = session.setup !is DcApiAnnexCFlowSetup,
+                    transactionData = session.authorizationRequest.transactionData.orEmpty(),
                     resolvedTypes = resolvedTypes,
                 ).mapCatching { matchedQueryIds ->
                     DcqlFulfillmentChecker.checkOverallDcqlFulfillment(dcqlQuery, matchedQueryIds).getOrThrow()
@@ -783,7 +884,7 @@ internal const val STORE_DOCUMENT_LIMIT_BYTES = 16_793_600
  * against the whole cause chain, because the driver's timeout arrives wrapped by the store layer.
  */
 private val INFRASTRUCTURE_FAILURE_MARKERS = listOf(
-    "Timeout", "TimedOut", "Socket", "Connect", "IOException", "Unreachable", "PoolClear",
+    "Timeout", "TimedOut", "Socket", "Connect", "Unreachable", "PoolClear",
     "NotPrimary", "NodeIsRecovering", "ShutdownInProgress", "Interrupted",
 )
 
@@ -801,7 +902,8 @@ internal fun Throwable.isInfrastructureFailure(): Boolean {
     val seen = mutableSetOf<Throwable>()
     while (current != null && seen.add(current)) {
         val name = current::class.simpleName ?: ""
-        if (INFRASTRUCTURE_FAILURE_MARKERS.any { name.contains(it, ignoreCase = true) }) return true
+        // Certificate decoders use CertIOException for malformed bytes, not a dependency outage.
+        if (name == "IOException" || INFRASTRUCTURE_FAILURE_MARKERS.any { name.contains(it, ignoreCase = true) }) return true
         current = current.cause
     }
     return false

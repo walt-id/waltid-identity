@@ -27,9 +27,9 @@ data class MsoMdocPresentation(
 
             return runCatching {
                 val (_, mdocsCredential) = when {
-                    isHex -> CredentialParser.handleMdocs(mdocString, base64 = false)
-                    isBase64 -> CredentialParser.handleMdocs(mdocString, base64 = true)
-                    else -> throw IllegalArgumentException("Invalid mdoc encoding: $mdocString")
+                    isHex -> CredentialParser.handleMdocsPresentation(mdocString, base64 = false)
+                    isBase64 -> CredentialParser.handleMdocsPresentation(mdocString, base64 = true)
+                    else -> throw IllegalArgumentException("Invalid mdoc presentation encoding")
                 }
 
                 MsoMdocPresentation(mdocsCredential)

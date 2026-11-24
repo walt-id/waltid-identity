@@ -186,8 +186,8 @@ for await state in session.states {
         showPreparationReview(plan, reason: reason)
     case .completed(let exchanges, _, _):
         showCompletion(exchanges: exchanges)
-    case .noData(let exchange):
-        showNoData(exchange: exchange)
+    case .noData(let exchange, let request):
+        showNoData(exchange: exchange, request: request)
     case .failed(let error):
         showFailure(error)
     default:
@@ -354,7 +354,13 @@ replaces the trust evaluator; install application CRL/IACA/custom policy afterwa
 stored data checks structure, not current trust. Service references remain live in a snapshot;
 collection data is detached. Demo imports do not install a CRL network client.
 
-A final request with no returnable data ends in `ProximityState.noData(exchange:)`. No credential
+An unmatched final request ends in `ProximityState.noData(exchange:unsatisfiedRequest:)`.
+Its required summary preserves every original requested document, index, namespace, field and retention
+intent. It contains no credential values or identifiers; reader authentication was not evaluated.
+Construct it as `.noData(exchange: exchange, unsatisfiedRequest: request)` and destructure it
+as `.noData(let exchange, let request)`. Holder decline and sharing failures use their existing
+completion/failure states.
+ No credential
 data was sent for that request; earlier exchanges in the same session may have
 shared approved data. Render `ProximityReview.readerAuthenticationSummary` for
 the request summary: it accounts for whole-request authentication coverage while

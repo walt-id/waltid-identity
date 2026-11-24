@@ -1,5 +1,10 @@
 package id.walt.walletdemo.compose.ui
 
+import id.walt.wallet2.mobile.ProximityUnsatisfiedDocument
+import id.walt.wallet2.mobile.ProximityUnsatisfiedRequest
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ComposeUiTest
@@ -70,6 +75,77 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoProximityTestScenarios {
+    fun unmatchedRequestShowsContextAndPagesLargeRequestsWithoutConsent(
+        runUiTest: (suspend ComposeUiTest.() -> Unit) -> Unit = { block -> runComposeUiTest(block = block) },
+        capture: ComposeUiTest.(String) -> Unit = {},
+    ) = runUiTest {
+        val summary = ProximityUnsatisfiedRequest(listOf(
+            ProximityUnsatisfiedDocument(0, "org.example.photoid", listOf(
+                ProximityRequestedElement("org.example.identity", "portrait", true),
+            )),
+        ))
+        val terminal = mutableStateOf(ProximityState.NoData(2, summary))
+        setProximityContent {
+            WalletDemoProximityScreen(
+                state = WalletDemoProximityUiState(active = true, sessionState = terminal.value),
+                credentialDetailsById = emptyMap(), hostActions = hostActions,
+                onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> }, onContinueAfterResponseChange = {},
+                onApprove = { _, _ -> error("No-match cannot offer approval") }, onDecline = {}, onRetry = {},
+                onRemediate = { _, _ -> }, onCancel = {}, onDismiss = {}, onRestart = {},
+            )
+        }
+        onNodeWithText("Request could not be satisfied").assertIsDisplayed()
+        onNodeWithText("Portrait").performScrollTo().assertIsDisplayed()
+        onNodeWithText("org.example.identity").assertIsDisplayed()
+        onNodeWithText("Reader intends to retain this data").performScrollTo().assertIsDisplayed()
+        onAllNodesWithTag(WalletUiTestTags.ProximityReview).assertCountEquals(0)
+        onNodeWithText("No credential data was shared for this request.").assertIsDisplayed()
+        capture("nearby-unmatched-request")
+        val evidenceCases = listOf(
+            "N1" to listOf(ProximityUnsatisfiedDocument(0, "unknown.document", listOf(
+                ProximityRequestedElement("org.iso.18013.5.1", "given_name", false)))),
+            "N2" to listOf(ProximityUnsatisfiedDocument(0, "org.iso.18013.5.1.mDL", listOf(
+                ProximityRequestedElement("unknown.namespace", "given_name", false)))),
+            "N3" to listOf(
+                ProximityUnsatisfiedDocument(0, "org.iso.18013.5.1.mDL", listOf(
+                    ProximityRequestedElement("org.iso.18013.5.1", "given_name", false),
+                    ProximityRequestedElement("org.iso.18013.5.1", "family_name", false))),
+                ProximityUnsatisfiedDocument(1, "missing.document", listOf(
+                    ProximityRequestedElement("namespace", "name", false)))),
+            "N4" to listOf(
+                ProximityUnsatisfiedDocument(0, "missing.document", listOf(
+                    ProximityRequestedElement("first.namespace", "名", true),
+                    ProximityRequestedElement("first.namespace", "age", true))),
+                ProximityUnsatisfiedDocument(1, "missing.document", listOf(
+                    ProximityRequestedElement("second.namespace", "portrait", false),
+                    ProximityRequestedElement("third.namespace", "address", false)))),
+        )
+        for ((caseId, documents) in evidenceCases) {
+            runOnIdle { terminal.value = ProximityState.NoData(2,
+                ProximityUnsatisfiedRequest(documents)) }
+            onNodeWithText("Request could not be satisfied").performScrollTo().assertIsDisplayed()
+            onAllNodesWithText(documents.first().docType).assertCountEquals(documents.size.takeIf { caseId == "N4" } ?: 1)
+            onAllNodesWithTag(WalletUiTestTags.ProximityReview).assertCountEquals(0)
+            capture(caseId)
+        }
+        runOnIdle {
+            terminal.value = ProximityState.NoData(3, ProximityUnsatisfiedRequest((0..5).map { index ->
+                ProximityUnsatisfiedDocument(index, "document-$index", (0..20).map { field ->
+                    ProximityRequestedElement("namespace", "field_$field", false)
+                })
+            }))
+        }
+        onAllNodesWithText("Field 20").assertCountEquals(0)
+        onAllNodesWithText("document-5").assertCountEquals(0)
+        capture("nearby-unmatched-large-initial")
+        onNodeWithText("Show more requested documents").performScrollToContent(this).performClick()
+        onNodeWithText("document-5").performScrollToContent(this).assertIsDisplayed()
+        onAllNodesWithText("Show more requested fields")[0].performScrollToContent(this).performClick()
+        onAllNodesWithText("Field 20").assertCountEquals(1)
+        onAllNodesWithText("Field 20")[0].performScrollToContent(this).assertIsDisplayed()
+        capture("nearby-unmatched-large-expanded")
+    }
+
     fun userFixedPermissionShowsSettingsWithoutChangingTheSdkAction() = runComposeUiTest {
         var remediated: ProximityRemediationAction? = null
         setProximityContent {
@@ -217,8 +293,12 @@ class WalletDemoProximityTestScenarios {
         onAllNodesWithText("Connection settings").assertCountEquals(0)
         onAllNodesWithTag("proximity-show-Qr").assertCountEquals(0)
         onAllNodesWithTag(WalletUiTestTags.ProximityQr).assertCountEquals(0)
-        runOnIdle { sessionState.value = ProximityState.NoData(2) }
-        onNodeWithText("No data shared").assertIsDisplayed()
+        runOnIdle { sessionState.value = ProximityState.NoData(2, ProximityUnsatisfiedRequest(listOf(
+            ProximityUnsatisfiedDocument(0, "org.example.photoid", listOf(
+                ProximityRequestedElement("org.example.identity", "portrait", true),
+            )),
+        ))) }
+        onNodeWithText("Request could not be satisfied").assertIsDisplayed()
         onNodeWithText("No credential data was shared for this request.").assertIsDisplayed()
         onAllNodesWithText("Presentation complete").assertCountEquals(0)
         onNodeWithTag(WalletUiTestTags.ProximityDone).assertIsDisplayed()
@@ -550,6 +630,10 @@ private fun ComposeUiTest.setProximityContent(content: @Composable () -> Unit) {
         val statuses = WalletDemoCredentialStatuses(proximityCredentialDetails().keys.associateWith {
             WalletVisualFixtures.credentialStatus("not_provided")
         })
-        CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(statuses)) { content() }
+        WalletDemoTheme {
+            Surface(modifier = Modifier.fillMaxSize()) {
+                CompositionLocalProvider(LocalCredentialStatusUi provides CredentialStatusUiContext(statuses)) { content() }
+            }
+        }
     }
 }

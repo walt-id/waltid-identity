@@ -4,94 +4,456 @@ import id.walt.ktornotifications.core.KtorSessionNotifications.VerificationSessi
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.webdatafetching.ssrf.BlockedAddressException
 import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
-import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
-import io.ktor.client.network.sockets.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.utils.io.*
-import java.net.UnknownHostException
-import java.nio.channels.UnresolvedAddressException
+import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.basicAuth
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.header
+import io.ktor.client.request.preparePost
+import io.ktor.client.request.setBody
+import io.ktor.serialization.kotlinx.json.DefaultJson
+import io.ktor.http.content.OutgoingContent
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.contentType
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.serialization.encodeToString
+import java.nio.file.Path
+import java.security.MessageDigest
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Base64
+import java.util.UUID
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.pow
+import kotlin.random.Random
+
+private fun addDelay(time: Long, delay: Long): Long =
+    if (time > Long.MAX_VALUE - delay) Long.MAX_VALUE else time + delay
+
+private val log = KotlinLogging.logger { }
 
 /** The private-network guard refused the webhook URL; the guard has already logged the destination. */
 class WebhookDestinationNotAllowedException(cause: Throwable) :
     IllegalArgumentException("Webhook destination is not allowed (network-fetch-guard.conf)", cause)
 
-object WebhookNotifier {
+internal interface WebhookTransport {
+    suspend fun deliver(delivery: WebhookDelivery, attempt: Int, timestampEpochSeconds: Long): WebhookAttemptResult
+}
 
-    private val webhookClient = HttpClient(OkHttp) {
-        // Redirects stay off. The guard checks the address OkHttp connects to and follows a redirect
-        // only when this client has followRedirects enabled.
+internal class KtorWebhookTransport(
+    private val client: HttpClient = HttpClient(OkHttp) {
+        // Redirects stay off. The guard checks the address OkHttp connects to, and a redirect would
+        // send credentials to an unconfigured URL and invalidate URL-bound signatures.
         followRedirects = false
-        install(ContentNegotiation) {
-            json()
+        engine { config { retryOnConnectionFailure(false) } }
+        install(HttpTimeout) {
+            connectTimeoutMillis = 10_000
+            requestTimeoutMillis = 30_000
+            socketTimeoutMillis = 30_000
         }
         installPrivateNetworkGuard()
-    }
-
-    /*
-    suspend fun notify(update: KtorSessionUpdate, config: VerificationSessionWebhookNotification) {
-        try {
-            log.debug { "Sending webhook notification to ${config.url} for target ${update.target}, event: ${update.event}" }
-            val response = webhookClient.post(config.url) {
+    },
+    private val nowEpochMilliseconds: () -> Long = System::currentTimeMillis,
+) : WebhookTransport {
+    override suspend fun deliver(
+        delivery: WebhookDelivery,
+        attempt: Int,
+        timestampEpochSeconds: Long,
+    ): WebhookAttemptResult {
+        return try {
+            client.preparePost(delivery.url) {
                 contentType(ContentType.Application.Json)
-                setBody(update)
-
-                if (config.basicAuthUser != null && config.basicAuthPass != null) {
-                    basicAuth(config.basicAuthUser!!, config.basicAuthPass!!)
+                header(WEBHOOK_ID_HEADER, delivery.deliveryId)
+                header(IDEMPOTENCY_KEY_HEADER, delivery.deliveryId)
+                header(WEBHOOK_SEQUENCE_HEADER, delivery.enqueueOrder)
+                header(WEBHOOK_TIMESTAMP_HEADER, timestampEpochSeconds)
+                header(WEBHOOK_ATTEMPT_HEADER, attempt)
+                header(CONTENT_DIGEST_HEADER, delivery.contentDigest)
+                delivery.signingSecret?.let { secret ->
+                    header(
+                        WEBHOOK_SIGNATURE_HEADER,
+                        WebhookSignature.sign(
+                            secret = secret,
+                            url = delivery.url,
+                            deliveryId = delivery.deliveryId,
+                            timestampEpochSeconds = timestampEpochSeconds,
+                            attempt = attempt,
+                            contentDigest = delivery.contentDigest,
+                        ),
+                    )
                 }
+                // Ktor's OkHttp engine marks streaming bodies as one-shot. This also prevents
+                // OkHttp from replaying a 503 with Retry-After: 0 within a single queue attempt.
+                val bytes = delivery.payload.encodeToByteArray()
+                setBody(object : OutgoingContent.ReadChannelContent() {
+                    override val contentType = ContentType.Application.Json
+                    override val contentLength = bytes.size.toLong()
+                    override fun readFrom() = ByteReadChannel(bytes)
+                })
 
-                if (config.bearerToken != null) {
-                    bearerAuth(config.bearerToken!!)
+                if (delivery.basicAuthUser != null && delivery.basicAuthPass != null) {
+                    basicAuth(delivery.basicAuthUser, delivery.basicAuthPass)
                 }
+                if (delivery.bearerToken != null) {
+                    bearerAuth(delivery.bearerToken)
+                }
+            }.execute { response ->
+                WebhookAttemptResult(
+                    statusCode = response.status.value,
+                    retryAfterMilliseconds = parseRetryAfter(response.headers[HttpHeaders.RetryAfter], nowEpochMilliseconds()),
+                )
             }
-            if (response.status.isSuccess()) {
-                log.debug { "Webhook notification sent successfully to ${config.url}, status: ${response.status}" }
-            } else {
-                log.warn { "Webhook notification to ${config.url} returned non-success status: ${response.status}" }
-            }
-        } catch (ex: Exception) {
-            log.warn(ex) { "Failed to send webhook notification to ${config.url} for target ${update.target}, event: ${update.event} - ${ex.message}" }
+        } catch (ex: CancellationException) {
             throw ex
+        } catch (ex: Exception) {
+            if (generateSequence<Throwable>(ex) { it.cause }.any { it is BlockedAddressException }) {
+                WebhookAttemptResult(error = WebhookDestinationNotAllowedException(ex))
+            } else throw ex
         }
     }
-     */
 
-    suspend fun notify(update: KtorSessionUpdate, config: VerificationSessionWebhookNotification) {
-        runCatching {
-            val response = webhookClient.post(config.url) {
-                contentType(ContentType.Application.Json)
-                setBody(update)
-
-                if (config.basicAuthUser != null && config.basicAuthPass != null) {
-                    basicAuth(config.basicAuthUser!!, config.basicAuthPass!!)
-                }
-
-                if (config.bearerToken != null) {
-                    bearerAuth(config.bearerToken!!)
-                }
-            }
-            if (!response.status.isSuccess()) {
-                throw IllegalArgumentException(
-                    "Configured webhook rejected session update with HTTP ${response.status.value}: ${config.url}",
-                )
-            }
-        }.getOrElse { ex ->
-            if (ex is CancellationException) throw ex
-            val causes = generateSequence(ex) { it.cause }
-            if (causes.any { it is BlockedAddressException }) {
-                throw WebhookDestinationNotAllowedException(ex)
-            }
-            if (ex is ConnectTimeoutException || causes.any { it is UnknownHostException || it is UnresolvedAddressException }) {
-                throw IllegalArgumentException(
-                    "Could not connect to configured webhook URL for session update: ${config.url.hostWithPortIfSpecified}",
-                    ex
-                )
-            } else {
-                throw IllegalArgumentException("Could not notify configured webhook for session update: ${ex.message}", ex)
-            }
+    private fun parseRetryAfter(value: String?, now: Long): Long? {
+        if (value == null) return null
+        if (value.isNotEmpty() && value.all { it in '0'..'9' }) {
+            return TimeUnit.SECONDS.toMillis(value.toLongOrNull() ?: Long.MAX_VALUE)
         }
+        return runCatching {
+            val retryAt = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli()
+            (retryAt - now).coerceAtLeast(0)
+        }.getOrNull()
     }
 }
+
+internal class WebhookDeliveryQueue(
+    private val store: WebhookDeliveryStore,
+    private val transport: WebhookTransport,
+    private val clock: () -> Long = System::currentTimeMillis,
+    private val jitter: (Long) -> Long = { upperExclusive ->
+        if (upperExclusive <= 1) 0 else Random.nextLong(upperExclusive)
+    },
+    private val pollIntervalMilliseconds: Long = 1_000,
+    private val maxConcurrentDeliveries: Int = DEFAULT_MAX_CONCURRENT_DELIVERIES,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+) {
+    private val wakeUp = Channel<Unit>(Channel.CONFLATED)
+    private val processingMutex = Mutex()
+    private val deliveryPermits = Semaphore(maxConcurrentDeliveries)
+    private val enqueueSequence = AtomicLong(clock() * 1_000)
+    private var worker: Job? = null
+
+    init {
+        require(maxConcurrentDeliveries > 0) { "maxConcurrentDeliveries must be greater than zero" }
+    }
+
+    @Synchronized
+    fun start() {
+        if (worker?.isActive == true) return
+        worker = scope.launch {
+            while (isActive) {
+                val claimed = try {
+                    processDue()
+                } catch (ex: CancellationException) {
+                    throw ex
+                } catch (ex: Exception) {
+                    log.error(ex) { "Webhook delivery worker failed; pending deliveries remain in the outbox" }
+                    0
+                }
+                // A full claim means more work may already be due. Poll again immediately so a backlog
+                // drains at the concurrency limit instead of one batch per poll interval.
+                if (claimed >= maxConcurrentDeliveries) continue
+                kotlinx.coroutines.withTimeoutOrNull(pollIntervalMilliseconds) { wakeUp.receive() }
+            }
+        }
+    }
+
+    suspend fun stop() {
+        val activeWorker = synchronized(this) {
+            worker.also { worker = null }
+        }
+        activeWorker?.cancel()
+        activeWorker?.join()
+    }
+
+    suspend fun enqueue(
+        update: KtorSessionUpdate,
+        config: VerificationSessionWebhookNotification,
+        sessionOwner: String? = null,
+        retainOnFailure: Boolean = true,
+        sessionGeneration: Long = 0,
+    ): String {
+        val payload = DefaultJson.encodeToString(update)
+        val now = clock()
+        val delivery = WebhookDelivery(
+            deliveryId = UUID.randomUUID().toString(),
+            url = config.url.toString(),
+            payload = payload,
+            contentDigest = contentDigest(payload),
+            target = update.target,
+            event = update.event,
+            requestId = update.requestId,
+            basicAuthUser = config.basicAuthUser,
+            basicAuthPass = config.basicAuthPass,
+            bearerToken = config.bearerToken,
+            signingSecret = config.signingSecret,
+            retryPolicy = config.retryPolicy,
+            sessionOwner = sessionOwner,
+            retainOnFailure = retainOnFailure,
+            sessionGeneration = sessionGeneration,
+            enqueueOrder = enqueueSequence.updateAndGet { previous ->
+                maxOf(previous + 1, now * 1_000)
+            },
+            createdAtEpochMilliseconds = now,
+            nextAttemptAtEpochMilliseconds = now,
+        )
+        store.enqueue(delivery)
+        wakeUp.trySend(Unit)
+        return delivery.deliveryId
+    }
+
+    suspend fun processDue(limit: Int = 100): Int = processingMutex.withLock {
+        val now = clock()
+        // Claim only work that this process can start immediately. Reserving a large backlog behind the
+        // local semaphore could let leases expire before their HTTP requests begin.
+        val claims = store.claimDue(
+            nowEpochMilliseconds = now,
+            leaseUntilEpochMilliseconds = now + DELIVERY_LEASE_MILLISECONDS,
+            limit = minOf(limit, maxConcurrentDeliveries),
+        )
+        coroutineScope {
+            claims.map { claim ->
+                async {
+                    deliveryPermits.withPermit {
+                        store.dispatch(claim) { process(claim) }
+                    }
+                }
+            }.awaitAll()
+        }
+        claims.size
+    }
+
+    suspend fun eraseSession(sessionOwner: String, allowFutureCallbacks: Boolean = false) =
+        store.eraseSession(sessionOwner, allowFutureCallbacks)
+
+    suspend fun isSessionDeleted(sessionOwner: String): Boolean = store.isSessionDeleted(sessionOwner)
+
+    suspend fun deadLetters(): List<WebhookDeadLetter> = store.deadLetters()
+
+    suspend fun redrive(deliveryId: String): Boolean {
+        val redriven = store.redrive(deliveryId, clock())
+        if (redriven) wakeUp.trySend(Unit)
+        return redriven
+    }
+
+    private suspend fun process(claim: WebhookDeliveryClaim) {
+        val delivery = claim.delivery
+        val now = clock()
+        val attempt = delivery.attemptCount + 1
+        val result = try {
+            transport.deliver(delivery, attempt, now / 1_000)
+        } catch (ex: CancellationException) {
+            throw ex
+        } catch (ex: Exception) {
+            WebhookAttemptResult(error = ex)
+        }
+        val attempted = delivery.copy(attemptCount = attempt)
+
+        if (result.successful) {
+            if (!store.markDelivered(claim)) {
+                log.warn { "Webhook success was not recorded because its lease was lost (deliveryId=${attempted.deliveryId})" }
+                return
+            }
+            log.info {
+                "Webhook delivered (deliveryId=${attempted.deliveryId}, target=${attempted.target}, " +
+                    "event=${attempted.event}, attempt=$attempt, status=${result.statusCode})"
+            }
+            return
+        }
+
+        val error = result.failureMessage()
+        val exhausted = attempt >= attempted.retryPolicy.maxAttempts
+        if (!result.retryable || exhausted) {
+            if (!delivery.retainOnFailure) {
+                store.markDelivered(claim)
+                log.warn { "Discarded unsuccessful webhook for non-persisted result (deliveryId=${delivery.deliveryId})" }
+                return
+            }
+            val moved = store.moveToDeadLetter(
+                claim,
+                attempted.copy(
+                    failedAtEpochMilliseconds = clock(),
+                    lastError = error,
+                )
+            )
+            if (!moved) {
+                log.warn { "Webhook failure was not recorded because its lease was lost (deliveryId=${attempted.deliveryId})" }
+                return
+            }
+            log.error {
+                "Webhook moved to dead-letter (deliveryId=${attempted.deliveryId}, target=${attempted.target}, " +
+                    "event=${attempted.event}, attempt=$attempt): $error"
+            }
+            return
+        }
+
+        val retryDelay = maxOf(backoffMilliseconds(attempted), result.retryAfterMilliseconds ?: 0)
+        val rescheduled = store.reschedule(
+            claim,
+            attempted.copy(
+                nextAttemptAtEpochMilliseconds = addDelay(clock(), retryDelay),
+                lastError = error,
+            )
+        )
+        if (!rescheduled) {
+            log.warn { "Webhook retry was not recorded because its lease was lost (deliveryId=${attempted.deliveryId})" }
+            return
+        }
+        log.warn {
+            "Webhook delivery failed and will be retried (deliveryId=${attempted.deliveryId}, " +
+                "target=${attempted.target}, event=${attempted.event}, attempt=$attempt, " +
+                "retryInMs=$retryDelay): $error"
+        }
+    }
+
+    private fun backoffMilliseconds(delivery: WebhookDelivery): Long {
+        val policy = delivery.retryPolicy
+        val base = policy.initialBackoffSeconds * 1_000.0 *
+            policy.backoffMultiplier.pow((delivery.attemptCount - 1).coerceAtLeast(0))
+        val capped = base.toLong().coerceAtMost(TimeUnit.SECONDS.toMillis(policy.maxBackoffSeconds))
+        val jitterUpperBound = capped / 2 + 1
+        return addDelay(capped, jitter(jitterUpperBound))
+    }
+
+    private fun contentDigest(payload: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(payload.toByteArray(Charsets.UTF_8))
+        return "sha-256=:${Base64.getEncoder().encodeToString(digest)}:"
+    }
+
+    private companion object {
+        const val DELIVERY_LEASE_MILLISECONDS = 5 * 60 * 1_000L
+        const val DEFAULT_MAX_CONCURRENT_DELIVERIES = 4
+    }
+}
+
+object WebhookNotifier {
+    private val lock = Any()
+
+    @Volatile
+    private var queue: WebhookDeliveryQueue? = null
+
+    /** Starts the worker and resumes deliveries left pending by a previous process. */
+    fun start(storageDirectory: Path = defaultStorageDirectory()) {
+        queue { FileWebhookDeliveryStore(storageDirectory) }.start()
+    }
+
+    /** Starts a worker in a service-specific directory below the configured outbox root. */
+    fun start(serviceName: String) {
+        require(serviceName.matches(Regex("[a-zA-Z0-9_-]+"))) { "Invalid webhook delivery service name" }
+        start(configuredStorageRoot().resolve(serviceName))
+    }
+
+    /** Starts the worker with a service-provided distributed outbox implementation. */
+    fun start(store: WebhookDeliveryStore) {
+        queue { store }.start()
+    }
+
+    suspend fun notify(update: KtorSessionUpdate, config: VerificationSessionWebhookNotification) {
+        enqueue(update, config)
+    }
+
+    /**
+     * Durably enqueues a webhook. Delivery happens asynchronously so protocol requests are not held open by
+     * receiver backoff. The returned ID is stable for all attempts of this logical delivery.
+     */
+    suspend fun enqueue(
+        update: KtorSessionUpdate,
+        config: VerificationSessionWebhookNotification,
+    ): String {
+        return enqueue(update, config, sessionOwner = null, retainOnFailure = true)
+    }
+
+    internal suspend fun enqueue(
+        update: KtorSessionUpdate,
+        config: VerificationSessionWebhookNotification,
+        sessionOwner: String?,
+        retainOnFailure: Boolean,
+        sessionGeneration: Long = 0,
+    ): String {
+        val activeQueue = queue()
+        activeQueue.start()
+        return activeQueue.enqueue(update, config, sessionOwner, retainOnFailure, sessionGeneration)
+    }
+
+    suspend fun eraseSession(sessionOwner: String, allowFutureCallbacks: Boolean = false) =
+        queue().eraseSession(sessionOwner, allowFutureCallbacks)
+
+    suspend fun isSessionDeleted(sessionOwner: String): Boolean = queue().isSessionDeleted(sessionOwner)
+
+    suspend fun deadLetters(): List<WebhookDeadLetter> = queue().deadLetters()
+
+    suspend fun redrive(deliveryId: String): Boolean = queue().redrive(deliveryId)
+
+    suspend fun stop() {
+        val activeQueue = synchronized(lock) { queue.also { queue = null } }
+        activeQueue?.stop()
+    }
+
+    private fun queue(
+        createStore: () -> WebhookDeliveryStore = { FileWebhookDeliveryStore(defaultStorageDirectory()) },
+    ): WebhookDeliveryQueue =
+        queue ?: synchronized(lock) {
+            queue ?: WebhookDeliveryQueue(
+                store = createStore(),
+                transport = KtorWebhookTransport(),
+            ).also { queue = it }
+        }
+
+    private fun defaultStorageDirectory(): Path =
+        configuredRoot()?.resolve("embedded")
+            ?: temporaryRoot().resolve("embedded-${ProcessHandle.current().pid()}")
+
+    private fun configuredRoot(): Path? =
+        (System.getProperty(STORAGE_DIRECTORY_PROPERTY) ?: System.getenv(STORAGE_DIRECTORY_ENVIRONMENT_VARIABLE))
+            ?.let { Path.of(it) }
+
+    private fun configuredStorageRoot(): Path = configuredRoot() ?: temporaryRoot()
+
+    private fun temporaryRoot(): Path {
+        val temporary = Path.of(System.getProperty("java.io.tmpdir"), "waltid-webhook-deliveries")
+        log.warn {
+            "Webhook delivery outbox is using temporary storage at $temporary. Pending and dead-letter " +
+                "deliveries may be lost on restart. Configure $STORAGE_DIRECTORY_ENVIRONMENT_VARIABLE or " +
+                "$STORAGE_DIRECTORY_PROPERTY on a durable, access-restricted volume for production."
+        }
+        return temporary
+    }
+}
+
+const val WEBHOOK_ID_HEADER = "Webhook-Id"
+const val IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+const val WEBHOOK_SEQUENCE_HEADER = "Webhook-Sequence"
+const val WEBHOOK_TIMESTAMP_HEADER = "Webhook-Timestamp"
+const val WEBHOOK_ATTEMPT_HEADER = "Webhook-Attempt"
+const val CONTENT_DIGEST_HEADER = "Content-Digest"
+const val WEBHOOK_SIGNATURE_HEADER = "X-Webhook-Signature"
+
+const val STORAGE_DIRECTORY_PROPERTY = "waltid.webhook.delivery.directory"
+const val STORAGE_DIRECTORY_ENVIRONMENT_VARIABLE = "WALTID_WEBHOOK_DELIVERY_DIRECTORY"

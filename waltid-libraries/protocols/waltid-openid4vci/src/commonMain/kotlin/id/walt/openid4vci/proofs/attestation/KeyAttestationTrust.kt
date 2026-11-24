@@ -3,6 +3,7 @@ package id.walt.openid4vci.proofs.attestation
 import id.walt.openid4vci.attestation.AttestationStatusPolicy
 import id.walt.openid4vci.attestation.AttestationStatusResolver
 
+import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.certificate.x509.validation.X509CertificateChain
@@ -14,11 +15,21 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.proofs.CredentialProofServiceException
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
 import id.walt.openid4vci.proofs.invalidCredentialProof
+import id.walt.trust.decision.TrustCheck
+import id.walt.trust.decision.TrustDecisionEvaluator
+import id.walt.trust.decision.TrustDecisionRequest
+import id.walt.trust.decision.TrustPurpose
+import id.walt.trust.decision.TrustRequirement
+import id.walt.trust.decision.TrustSubject
+import id.walt.trust.decision.check
+import id.walt.trust.model.TrustDecisionCode
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.io.encoding.Base64
 
 /**
  * Header values are untrusted hints. Return only authorized keys with exportable public material.
@@ -30,6 +41,28 @@ fun interface KeyAttestationTrustResolver {
         context: CredentialProofValidationContext,
         configuration: CredentialConfiguration,
     ): List<Key>
+}
+
+/**
+ * A resolver whose trust decision needs a lookup. [KeyAttestationVerifier] takes the signer keys from the
+ * attestation, verifies the signature, and only then calls [authorizeSigner], so a forged attestation never
+ * reaches the trust source. [resolve] authorizes first, so a caller that wraps this resolver stays fail-closed.
+ */
+internal interface SignatureFirstKeyAttestationTrustResolver : KeyAttestationTrustResolver {
+    /** The signer keys the attestation itself names. Implies no trust and does no I/O. */
+    suspend fun candidateKeys(header: JsonObject): List<Key>
+
+    /** Throws unless the signer is trusted. Called only after a [candidateKeys] key verified the signature. */
+    suspend fun authorizeSigner(header: JsonObject)
+
+    override suspend fun resolve(
+        header: JsonObject,
+        context: CredentialProofValidationContext,
+        configuration: CredentialConfiguration,
+    ): List<Key> {
+        authorizeSigner(header)
+        return candidateKeys(header)
+    }
 }
 
 fun interface KeyAttestationKeyReferenceResolver {
@@ -65,6 +98,7 @@ class KeyAttestationServiceException(message: String, cause: Throwable? = null) 
 internal suspend fun createKeyAttestationTrustResolver(
     method: KeyAttestationVerificationMethod,
     keyReferenceResolver: KeyAttestationKeyReferenceResolver?,
+    trustEvaluator: TrustDecisionEvaluator? = null,
 ): KeyAttestationTrustResolver = when (method) {
     is KeyAttestationVerificationMethod.StaticJwk -> {
         val key = try {
@@ -97,22 +131,7 @@ internal suspend fun createKeyAttestationTrustResolver(
         }
         KeyAttestationTrustResolver { header, _, _ ->
             attestationInput {
-                val certificates = header["x5c"] as? JsonArray
-                    ?: throw invalidCredentialProof("Key attestation x5c chain is required")
-                if (certificates.isEmpty()) {
-                    throw invalidCredentialProof("Key attestation certificate chain must not be empty")
-                }
-                val chain = certificates.map { element ->
-                    val encoded = (element as? JsonPrimitive)?.takeIf { it.isString }?.content
-                        ?: throw invalidCredentialProof("Key attestation certificates must be strings")
-                    X509CertificateUtil.parseCertificateDerEncoded(ByteString(encoded.decodeFromBase64()))
-                }
-                val ordered = X509CertificateChain.of(chain)
-                if (ordered.size != chain.size || chain.indices.any {
-                        chain[it].fingerprintSha256 != ordered[ordered.size - 1 - it].fingerprintSha256
-                    }) {
-                    throw invalidCredentialProof("Key attestation x5c must contain one leaf-first certificate chain")
-                }
+                val chain = leafFirstX5cChain(header)
                 if (!X509CertificateUtil.validateCertificateChain(chain, roots).valid) {
                     throw invalidCredentialProof("Key attestation certificate chain is not trusted")
                 }
@@ -122,4 +141,63 @@ internal suspend fun createKeyAttestationTrustResolver(
             }
         }
     }
+
+    is KeyAttestationVerificationMethod.X509TrustRegistry -> X509TrustRegistryResolver(method, trustEvaluator)
 }
+
+private class X509TrustRegistryResolver(
+    private val method: KeyAttestationVerificationMethod.X509TrustRegistry,
+    private val trustEvaluator: TrustDecisionEvaluator?,
+) : SignatureFirstKeyAttestationTrustResolver {
+    override suspend fun candidateKeys(header: JsonObject): List<Key> = attestationInput {
+        listOf(leafFirstX5cChain(header).first().restoreSubjectPublicKey(CryptoRuntime(defaultSoftwareKeyProviders())))
+    }
+
+    override suspend fun authorizeSigner(header: JsonObject) {
+        val chain = attestationInput { leafFirstX5cChain(header) }
+        // Outside attestationInput: an issuer that cannot decide trust must not report an invalid proof.
+        val evaluator = trustEvaluator
+            ?: throw KeyAttestationServiceException("Key attestation trust registry is not configured")
+        val request = TrustDecisionRequest(
+            purpose = TrustPurpose.ISSUER_WUA_SIGNER,
+            subject = TrustSubject.CertificateChain(chain.map { Base64.encode(it.encodedDer.toByteArray()) }),
+            expectedEntityTypes = method.expectedEntityTypes,
+        )
+        when (val check = evaluator.check(request, TrustRequirement.RegistryFresh(method.requireAuthenticatedSource))) {
+            is TrustCheck.Accepted -> Unit
+            is TrustCheck.Rejected -> {
+                if (check.decision?.decision == TrustDecisionCode.UNKNOWN) {
+                    log.warn { "Key attestation trust source is unavailable: ${check.decision?.warnings}" }
+                    throw KeyAttestationServiceException("Key attestation trust source is unavailable")
+                }
+                log.info { "Key attestation signer is not trusted: ${check.reason}" }
+                throw invalidCredentialProof("Key attestation certificate chain is not trusted")
+            }
+
+            TrustCheck.Skipped -> throw KeyAttestationServiceException("A registry trust requirement is never skipped")
+        }
+    }
+}
+
+/** The x5c certificates, which must form one chain in leaf-first order. Call within [attestationInput]. */
+private fun leafFirstX5cChain(header: JsonObject): List<X509Certificate> {
+    val certificates = header["x5c"] as? JsonArray
+        ?: throw invalidCredentialProof("Key attestation x5c chain is required")
+    if (certificates.isEmpty()) {
+        throw invalidCredentialProof("Key attestation certificate chain must not be empty")
+    }
+    val chain = certificates.map { element ->
+        val encoded = (element as? JsonPrimitive)?.takeIf { it.isString }?.content
+            ?: throw invalidCredentialProof("Key attestation certificates must be strings")
+        X509CertificateUtil.parseCertificateDerEncoded(ByteString(encoded.decodeFromBase64()))
+    }
+    val ordered = X509CertificateChain.of(chain)
+    if (ordered.size != chain.size || chain.indices.any {
+            chain[it].fingerprintSha256 != ordered[ordered.size - 1 - it].fingerprintSha256
+        }) {
+        throw invalidCredentialProof("Key attestation x5c must contain one leaf-first certificate chain")
+    }
+    return chain
+}
+
+private val log = KotlinLogging.logger { }
