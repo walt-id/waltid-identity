@@ -40,43 +40,29 @@ also drop the volumes) and run the command above again.
 
 ### Upgrading an existing Wallet2 database
 
-Older Compose releases shipped a nested `wallet2-persistence.conf` that fell back to SQLite at
-`/waltid-wallet-api2/wallet2.db` inside the container. To keep using that database, stop Wallet2 and
-copy the file before replacing the container or starting it with the corrected PostgreSQL configuration.
-Run these commands from the Compose directory:
+Older releases stored the default Wallet2 SQLite database at `/waltid-wallet-api2/wallet2.db`
+inside the container. The current Compose file mounts `wallet-api2/data` from the host and uses
+`wallet2.db` in that directory. To keep the old database, run these commands from the Compose
+directory before removing or recreating the existing container:
 
 ```bash
 docker compose stop wallet-api2
 mkdir -p wallet-api2/data
-docker compose cp wallet-api2:/waltid-wallet-api2/wallet2.db ./wallet-api2/data/wallet2.db
+test ! -e wallet-api2/data/wallet2.db && docker compose cp wallet-api2:/waltid-wallet-api2/wallet2.db ./wallet-api2/data/wallet2.db
 ```
 
-If the stopped container also contains `wallet2.db-wal` or `wallet2.db-shm`, copy those files into
-the same directory. Set `wallet-api2/config/wallet2-persistence.conf` to the following:
-
-```hocon
-jdbcUrl = "jdbc:sqlite:/waltid-wallet-api2/data/wallet2.db"
-driverClassName = "org.sqlite.JDBC"
-```
-
-Add a `wallet2-sqlite.override.yaml` beside `docker-compose.yaml`:
-
-```yaml
-services:
-  wallet-api2:
-    volumes:
-      - ./wallet-api2/data:/waltid-wallet-api2/data
-```
-
-Use both files when starting Wallet2 or managing the upgraded stack:
+If the stopped container also contains `wallet2.db-wal`, `wallet2.db-shm`, or `wallet2.db-journal`,
+copy those files into the same directory. Start Wallet2 using the updated Compose and configuration files:
 
 ```bash
-docker compose -f docker-compose.yaml -f wallet2-sqlite.override.yaml up -d wallet-api2
+docker compose up -d wallet-api2
 ```
 
-Startup adds the account tables to the restored database and preserves its wallets and ownership
-links. Older releases kept password verifiers in memory, so the SQLite backup cannot restore those
-logins. Registering an email creates a new account with its own wallets.
+Startup adds the account tables to the copied database and keeps each wallet linked to its original
+account ID. Older releases stored the login details only in memory, so the copied database cannot
+restore those logins. Registering the same email creates a new account ID, and the original wallets
+stay linked to the original ID. If your deployment already uses a custom persistent database, keep
+its configuration and storage mount when upgrading.
 
 ### Stop the Services
 
@@ -89,6 +75,8 @@ $ docker compose down
 ```bash
 $ docker compose down -v
 ```
+
+Wallet2's bind-mounted SQLite data remains in `wallet-api2/data`.
 
 *Note:*
 The version of the images pulled is controlled by the `VERSION_TAG` in the `.env` file. By default, it is set to latest,
@@ -161,7 +149,6 @@ $ docker compose up wallet-demo-compose-web wallet-api2
 will start automatically:
 
 - caddy
-- postgres
 - wallet-api2
 - and wallet-demo-compose-web itself
 
@@ -172,7 +159,7 @@ profiles to start the services for. The services are available with the followin
 
 - **identity** - the current stack implementing the final v1 protocols (issuer-api2, verifier-api2, wallet-api2,
   web-portal2, wallet-demo-compose-web). wallet-api2 has the `auth` feature enabled (email/password JWT; see
-  `wallet-api2/config/auth.conf`) and stores accounts and wallets in PostgreSQL. The published `stable` tag
+  `wallet-api2/config/auth.conf`) and stores accounts and wallets in SQLite under `wallet-api2/data`. The published `stable` tag
   (0.23.0) cannot load that auth config; use `latest`
   or a locally built `1.0.0-SNAPSHOT` image for wallet-api2 when auth is on. The Compose web wallet image is
   built from source (`docker compose build wallet-demo-compose-web`) until a matching tag is published.

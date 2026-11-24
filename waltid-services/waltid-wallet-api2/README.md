@@ -25,7 +25,7 @@
 **Key differences from waltid-wallet-api (v1):**
 - Built on the new `waltid-openid4vc-wallet` library (multiplatform core).
 - Clean separation: all route logic lives in `waltid-openid4vc-wallet-server`, and is similar to Enterprise to allow for easy later upgrading.
-- Pluggable stores: the standalone sample enables SQLite via `wallet2-persistence` and Docker Compose uses PostgreSQL. Wallet and account data are in memory when persistence is disabled.
+- Pluggable stores: the standalone sample and Docker Compose enable SQLite via `wallet2-persistence`. Wallet and account data are in memory when persistence is disabled.
 - Auth is opt-in: enable the `auth` feature for account registration, JWT-based login, and wallet ownership enforcement.
 
 ---
@@ -46,7 +46,7 @@ Apply the [shared deployment controls](../README.md#production-deployment) and c
 
 Before launch, test account isolation and a complete receive-and-present flow, including access to the same wallet and credentials after a restart or restore.
 
-With `auth` and `wallet2-persistence` enabled, Wallet2 stores account IDs, email identifiers, and password hashes in the same database as wallet ownership. Startup adds the account tables to an existing database and preserves its wallet ownership records. Older versions held accounts only in memory, so upgrading cannot recover their credentials or account IDs from an email address. Registering that email creates a new account with its own wallets.
+With `auth` and `wallet2-persistence` enabled, Wallet2 stores account IDs, email identifiers, and password hashes in the same database as wallet ownership. Startup adds the account tables to an existing database and keeps each wallet linked to its original account ID. Older versions held logins only in memory, so the database contains no email or password hash to restore them. Registering the same email creates a new account ID, and the original wallets stay linked to the original ID.
 
 ## Features
 
@@ -147,17 +147,20 @@ docker run --rm \
 
 #### With Postgres
 
-Override `wallet2-persistence.conf` by placing a custom one in your mounted config directory:
+Place a custom `wallet2-persistence.conf` in your mounted config directory. Set `WALLET2_DB_USERNAME` and `WALLET2_DB_PASSWORD` in the environment that launches Docker.
 
 ```hocon
-jdbcUrl = "jdbc:postgresql://db:5432/wallet2?user=wallet&password=secret"
+jdbcUrl = "jdbc:postgresql://db:5432/wallet2"
 driverClassName = "org.postgresql.Driver"
+username = "${WALLET2_DB_USERNAME}"
+password = "${WALLET2_DB_PASSWORD}"
 ```
 
 ```bash
 docker run --rm \
   -p 7005:7005 \
   -v "$(pwd)/my-config:/waltid-wallet-api2/config" \
+  -e WALLET2_DB_USERNAME -e WALLET2_DB_PASSWORD \
   --network my-net \
   waltid/wallet-api2:latest
 ```

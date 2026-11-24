@@ -66,7 +66,7 @@ data class Wallet2PersistenceConfig(
 fun initWallet2Database(
     config: Wallet2PersistenceConfig = Wallet2PersistenceConfig()
 ): Database {
-    log.info { "Initialising wallet2 database: ${config.jdbcUrl}" }
+    log.info { "Initialising wallet2 database with ${config.driverClassName}" }
 
     ensureSqliteParentDir(config.jdbcUrl)
 
