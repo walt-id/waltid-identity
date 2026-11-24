@@ -8,6 +8,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -28,6 +29,8 @@ internal class CscCredentialInfo(
     val certificateStatus: String?,
     val certificates: List<ByteArray>,
     val authMode: String,
+    /** How the [authObjects] combine; `null` means all of them (CSC: "an AND of all authentication objects"). */
+    val authExpression: String?,
     val authObjects: List<CscAuthObject>,
 )
 
@@ -58,14 +61,17 @@ internal class CscClient(private val client: HttpClient) {
         val key = response.requiredObject("key")
         val cert = response.requiredObject("cert")
         val auth = response.requiredObject("auth")
+        val authMode = auth.requiredString("mode")
         return CscCredentialInfo(
             keyStatus = key.requiredString("status"),
             keyAlgorithms = key.requiredStrings("algo"),
             keyCurve = key.optionalString("curve"),
             certificateStatus = cert.optionalString("status"),
             certificates = cert.requiredStrings("certificates").map { decodeBase64(it, "certificate") },
-            authMode = auth.requiredString("mode"),
-            authObjects = (auth["objects"] as? JsonArray).orEmpty().map { element ->
+            authMode = authMode,
+            authExpression = auth.typedOptionalString("expression"),
+            // Required for explicit authorization, where an empty array means that no object is needed.
+            authObjects = if (authMode != EXPLICIT) emptyList() else auth.requiredArray("objects").map { element ->
                 val objectType = element as? JsonObject
                     ?: throw KmsProviderException("CSC authentication object is not a JSON object")
                 CscAuthObject(
@@ -156,6 +162,7 @@ internal class CscClient(private val client: HttpClient) {
     private fun bearer(token: String) = mapOf(HttpHeaders.Authorization to "Bearer $token")
 
     companion object {
+        const val EXPLICIT = "explicit"
         const val SHA256_OID = "2.16.840.1.101.3.4.2.1"
         const val ECDSA_SHA256_OID = "1.2.840.10045.4.3.2"
         const val P256_OID = "1.2.840.10045.3.1.7"
@@ -175,6 +182,17 @@ private fun JsonObject.optionalString(name: String): String? =
 
 private fun JsonObject.requiredString(name: String): String =
     optionalString(name) ?: throw KmsProviderException("CSC response is missing string: $name")
+
+/** Like [optionalString], but a present value that is not a string is an error rather than absent. */
+private fun JsonObject.typedOptionalString(name: String): String? {
+    val value = this[name]?.takeUnless { it is JsonNull } ?: return null
+    val string = (value as? JsonPrimitive)?.takeIf { it.isString }?.content
+        ?: throw KmsProviderException("CSC response field is not a string: $name")
+    return string.takeIf(String::isNotBlank)
+}
+
+private fun JsonObject.requiredArray(name: String): JsonArray =
+    this[name] as? JsonArray ?: throw KmsProviderException("CSC response is missing array: $name")
 
 private fun JsonObject.requiredObject(name: String): JsonObject =
     this[name] as? JsonObject ?: throw KmsProviderException("CSC response is missing object: $name")

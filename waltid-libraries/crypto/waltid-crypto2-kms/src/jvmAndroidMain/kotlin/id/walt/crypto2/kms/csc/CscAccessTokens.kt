@@ -62,6 +62,12 @@ internal class CscAccessTokens(
         val token = (response["access_token"] as? JsonPrimitive)?.takeIf { it.isString }?.content
             ?.takeIf(String::isNotBlank)
             ?: throw KmsProviderException("CSC token response is missing access_token")
+        // CSC requires token_type, and the token is sent with the Bearer scheme (RFC 6749 §7.1; the type is
+        // case-insensitive, §5.1).
+        val tokenType = (response["token_type"] as? JsonPrimitive)?.takeIf { it.isString }?.content
+        if (!tokenType.equals(BEARER, ignoreCase = true)) {
+            throw KmsProviderException("CSC token response must have token_type $BEARER")
+        }
         val expiresIn = response["expires_in"]?.let {
             (it as? JsonPrimitive)?.intOrNull ?: throw KmsProviderException("CSC token expires_in is not an integer")
         } ?: DEFAULT_LIFETIME_SECONDS
@@ -79,6 +85,8 @@ internal class CscAccessTokens(
     }
 
     private companion object {
+        const val BEARER = "Bearer"
+
         /** CSC API v2.2: "If omitted, the default expiration time is 3600". */
         const val DEFAULT_LIFETIME_SECONDS = 3600
     }

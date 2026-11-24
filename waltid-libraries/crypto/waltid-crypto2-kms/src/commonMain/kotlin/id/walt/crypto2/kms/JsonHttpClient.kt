@@ -2,6 +2,8 @@ package id.walt.crypto2.kms
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.ResponseException
+import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.header
 import io.ktor.client.request.request
 import io.ktor.client.request.setBody
@@ -38,6 +40,9 @@ internal suspend fun HttpClient.executeJsonResponse(
     val response = try {
         request(endpoint) {
             this.method = method
+            // The status is checked below. Ktor's default validation would throw first, without the status, and with
+            // the response body in the exception message.
+            expectSuccess = false
             header(HttpHeaders.Accept, ContentType.Application.Json.toString())
             headers.forEach { (name, value) -> header(name, value) }
             body?.let {
@@ -47,12 +52,13 @@ internal suspend fun HttpClient.executeJsonResponse(
         }
     } catch (cause: CancellationException) {
         throw cause
+    } catch (cause: ResponseException) {
+        // A custom response validator of the injected client still runs: keep its status, not its body.
+        throw httpStatusFailure(provider, cause.response.status.value)
     } catch (cause: Exception) {
         throw KmsProviderException("$provider request failed", cause)
     }
-    if (!response.status.isSuccess()) {
-        throw KmsProviderException("$provider request failed with HTTP ${response.status.value}", null, response.status.value)
-    }
+    if (!response.status.isSuccess()) throw httpStatusFailure(provider, response.status.value)
     val responseBody = response.body<String>()
     if (responseBody.isBlank()) return JsonHttpResponse(response.status.value, null)
     val json = try {
@@ -62,3 +68,7 @@ internal suspend fun HttpClient.executeJsonResponse(
     }
     return JsonHttpResponse(response.status.value, json)
 }
+
+/** Response bodies can echo credentials, so the failure carries only the status. */
+private fun httpStatusFailure(provider: String, status: Int) =
+    KmsProviderException("$provider request failed with HTTP $status", null, status)

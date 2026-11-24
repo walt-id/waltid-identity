@@ -50,8 +50,11 @@ internal const val CREDENTIAL_INFO_PATH = "/csc/v2/credentials/info"
 internal const val AUTHORIZE_PATH = "/csc/v2/credentials/authorize"
 internal const val SIGN_HASH_PATH = "/csc/v2/signatures/signHash"
 
-/** A CSC v2.2 RSSP stub. Each property describes one part of its responses; tests change them before a call. */
-internal class CscStub(var certificates: List<ByteArray>) {
+/**
+ * A CSC v2.2 RSSP stub. Each property describes one part of its responses; tests change them before a call. With
+ * [validateResponses], its client throws on error statuses like a client configured with `expectSuccess = true`.
+ */
+internal class CscStub(var certificates: List<ByteArray>, validateResponses: Boolean = false) {
     var specs = "2.2.0.0"
     var authTypes = listOf("oauth2client")
     var oauth2: String? = "https://rssp.example"
@@ -59,8 +62,13 @@ internal class CscStub(var certificates: List<ByteArray>) {
     var keyAlgorithms = listOf(CscClient.ECDSA_SHA256_OID)
     var keyCurve = CscClient.P256_OID
     var certificateStatus: String? = "valid"
+    var tokenType: String? = "Bearer"
+    var tokenStatus = HttpStatusCode.OK
     var authMode = "explicit"
-    var authObjects = """[{"type":"Password","id":"PIN","format":"N","label":"PIN"}]"""
+    /** The raw JSON value of `auth/expression`, or `null` to leave it out. */
+    var authExpression: String? = null
+    /** The raw JSON value of `auth/objects`, or `null` to leave it out. */
+    var authObjects: String? = """[{"type":"Password","id":"PIN","format":"N","label":"PIN"}]"""
     var credentialInfoStatus = HttpStatusCode.OK
     var authorizeStatus = HttpStatusCode.OK
     var signHashStatus = HttpStatusCode.OK
@@ -71,7 +79,10 @@ internal class CscStub(var certificates: List<ByteArray>) {
         private set
     private val bodies = mutableMapOf<String, String>()
 
-    val client = HttpClient(MockEngine) { engine { addHandler { request -> respondTo(request) } } }
+    val client = HttpClient(MockEngine) {
+        expectSuccess = validateResponses
+        engine { addHandler { request -> respondTo(request) } }
+    }
 
     fun body(path: String): String = requireNotNull(bodies[path]) { "No request to $path" }
 
@@ -94,7 +105,16 @@ internal class CscStub(var certificates: List<ByteArray>) {
             )
             TOKEN_PATH -> {
                 tokenHost = request.url.host
-                respondJson("""{"access_token":"$ACCESS_TOKEN","token_type":"Bearer","expires_in":3600}""")
+                if (tokenStatus != HttpStatusCode.OK) {
+                    val error = """{"error":"invalid_client","error_description":"Unknown $CLIENT_SECRET"}"""
+                    respondJson(error, tokenStatus)
+                } else respondJson(
+                    listOfNotNull(
+                        "\"access_token\":\"$ACCESS_TOKEN\"",
+                        tokenType?.let { "\"token_type\":\"$it\"" },
+                        "\"expires_in\":3600",
+                    ).joinToString(",", "{", "}")
+                )
             }
             CREDENTIAL_INFO_PATH -> if (credentialInfoStatus != HttpStatusCode.OK) {
                 respondJson("""{"error":"invalid_token","error_description":"Expired token"}""", credentialInfoStatus)
@@ -102,7 +122,7 @@ internal class CscStub(var certificates: List<ByteArray>) {
                 """{"key":{"status":"$keyStatus","algo":${keyAlgorithms.toJsonArray()},"len":256,"curve":"$keyCurve"},
                    |"cert":{${certificateStatus?.let { "\"status\":\"$it\"," }.orEmpty()}
                    |"certificates":${certificates.map(Base64.Default::encode).toJsonArray()}},
-                   |"auth":{"mode":"$authMode","objects":$authObjects},"SCAL":"2","multisign":1}""".trimMargin()
+                   |"auth":${authJson()},"SCAL":"2","multisign":1}""".trimMargin()
             )
             AUTHORIZE_PATH -> respondJson("""{"SAD":"$SAD","expiresIn":300}""", authorizeStatus)
             SIGN_HASH_PATH -> {
@@ -120,6 +140,12 @@ internal class CscStub(var certificates: List<ByteArray>) {
 
     private fun MockRequestHandleScope.respondJson(content: String, status: HttpStatusCode = HttpStatusCode.OK) =
         respond(content, status, headersOf(HttpHeaders.ContentType, "application/json"))
+
+    private fun authJson() = listOfNotNull(
+        "\"mode\":\"$authMode\"",
+        authExpression?.let { "\"expression\":$it" },
+        authObjects?.let { "\"objects\":$it" },
+    ).joinToString(",", "{", "}")
 
     private fun List<String>.toJsonArray() = joinToString(",", "[", "]") { "\"$it\"" }
 }

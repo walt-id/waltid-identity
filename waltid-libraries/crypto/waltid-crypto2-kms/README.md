@@ -48,6 +48,7 @@ service URL's origin, so the client secret never follows an unauthenticated answ
 `CscOptions.tokenEndpoint` for an authorization server elsewhere. A credential the provider cannot use fails with
 `KmsProviderException`; an HTTP 401 from the service drops the cached access token.
 
-Supported: `specs` 2.2.0.0, OAuth 2.0 client credentials (`oauth2client`), `explicit` credential authorization with
-static `Password` objects (`CscCredentials.authData`), ECDSA P-256 with SHA-256. Not supported: other CSC versions,
-`oauth2code`, out-of-band or one-time-password authorization, `signDoc`, asynchronous signing, and digest-only signing.
+Supported: `specs` 2.2.0.0, OAuth 2.0 client credentials (`oauth2client`) with `Bearer` tokens, `explicit` credential
+authorization with static `Password` objects (`CscCredentials.authData`) that `auth/expression` combines only with
+`AND`, ECDSA P-256 with SHA-256. Not supported: other CSC versions, `oauth2code`, `OR` and `XOR` authorization
+expressions, out-of-band or one-time-password authorization, `signDoc`, asynchronous signing, and digest-only signing.

@@ -47,8 +47,9 @@ import kotlin.time.Instant
  *
  * The RSSP provisions the credential, so [generate] is rejected: attach an existing credential with
  * [storedKeyForExisting]. Supported scope: `specs` 2.2.0.0, OAuth 2.0 client-credentials service authorization
- * (`oauth2client`), `explicit` credential authorization with static `Password` objects, ECDSA P-256 with SHA-256,
- * synchronous `signatures/signHash`. Every returned signature is verified locally against the leaf certificate's key.
+ * (`oauth2client`), `explicit` credential authorization with static `Password` objects combined only with `AND`,
+ * ECDSA P-256 with SHA-256, synchronous `signatures/signHash`. Every returned signature is verified locally against
+ * the leaf certificate's key.
  */
 class CscKeyProvider(
     client: HttpClient,
@@ -103,8 +104,11 @@ class CscKeyProvider(
         }
         requireRssp(credential.keyCurve == CscClient.P256_OID) { "CSC credential key is not on curve P-256" }
         credential.certificateStatus?.let { requireRssp(it == "valid") { "CSC credential certificate is $it" } }
-        requireRssp(credential.authMode == "explicit") { "Unsupported CSC authorization mode: ${credential.authMode}" }
-        credential.authObjects.forEach {
+        requireRssp(credential.authMode == CscClient.EXPLICIT) {
+            "Unsupported CSC authorization mode: ${credential.authMode}"
+        }
+        val authObjects = requiredAuthObjects(credential.authExpression, credential.authObjects)
+        authObjects.forEach {
             requireRssp(it.type == "Password" && it.generator == null) {
                 "CSC authentication object ${it.id} needs user interaction, which is not supported"
             }
@@ -138,7 +142,7 @@ class CscKeyProvider(
                 options = options,
                 credentialID = credentialID,
                 tokenEndpoint = tokenEndpoint,
-                authObjectIds = credential.authObjects.map { it.id },
+                authObjectIds = authObjects.map { it.id },
                 certificateChain = credential.certificates.map(Base64.Default::encode),
             ).encode(),
             publicKey = publicKey,
@@ -254,6 +258,51 @@ class CscKeyProvider(
         private inline fun requireRssp(condition: Boolean, message: () -> String) {
             if (!condition) throw KmsProviderException(message())
         }
+
+        /**
+         * The authentication objects that every authorization sends: all of them without `auth/expression`, otherwise
+         * those it names. Only conjunctions are supported. With `OR` or `XOR` the client must choose, and sending
+         * every value can fail where the service expects exactly one.
+         */
+        private fun requiredAuthObjects(expression: String?, objects: List<CscAuthObject>): List<CscAuthObject> {
+            if (expression == null) return objects
+            val unsupported = { "Unsupported CSC authorization expression: $expression" }
+            val byId = objects.associateBy { it.id }
+            val required = mutableListOf<CscAuthObject>()
+            var depth = 0
+            var operandNext = true
+            AUTH_EXPRESSION_TOKEN.findAll(expression).forEach { match ->
+                val token = match.value
+                when (token.uppercase()) {
+                    "(" -> {
+                        requireRssp(operandNext, unsupported)
+                        depth++
+                    }
+                    ")" -> {
+                        requireRssp(!operandNext && depth > 0, unsupported)
+                        depth--
+                    }
+                    "AND" -> {
+                        requireRssp(!operandNext, unsupported)
+                        operandNext = true
+                    }
+                    "OR", "XOR" -> throw KmsProviderException(
+                        "CSC authorization expression $expression needs a choice of authentication objects, " +
+                            "which is not supported"
+                    )
+                    else -> {
+                        requireRssp(operandNext, unsupported)
+                        required += byId[token]
+                            ?: throw KmsProviderException("CSC authorization expression names unknown object $token")
+                        operandNext = false
+                    }
+                }
+            }
+            requireRssp(depth == 0 && !operandNext, unsupported)
+            return required.distinct()
+        }
+
+        private val AUTH_EXPRESSION_TOKEN = Regex("""[()]|[^\s()]+""")
 
         private inline fun parseCertificate(der: ByteArray, failure: (Exception) -> Exception): X509Certificate =
             try {

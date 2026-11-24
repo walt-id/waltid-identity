@@ -119,6 +119,27 @@ class CscKeyProviderTest {
             Rejection("PIN that is not stored", "object SIGNING_PIN", input) {
                 authObjects = """[{"type":"Password","id":"SIGNING_PIN"}]"""
             },
+            Rejection("exclusive alternative", "needs a choice", remote) {
+                authObjects = TWO_PASSWORDS
+                authExpression = "\"PIN XOR SECOND_PIN\""
+            },
+            Rejection("inclusive alternative", "needs a choice", remote) {
+                authObjects = TWO_PASSWORDS
+                authExpression = "\"(PIN AND SECOND_PIN) OR SECOND_PIN\""
+            },
+            Rejection("expression with an unknown object", "unknown object OTP", remote) {
+                authExpression = "\"PIN AND OTP\""
+            },
+            Rejection("incomplete expression", "Unsupported CSC authorization expression", remote) {
+                authExpression = "\"(PIN AND\""
+            },
+            Rejection("expression that is not a string", "not a string: expression", remote) {
+                authExpression = "[\"PIN\"]"
+            },
+            Rejection("explicit authorization without objects", "missing array: objects", remote) {
+                authObjects = null
+            },
+            Rejection("objects that are not an array", "missing array: objects", remote) { authObjects = "{}" },
             Rejection("expired leaf", "not valid now", remote) {
                 certificates = listOf(expired)
             },
@@ -230,6 +251,47 @@ class CscKeyProviderTest {
     }
 
     @Test
+    fun `sends only the authentication objects that an AND expression requires`() = runTest {
+        val rssp = TestRsspKey.generate()
+        val stub = CscStub(listOf(testCertificate(rssp.key)))
+        stub.authObjects = """[{"type":"Password","id":"PIN"},{"type":"Password","id":"SECOND_PIN"},
+            |{"type":"Password","id":"OTP","generator":"totp"}]""".trimMargin()
+        stub.authExpression = "\"(PIN AND SECOND_PIN)\""
+        stub.signatureFor = { rssp.sign(message, EcdsaSignatureEncoding.IEEE_P1363) }
+        val credentials = CscCredentials(CLIENT_ID, CLIENT_SECRET, mapOf("PIN" to PIN, "SECOND_PIN" to "0815"))
+        val key = attachAndRestore(stub, credentials)
+
+        requireNotNull(key.capabilities.signer).sign(message, es256(EcdsaSignatureEncoding.IEEE_P1363))
+
+        assertEquals(
+            JsonArray(
+                listOf(
+                    buildJsonObject { put("id", "PIN"); put("value", PIN) },
+                    buildJsonObject { put("id", "SECOND_PIN"); put("value", "0815") },
+                )
+            ),
+            stub.json(AUTHORIZE_PATH)["authData"],
+        )
+    }
+
+    @Test
+    fun `sends the access token only when it is a Bearer token`() = runTest {
+        val rssp = TestRsspKey.generate()
+        for (tokenType in listOf(null, "mac")) {
+            val stub = CscStub(listOf(testCertificate(rssp.key))).apply { this.tokenType = tokenType }
+            val failure = assertFailsWith<KmsProviderException>("token_type $tokenType") {
+                provider(stub).storedKeyForExisting(KeyId("qeaa-seal"), options, CREDENTIAL_ID)
+            }
+            assertEquals("CSC token response must have token_type Bearer", failure.message)
+            assertEquals(listOf(INFO_PATH, TOKEN_PATH), stub.requests)
+        }
+
+        val stub = CscStub(listOf(testCertificate(rssp.key))).apply { tokenType = "bEaReR" }
+        provider(stub).storedKeyForExisting(KeyId("qeaa-seal"), options, CREDENTIAL_ID)
+        assertEquals(listOf(INFO_PATH, TOKEN_PATH, CREDENTIAL_INFO_PATH), stub.requests)
+    }
+
+    @Test
     fun `uses a configured token endpoint on another host`() = runTest {
         val rssp = TestRsspKey.generate()
         val stub = CscStub(listOf(testCertificate(rssp.key))).apply { oauth2 = "https://auth.example" }
@@ -246,18 +308,20 @@ class CscKeyProviderTest {
     @Test
     fun `a token rejected at attach is fetched again on the next attach`() = runTest {
         val rssp = TestRsspKey.generate()
-        val stub = CscStub(listOf(testCertificate(rssp.key)))
-        val provider = provider(stub)
+        for (validateResponses in listOf(false, true)) {
+            val stub = CscStub(listOf(testCertificate(rssp.key)), validateResponses)
+            val provider = provider(stub)
 
-        stub.credentialInfoStatus = HttpStatusCode.Unauthorized
-        val failure = assertFailsWith<KmsProviderException> {
+            stub.credentialInfoStatus = HttpStatusCode.Unauthorized
+            val failure = assertFailsWith<KmsProviderException> {
+                provider.storedKeyForExisting(KeyId("qeaa-seal"), options, CREDENTIAL_ID)
+            }
+            assertEquals(401, failure.httpStatus, "validateResponses=$validateResponses")
+            stub.credentialInfoStatus = HttpStatusCode.OK
             provider.storedKeyForExisting(KeyId("qeaa-seal"), options, CREDENTIAL_ID)
-        }
-        assertEquals(401, failure.httpStatus)
-        stub.credentialInfoStatus = HttpStatusCode.OK
-        provider.storedKeyForExisting(KeyId("qeaa-seal"), options, CREDENTIAL_ID)
 
-        assertEquals(2, stub.count(TOKEN_PATH))
+            assertEquals(2, stub.count(TOKEN_PATH), "validateResponses=$validateResponses")
+        }
     }
 
     @Test
@@ -331,19 +395,24 @@ class CscKeyProviderTest {
     @Test
     fun `a 401 from the RSSP drops the access token without retrying`() = runTest {
         val rssp = TestRsspKey.generate()
-        val stub = CscStub(listOf(testCertificate(rssp.key)))
-        stub.signatureFor = { rssp.sign(message, EcdsaSignatureEncoding.IEEE_P1363) }
-        val key = attachAndRestore(stub)
-        val signer = requireNotNull(key.capabilities.signer)
+        for (validateResponses in listOf(false, true)) {
+            val stub = CscStub(listOf(testCertificate(rssp.key)), validateResponses)
+            stub.signatureFor = { rssp.sign(message, EcdsaSignatureEncoding.IEEE_P1363) }
+            val key = attachAndRestore(stub)
+            val signer = requireNotNull(key.capabilities.signer)
 
-        stub.authorizeStatus = HttpStatusCode.Unauthorized
-        assertFailsWith<KmsProviderException> { signer.sign(message, es256(EcdsaSignatureEncoding.IEEE_P1363)) }
-        assertEquals(1, stub.count(AUTHORIZE_PATH))
-        stub.authorizeStatus = HttpStatusCode.OK
-        signer.sign(message, es256(EcdsaSignatureEncoding.IEEE_P1363))
+            stub.authorizeStatus = HttpStatusCode.Unauthorized
+            val failure = assertFailsWith<KmsProviderException> {
+                signer.sign(message, es256(EcdsaSignatureEncoding.IEEE_P1363))
+            }
+            assertEquals(401, failure.httpStatus, "validateResponses=$validateResponses")
+            assertEquals(1, stub.count(AUTHORIZE_PATH))
+            stub.authorizeStatus = HttpStatusCode.OK
+            signer.sign(message, es256(EcdsaSignatureEncoding.IEEE_P1363))
 
-        assertEquals(2, stub.count(TOKEN_PATH))
-        assertEquals(1, stub.count(SIGN_HASH_PATH))
+            assertEquals(2, stub.count(TOKEN_PATH), "validateResponses=$validateResponses")
+            assertEquals(1, stub.count(SIGN_HASH_PATH))
+        }
     }
 
     @Test
@@ -368,25 +437,35 @@ class CscKeyProviderTest {
     fun `failures never expose secrets`() = runTest {
         val rssp = TestRsspKey.generate()
         val other = TestRsspKey.generate()
-        val failures = mutableListOf<Throwable>()
-        val signWith: suspend (CscStub.() -> Unit) -> Unit = { change ->
-            val stub = CscStub(listOf(testCertificate(rssp.key)))
-            val key = attachAndRestore(stub)
-            stub.change()
-            failures += assertFails {
-                requireNotNull(key.capabilities.signer).sign(message, es256(EcdsaSignatureEncoding.IEEE_P1363))
+        // The stub's error bodies echo the client secret and the SAD; a validating client puts them in its exceptions.
+        for (validateResponses in listOf(false, true)) {
+            val failures = mutableListOf<Throwable>()
+            val signWith: suspend (CscStub.() -> Unit) -> Unit = { change ->
+                val stub = CscStub(listOf(testCertificate(rssp.key)), validateResponses)
+                val key = attachAndRestore(stub)
+                stub.change()
+                failures += assertFails {
+                    requireNotNull(key.capabilities.signer).sign(message, es256(EcdsaSignatureEncoding.IEEE_P1363))
+                }
             }
-        }
-        signWith { authorizeStatus = HttpStatusCode.Unauthorized }
-        signWith { signHashStatus = HttpStatusCode.BadRequest }
-        signWith { signatureFor = { other.sign(message, EcdsaSignatureEncoding.IEEE_P1363) } }
+            signWith { authorizeStatus = HttpStatusCode.Unauthorized }
+            signWith { signHashStatus = HttpStatusCode.BadRequest }
+            signWith { signatureFor = { other.sign(message, EcdsaSignatureEncoding.IEEE_P1363) } }
+            val rejectedClient = CscStub(listOf(testCertificate(rssp.key)), validateResponses)
+                .apply { tokenStatus = HttpStatusCode.Unauthorized }
+            failures += assertFails {
+                provider(rejectedClient).storedKeyForExisting(KeyId("qeaa-seal"), options, CREDENTIAL_ID)
+            }
 
-        val messages = failures.flatMap { failure -> generateSequence(failure) { it.cause }.mapNotNull { it.message } }
-        assertEquals(3, failures.size)
-        assertTrue(failures.all { it is KmsProviderException }, "Unexpected failure types: $failures")
-        assertTrue("HTTP 401" in failures[0].message.orEmpty())
-        listOf(CLIENT_SECRET, PIN, ACCESS_TOKEN, SAD).forEach { secret ->
-            assertFalse(messages.any { secret in it }, "A failure message exposes a secret: $messages")
+            val messages = failures.flatMap { failure ->
+                generateSequence(failure) { it.cause }.mapNotNull { it.message }
+            }
+            assertEquals(4, failures.size)
+            assertTrue(failures.all { it is KmsProviderException }, "Unexpected failure types: $failures")
+            assertTrue("HTTP 401" in failures[0].message.orEmpty())
+            listOf(CLIENT_SECRET, PIN, ACCESS_TOKEN, SAD).forEach { secret ->
+                assertFalse(messages.any { secret in it }, "validation $validateResponses exposes $secret: $messages")
+            }
         }
     }
 
@@ -434,3 +513,5 @@ class CscKeyProviderTest {
 }
 
 private fun kotlinx.serialization.json.JsonObject.string(name: String): String = requireNotNull(this[name]).jsonPrimitive.content
+
+private const val TWO_PASSWORDS = """[{"type":"Password","id":"PIN"},{"type":"Password","id":"SECOND_PIN"}]"""
