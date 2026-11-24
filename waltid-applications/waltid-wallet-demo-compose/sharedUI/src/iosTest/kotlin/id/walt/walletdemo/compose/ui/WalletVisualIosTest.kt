@@ -54,6 +54,7 @@ class WalletVisualIosTest {
     @Test fun credentialStatusBackgroundOff() = scenario { credentialStatusBackgroundSettings() }
     @Test fun credentialStatusBackgroundPaused() = scenario { credentialStatusBackgroundSettings(paused = true) }
     @Test fun credentialStatusHomeNotice() = scenario { credentialStatusHomeNotice() }
+    @Test fun credentialStatusHomeNoticeDark() = scenario(dark = true) { credentialStatusHomeNotice(dark = true) }
     @Test fun credentialStatusCompactRtl() = scenario(size = Size(320f, 568f), dark = true, fontScale = 1.5f) { credentialStatusKinds(compactRtl = true) }
 
     @Test fun walletOpening() = scenario { walletOpening() }

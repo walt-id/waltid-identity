@@ -49,24 +49,26 @@ final class WalletVisualTests: XCTestCase {
             .environment(\.credentialStatusUI, CredentialStatusUIContext(values: [credential.id: status])), id: "status.home.issue")
     }
 
-    func testCredentialStatusHomeNotice() async throws {
+    func testCredentialStatusHomeNotice() async throws { try await credentialStatusHomeNotice() }
+    func testCredentialStatusHomeNoticeDark() async throws { try await credentialStatusHomeNotice(dark: true) }
+
+    private func credentialStatusHomeNotice(dark: Bool = false) async throws {
         let fixtures = try WalletVisualFixtures()
         let credential = try fixtures.credential()
         let status = try fixtures.credentialStatus("revoked_current")
-        let checkedAt = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-20T12:00:00Z"))
+        let checkedAt = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-20T12:00:37Z"))
         let notice = PendingCredentialStatusNotice(credentialID: credential.id, version: "revoked-v1",
             kind: .revoked, checkedAt: checkedAt, historical: false)
-        let snapshot = CredentialStatusSnapshot(evaluatedAt: checkedAt, credentials: [
-            CredentialStatusRecord(credentialID: credential.id, storeIndex: 0, value: status),
-        ], refreshingCredentialIDs: [], pendingNotices: [notice])
-        let model = makeModel(walletClient: MockWalletClient(credentialStatusSnapshot: snapshot))
-        model.automaticCredentialStatusChecks = false
-        model.auth = .unlocked
+        let model = makeModel()
         model.credentials = [credential]
         model.isReady = true
-        defer { model.handleApplicationEnteredBackground() }
-        try await captureWhenReady(HomeView(viewModel: model), id: "status.home.notice",
-            isReady: { model.walletStatusNotices == [notice] }, failure: "The unlocked wallet must load the pending revocation")
+        model.statusMessage = ""
+        let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
+        let content = CredentialsTabView(viewModel: model, selectedDetailsID: .constant(nil), cards: cards,
+            onOpenSettings: {}, onScan: {}, onShareNearby: {}, statusNotices: [notice])
+            .environment(\.credentialStatusUI, CredentialStatusUIContext(values: [credential.id: status]))
+        try await captureWhenReady(content, id: dark ? "status.home.notice.dark" : "status.home.notice",
+            colorScheme: dark ? .dark : .light, isReady: { !cards.isEmpty }, failure: "The credential card must be rendered")
     }
 
     func testCredentialStatusMixedArtwork() async throws { try await credentialStatusMixedArtwork() }

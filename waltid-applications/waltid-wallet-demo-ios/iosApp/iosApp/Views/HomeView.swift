@@ -105,28 +105,6 @@ struct HomeView: View {
                 viewModel.selectedTab = .credentials
             }
         }
-        .overlay(alignment: .bottom) {
-            if let notice = viewModel.walletStatusNotices.first(where: { notice in
-                    viewModel.credentials.contains { $0.id == notice.credentialID }
-               }),
-               let credential = viewModel.credentials.first(where: { $0.id == notice.credentialID }),
-               canShowStatusNotice {
-                let name = CredentialDisplayNormalizer.details(for: credential).cardSummary.title
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(statusNoticeMessage(notice, name: name)).font(.footnote)
-                    HStack {
-                        Button("View credential") {
-                            viewModel.acknowledgeCredentialStatusNotice(notice)
-                            selectedCredentialDetailsID = notice.credentialID
-                        }
-                        Spacer()
-                        Button("Dismiss") { viewModel.acknowledgeCredentialStatusNotice(notice) }
-                    }
-                }
-                .padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
-                .accessibilityIdentifier("credential-status-notice")
-            }
-        }
     }
 
     private var canOpenStatusNotification: Bool {
@@ -141,19 +119,6 @@ struct HomeView: View {
             viewModel.externalFlow == nil && viewModel.offerPreview == nil && !viewModel.statusNotificationOpened &&
             !showingSettings && !dismissingSettings && !showingTaskSheet && !nearbySheet.keepsHomeVisible &&
             selectedCredentialDetailsID == nil
-    }
-
-    private func statusNoticeMessage(_ notice: PendingCredentialStatusNotice, name: String) -> String {
-        let kind: String
-        switch notice.kind {
-        case .revoked: kind = String(localized: "Revoked")
-        case .suspended: kind = String(localized: "Suspended")
-        default: kind = String(localized: "Invalid")
-        }
-        let time = notice.checkedAt.formatted(date: .abbreviated, time: .shortened)
-        return notice.historical
-            ? String(localized: "\(name) · Last reported \(kind) on \(time)")
-            : String(localized: "\(name) · \(kind). Checked \(time)")
     }
 
     private func openSettings() {
@@ -171,7 +136,8 @@ struct HomeView: View {
     private var credentialsContent: some View {
         CredentialsTabView(viewModel: viewModel, selectedDetailsID: $selectedCredentialDetailsID, cards: credentialCards,
             onOpenSettings: openSettings, onScan: { showingScanner = true }, onShareNearby: startNearbySharing,
-            nearbyPreparing: nearbySheet.isPreparing, nearbyEnabled: !proximity.closing)
+            nearbyPreparing: nearbySheet.isPreparing, nearbyEnabled: !proximity.closing,
+            statusNotices: canShowStatusNotice ? viewModel.walletStatusNotices : [])
             .accessibilityHidden(showingTaskSheet || nearbySheet.keepsHomeVisible)
     }
 

@@ -1409,10 +1409,24 @@
       "id": "status.home.notice",
       "title": "Dated revocation notice on unlocked Home",
       "requirements": [
-        "The notice identifies the credential, shows the recorded status and time, and offers View credential and dismissal"
+        "A light warning surface shows the credential and status, localized check time, View credential action and close icon on unlocked Home"
       ],
       "composeTest": "credentialStatusHomeNotice",
       "swiftTest": "testCredentialStatusHomeNotice"
+    },
+    {
+      "id": "status.home.notice.dark",
+      "title": "Dated revocation notice on unlocked Home in dark mode",
+      "requirements": [
+        "The same notice separates clearly from the dark Home background and preserves the dated message and both actions"
+      ],
+      "composeTest": "credentialStatusHomeNoticeDark",
+      "swiftTest": "testCredentialStatusHomeNoticeDark",
+      "configuration": {
+        "android": { "theme": "dark" },
+        "compose-ios": { "theme": "dark" },
+        "swiftui": { "theme": "dark" }
+      }
     },
     {
       "id": "status.settings.partial",
@@ -1510,6 +1524,7 @@
     "settings.root.default"
   ],
   "galleryVariants": [
+    "status.home.notice.dark",
     "payment.recurring.compact_large_text",
     "payment.localized.compact_large_text",
     "onboarding.pin.compact_dark_large_text",

@@ -22,6 +22,7 @@ internal object WalletUiTestTags {
     val StatusExpand = tag("statusExpand")
     val CredentialsLoading = tag("credentials", "loading")
     val CredentialsEmpty = tag("credentials", "empty")
+    val CredentialStatusNotice = tag("credentialStatusNotice")
     val CredentialDetailsScreen = tag("credentialDetailsScreen")
     val DetailsBack = tag("detailsBack")
     val DetailsMenu = tag("detailsMenu")

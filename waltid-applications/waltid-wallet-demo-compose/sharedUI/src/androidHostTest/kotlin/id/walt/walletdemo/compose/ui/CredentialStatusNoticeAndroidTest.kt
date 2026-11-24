@@ -4,11 +4,14 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.v2.runAndroidComposeUiTest
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
@@ -27,23 +30,24 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlin.test.Test
-import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class CredentialStatusNoticeAndroidTest {
     @Test
-    fun theExistingSnackbarOpensDetailsAndLeavesTheNextNoticeForHome() = runAndroidComposeUiTest<ComponentActivity> {
+    fun theNoticeAndItsActionOpenDetailsAndTheCloseButtonOnlyDismisses() = runAndroidComposeUiTest<ComponentActivity> {
         val wallet = WalletVisualFixtures.partialResult.session as WalletSessionState.Ready
         val first = wallet.credentials.first()
         val second = first.copy(id = "other-credential")
+        val third = first.copy(id = "third-credential")
         val notices = listOf(
             WalletDemoCredentialStatusNotice(first.id, "first-notice", "REVOKED", "2026-11-20T12:00:00Z", false),
             WalletDemoCredentialStatusNotice(second.id, "second-notice", "SUSPENDED", "2026-11-20T12:00:00Z", true),
+            WalletDemoCredentialStatusNotice(third.id, "third-notice", "REVOKED", "2026-11-20T12:00:00Z", false),
         )
         val snapshots = MutableStateFlow(WalletDemoCredentialStatuses(pendingNotices = emptyList()))
-        val demoWallet = object : DemoWallet by WalletUiTestWallet(listOf(first, second)) {
+        val demoWallet = object : DemoWallet by WalletUiTestWallet(listOf(first, second, third)) {
             override fun credentialStatusSnapshots() = snapshots
             override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) {
                 snapshots.update { snapshot ->
@@ -67,14 +71,22 @@ class CredentialStatusNoticeAndroidTest {
 
             onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
             waitUntil(timeoutMillis = 5_000) { onAllNodesWithText("View credential").fetchSemanticsNodes().size == 1 }
-            onNodeWithText("View credential").performClick()
+            onNodeWithText("View credential", useUnmergedTree = true).performTouchInput { click() }
             onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
             waitUntil(timeoutMillis = 5_000) { snapshots.value.pendingNotices == notices.drop(1) }
             onAllNodesWithText("View credential").assertCountEquals(0)
 
             onNodeWithTag(WalletUiTestTags.DetailsBack).performClick()
-            onNodeWithText("Last reported Suspended", substring = true).assertIsDisplayed()
-            assertEquals(notices.drop(1), snapshots.value.pendingNotices)
+            onNodeWithText("(last known)", substring = true).assertIsDisplayed()
+            onNodeWithText("Resident card - Suspended", useUnmergedTree = true).performTouchInput { click() }
+            onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
+            waitUntil(timeoutMillis = 5_000) { snapshots.value.pendingNotices == notices.drop(2) }
+
+            onNodeWithTag(WalletUiTestTags.DetailsBack).performClick()
+            onNodeWithContentDescription("Dismiss credential status notice").performTouchInput { click() }
+            waitUntil(timeoutMillis = 5_000) { snapshots.value.pendingNotices.orEmpty().isEmpty() }
+            onAllNodesWithTag(WalletUiTestTags.CredentialStatusNotice).assertCountEquals(0)
+            onAllNodesWithTag(WalletUiTestTags.CredentialDetailsScreen).assertCountEquals(0)
         } finally {
             scope.cancel()
         }

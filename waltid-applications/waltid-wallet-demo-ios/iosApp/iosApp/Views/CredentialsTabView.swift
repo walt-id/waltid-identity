@@ -12,6 +12,7 @@ struct CredentialsTabView: View {
     var onShareNearby: (() -> Void)? = nil
     var nearbyPreparing = false
     var nearbyEnabled = true
+    var statusNotices: [PendingCredentialStatusNotice] = []
     @Environment(\.walletDemoBranding) private var branding
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmDelete = false
@@ -86,7 +87,24 @@ struct CredentialsTabView: View {
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: expanded?.id)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if selectedDetailsID == nil { WalletTabFeedback(viewModel: viewModel, tab: .credentials) }
+                if selectedDetailsID == nil {
+                    VStack(spacing: 0) {
+                        if let (notice, title) = statusNotices.lazy.compactMap({ notice in
+                            cards.first { $0.id == notice.credentialID }.map { (notice, $0.summary.title) }
+                        }).first {
+                            CredentialStatusHomeNotice(title: title, notice: notice, onOpen: {
+                                openDetails(notice.credentialID)
+                                viewModel.acknowledgeCredentialStatusNotice(notice)
+                            }, onDismiss: {
+                                viewModel.acknowledgeCredentialStatusNotice(notice)
+                            })
+                            .id(notice.version)
+                            .frame(maxWidth: credentialCardMaxWidth).frame(maxWidth: .infinity)
+                            .padding(.horizontal, 16).padding(.vertical, 12)
+                        }
+                        WalletTabFeedback(viewModel: viewModel, tab: .credentials)
+                    }
+                }
             }
             .background(Color(.systemGroupedBackground))
             .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: selectedDetailsID)
@@ -175,5 +193,73 @@ struct CredentialsTabView: View {
 
     private func closeDetails() {
         withAnimation(WalletMotion.navigation(reduceMotion: reduceMotion)) { selectedDetailsID = nil }
+    }
+}
+
+private struct CredentialStatusHomeNotice: View {
+    let title: String
+    let notice: PendingCredentialStatusNotice
+    let onOpen: () -> Void
+    let onDismiss: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var locale
+    @Environment(\.timeZone) private var timeZone
+
+    private var kind: String {
+        switch notice.kind {
+        case .revoked: String(localized: "Revoked")
+        case .suspended: String(localized: "Suspended")
+        default: String(localized: "Invalid")
+        }
+    }
+
+    private var checked: String {
+        let minute = Date(timeIntervalSince1970: floor(notice.checkedAt.timeIntervalSince1970 / 60) * 60)
+        let date = WalletInstant(minute).formatted(timeZone: timeZone, locale: locale).fullText
+        return notice.historical
+            ? String(localized: "Checked: \(date) (last known)")
+            : String(localized: "Checked: \(date)")
+    }
+
+    var body: some View {
+        let dark = colorScheme == .dark
+        let background = dark
+            ? Color(red: 0x34 / 255.0, green: 0x2A / 255.0, blue: 0x1B / 255.0)
+            : Color(red: 0xFD / 255.0, green: 0xF0 / 255.0, blue: 0xD5 / 255.0)
+        let border = dark
+            ? Color(red: 0x8E / 255.0, green: 0x75 / 255.0, blue: 0x4D / 255.0)
+            : Color(red: 0xC6 / 255.0, green: 0xA3 / 255.0, blue: 0x5C / 255.0)
+        let foreground = dark
+            ? Color(red: 0xFF / 255.0, green: 0xE5 / 255.0, blue: 0xAE / 255.0)
+            : Color(red: 0x4B / 255.0, green: 0x32 / 255.0, blue: 0x08 / 255.0)
+        let shape = RoundedRectangle(cornerRadius: 16)
+        ZStack(alignment: .topTrailing) {
+            Button(action: onOpen) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(title) - \(kind)").font(.callout.weight(.semibold))
+                    Text(checked).font(.footnote)
+                    Text("View credential")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(foreground.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                        .padding(.top, 4)
+                }
+                .multilineTextAlignment(.leading)
+                .padding(.leading, 14).padding(.trailing, 50).padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark").font(.callout.weight(.semibold))
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss credential status notice")
+        }
+        .foregroundStyle(foreground)
+        .background(background, in: shape)
+        .overlay { shape.strokeBorder(border, lineWidth: 1).allowsHitTesting(false) }
     }
 }

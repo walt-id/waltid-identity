@@ -13,23 +13,42 @@ final class MockWalletUITests: XCTestCase {
             "E2E_MOCK_STATUS_NOTIFICATION": "1",
         ], unlock: false)
 
-        let viewCredential = app.buttons["View credential"]
+        let notice = app.buttons.containing(.staticText, identifier: "View credential").firstMatch
         let pin = ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
         XCTAssertTrue(pin.waitForExistence(timeout: 10))
-        XCTAssertFalse(viewCredential.exists)
+        XCTAssertFalse(notice.exists)
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Travel credential")).firstMatch.exists)
 
         ui.unlockWallet()
-        XCTAssertTrue(viewCredential.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Travel credential · Revoked")).firstMatch.exists)
+        XCTAssertTrue(notice.waitForExistence(timeout: 10))
+        XCTAssertTrue(notice.label.contains("Travel credential - Revoked"))
+        XCTAssertTrue(notice.label.contains("Checked: "))
+        XCTAssertTrue(notice.label.contains("View credential"))
         captureGallery(app, name: "native-ios-status-unlocked-notice")
-        viewCredential.tap()
+        notice.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.2)).tap()
         ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
         XCTAssertTrue(app.staticTexts["Travel credential"].exists)
         captureGallery(app, name: "native-ios-status-notice-details")
         ui.tapNavigationBack()
         XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10))
-        XCTAssertTrue(viewCredential.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(notice.waitForNonExistence(timeout: 5))
+    }
+
+    func testClosingTheCredentialStatusNoticeStaysOnHome() {
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        WalletE2EUI(app: app).launch(environment: [
+            "E2E_MOCK_WALLET": "1",
+            "E2E_MOCK_STATUS": "revoked_current",
+            "E2E_MOCK_STATUS_NOTIFICATION": "1",
+        ])
+
+        let dismiss = app.buttons["Dismiss credential status notice"]
+        XCTAssertTrue(dismiss.waitForExistence(timeout: 10))
+        dismiss.tap()
+        XCTAssertTrue(dismiss.waitForNonExistence(timeout: 5))
+        XCTAssertFalse(app.buttons.containing(.staticText, identifier: "View credential").firstMatch.exists)
+        XCTAssertTrue(app.buttons["wallet.scanButton"].exists)
     }
 
     func testCredentialStatusSettingsToggleAndBatchReport() async {

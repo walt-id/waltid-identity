@@ -194,7 +194,6 @@ internal fun WalletScreen(
                 onDetailsOpened = controller::checkCredentialStatusOnDetails,
                 statusNotices = state.credentialStatuses.pendingNotices.orEmpty()
                     .takeIf { showStatusNotices && state.credentialStatuses.available }.orEmpty(),
-                statusSnackbar = statusSnackbar,
                 onAcknowledgeStatusNotice = controller::acknowledgeCredentialStatusNotice,
                 openStatusNoticeOnHome = openingStatusNotice && !showingFlow,
                 onStatusNoticeOpenedOnHome = controller::credentialStatusNotificationOpenedOnHome,
