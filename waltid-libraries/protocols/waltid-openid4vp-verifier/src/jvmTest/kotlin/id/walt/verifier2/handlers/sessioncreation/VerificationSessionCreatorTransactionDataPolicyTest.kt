@@ -36,6 +36,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -248,6 +249,39 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
     }
 
     @Test
+    fun `a kid that cannot be derived from the signing key fails as signing`() = runTest {
+        // Deriving the kid reads the key, which a KMS can back. An IllegalArgumentException from there must not
+        // escape as one: callers map that type to a 400 that repeats its message, here a backend's host.
+        val keyIdFailure = IllegalArgumentException("kms://vault-internal.example/keys/verifier not found")
+        val exception = assertFailsWith<AuthorizationRequestSigningException> {
+            VerificationSessionCreator.createVerificationSession(
+                setup = CrossDeviceFlowSetup(
+                    core = GeneralFlowConfig(
+                        dcqlQuery = DcqlQuery(
+                            credentials = listOf(
+                                CredentialQuery(
+                                    id = "pid",
+                                    format = CredentialFormat.DC_SD_JWT,
+                                    meta = NoMeta,
+                                )
+                            )
+                        ),
+                        signedRequest = true,
+                        clientId = "x509_san_dns:verifier.example.com",
+                    )
+                ),
+                clientId = "x509_san_dns:verifier.example.com",
+                urlPrefix = "https://verifier.example.com/verification-session",
+                urlHost = "openid4vp://authorize",
+                key = ThrowingSigningKey(keyIdFailure),
+            )
+        }
+
+        assertEquals("Failed to sign authorization request", exception.message)
+        assertSame(keyIdFailure, exception.cause)
+    }
+
+    @Test
     fun `transaction data policies are mandatory when custom vp policies are supplied`() = runTest {
         val session = VerificationSessionCreator.createVerificationSession(
             setup = CrossDeviceFlowSetup(
@@ -388,11 +422,11 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
     )
 }
 
-private class ThrowingSigningKey : Key() {
+private class ThrowingSigningKey(private val keyIdFailure: Exception? = null) : Key() {
     override val keyType: KeyType = KeyType.secp256r1
     override val hasPrivateKey: Boolean = true
 
-    override suspend fun getKeyId(): String = "throwing-kid"
+    override suspend fun getKeyId(): String = keyIdFailure?.let { throw it } ?: "throwing-kid"
     override suspend fun getThumbprint(): String = "throwing-thumbprint"
     override suspend fun exportJWK(): String = """{"kty":"EC","crv":"P-256","x":"x","y":"y"}"""
     override suspend fun exportJWKObject(): JsonObject = JsonObject(emptyMap())

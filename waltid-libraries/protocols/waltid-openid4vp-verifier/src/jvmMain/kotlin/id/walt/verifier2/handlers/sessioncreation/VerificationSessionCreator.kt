@@ -497,11 +497,6 @@ object VerificationSessionCreator {
 
         val signedAuthorizationRequest = if (isSignedRequest) {
             val requestSigningKey = requireNotNull(signingKey)
-            val headers = hashMapOf<String, JsonElement>(
-                "typ" to JsonPrimitive("oauth-authz-req+jwt"),
-                "kid" to JsonPrimitive(getKid(effectiveClientId, requestSigningKey))
-            )
-            if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
 
             // OID4VP 1.0 Final §5.8: when static discovery metadata is used (no dynamic discovery),
             // aud MUST be "https://self-issued.me/v2"
@@ -517,7 +512,16 @@ object VerificationSessionCreator {
                 .let { JsonObject(it) }
 
             val payload = Json.encodeToString(payloadWithAud).encodeToByteArray()
-            signRequest { requestSigningKey.signJws(payload, headers) }
+            // The kid is derived from the signing key, which can be backed by a KMS: deriving it belongs to
+            // signing, so its failure is reported like one rather than with the key backend's message.
+            signRequest {
+                val headers = hashMapOf<String, JsonElement>(
+                    "typ" to JsonPrimitive("oauth-authz-req+jwt"),
+                    "kid" to JsonPrimitive(getKid(effectiveClientId, requestSigningKey))
+                )
+                if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
+                requestSigningKey.signJws(payload, headers)
+            }
         } else null
 
         if (isSignedRequest) {
@@ -601,9 +605,10 @@ object VerificationSessionCreator {
                     )
 
                     // cryptography setup for both signature types
-                    val coseSigner = annexSigningKey.toCoseSigner()
+                    // Preparing the signer reads the key, like signing itself, so it shares the signing boundary.
+                    val coseSigner = signRequest { annexSigningKey.toCoseSigner() }
                     val x5cByteArrays = x5c.map { Base64.decode(it) }
-                    val protectedHeaders = CoseHeaders(algorithm = annexSigningKey.coseAlgorithm)
+                    val protectedHeaders = CoseHeaders(algorithm = signRequest { annexSigningKey.coseAlgorithm })
                     val unprotectedHeaders = CoseHeaders(x5chain = x5cByteArrays.map { CoseCertificate(it) })
 
                     // Generate readerAuth for EACH document requested (Per-Document Signature)

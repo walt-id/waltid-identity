@@ -338,7 +338,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
                 assertTrue { policyResults.vpPolicies.getValue("my_pid").getValue("dc+sd-jwt/exp-check").success }
                 assertEquals(listOf("signature"), policyResults.vcPolicies.filterNot { it.success }.map { it.policy.id })
                 val signatureResult = policyResults.vcPolicies.single { it.policy.id == "signature" }
-                assertEquals("Invalid JWS signature", signatureResult.error)
+                assertEquals("Credential did not pass the 'signature' policy", signatureResult.error)
                 val presentedCredential = assertNotNull(info2.presentedCredentials).getValue("my_pid").single()
                 assertFalse(presentedCredential.credentialData.containsKey("birthdate"))
             }
