@@ -1,5 +1,6 @@
 package id.walt.issuer2.controller
 
+import id.walt.commons.web.respondEventStream
 import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.models.CredentialOfferCreateRequest
@@ -112,14 +113,17 @@ class Issuer2ManagementController(
             }
 
             route(Issuer2ManagementRoutesDocs.sessionEvents()) {
-                sse("sessions/{sessionId}/events") {
+                // Not `sse(...)`: look the session up before the stream starts, so an unknown one is a readable 404.
+                get("sessions/{sessionId}/events") {
                     val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
                     sessionService.getSession(sessionId)
-                    val sseFlow = SseNotifier.getSseFlow(sessionId)
+                    call.respondEventStream {
+                        val sseFlow = SseNotifier.getSseFlow(sessionId)
 
-                    send("{}")
-                    sseFlow.collect { update ->
-                        send(Json.encodeToString(update))
+                        send("{}")
+                        sseFlow.collect { update ->
+                            send(Json.encodeToString(update))
+                        }
                     }
                 }
             }

@@ -339,6 +339,18 @@ class ExternalReaderVerificationTest {
     }
 
     @Test
+    fun `events for an unknown verification session are a readable 404, not an empty stream`() = testApplication {
+        startup()
+        routes()
+
+        val response = client.get("/verification-session/missing-session/events")
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
+        assertTrue(response.contentType()?.match(ContentType.Text.EventStream) != true, "${response.contentType()}")
+        assertTrue("Verification session 'missing-session' was not found" in response.bodyAsText(), response.bodyAsText())
+    }
+
+    @Test
     fun `malformed responses private reader keys and encrypted SessionData return 400 without sessions`() = testApplication {
         startup()
         val repository = InMemoryVerificationSessionRepository()
