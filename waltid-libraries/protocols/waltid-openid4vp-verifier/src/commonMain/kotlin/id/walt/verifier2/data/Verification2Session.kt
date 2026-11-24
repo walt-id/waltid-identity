@@ -7,6 +7,7 @@ import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.WebhookPolicy
+import id.walt.policies2.vc.policies.CredentialVerificationPolicy2
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
@@ -257,15 +258,20 @@ data class Verification2Session(
         crypto2EphemeralDecryptionKey = null,
         responseCode = null,
     ).let { view ->
-        if (setup !is SameDeviceFlowSetup || includeSameDeviceResult) view else view.copy(
-            presentedRawData = null,
-            presentedPresentations = null,
-            presentedCredentials = null,
-            policyResults = null,
-            presentationValidationResults = null,
-            failure = null,
-            statusReason = null,
-        )
+        if (setup !is SameDeviceFlowSetup || includeSameDeviceResult) view else {
+            val failed = status == VerificationSessionStatus.FAILED
+            val diagnostics = failure?.takeIf { failed }?.diagnosticView()
+            view.copy(
+                presentedRawData = null,
+                presentedPresentations = null,
+                presentedCredentials = null,
+                policyResults = policyResults?.takeIf { failed }?.diagnosticView(),
+                presentationValidationResults = presentationValidationResults?.takeIf { failed }
+                    ?.mapValues { (_, results) -> results.mapValues { (_, result) -> result.diagnosticView() } },
+                failure = diagnostics,
+                statusReason = if (failed) diagnostics?.reason ?: "Verification failed." else null,
+            )
+        }
     }
 
     private fun redactCredentialSubject(resultElement: JsonElement): JsonElement {
@@ -408,14 +414,11 @@ internal fun Verification2Session.DefinedVerificationPolicies.publicView() = cop
     specific_vc_policies = specific_vc_policies?.mapValues { (_, policies) -> policies.publicView() },
 )
 
-private fun VCPolicyList.publicView() = copy(
-    policies = policies.map { policy ->
-        if (policy is WebhookPolicy) {
-            policy.copy(
-                basicAuthUsername = null,
-                basicAuthPassword = null,
-                bearerAuthToken = null,
-            )
-        } else policy
-    }
-)
+private fun VCPolicyList.publicView() = copy(policies = policies.map { it.publicView() })
+
+internal fun CredentialVerificationPolicy2.publicView(): CredentialVerificationPolicy2 =
+    if (this is WebhookPolicy) copy(
+        basicAuthUsername = null,
+        basicAuthPassword = null,
+        bearerAuthToken = null,
+    ) else this
