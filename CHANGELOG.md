@@ -1,5 +1,10 @@
 # Unreleased
 
+### Issuer 2 and Wallet 2 API responses
+
+- Issuer 2 profile and session responses now report the issuer signing key as `{"type":"redacted"}`. The generated OpenAPI profile examples use the same value.
+- With Wallet 2 authentication enabled, `GET /wallet` returns only the caller's wallet IDs with `Cache-Control: no-store`. Accounts without wallets receive an empty list.
+
 ### Issuer trust for keys from `x5c`
 
 New `x509-trust` credential policy (verification policies 2). It takes caller-supplied `trustRoots` (PEM or base64 DER) and trusts the credential issuer when the signing certificate is one of them or chains to one. Certificates inside the credential are never used as anchors, and no system trust store is consulted. It supports SD-JWT VC, W3C VCs secured as JWT or COSE, and mdoc.
