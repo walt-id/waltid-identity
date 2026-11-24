@@ -73,6 +73,7 @@ internal fun SettingsScreen(
     onClose: (() -> Unit)? = null,
     closeEnabled: Boolean = true,
     showHeader: Boolean = true,
+    onDismissStatusMessage: ((String) -> Unit)? = null,
 ) {
     val currentState by rememberUpdatedState(state)
     val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
@@ -297,6 +298,13 @@ internal fun SettingsScreen(
                                     }
                                     SettingsNotice(stringResource(digitalCredentialsRequirements))
                                 }
+                            }
+                        }
+                        if (destination == SettingsDestination.CredentialStatus && destination == path.last() &&
+                            onDismissStatusMessage != null
+                        ) {
+                            currentState.credentialStatusNotice?.let { message ->
+                                WalletFooter(feedback = { CredentialStatusMessage(message, onDismissStatusMessage) })
                             }
                         }
                     }

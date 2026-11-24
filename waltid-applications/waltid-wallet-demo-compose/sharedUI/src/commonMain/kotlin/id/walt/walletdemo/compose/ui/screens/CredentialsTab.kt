@@ -40,7 +40,6 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -64,6 +63,7 @@ import id.walt.walletdemo.compose.ui.WalletUiTestTags
 import id.walt.walletdemo.compose.ui.components.CredentialCardMaxWidth
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import id.walt.walletdemo.compose.ui.components.CredentialStatusMessage
 import id.walt.walletdemo.compose.ui.components.CredentialTechnicalInformation
 import id.walt.walletdemo.compose.ui.components.Id1AspectRatio
 import id.walt.walletdemo.compose.ui.components.walletNavigationMotion
@@ -80,7 +80,6 @@ import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
@@ -227,9 +226,9 @@ internal fun CredentialsTab(
                 }
             }
         }
-        if (showFeedback && !showingDetails && !confirmDelete) {
-            WalletHomeFeedback(
-                state, cards, onDismissStatus, onToggleStatusExpanded, onDismissStatusMessage,
+        if (showFeedback && !confirmDelete) {
+            CredentialScreenFeedback(
+                state, cards, showingDetails, onDismissStatus, onToggleStatusExpanded, onDismissStatusMessage,
                 onAcknowledgeStatusNotice, onOpenDetails = { expandedId = it },
             )
         }
@@ -266,18 +265,19 @@ internal fun CredentialsTab(
 }
 
 @Composable
-private fun WalletHomeFeedback(
+private fun CredentialScreenFeedback(
     state: WalletDemoUiState,
     cards: List<CredentialCardDisplayData>,
+    showingDetails: Boolean,
     onDismissStatus: () -> Unit,
     onToggleStatusExpanded: () -> Unit,
     onDismissStatusMessage: (String) -> Unit,
     onAcknowledgeStatusNotice: (WalletDemoCredentialStatusNotice) -> Unit,
     onOpenDetails: (String) -> Unit,
 ) {
-    val operation = state.statusBanner()?.takeUnless { it.key == state.statusDismissedKey }
+    val operation = state.statusBanner()?.takeUnless { showingDetails || it.key == state.statusDismissedKey }
     val allowStatus = state.externalFlow == null && state.presentationReview == null && state.offerPreview == null && !state.isBusy
-    val credentialNotices = if (allowStatus && state.credentialStatuses.available) {
+    val credentialNotices = if (!showingDetails && allowStatus && state.credentialStatuses.available) {
         state.credentialStatuses.pendingNotices.orEmpty().mapNotNull { notice ->
             cards.firstOrNull { it.id == notice.credentialId }?.let { notice to it.title }
         }
@@ -306,23 +306,7 @@ private fun WalletHomeFeedback(
                         )
                     }
                 }
-                statusMessage != null -> key(statusMessage) {
-                    val timeout = LocalAccessibilityManager.current?.calculateRecommendedTimeoutMillis(
-                        4_000, containsIcons = true, containsText = true, containsControls = true,
-                    ) ?: 4_000
-                    LaunchedEffect(timeout) {
-                        delay(timeout)
-                        onDismissStatusMessage(statusMessage)
-                    }
-                    val dismiss = { onDismissStatusMessage(statusMessage) }
-                    WalletNoticeCard(tone = WalletNoticeTone.Warning, onDismiss = dismiss) {
-                        Row(Modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(statusMessage, Modifier.weight(1f).padding(vertical = 12.dp),
-                                style = MaterialTheme.typography.bodyMedium)
-                            WalletNoticeClose(stringResource(Res.string.credential_status_notice_dismiss), dismiss)
-                        }
-                    }
-                }
+                statusMessage != null -> CredentialStatusMessage(statusMessage, onDismissStatusMessage)
                 else -> StatusCard(state, onDismissStatus, onToggleStatusExpanded)
             }
         }

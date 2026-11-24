@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
@@ -19,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +53,10 @@ import id.walt.walletdemo.compose.logic.isStatusExpanded
 import id.walt.walletdemo.compose.logic.isStatusVisible
 import id.walt.walletdemo.compose.logic.statusBanner
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.resources.Res
+import id.walt.walletdemo.compose.ui.resources.credential_status_notice_dismiss
+import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -107,6 +115,31 @@ internal fun WalletNoticeCard(
 internal fun WalletNoticeClose(label: String, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     IconButton(onClick = onDismiss, modifier = modifier) {
         WalletIcon(WalletSymbol.Decline, label)
+    }
+}
+
+@Composable
+internal fun CredentialStatusMessage(message: String, onDismiss: (String) -> Unit) = key(message) {
+    val dismissMessage by rememberUpdatedState(onDismiss)
+    val dismiss = { dismissMessage(message) }
+    val timeout = LocalAccessibilityManager.current?.calculateRecommendedTimeoutMillis(
+        4_000, containsIcons = true, containsText = true, containsControls = true,
+    ) ?: 4_000
+    LaunchedEffect(timeout) {
+        delay(timeout)
+        dismiss()
+    }
+    WalletNoticeCard(
+        modifier = Modifier.fillMaxWidth()
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = CredentialCardMaxWidth),
+        tone = WalletNoticeTone.Warning,
+        onDismiss = dismiss,
+    ) {
+        Row(Modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(message, Modifier.weight(1f).padding(vertical = 12.dp), style = MaterialTheme.typography.bodyMedium)
+            WalletNoticeClose(stringResource(Res.string.credential_status_notice_dismiss), dismiss)
+        }
     }
 }
 

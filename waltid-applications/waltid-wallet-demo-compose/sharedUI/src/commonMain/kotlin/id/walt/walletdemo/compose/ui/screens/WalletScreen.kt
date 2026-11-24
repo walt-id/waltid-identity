@@ -123,6 +123,7 @@ internal fun WalletScreen(
             serverSettingsContent = serverSettingsContent,
             walletAccessContent = { WalletAccessSettingsScreen(controller, state.access) },
             onCancelPinChange = controller::cancelPinChange,
+            onDismissStatusMessage = controller::dismissCredentialStatusNotice,
         )
         return
     }
