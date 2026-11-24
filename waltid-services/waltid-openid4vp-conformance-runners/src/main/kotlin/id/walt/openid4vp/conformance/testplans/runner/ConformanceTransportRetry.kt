@@ -12,12 +12,13 @@ import kotlinx.serialization.json.intOrNull
  * Decides when a conformance module failed because the tunnel or the socket died, rather than
  * because the wallet or verifier produced a verdict.
  *
- * A Cloudflare Quick Tunnel answers 502, 503, or 504 when it cannot reach the local service. The
+ * A Cloudflare Quick Tunnel can answer 502, 503, 504, or 525 before the local service handles the
+ * request. The
  * suite then records that status as the HTTP result it observed (`actual` on a failed check, or
  * `response_status_code` on the HTTP line), and the verifier session stays
  * [VerificationSessionStatus.UNUSED] because the presentation never arrived. That is not a
- * rejection and not an acceptance. A verifier that did answer — including with 200 when the suite
- * required 4xx — has left UNUSED, so it is not retried.
+ * rejection and not an acceptance. A verifier that did answer - including with 200 when the suite
+ * required 4xx - has left UNUSED, so it is not retried.
  *
  * The same gateway status also aborts a module as `INTERRUPTED` before it has a verdict: the
  * issuer and VCI wallet see that status directly, and the verifier and VP wallet see it as
@@ -25,7 +26,7 @@ import kotlinx.serialization.json.intOrNull
  * finished is not retried.
  */
 internal object ConformanceTransportRetry {
-    private val gatewayStatuses = setOf(502, 503, 504)
+    private val gatewayStatuses = setOf(502, 503, 504, 525)
 
     fun unusedVerifierAfterGateway(
         verifierStatus: VerificationSessionStatus?,
@@ -59,7 +60,7 @@ internal object ConformanceTransportRetry {
      * True when the suite aborted a module before a verdict because the tunnel returned a gateway
      * status.
      *
-     * `INTERRUPTED` plus `502`, `503`, or `504` on `response_status_code` or `actual` is the shape
+     * `INTERRUPTED` plus `502`, `503`, `504`, or `525` on `response_status_code` or `actual` is the shape
      * the issuer and VCI wallet observe (often a credential-issuer metadata fetch). A module that
      * finished, including a negative test that failed its assertion, is not retried.
      */

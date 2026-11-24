@@ -1,9 +1,11 @@
 package id.walt.mdoc.proximity
 
+import id.walt.mdoc.encoding.requireSupportedMdocVersion
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
+import id.walt.mdoc.encoding.validateMdocCbor
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.engagement.DeviceEngagement
@@ -29,8 +31,9 @@ object MdocProximityVerifier {
         coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(deviceEngagement)
         val readerKey = coseCompliantCbor.decodeFromByteArray<CoseKey>(eReaderKey)
         require(readerKey.d == null) { "eReaderKey must contain public key material only" }
+        validateMdocCbor(deviceResponse)
         val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(deviceResponse)
-        require(response.version == "1.0") { "Unsupported DeviceResponse version" }
+        requireSupportedMdocVersion(response.version)
         // Decode embedded signed structures now too: malformed CBOR must not create a session.
         response.documents.orEmpty().forEach { document ->
             document.issuerSigned.decodeMobileSecurityObject()

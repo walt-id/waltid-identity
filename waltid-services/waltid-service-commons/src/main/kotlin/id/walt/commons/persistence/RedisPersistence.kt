@@ -20,7 +20,7 @@ class RedisPersistence<V>(
         pool.get("$discriminator:$id")?.let { decoding.invoke(it) }
 
     override operator fun set(id: String, value: V) {
-        if (defaultExpiration != null) {
+        if (defaultExpiration != null && defaultExpiration != Duration.INFINITE) {
             if (defaultExpiration <= Duration.ZERO) {
                 remove(id)
                 return
@@ -33,7 +33,7 @@ class RedisPersistence<V>(
     override fun set(id: String, value: V, ttl: Duration?) {
         val effectiveTtl = ttl ?: defaultExpiration
 
-        if (effectiveTtl != null) {
+        if (effectiveTtl != null && effectiveTtl != Duration.INFINITE) {
             if (effectiveTtl <= Duration.ZERO) {
                 remove(id)
                 return
@@ -56,7 +56,8 @@ class RedisPersistence<V>(
         // Preserve the original bytes for legacy records whose decoder supplies new default fields.
         if (existing == null && expected != null) return false
         if (existing != null && (expected == null || encoding(decoding(existing)) != encoding(expected))) return false
-        val milliseconds = (ttl ?: defaultExpiration)?.inWholeMilliseconds?.coerceAtLeast(1) ?: 0
+        val milliseconds = (ttl ?: defaultExpiration)?.takeUnless { it == Duration.INFINITE }
+            ?.inWholeMilliseconds?.coerceAtLeast(1) ?: 0
         val script = """
             local current = redis.call('GET', KEYS[1])
             if ARGV[1] == 'absent' then
@@ -71,6 +72,12 @@ class RedisPersistence<V>(
     }
 
     override fun retainForAtLeast(id: String, ttl: Duration): Boolean {
+        if (ttl == Duration.INFINITE) {
+            return pool.eval(
+                "if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end; redis.call('PERSIST', KEYS[1]); return 1",
+                listOf("$discriminator:$id"), emptyList(),
+            ) == 1L
+        }
         val script = """
             local remaining = redis.call('PTTL', KEYS[1])
             if remaining == -2 then return 0 end
@@ -96,12 +103,14 @@ class RedisPersistence<V>(
         pool.sadd("$discriminator:$id", value.toString())
 
         val effectiveTtl = ttl ?: defaultExpiration
-        if (effectiveTtl != null) {
+        if (effectiveTtl != null && effectiveTtl != Duration.INFINITE) {
             if (effectiveTtl <= Duration.ZERO) {
                 remove(id)
                 return
             }
             pool.expire("$discriminator:$id", effectiveTtl.inWholeSeconds.coerceAtLeast(1))
+        } else if (effectiveTtl == Duration.INFINITE) {
+            pool.persist("$discriminator:$id")
         }
     }
 

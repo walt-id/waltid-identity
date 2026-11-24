@@ -93,6 +93,16 @@ class CredentialProfileServiceTest {
     }
 
     @Test
+    fun `offerless lookup validates the profile for the requested credential configuration`() {
+        val service = serviceWithProfiles(profiles = mapOf(
+            PROFILE_ID to profileConfig(),
+            "otherProfile" to profileConfig(credentialConfigurationId = "unsupported"),
+        ))
+        assertEquals(PROFILE_ID, service.resolveProfileByCredentialConfigurationId(CREDENTIAL_CONFIGURATION_ID).profileId)
+        assertFailsWith<IllegalArgumentException> { service.resolveProfileByCredentialConfigurationId("unsupported") }
+    }
+
+    @Test
     fun `rejects profile referencing unsupported credential configuration`() {
         val service = serviceWithProfiles(
             profiles = mapOf(

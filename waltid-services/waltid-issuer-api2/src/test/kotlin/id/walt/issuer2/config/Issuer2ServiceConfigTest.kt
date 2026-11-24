@@ -13,6 +13,7 @@ import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
+import id.walt.trust.model.TrustedEntityType
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -367,6 +368,54 @@ class Issuer2ServiceConfigTest {
         )
         assertEquals(1, method.trustedRootCertificatesPem.size)
         assertEquals(false, config.supportsPreAuthAnonymous())
+    }
+
+    @Test
+    fun `service config decodes the attestation trust resolver without logging header values`() {
+        val config = loadServiceConfig(
+            """
+                baseUrl = "http://localhost:7002"
+                attestationTrustResolver {
+                    resolveCertificateChainUrl = "https://registry.example/trust-registry/resolve/certificate-chain"
+                    headers { Authorization = "Bearer synthetic-token" }
+                }
+            """.trimIndent(),
+        )
+
+        val resolver = assertNotNull(config.attestationTrustResolver)
+        assertEquals("https://registry.example/trust-registry/resolve/certificate-chain", resolver.resolveCertificateChainUrl)
+        assertEquals(mapOf("Authorization" to "Bearer synthetic-token"), resolver.headers)
+        assertFalse("synthetic-token" in config.toString())
+        assertNotNull(OpenId4VciModule.createAttestationTrustEvaluator(config))
+    }
+
+    @Test
+    fun `startup fails when x509 trust registry client attestation has no resolver`() {
+        val config = loadServiceConfig(
+            """
+                baseUrl = "http://localhost:7002"
+                clientAuthenticationConfig {
+                    supportedMethods = [
+                        {
+                            type = "client-attestation"
+                            config {
+                                verificationMethod {
+                                    type = "x509-trust-registry"
+                                    expectedEntityTypes = ["WALLET_PROVIDER"]
+                                }
+                            }
+                        }
+                    ]
+                }
+            """.trimIndent(),
+        )
+
+        val method = assertIs<ClientAttestationVerificationMethod.X509TrustRegistry>(
+            config.clientAttestationConfig()?.verificationMethod,
+        )
+        assertEquals(setOf(TrustedEntityType.WALLET_PROVIDER), method.expectedEntityTypes)
+        val error = assertFails { OpenId4VciModule.createAttestationTrustEvaluator(config) }
+        assertTrue("attestationTrustResolver" in error.message.orEmpty(), error.message)
     }
 
     @Test

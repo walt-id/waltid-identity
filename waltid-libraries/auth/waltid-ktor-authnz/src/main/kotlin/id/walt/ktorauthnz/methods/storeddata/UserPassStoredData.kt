@@ -1,6 +1,7 @@
 package id.walt.ktorauthnz.methods.storeddata
 
 import id.walt.ktorauthnz.methods.UserPass
+import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.ktorauthnz.security.PasswordHashing
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -9,9 +10,10 @@ import kotlinx.serialization.Serializable
 @SerialName("userpass")
 data class UserPassStoredData(
     val password: String? = null,
-    val passwordHash: String? = null
-) : AuthMethodStoredData {
+    override val passwordHash: String? = null
+) : PasswordStoredData {
     override fun authMethod() = UserPass
+    override fun withPasswordHash(hash: PasswordHash) = UserPassStoredData(passwordHash = hash.toString())
     override suspend fun transformSavable(): UserPassStoredData =
         when {
             passwordHash != null -> UserPassStoredData(passwordHash = passwordHash)

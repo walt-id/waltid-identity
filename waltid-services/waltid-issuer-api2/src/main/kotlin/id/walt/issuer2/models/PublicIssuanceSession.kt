@@ -3,6 +3,7 @@ package id.walt.issuer2.models
 import id.walt.issuer2.domain.IssuanceResult
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.domain.CredentialStatusConfiguration
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -35,7 +36,7 @@ val multiIssuanceSessionDescriptor: SerialDescriptor =
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name !in setOf("deferredState", "issuanceClaimId")) element(
+            if (name !in setOf("deferredState", "issuanceClaimId", "credentialStatusIssuance")) element(
                 name,
                 if (name == "issuanceResults") mapSerialDescriptor(String.serializer().descriptor, publicIssuanceResultDescriptor) else session.getElementDescriptor(index),
                 isOptional = session.isElementOptional(index),
@@ -49,7 +50,7 @@ val singleIssuanceSessionDescriptor: SerialDescriptor =
         val session = IssuanceSession.serializer().descriptor
         for (index in 0 until session.elementsCount) {
             val name = session.getElementName(index)
-            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState", "issuanceClaimId"))
+            if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState", "issuanceClaimId", "credentialStatusIssuance"))
                 element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
         }
         val request = id.walt.issuer2.domain.IssuanceRequest.serializer().descriptor
@@ -81,14 +82,25 @@ object PublicIssuanceSessionSerializer : KSerializer<PublicIssuanceSession> {
 
 fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
     val publicRequests = issuanceRequests.map { it.copy(issuerKey = REDACTED_ISSUER_KEY) }
-    val encoded = JsonObject(json.encodeToJsonElement(copy(issuanceRequests = publicRequests)).jsonObject - buildSet {
+    val publicNotifications = notifications?.let {
+        it.copy(webhook = it.webhook?.copy(signingSecret = null))
+    }
+    val publicSnapshot = copy(issuanceRequests = publicRequests, notifications = publicNotifications)
+    val encoded = JsonObject(json.encodeToJsonElement(publicSnapshot).jsonObject - buildSet {
         add("deferredState")
         add("issuanceClaimId")
+        add("credentialStatusIssuance")
         if (deferredStatus == null) add("deferredStatus")
     })
+    fun publicRequest(request: id.walt.issuer2.domain.IssuanceRequest): JsonObject {
+        val value = json.encodeToJsonElement(request).jsonObject
+        return if (CredentialStatusConfiguration.isPreallocated(request.credentialStatus))
+            JsonObject(value - "credentialStatus") else value
+    }
     if (publicRequests.size != 1) {
-        val results = encoded["issuanceResults"] as? JsonObject ?: return encoded
-        return JsonObject(encoded + ("issuanceResults" to JsonObject(results.mapValues { (identifier, value) ->
+        val publicSession = JsonObject(encoded + ("issuanceRequests" to JsonArray(publicRequests.map(::publicRequest))))
+        val results = encoded["issuanceResults"] as? JsonObject ?: return publicSession
+        return JsonObject(publicSession + ("issuanceResults" to JsonObject(results.mapValues { (identifier, value) ->
             val fields = (value.jsonObject - "walletNotification").toMutableMap()
             val notification = issuanceResults[identifier]?.walletNotification
             fun putNotificationField(name: String, value: String?) {
@@ -105,7 +117,7 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
     val fields = encoded.toMutableMap()
     fields.keys.removeAll(setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState"))
     fields.putAll(
-        json.encodeToJsonElement(request).jsonObject - setOf(
+        publicRequest(request) - setOf(
             "credentialIdentifier",
             "expectedCredentialProofKeyJwks"
         )

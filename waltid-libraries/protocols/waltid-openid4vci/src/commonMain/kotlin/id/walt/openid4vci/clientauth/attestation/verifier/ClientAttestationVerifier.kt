@@ -17,3 +17,10 @@ sealed interface ClientAttestationVerificationResult {
     data class VerifiedWithSigner(val publicJwk: JsonObject) : ClientAttestationVerificationResult
     data class Rejected(val reason: String? = null) : ClientAttestationVerificationResult
 }
+
+/**
+ * The issuer cannot decide whether to trust a client attestation, for example because its trust source is
+ * unavailable. Client authentication reports it as `server_error`, never as `invalid_client`.
+ */
+class ClientAttestationServiceException(message: String, cause: Throwable? = null) :
+    IllegalStateException(message, cause)
