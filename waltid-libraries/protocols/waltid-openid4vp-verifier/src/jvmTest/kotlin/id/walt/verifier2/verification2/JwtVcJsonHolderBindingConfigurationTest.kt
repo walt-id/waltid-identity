@@ -23,10 +23,11 @@ class JwtVcJsonHolderBindingConfigurationTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         val did = DidService.registerByKey("key", key).did
         val kid = DidService.resolveAuthenticationMethodId(did, key.getKeyId())
-        val payload = JsonObject(mapOf("iss" to JsonPrimitive(did)))
+        val vp = JsonObject(emptyMap())
+        val payload = JsonObject(mapOf("iss" to JsonPrimitive(did), "vp" to vp))
         val jwt = key.signJws(payload.toString().encodeToByteArray(), mapOf("kid" to JsonPrimitive(kid)))
         val credential = W3C11(credentialData = JsonObject(emptyMap()), subject = did, signature = null, signed = jwt)
-        val presentation = JwtVcJsonPresentation(jwt, payload, did, null, null, null, listOf(credential))
+        val presentation = JwtVcJsonPresentation(jwt, payload, did, null, null, vp, listOf(credential))
         for (required in listOf(true, false)) {
             val query = Json.decodeFromString<CredentialQuery>("""{
                 "id":"identity","format":"jwt_vc_json","meta":{"type_values":[["VerifiedID"]]},"require_cryptographic_holder_binding":$required
