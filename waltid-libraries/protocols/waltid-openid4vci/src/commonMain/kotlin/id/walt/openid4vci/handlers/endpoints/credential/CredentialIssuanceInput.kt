@@ -25,6 +25,9 @@ data class CredentialIssuanceInput(
  */
 fun interface CredentialIssuanceInputProvider {
     suspend fun provide(credentialCount: Int): List<CredentialIssuanceInput>
+
+    /** Inspect the same ordered bindings used for signing. Return a rejection or a saved response to finish early. */
+    suspend fun prepare(bindings: List<VerifiedCredentialBinding>): CredentialResponseResult? = null
 }
 
 data class CredentialIssuanceInstance(

@@ -1,16 +1,24 @@
 package id.walt.crypto.keys.azure
 
 import com.azure.core.exception.ResourceNotFoundException
+import com.azure.security.keyvault.keys.cryptography.CryptographyAsyncClient
 import com.azure.security.keyvault.keys.cryptography.models.SignatureAlgorithm
 import com.azure.security.keyvault.keys.models.CreateEcKeyOptions
 import com.azure.security.keyvault.keys.models.CreateRsaKeyOptions
 import com.azure.security.keyvault.keys.models.KeyCurveName
+import com.azure.security.keyvault.keys.models.KeyVaultKey
 import id.walt.crypto.exceptions.*
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto2.algorithms.EcdsaSignatureCodec
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -71,7 +79,7 @@ class AzureKey(
             val hashFunction = getHashFunction()
             val digest = hashFunction(plaintext)
 
-            val cryptoClient = KeyVaultClientFactory.cryptoClient(config.auth.keyVaultUrl, id)
+            val cryptoClient = versionedCryptoClient()
             val signResult = cryptoClient.sign(azureSignatureAlgorithm, digest).awaitSingle()
             val rawSignature = signResult.signature
                 ?: throw SigningException("Azure Key Vault returned null signature")
@@ -81,10 +89,14 @@ class AzureKey(
             // OCIKey, and AzureKeyRestApi). Consumers like BouncyCastle's ContentSigner used
             // for X.509 issuance decode the result as DER, so convert here to keep parity.
             if (keyType in KeyTypes.EC_KEYS) {
-                EccUtils.convertP1363toDER(rawSignature)
+                EcdsaSignatureCodec.p1363ToDer(rawSignature, EC_COMPONENT_SIZE)
             } else {
                 rawSignature
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: KeyNotFoundException) {
+            throw e
         } catch (e: ResourceNotFoundException) {
             throw KeyNotFoundException(id, "Key not found in Azure Key Vault", e)
         } catch (e: com.azure.core.exception.HttpResponseException) {
@@ -110,7 +122,7 @@ class AzureKey(
 
         val rawDerOrRsaSignature = signRaw("$header.$payload".encodeToByteArray())
         val jwsSignature = if (keyType in KeyTypes.EC_KEYS) {
-            EccUtils.convertDERtoIEEEP1363(rawDerOrRsaSignature)
+            EcdsaSignatureCodec.derToP1363(rawDerOrRsaSignature, EC_COMPONENT_SIZE)
         } else {
             rawDerOrRsaSignature
         }
@@ -131,14 +143,16 @@ class AzureKey(
             val hashFunction = getHashFunction()
             val digest = hashFunction(messageToVerify)
 
-            val cryptoClient = KeyVaultClientFactory.cryptoClient(config.auth.keyVaultUrl, id)
-            val verifyResult = cryptoClient.verify(azureSignatureAlgorithm, digest, signed).awaitSingle()
-
-            if (verifyResult.isValid) {
+            val cryptoClient = versionedCryptoClient()
+            if (verifyWithAzure(cryptoClient, digest, signed)) {
                 Result.success(messageToVerify)
             } else {
                 Result.failure(VerificationException("Signature verification failed"))
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: KeyNotFoundException) {
+            Result.failure(e)
         } catch (e: ResourceNotFoundException) {
             Result.failure(KeyNotFoundException(id, "Key not found in Azure Key Vault", e))
         } catch (e: com.azure.core.exception.HttpResponseException) {
@@ -151,23 +165,58 @@ class AzureKey(
         }
     }
 
+    private suspend fun verifyWithAzure(client: CryptographyAsyncClient, digest: ByteArray, signed: ByteArray): Boolean {
+        if (keyType !in KeyTypes.EC_KEYS) return client.verify(azureSignatureAlgorithm, digest, signed).awaitSingle().isValid
+
+        val raw = try {
+            EcdsaSignatureCodec.derToP1363(signed, EC_COMPONENT_SIZE)
+        } catch (e: IllegalArgumentException) {
+            // Retain support for callers that already pass Azure's fixed-width encoding.
+            if (signed.size != EC_COMPONENT_SIZE * 2) throw e
+            signed
+        }
+        if (client.verify(azureSignatureAlgorithm, digest, raw).awaitSingle().isValid) return true
+        // Fixed-width inputs can also happen to parse as DER. Prefer DER and try the original bytes if necessary.
+        return signed.size == EC_COMPONENT_SIZE * 2 && !raw.contentEquals(signed) &&
+            client.verify(azureSignatureAlgorithm, digest, signed).awaitSingle().isValid
+    }
+
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val publicKey = getPublicKey()
         return publicKey.verifyJws(signedJws)
     }
 
     @Transient
-    private var backedKey: Key? = null
+    private val keyVersionLock = Mutex()
 
-    override suspend fun getPublicKey(): Key = backedKey ?: when {
-        _publicKey != null -> _publicKey!!.key
-        else -> retrievePublicKey()
-    }.also { newBackedKey -> backedKey = newBackedKey }
+    @Transient
+    private var keyVersion: String? = null
 
-    private suspend fun retrievePublicKey(): Key {
-        val publicKey = getAzurePublicKey(config, id)
-        _publicKey = DirectSerializedKey(publicKey)
-        return publicKey
+    override suspend fun getPublicKey(): Key = keyVersionLock.withLock {
+        (_publicKey ?: DirectSerializedKey(getAzurePublicKey(config, id)).also { _publicKey = it }).key
+    }
+
+    private suspend fun versionedCryptoClient(): CryptographyAsyncClient =
+        KeyVaultClientFactory.cryptoClient(config.auth.keyVaultUrl, id, keyVersionLock.withLock { resolveKeyVersion() })
+
+    // Called under keyVersionLock. Existing records may have only the key name and the original public material.
+    private suspend fun resolveKeyVersion(): String = keyVersion ?: withContext(Dispatchers.IO) {
+        val keys = KeyVaultClientFactory.keyClient(config.auth.keyVaultUrl)
+        val latest = keys.getKey(id)
+        val latestVersion = latest.version()
+        val latestPublicKey = latest.toWaltPublicKey()
+        val expectedThumbprint = _publicKey?.key?.getThumbprint()
+        val matchingVersion = if (expectedThumbprint == null || latestPublicKey.getThumbprint() == expectedThumbprint) {
+            latestVersion
+        } else {
+            keys.listPropertiesOfKeyVersions(id).firstNotNullOfOrNull { properties ->
+                val version = properties.version?.takeIf { it.isNotBlank() && it != latestVersion }
+                    ?: return@firstNotNullOfOrNull null
+                keys.getKey(id, version).takeIf { it.toWaltPublicKey().getThumbprint() == expectedThumbprint }?.version()
+            } ?: throw KeyNotFoundException(id, "No Azure Key Vault version matches the stored public key")
+        }
+        if (_publicKey == null) _publicKey = DirectSerializedKey(latestPublicKey)
+        matchingVersion.also { keyVersion = it }
     }
 
     override suspend fun getPublicKeyRepresentation(): ByteArray {
@@ -198,6 +247,16 @@ class AzureKey(
 
 
     companion object {
+        private const val EC_COMPONENT_SIZE = 32
+
+        private fun KeyVaultKey.version(): String =
+            requireNotNull(properties.version?.takeIf { it.isNotBlank() }) { "Azure Key Vault did not return a key version" }
+
+        private suspend fun KeyVaultKey.toWaltPublicKey(): JWKKey {
+            val imported = JWKKey.importJWK(key.toString()).getOrThrow()
+            return parseAzurePublicKey(imported.exportJWKObject()).publicKey
+        }
+
         data class ParsedAzurePublicKey(
             val kid: String,
             val azureKeyType: String,
@@ -269,16 +328,13 @@ class AzureKey(
                 }
 
                 val keyVaultKey = keyClient.createKey(createKeyOptions)
-                val publicKey = getAzurePublicKey(config, keyVaultKey.name)
-
-                val normalizedPublicKey = parseAzurePublicKey(publicKey.exportJWKObject()).publicKey
                 val editedConfig = config.copy(tags = null)
                 AzureKey(
                     config = editedConfig,
                     id = keyVaultKey.name,
-                    _publicKey = DirectSerializedKey(normalizedPublicKey),
+                    _publicKey = DirectSerializedKey(keyVaultKey.toWaltPublicKey()),
                     _keyType = keyType
-                )
+                ).also { it.keyVersion = keyVaultKey.version() }
             } catch (e: com.azure.core.exception.HttpResponseException) {
                 when (e.response.statusCode) {
                     403 -> throw UnauthorizedKeyAccess("Access denied. Check RBAC permissions for Key Vault.", e)
@@ -297,10 +353,7 @@ class AzureKey(
                 val keyClient = KeyVaultClientFactory.keyClient(config.auth.keyVaultUrl)
                 val keyVaultKey = keyClient.getKey(keyName)
 
-                val jwk = keyVaultKey.key
-                val jwkJson = jwk.toString() // Azure SDK's JsonWebKey has a toString that outputs JWK JSON
-                val imported = JWKKey.importJWK(jwkJson).getOrThrow()
-                parseAzurePublicKey(imported.exportJWKObject()).publicKey
+                keyVaultKey.toWaltPublicKey()
             } catch (e: ResourceNotFoundException) {
                 throw KeyNotFoundException(keyName, "Key not found in Azure Key Vault", e)
             } catch (e: com.azure.core.exception.HttpResponseException) {

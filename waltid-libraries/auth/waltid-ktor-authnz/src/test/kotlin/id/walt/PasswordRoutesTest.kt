@@ -1,6 +1,7 @@
 package id.walt
 
 import id.walt.ktorauthnz.KtorAuthnz
+import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.ExampleAccountStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.attempts.AttemptLimits
@@ -12,6 +13,7 @@ import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.flows.authFlows
 import id.walt.ktorauthnz.methods.EmailPass
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
+import id.walt.ktorauthnz.security.PasswordHashingAlgorithm
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
 import id.walt.ktorauthnz.tokens.ktorauthnztoken.KtorAuthNzTokenHandler
@@ -83,6 +85,24 @@ class PasswordRoutesTest {
 
     private suspend fun ApplicationTestBuilder.token(password: String) =
         assertNotNull(json.decodeFromString<AuthSessionInformation>(login(password).bodyAsText()).token)
+
+    @Test
+    fun `a store without conditional updates authenticates without rewriting credentials`() = passwordTest {
+        startApplication()
+        val identifier = EmailIdentifier(email)
+        val previous = KtorAuthnzManager.passwordHashingConfig
+        try {
+            val legacy = EmailPassStoredData(passwordHash = "NONE/" + previous.pepper + "first-password")
+            ExampleAccountStore.updateAccountIdentifierStoredData(identifier, EmailPass.id, legacy)
+            KtorAuthnzManager.passwordHashingConfig = previous.copy(
+                selectedHashConversions = mapOf(PasswordHashingAlgorithm.NONE to PasswordHashingAlgorithm.ARGON2)
+            )
+            assertEquals(HttpStatusCode.OK, login("first-password").status)
+            assertEquals(legacy, ExampleAccountStore.lookupStoredDataForAccountIdentifier(identifier, EmailPass))
+        } finally {
+            KtorAuthnzManager.passwordHashingConfig = previous
+        }
+    }
 
     @Test
     fun `a password change needs the current password and ends every session`() = passwordTest {

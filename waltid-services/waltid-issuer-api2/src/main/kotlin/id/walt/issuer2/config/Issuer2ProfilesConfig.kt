@@ -42,5 +42,6 @@ data class CredentialProfileConfig(
     val msoData: MsoData? = null,
     val x5Chain: List<String>? = null,
     val notifications: IssuanceNotifications? = null,
+    /** Fixed object/flat W3C group, or per-copy flat SD-JWT/mdoc arrays/nested W3C groups requiring Redis. */
     val credentialStatus: JsonElement? = null,
 )

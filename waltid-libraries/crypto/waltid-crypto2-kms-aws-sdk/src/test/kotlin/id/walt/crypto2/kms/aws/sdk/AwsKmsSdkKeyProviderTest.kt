@@ -32,6 +32,7 @@ import id.walt.crypto2.algorithms.EcdsaSignatureCodec
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.AsymmetricCiphertext
+import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.KeyDeletionResult
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
@@ -39,6 +40,7 @@ import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.providers.GenerateManagedKeyRequest
+import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
@@ -133,6 +135,22 @@ class AwsKmsSdkKeyProviderTest {
     }
 
     @Test
+    fun `existing descriptor rejects mixed usage and EC encryption`() = runTest {
+        val options = AwsKmsSdkOptions(primaryRegion = "us-east-1")
+        val publicKey = EncodedKey.SpkiDer(BinaryData(TEST_SPKI))
+        assertFailsWith<IllegalArgumentException> {
+            AwsKmsSdkKeyProvider.storedKeyForExisting(
+                KeyId("mixed-usage"), KeySpec.Rsa(2048), setOf(KeyUsage.SIGN, KeyUsage.DECRYPT), options, "remote", publicKey,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AwsKmsSdkKeyProvider.storedKeyForExisting(
+                KeyId("ec-encryption"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.ENCRYPT), options, "remote", publicKey,
+            )
+        }
+    }
+
+    @Test
     fun `RSA encryption uses provider-bound opaque ciphertext`() = runTest {
         val state = FakeState(ByteArray(0))
         val plaintext = "plaintext".encodeToByteArray()
@@ -146,6 +164,7 @@ class AwsKmsSdkKeyProviderTest {
                 providerOptions = AwsKmsSdkOptions(primaryRegion = "us-east-1").encode(),
             ),
         )
+        assertTrue(key.capabilities.signatureAlgorithms.isEmpty())
         state.decryptedPlaintext = plaintext
         val algorithm = AsymmetricEncryptionAlgorithm.RsaOaep(DigestAlgorithm.SHA_256)
         val ciphertext = assertIs<AsymmetricCiphertext.Opaque>(

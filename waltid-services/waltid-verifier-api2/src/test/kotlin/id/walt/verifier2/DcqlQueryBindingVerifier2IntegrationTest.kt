@@ -185,7 +185,7 @@ class DcqlQueryBindingVerifier2IntegrationTest {
             },
         )
 
-        runPresentation(mdocQuery("org.iso.18013.5.1.mDL")) { bootstrapUrl ->
+        runPresentation(mdocQuery("org.iso.18013.5.1.mDL"), expectMdocIntegrityFailure = true) { bootstrapUrl ->
             presentMdoc(bootstrapUrl, relabelled, mdocQuery("org.iso.18013.5.1.mDL"))
         }
     }
@@ -221,6 +221,7 @@ class DcqlQueryBindingVerifier2IntegrationTest {
         expectAccepted: Boolean = false,
         expectStatusRejected: Boolean = false,
         statusToken: (() -> String)? = null,
+        expectMdocIntegrityFailure: Boolean = false,
         present: suspend (bootstrapUrl: Url) -> Result<WalletPresentFunctionality2.WalletPresentResult>,
     ) {
         val host = "127.0.0.1"
@@ -299,10 +300,16 @@ class DcqlQueryBindingVerifier2IntegrationTest {
                     assertTrue(session.policyResults!!.vcPolicies.any { it.policy.id == "credential-status" && !it.success })
                 }
             } else {
-                test("Session failed on DCQL fulfillment, before credential policies") {
+                test("Session failed before credential policies") {
                     assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
-                    val failure = assertIs<SessionFailure.DcqlFulfillment>(session.failure, session.failure.toString())
-                    assertEquals(setOf("requested"), failure.failure.missingQueryIds)
+                    if (expectMdocIntegrityFailure) {
+                        // Structural inconsistencies are rejected by the VP policy before DCQL matching.
+                        val failure = assertIs<SessionFailure.PresentationValidation>(session.failure)
+                        assertTrue("mso_mdoc/issuer_signed_integrity" in failure.failedPolicies.getValue("requested"))
+                    } else {
+                        val failure = assertIs<SessionFailure.DcqlFulfillment>(session.failure, session.failure.toString())
+                        assertEquals(setOf("requested"), failure.failure.missingQueryIds)
+                    }
                     assertNull(session.policyResults)
                 }
             }

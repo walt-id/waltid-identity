@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class ConformanceTransportRetryTest {
     @Test
     fun retriesWhenTheSuiteObservedAGatewayStatusAndTheVerifierNeverSawThePresentation() {
-        for (status in listOf(502, 503, 504)) {
+        for (status in listOf(502, 503, 504, 525)) {
             val log = lenientJson.decodeFromString<List<TestLogEntry>>(
                 """[{"result":"FAILURE","src":"EnsureHttpStatusCodeIs4xx","actual":$status}]""",
             )
@@ -75,7 +75,7 @@ class ConformanceTransportRetryTest {
 
     @Test
     fun retriesAnUnusedVerifierWhenTheGatewayStatusIsOnlyOnTheHttpLine() {
-        for (status in listOf(502, 503, 504)) {
+        for (status in listOf(502, 503, 504, 525)) {
             val log = lenientJson.decodeFromString<List<TestLogEntry>>(
                 """[{"msg":"HTTP response","response_status_code":$status}]""",
             )
@@ -133,7 +133,7 @@ class ConformanceTransportRetryTest {
 
     @Test
     fun issuerAndVciWalletRetryWhenInterruptedAfterAGatewayStatus() {
-        for (status in listOf(502, 503, 504)) {
+        for (status in listOf(502, 503, 504, 525)) {
             val httpLine = lenientJson.decodeFromString<List<TestLogEntry>>(
                 """[{"msg":"HTTP response","response_status_code":$status}]""",
             )
@@ -214,6 +214,20 @@ class ConformanceTransportRetryTest {
                 gateway,
             ),
         )
+    }
+
+    @Test
+    fun cloudflareHandshakeFailureRetriesOnlyBeforeAVerifierOutcome() {
+        val log = lenientJson.decodeFromString<List<TestLogEntry>>(
+            """[{"msg":"HTTP response","response_status_code":"525"},
+                {"result":"INTERRUPTED","src":"FetchRequestUriAndExtractRequestObject"}]""",
+        )
+        assertTrue(ConformanceTransportRetry.unusedVerifierAfterGateway(VerificationSessionStatus.UNUSED, false, log))
+        assertFalse(ConformanceTransportRetry.unusedVerifierAfterGateway(VerificationSessionStatus.SUCCESSFUL, false, log))
+        assertFalse(ConformanceTransportRetry.unusedVerifierAfterGateway(VerificationSessionStatus.FAILED, false, log))
+        assertFalse(ConformanceTransportRetry.unusedVerifierAfterGateway(VerificationSessionStatus.UNUSED, true, log))
+        assertTrue(ConformanceTransportRetry.interruptedByGateway("INTERRUPTED", log))
+        assertFalse(ConformanceTransportRetry.interruptedByGateway("FINISHED", log))
     }
 
     @Test

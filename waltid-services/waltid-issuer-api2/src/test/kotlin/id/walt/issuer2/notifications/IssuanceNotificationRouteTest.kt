@@ -1,17 +1,7 @@
 package id.walt.issuer2.notifications
 
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.KeyId
-import id.walt.crypto2.keys.KeySpec
-import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
-import id.walt.did.dids.registrar.local.jwk.Crypto2DidJwkRegistrar
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.issuer2Module
@@ -36,14 +26,14 @@ import id.walt.issuer2.testsupport.issuer2TestJson
 import id.walt.issuer2.testsupport.loadIssuer2ConfigFiles
 import id.walt.issuer2.testsupport.resolveOffer
 import id.walt.ktornotifications.SseNotifier
+import id.walt.ktornotifications.WebhookSignature
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 import id.walt.openid4vci.dpop.DPoPConstants
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
+import id.walt.openid4vci.proofs.Proofs
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
-import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
-import id.waltid.openid4vci.wallet.proof.ProofKeyBinding
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -87,9 +77,13 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import java.security.MessageDigest
+import java.util.Base64
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -104,6 +98,74 @@ class IssuanceNotificationRouteTest {
     @AfterEach
     fun clearConfig() {
         clearIssuer2TestEnvironment()
+    }
+
+    @Test
+    fun blankAndShortSigningSecretsAreRejectedAsBadRequests() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        for (secret in listOf("", " ".repeat(32), "x".repeat(31))) {
+            val response = client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    """{"profileId":"openBadgeCredential","authMethod":"PRE_AUTHORIZED","runtimeOverrides":{"notifications":{"webhook":{"url":"https://receiver.example/hook","signing_secret":"$secret"}}}}"""
+                )
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    @Test
+    fun issuanceOfferWebhookIsSignedAndItsSecretIsRedacted() = testApplication {
+        val notificationServer = Issuer2TestNotificationServer()
+        notificationServer.startServer()
+        val secret = "manual-test-secret-0123456789abcdef"
+
+        try {
+            installIssuer2WithConfigFiles()
+            val client = apiClient()
+            val callbackUrl = notificationServer.webhookUrl()
+            val createdOffer = client.createCredentialOffer(
+                Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.withRuntimeOverrides(
+                    CredentialOfferRuntimeOverrides(
+                        notifications = IssuanceNotifications(
+                            webhook = IssuanceNotifications.WebhookNotification(
+                                url = callbackUrl,
+                                signingSecret = secret,
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+            notificationServer.awaitEvent(createdOffer.offerId, IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED)
+            val callback = notificationServer.getReceivedCallbacks().first {
+                it.update.target == createdOffer.offerId &&
+                    it.update.event == IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED.value
+            }
+            val deliveryId = assertNotNull(callback.deliveryId)
+            assertEquals(deliveryId, callback.idempotencyKey)
+            assertEquals("1", callback.attempt)
+            val digest = "sha-256=:" + Base64.getEncoder().encodeToString(
+                MessageDigest.getInstance("SHA-256").digest(callback.rawBody.toByteArray(Charsets.UTF_8)),
+            ) + ":"
+            assertEquals(digest, callback.contentDigest)
+            assertTrue(WebhookSignature.verify(
+                signature = assertNotNull(callback.signature),
+                secret = secret,
+                url = callbackUrl,
+                deliveryId = deliveryId,
+                timestampEpochSeconds = assertNotNull(callback.timestamp).toLong(),
+                attempt = 1,
+                contentDigest = digest,
+            ))
+            assertFalse(secret in callback.rawBody)
+            val publicSession = client.get("/issuer2/sessions/${createdOffer.offerId}")
+            assertEquals(HttpStatusCode.OK, publicSession.status)
+            assertFalse(secret in publicSession.bodyAsText())
+        } finally {
+            notificationServer.stopServer()
+        }
     }
 
     @Test
@@ -300,10 +362,11 @@ class IssuanceNotificationRouteTest {
             assertEquals(errorBody["error"]?.jsonPrimitive?.contentOrNull, failure.error)
             assertEquals(errorBody["error_description"]?.jsonPrimitive?.contentOrNull, failure.errorDescription)
 
-            notificationServer.awaitEvent(
-                createdOffer.offerId,
+            listOf(
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
                 IssuanceSessionEvent.TOKEN_REQUEST_PRE_AUTHORIZED_CODE_SUCCEEDED,
-            )
+            ).forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
             val events = notificationServer.getReceivedUpdates()
                 .filter { it.target == createdOffer.offerId }
                 .map { it.event }
@@ -649,6 +712,11 @@ class IssuanceNotificationRouteTest {
                 parResponse.body<JsonObject>()["error"]?.jsonPrimitive?.content,
             )
 
+            listOf(
+                IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
+                IssuanceSessionEvent.CREDENTIAL_OFFER_RETRIEVED,
+            ).forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
+
             assertEquals(
                 listOf(
                     IssuanceSessionEvent.CREDENTIAL_OFFER_CREATED,
@@ -743,40 +811,18 @@ class IssuanceNotificationRouteTest {
         val issuerMetadata = get("/.well-known/openid-credential-issuer/openid4vci").also {
             assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
         }.body<CredentialIssuerMetadata>()
-        val nonceResponse = post("/openid4vci/nonce").also {
-            assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText())
-        }.body<JsonObject>()
-        val nonce = assertNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull)
-        val proofKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(GenerateSoftwareKeyRequest(
-            KeyId("holder-proof"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-        ))
-        val holderDid = Crypto2DidJwkRegistrar()
-            .createByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
-            .did
-        val validProofs = JwtProofBuilder().buildProof(
-            key = proofKey,
-            algorithm = JwsAlgorithm.ES256,
-            audience = issuerMetadata.credentialIssuer,
-            nonce = nonce,
-            binding = ProofKeyBinding.KeyId("$holderDid#0"),
-            clientId = null,
-        )
-        val proofs = if (tamperProof) {
-            validProofs.copy(jwt = validProofs.jwt?.map(::tamperSignature))
-        } else {
-            validProofs.copy(jwt = List(proofCount) { requireNotNull(validProofs.jwt).single() })
+        val configurationId = resolvedOffer.credentialConfigurationIds.single()
+        val wallet = Issuer2WalletFlowDriver(this)
+        val proofs = List(proofCount) {
+            val jwt = requireNotNull(wallet.buildJwtProofs(issuerMetadata, configurationId, includeDidInProof = true).jwt).single()
+            if (tamperProof) tamperSignature(jwt) else jwt
         }
 
         return post("/openid4vci/credential") {
             requestId?.let { header(HttpHeaders.XRequestId, it) }
             bearerAuth(tokenResponse.access_token)
             contentType(ContentType.Application.Json)
-            setBody(
-                credentialRequest(
-                    credentialConfigurationId = resolvedOffer.credentialConfigurationIds.single(),
-                    proofs = proofs,
-                )
-            )
+            setBody(credentialRequest(configurationId, Proofs(jwt = proofs)))
         }
     }
 

@@ -75,6 +75,12 @@ Set your own `passwordHashing = PasswordHashingConfiguration(pepper = ...)`, a s
 default pepper is public, and ktor-authnz warns at startup while it is used. Hashes only verify with the pepper they
 were made with, so keep the one you start with.
 
+Use `ARGON2`, `BCRYPT`, `SCRYPT` or `PBKDF2_COMPRESSED` for new password hashes.
+The other salted formats need a separate salt that the credential record cannot store.
+To enable login-time migration in a custom account store, implement `PasswordHashUpgradeStore`
+and atomically replace the record only if it still contains the verified hash. Stores implementing
+only `EditableAccountStore` continue to authenticate existing credentials without rehashing them.
+
 The configuration is process-wide (kept in `KtorAuthnzManager`): one JVM runs one ktor-authnz configuration. Use
 Valkey stores when a service runs on more than one instance.
 
