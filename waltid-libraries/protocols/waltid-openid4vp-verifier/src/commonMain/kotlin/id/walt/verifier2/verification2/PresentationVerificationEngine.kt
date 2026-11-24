@@ -227,7 +227,9 @@ object PresentationVerificationEngine {
 
             // DCQL holder binding is mandatory even when custom policies replace the defaults.
             val binding = HolderBindingJwtVcJsonVPPolicy()
-            val enforcedResults = if (presentation is JwtVcJsonPresentation && query.requireCryptographicHolderBinding && binding.id !in policyResults) {
+            // Missing vp is rejected by the structural guard before credentials are published below.
+            val enforcedResults = if (presentation is JwtVcJsonPresentation && presentation.vp != null &&
+                query.requireCryptographicHolderBinding && binding.id !in policyResults) {
                 policyResults + (binding.id to binding.runPolicy(presentation, null))
             } else policyResults
             query.id to enforcedResults
