@@ -122,22 +122,7 @@ final class WalletE2EUI {
     }
 
     func waitUntilWalletReady(timeout: TimeInterval) -> String? {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            guard let elements = walletSnapshotElements() else { return nil }
-            if let failure = latestStatus(prefixes: ["Bootstrap failed"], elements: elements) {
-                return failure
-            }
-            // Both are rendered only after isReady, including the initial credential read.
-            // Idle readiness has no banner; wait for the prepared wallet content.
-            if elements.contains(where: {
-                $0.identifier == "wallet.credentials.empty" || $0.identifier.hasPrefix("wallet.credentialCard.")
-            }) {
-                return "Wallet ready"
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        }
-        return nil
+        waitForPreparedWallet(app, timeout: timeout)
     }
 
     private func walletSnapshotElements() -> [any XCUIElementSnapshot]? {
