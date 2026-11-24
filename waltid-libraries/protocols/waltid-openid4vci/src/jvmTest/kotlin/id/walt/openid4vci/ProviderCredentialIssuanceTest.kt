@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.credentials.CredentialParser
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.credentials.issuance.IssuanceClock
 import kotlinx.coroutines.withContext
@@ -99,7 +100,7 @@ class ProviderCredentialIssuanceTest {
     }
 
     @Test
-    fun `W3C v1 signs the mapped subject ID in plain and selectively disclosed JWTs`() = runBlocking {
+    fun `W3C signs mapped subject claims according to the version and disclosure`() = runBlocking {
         val holder = p256Key("wallet")
         val issuer = p256Key("issuer")
         val credentialData = buildJsonObject {
@@ -112,7 +113,7 @@ class ProviderCredentialIssuanceTest {
         }
         val expectedSubject = JsonPrimitive(Crypto2DidService.registerByKey(method = "jwk", key = holder).did)
 
-        suspend fun issue(mapping: JsonObject, disclosure: SDMap?) = W3cJwtVcCredentialSigner.generateW3CJwtVC(
+        suspend fun issue(mapping: JsonObject, disclosure: SDMap?, version: String? = null) = W3cJwtVcCredentialSigner.generateW3CJwtVC(
             verifiedBinding = VerifiedCredentialBinding(holderKey = holder),
             credentialData = credentialData,
             issuerKey = issuer,
@@ -120,6 +121,7 @@ class ProviderCredentialIssuanceTest {
             issuerId = "https://issuer.example",
             dataMapping = mapping,
             selectiveDisclosure = disclosure,
+            w3cVersion = version,
         )
 
         val discloseName = SDMap.generateSDMap(listOf("credentialSubject.name"))
@@ -146,9 +148,20 @@ class ProviderCredentialIssuanceTest {
 
         val discloseId = SDMap.generateSDMap(listOf("credentialSubject.id"))
         val hidden = SDJwt.parse(issue(subjectMapping, discloseId))
-        assertNotEquals(expectedSubject, hidden.undisclosedPayload["sub"])
+        val signedHiddenClaims = Json.parseToJsonElement(
+            CompactJws.verify(hidden.jwt, issuer, JwsAlgorithm.ES256).payload.decodeToString()
+        ).jsonObject
+        assertFalse("sub" in signedHiddenClaims)
+        assertFalse("sub" in hidden.fullPayload)
         assertNull(hidden.undisclosedPayload.getValue("vc").jsonObject["credentialSubject"]?.jsonObject?.get("id"))
-        assertEquals(expectedSubject, hidden.fullPayload.getValue("vc").jsonObject["credentialSubject"]?.jsonObject?.get("id"))
+        assertEquals(expectedSubject.content, CredentialParser.getJwtHeaderOrDataSubject(hidden.fullPayload))
+
+        val v2 = issue(subjectMapping, null, version = "W3CV2")
+        val v2Claims = Json.parseToJsonElement(
+            CompactJws.verify(v2, issuer, JwsAlgorithm.ES256).payload.decodeToString()
+        ).jsonObject
+        assertFalse("sub" in v2Claims)
+        assertEquals(expectedSubject, v2Claims.getValue("credentialSubject").jsonObject["id"])
     }
 
     @Test
