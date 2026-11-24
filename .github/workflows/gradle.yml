@@ -332,21 +332,35 @@ jobs:
           wget -q -O cloudflared "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
           chmod +x cloudflared
           log="$RUNNER_TEMP/lt_role.txt"
-          ./cloudflared tunnel --url "http://localhost:${ROLE_PORT}" > "$log" 2>&1 &
-          pid=$!
-          echo "$pid" > "$RUNNER_TEMP/lt_role.pid"
+          # Quick-tunnel registration fails intermittently (e.g. "invalid UUID length: 0"), so retry with backoff.
+          max_attempts=4
+          backoff=(5 15 30)
           url=""
-          for i in $(seq 1 60); do
-            url=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$log" | head -n 1 || true)
+          for attempt in $(seq 1 "$max_attempts"); do
+            ./cloudflared tunnel --url "http://localhost:${ROLE_PORT}" > "$log" 2>&1 &
+            pid=$!
+            echo "$pid" > "$RUNNER_TEMP/lt_role.pid"
+            failure=""
+            for i in $(seq 1 60); do
+              url=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$log" | head -n 1 || true)
+              [ -n "$url" ] && break
+              if ! kill -0 "$pid" 2>/dev/null; then failure="${ROLE} cloudflared exited before printing a URL"; break; fi
+              sleep 1
+            done
             [ -n "$url" ] && break
-            kill -0 "$pid" 2>/dev/null || { echo "::error::${ROLE} cloudflared exited before printing a URL"; cat "$log"; exit 1; }
-            sleep 1
-          done
-          if [ -z "$url" ]; then
-            echo "::error::Failed to get ${ROLE} tunnel URL after ${i}s"
+            [ -n "$failure" ] || failure="Failed to get ${ROLE} tunnel URL after ${i}s"
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "::error::${failure}"
+              cat "$log"
+              exit 1
+            fi
+            delay=${backoff[attempt - 1]}
+            echo "::warning::${failure} (attempt ${attempt}/${max_attempts}), retrying in ${delay}s"
             cat "$log"
-            exit 1
-          fi
+            sleep "$delay"
+          done
           echo "${ROLE} tunnel: $url"
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
@@ -759,17 +773,35 @@ jobs:
             http://127.0.0.1:7005 7006 "$OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE" \
             > "$RUNNER_TEMP/issuer-deferred-proxy.log" 2>&1 &
           echo "$!" > "$RUNNER_TEMP/issuer-deferred-proxy.pid"
-          "$CLOUDFLARED" tunnel --url http://127.0.0.1:7006 > "$TUNNEL_LOG" 2>&1 &
-          CF_PID=$!
-          echo "$CF_PID" > "$RUNNER_TEMP/cloudflared-issuer2.pid"
+          # Quick-tunnel registration fails intermittently (e.g. "invalid UUID length: 0"), so retry with backoff.
+          TUNNEL_MAX_ATTEMPTS=4
+          TUNNEL_BACKOFF=(5 15 30)
           TUNNEL_URL=""
-          for attempt in $(seq 1 60); do
-            TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" | head -n 1 || true)
+          for tunnel_attempt in $(seq 1 "$TUNNEL_MAX_ATTEMPTS"); do
+            "$CLOUDFLARED" tunnel --url http://127.0.0.1:7006 > "$TUNNEL_LOG" 2>&1 &
+            CF_PID=$!
+            echo "$CF_PID" > "$RUNNER_TEMP/cloudflared-issuer2.pid"
+            TUNNEL_FAILURE=""
+            for attempt in $(seq 1 60); do
+              TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" | head -n 1 || true)
+              [ -n "$TUNNEL_URL" ] && break
+              if ! kill -0 "$CF_PID" 2>/dev/null; then TUNNEL_FAILURE="Issuer tunnel exited during startup"; break; fi
+              sleep 1
+            done
             [ -n "$TUNNEL_URL" ] && break
-            kill -0 "$CF_PID" 2>/dev/null || { echo "::error::Issuer tunnel exited during startup"; exit 1; }
-            sleep 1
+            [ -n "$TUNNEL_FAILURE" ] || TUNNEL_FAILURE="No issuer tunnel URL after 60s"
+            kill "$CF_PID" 2>/dev/null || true
+            wait "$CF_PID" 2>/dev/null || true
+            if [ "$tunnel_attempt" -eq "$TUNNEL_MAX_ATTEMPTS" ]; then
+              echo "::error::${TUNNEL_FAILURE}"
+              cat "$TUNNEL_LOG"
+              exit 1
+            fi
+            delay=${TUNNEL_BACKOFF[tunnel_attempt - 1]}
+            echo "::warning::${TUNNEL_FAILURE} (attempt ${tunnel_attempt}/${TUNNEL_MAX_ATTEMPTS}), retrying in ${delay}s"
+            cat "$TUNNEL_LOG"
+            sleep "$delay"
           done
-          [ -n "$TUNNEL_URL" ] || { echo "::error::No issuer tunnel URL after 60s"; exit 1; }
           sed "s|__ISSUER_BASE_URL__|$TUNNEL_URL|g" "$FIXTURES/issuer-service-ci.conf.template" > "$ISSUER_CONFIG"
 
           pushd waltid-identity/waltid-services/waltid-issuer-api2 >/dev/null
