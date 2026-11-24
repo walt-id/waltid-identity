@@ -17,7 +17,7 @@ import kotlin.test.assertIs
 class MissingVpRejectionTest {
     @Test
     fun missingVpMarksTheSessionFailedBeforeRejecting() = runTest {
-        val query = """{"credentials":[{"id":"identity","format":"jwt_vc_json","require_cryptographic_holder_binding":false,"meta":{"type_values":[["VerifiableCredential"]]}}]}"""
+        val query = """{"credentials":[{"id":"identity","format":"jwt_vc_json","meta":{"type_values":[["VerifiableCredential"]]}}]}"""
         val session = Json.decodeFromString<Verification2Session>("""
             {
               "id":"missing-vp",
