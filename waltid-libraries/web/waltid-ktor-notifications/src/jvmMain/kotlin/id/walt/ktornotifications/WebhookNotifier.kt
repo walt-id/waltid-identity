@@ -253,6 +253,8 @@ internal class WebhookDeliveryQueue(
     suspend fun eraseSession(sessionOwner: String, allowFutureCallbacks: Boolean = false) =
         store.eraseSession(sessionOwner, allowFutureCallbacks)
 
+    suspend fun isSessionDeleted(sessionOwner: String): Boolean = store.isSessionDeleted(sessionOwner)
+
     suspend fun deadLetters(): List<WebhookDeadLetter> = store.deadLetters()
 
     suspend fun redrive(deliveryId: String): Boolean {
@@ -402,6 +404,8 @@ object WebhookNotifier {
 
     suspend fun eraseSession(sessionOwner: String, allowFutureCallbacks: Boolean = false) =
         queue().eraseSession(sessionOwner, allowFutureCallbacks)
+
+    suspend fun isSessionDeleted(sessionOwner: String): Boolean = queue().isSessionDeleted(sessionOwner)
 
     suspend fun deadLetters(): List<WebhookDeadLetter> = queue().deadLetters()
 

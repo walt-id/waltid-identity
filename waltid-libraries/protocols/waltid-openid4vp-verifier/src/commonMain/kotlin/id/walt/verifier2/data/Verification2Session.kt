@@ -172,6 +172,11 @@ data class Verification2Session(
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     var webhookGeneration: Long = 0
 
+    /** Completed outcome masked by a standalone verifier's pre-admission processing claim. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    var outcomeBeforeProcessingClaim: VerificationSessionStatus? = null
+
     /** Keep internal delivery state when copying a session for storage or processing rollback. */
     fun copyWithWebhookGeneration(generation: Long = webhookGeneration): Verification2Session =
         copy().also { it.webhookGeneration = generation }

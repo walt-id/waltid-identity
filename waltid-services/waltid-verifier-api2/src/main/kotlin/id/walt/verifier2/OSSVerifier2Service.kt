@@ -280,11 +280,16 @@ object Verifier2Service {
                         repository.update(sessionId, shouldUpdate = { webhookGeneration < generation }) {
                             deletePII()
                             // The old request loses its generation and cannot finish or roll back its claim.
-                            if (status == VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST ||
-                                status == VerificationSessionStatus.PROCESSING_FLOW
-                            ) {
-                                status = if (attempted) VerificationSessionStatus.FAILED else VerificationSessionStatus.IN_USE
-                                statusReason = if (attempted) "Presentation processing was interrupted by PII purge" else null
+                            when (status) {
+                                VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST -> {
+                                    status = outcomeBeforeProcessingClaim ?: VerificationSessionStatus.IN_USE
+                                    outcomeBeforeProcessingClaim = null
+                                }
+                                VerificationSessionStatus.PROCESSING_FLOW -> {
+                                    status = VerificationSessionStatus.FAILED
+                                    statusReason = "Presentation processing was interrupted by PII purge"
+                                }
+                                else -> Unit
                             }
                             webhookGeneration = generation
                         }

@@ -408,6 +408,42 @@ class VerificationSessionRepositoryTest {
     }
 
     @Test
+    fun `purge before admission preserves the previous outcome and presentation ID`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+        val outcomes = listOf(
+            Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            Verification2Session.VerificationSessionStatus.FAILED,
+        )
+        for (outcome in outcomes) {
+            val id = "retry-purge-${outcome.name}"
+            val previous = session(id).copy(
+                status = outcome,
+                attempted = true,
+                presentationId = "previous-presentation",
+                statusReason = if (outcome.successful == false) "wallet declined" else null,
+                presentedRawData = Verification2Session.PresentedRawData(mapOf("stub" to listOf("previous-token")), null),
+            )
+            repository.create(previous)
+            val retry = repository.claimForProcessingWithOriginal(id)
+            assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/$id/pii").status)
+            repository.restoreProcessingClaim(retry)
+
+            val retained = repository.claimForProcessingWithOriginal(id).original.session
+            assertEquals(outcome, retained.status)
+            assertEquals(previous.presentationId, retained.presentationId)
+            assertEquals(previous.statusReason, retained.statusReason)
+            assertNull(retained.presentedRawData)
+            assertTrue(retained.webhookGeneration > retry.original.session.webhookGeneration)
+        }
+    }
+
+    @Test
     fun `pii route reports 404 for a missing session`() = testApplication {
         application {
             install(ContentNegotiation) { json() }

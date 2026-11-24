@@ -29,6 +29,8 @@ interface WebhookDeliveryStore {
     suspend fun enqueue(delivery: WebhookDelivery)
     /** Revoke older generations, including producers that still hold a pre-erasure snapshot. */
     suspend fun eraseSession(sessionOwner: String, allowFutureCallbacks: Boolean = false): Long
+    /** Whether full erasure has permanently revoked delivery for this owner, even if erasure needs a retry. */
+    suspend fun isSessionDeleted(sessionOwner: String): Boolean
     /** Keep erasure from succeeding between admission of a scoped claim and completion of its send. */
     suspend fun dispatch(claim: WebhookDeliveryClaim, send: suspend () -> Unit)
     suspend fun pending(deliveryId: String): WebhookDelivery?
@@ -100,6 +102,9 @@ internal class FileWebhookDeliveryStore(
     } catch (_: NoSuchFileException) {
         0L
     }
+
+    override suspend fun isSessionDeleted(sessionOwner: String): Boolean =
+        generation(sessionOwner) == DELETED_WEBHOOK_SESSION
 
     private fun accepts(owner: String, expected: Long) = expected >= 0 && generation(owner) == expected
 

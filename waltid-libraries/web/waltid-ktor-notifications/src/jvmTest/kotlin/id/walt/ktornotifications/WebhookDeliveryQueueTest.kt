@@ -510,6 +510,7 @@ class WebhookDeliveryQueueTest {
             resumeProducer.await()
             queue.enqueue(oldUpdate, webhook(), sessionOwner = owner)
         }
+        assertFalse(queue.isSessionDeleted(owner))
         val purged = queue.eraseSession(owner, allowFutureCallbacks = true)
         resumeProducer.complete(Unit)
         assertNull(store.pending(late.await()))
@@ -519,7 +520,9 @@ class WebhookDeliveryQueueTest {
         assertNull(restarted.pending(resumed.enqueue(oldUpdate, webhook(), sessionOwner = owner)))
         val redacted = resumed.enqueue(update("data_retention_purge"), webhook(), owner, sessionGeneration = purged)
         assertNotNull(restarted.pending(redacted))
+        assertFalse(resumed.isSessionDeleted(owner))
         resumed.eraseSession(owner)
+        assertTrue(FileWebhookDeliveryStore(directory).isSessionDeleted(owner))
         assertNull(restarted.pending(redacted))
         assertNull(restarted.pending(resumed.enqueue(update("data_retention_purge"), webhook(), owner, sessionGeneration = purged)))
         assertEquals(0, resumed.processDue())
