@@ -11,6 +11,7 @@ import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationKeyRe
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.openid4vci.clientauth.attestation.verifier.Crypto2ClientAttestationKeyReferenceResolver
 import id.walt.openid4vci.clientauth.attestation.verifier.toClientAttestationConfig
+import id.walt.trust.decision.TrustDecisionEvaluator
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -45,6 +46,8 @@ data class ClientAuthenticationConfig(
         crypto2KeyReferenceResolver: Crypto2ClientAttestationKeyReferenceResolver? = null,
         challengeService: AttestationChallengeService? = null,
         statusResolver: AttestationStatusResolver? = null,
+        /** Required by the `x509-trust-registry` client attestation method; checked when an attestation is verified. */
+        trustEvaluator: TrustDecisionEvaluator? = null,
     ): ClientAuthenticationServiceConfig {
         val methodConfig = clientAttestationMethod()
         require((methodConfig?.challenge != null) == (challengeService != null)) {
@@ -52,7 +55,7 @@ data class ClientAuthenticationConfig(
         }
         if (methodConfig == null) return ClientAuthenticationServiceConfig()
         val attestationMethod = methodConfig.config
-            .toClientAttestationConfig(keyReferenceResolver, crypto2KeyReferenceResolver, statusResolver)
+            .toClientAttestationConfig(keyReferenceResolver, crypto2KeyReferenceResolver, statusResolver, trustEvaluator)
             .toAuthenticationMethod(
                 challengeService = challengeService,
             )
