@@ -462,8 +462,13 @@ class Issuer2SharedCredentialStatusTest {
 
         val exhausted = poll()
         assertEquals(HttpStatusCode.BadRequest, exhausted.status)
-        assertEquals("invalid_credential_request", exhausted.body<JsonObject>().getValue("error").jsonPrimitive.content)
+        assertEquals("credential_request_denied", exhausted.body<JsonObject>().getValue("error").jsonPrimitive.content)
         assertEquals("invalid_transaction_id", poll().body<JsonObject>().getValue("error").jsonPrimitive.content)
+
+        val tooLarge = issue(fixture.twoProofs(resolved, configurationId))
+        assertEquals(HttpStatusCode.BadRequest, tooLarge.status)
+        assertEquals("invalid_credential_request", tooLarge.body<JsonObject>().getValue("error").jsonPrimitive.content)
+
         val issued = issue(fixture.wallet.buildJwtProofs(resolved.issuerMetadata, configurationId))
         assertEquals(HttpStatusCode.OK, issued.status, issued.bodyAsText())
         assertPreallocatedStatuses(issued.body(), "dc+sd-jwt", groups)

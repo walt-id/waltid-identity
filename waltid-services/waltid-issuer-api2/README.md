@@ -327,11 +327,12 @@ the configured backend is not Redis. No status-allocation HTTP service or
 new management endpoint is required.
 
 After proof validation, issuer2 atomically reserves one unused group for each selected
-holder key. If too few groups remain, the entire request fails before signing with
-`invalid_credential_request`, without consuming a partial batch. Later successful
+holder key. If too few groups remain, a Credential Request fails before signing with
+`invalid_credential_request` and consumes no entries. Later successful
 requests and other sessions, including those using different profiles, consume additional
 unused groups from the same Redis consumption ledger.
-If a deferred collection fails for lack of groups, issuer2 invalidates that transaction ID.
+If a deferred poll fails for lack of groups, issuer2 returns `credential_request_denied`
+and invalidates that transaction ID.
 The wallet can submit a new Credential Request for the same item with fewer proofs.
 Invalid proofs consume no groups.
 

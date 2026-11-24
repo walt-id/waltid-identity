@@ -935,7 +935,10 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         return try {
             val session = claims.stringClaim("sub")?.let { sessionService.getSessionOrNull(it) }
                 ?: return oauth2Provider.writeDeferredCredentialError(CredentialError(CredentialErrorCodes.INVALID_TRANSACTION_ID))
-            collectDeferredCredential(authorization.token, session, request, claims, requestId)
+            collectDeferredCredential(
+                authorization.token, session, request, claims, requestId,
+                capacityErrorCode = CredentialErrorCodes.CREDENTIAL_REQUEST_DENIED,
+            )
         } catch (e: CancellationException) {
             throw e
         } catch (e: CredentialProtocolException) {
@@ -947,7 +950,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
     private suspend fun collectDeferredCredential(
         accessToken: String, session: IssuanceSession, request: DeferredCredentialRequest,
-        tokenClaims: JsonObject, requestId: String,
+        tokenClaims: JsonObject, requestId: String, capacityErrorCode: String,
     ): CredentialResponseHttp {
         val authorized = session.issuanceRequests.map { it.toCredentialAuthorization() }.authorizedByVerifiedToken(
             tokenClaims, session.authorizedCredentialIdentifiers,
@@ -981,7 +984,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         withContext(NonCancellable) { deferredIssuance.discardUnissued(session.sessionId, claim) }
                         return rejectCredentialRequest(
                             prepared, session, claim.accepted.configuration.format, requestId,
-                            CredentialError(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, e.message),
+                            CredentialError(capacityErrorCode, e.message),
                         )
                     }
                     // Later polls of a denied transaction are rejected before acquiring a claim.
@@ -1239,6 +1242,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                 return collectDeferredCredential(
                     accessToken, observedSession, DeferredCredentialRequest(transaction.id, requestWithSession.credentialResponseEncryption),
                     tokenClaims, requestId,
+                    capacityErrorCode = CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST,
                 )
             } catch (e: CredentialProofValidationException) {
                 val error = CredentialError(e.errorCode, e.message)
