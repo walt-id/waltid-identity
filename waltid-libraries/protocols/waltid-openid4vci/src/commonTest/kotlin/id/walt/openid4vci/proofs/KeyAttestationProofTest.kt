@@ -495,9 +495,9 @@ class KeyAttestationProofTest {
 
     @Test
     fun `ordinary JWT bindings use the registered credential handler requirements in both signing APIs`() = runTest {
-        val holder = key()
-        val jwt = proof(holder, null)
-        val request = request(jwt, jwt)
+        val holders = List(2) { key() }
+        val request = request(proof(holders[0], null), proof(holders[1], null))
+        val expectedThumbprints = holders.map { Jwk.sha256Thumbprint(it.exportPublicJwk()) }
         val w3c = configuration.copy(format = CredentialFormat.JWT_VC_JSON,
             proofTypesSupported = mapOf(ProofType.JWT.value to ProofTypeMetadata(setOf("ES256"))))
         val context = context(key())
@@ -523,7 +523,7 @@ class KeyAttestationProofTest {
                 validations++
                 assertEquals(2, bindings.size)
                 assertTrue(bindings.all { it.holderDid == null })
-                assertEquals(setOf(Jwk.sha256Thumbprint(holder.exportPublicJwk())), bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) }.toSet())
+                assertEquals(expectedThumbprints, bindings.map { Jwk.sha256Thumbprint(it.holderKey.exportPublicJwk()) })
             }
         }
         for (useCrypto2 in listOf(false, true)) {

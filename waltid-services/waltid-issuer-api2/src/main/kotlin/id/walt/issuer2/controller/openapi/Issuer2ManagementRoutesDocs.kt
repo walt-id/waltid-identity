@@ -5,7 +5,7 @@ import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.domain.CredentialProfile
-import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.models.withRedactedIssuerKey
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import id.walt.issuer2.models.singleIssuanceSessionDescriptor
 import id.walt.issuer2.models.multiIssuanceSessionDescriptor
@@ -27,7 +27,8 @@ object Issuer2ManagementRoutesDocs {
             returned profileId in POST /issuer2/credential-offers. Runtime overrides may
             provide credential data, mappings, selective disclosure, mDoc namespace data
             mappings, authorized transaction data types, ID token claim mappings, x5 chains,
-            and webhook URLs for a single issuance session.
+            and webhook URLs for a single issuance session. Each profile reports its signing
+            key as `{"type":"redacted"}`.
         """.trimIndent()
         response {
             HttpStatusCode.OK to {
@@ -46,8 +47,7 @@ object Issuer2ManagementRoutesDocs {
         description = """
             Get one credential profile by profile ID.
 
-            The response is the exact profile loaded from issuer2-profiles.conf, including
-            issuer key material for this first OSS issuer2 version.
+            The profile reports its signing key as `{"type":"redacted"}`.
         """.trimIndent()
         request {
             pathParameter<String>("profileId") {
@@ -109,7 +109,7 @@ object Issuer2ManagementRoutesDocs {
             **mDoc mapping and validity**
 
             - Put namespace data functions such as `<date>`, `<date-in:365d>`, and `<date-before:30d>` in `mapping`.
-              Put MSO validity functions in `msoData`; `mapping.validFrom` and `mapping.validUntil` are rejected.
+              Put MSO validity functions in `msoData`. Offer creation returns HTTP 400 for top-level validity fields in `mapping`.
             - Non-empty `runtimeOverrides.msoData` is accepted only for `mso_mdoc`. Blank validity values are rejected.
               Null `expectedUpdate` clears the profile value; null `validFrom` or `validUntil` inherits it.
             - Validity must satisfy `signed <= validFrom < validUntil`. `expectedUpdate` is optional;
@@ -123,10 +123,22 @@ object Issuer2ManagementRoutesDocs {
 
             - Redeem different offer items through separate Credential Requests. Multiple proofs request
               copies of one selected item, subject to the advertised `batch_credential_issuance.batch_size` limit.
-            - Copies and repeated issuance of an item share its configured `credentialStatus` entry.
-              Revoking that entry revokes every credential referencing it; shared references also make copies linkable.
+            - A status object or flat W3C status array retains fixed, shared behavior: copies and repeated
+              issuance share the configured value. Shared status references make those copies linkable.
+            - For SD-JWT VC/mdoc, a flat `credentialStatus` array supplies one complete IETF status value
+              per copy. For W3C, nested arrays supply one group per copy, containing one or more status
+              entries such as revocation and suspension. No `mode` or additional field is needed.
+            - Preallocated groups require Redis persistence. Consumption is atomic and shared across
+              profiles and sessions using the same Redis consumption ledger. Each reference retains
+              its owning profile and issuance operation; another operation cannot reuse it.
+              Insufficient remaining groups return
+              `invalid_credential_request` before signing, without partially consuming a batch.
+              Retries retain pending assignments; successful subsequent requests consume fresh groups.
+            - Profile-configured groups work with offered and offerless authorization sessions.
+              Sessions snapshot their configuration. Replenish profiles with fresh groups and restart
+              the service without clearing Redis. Changing profile IDs does not reset consumption.
             - Override status with `runtimeOverrides.credentialStatus` on the single-profile request or each
-              `credentials[]` entry. The caller allocates and manages status entries; OSS only embeds them.
+              `credentials[]` entry. The caller allocates and manages status entries; OSS embeds the selected values.
 
             See [credential status and batch issuance](https://docs.walt.id/community-stack/issuer2/credential-offers/credential-status#batch-issuance).
         """.trimIndent()
@@ -171,7 +183,7 @@ object Issuer2ManagementRoutesDocs {
 
     fun listSessions(): RouteConfig.() -> Unit = {
         summary = "List issuance sessions"
-        description = "List currently stored issuance sessions."
+        description = "List currently stored issuance sessions with issuer signing keys redacted."
         response {
             HttpStatusCode.OK to {
                 description = "Issuance sessions"
@@ -182,7 +194,7 @@ object Issuer2ManagementRoutesDocs {
 
     fun getSession(): RouteConfig.() -> Unit = {
         summary = "Get issuance session"
-        description = "Get one issuance session by session ID."
+        description = "Get one issuance session by session ID with issuer signing keys redacted."
         request {
             pathParameter<String>("sessionId")
         }
@@ -262,6 +274,7 @@ object Issuer2ManagementRoutesDocs {
         return (preferred + profiles.filterNot { it.profileId in preferredProfileExampleIds })
             .distinctBy { it.profileId }
             .take(MAX_PROFILE_EXAMPLES)
+            .map(CredentialProfile::withRedactedIssuerKey)
     }
 
     private val preferredProfileExampleIds = listOf(

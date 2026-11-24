@@ -13,11 +13,12 @@
   "devDependencies": {
     "@nuxt/content": "^2.13.0",
     "@nuxt/devtools": "^2.6.2",
+    "@nuxt/icon": "^1.11.0",
     "@unocss/nuxt": "^66.4.2",
     "nuxt": "^3.10.0",
-    "@nuxt/icon": "^1.11.0",
     "nuxt-security": "2.7.0",
     "tailwindcss": "^4.1.11",
+    "unocss": "66.13.0",
     "vue-router": "^4.5.1"
   },
   "dependencies": {

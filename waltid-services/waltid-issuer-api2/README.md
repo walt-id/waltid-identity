@@ -264,18 +264,122 @@ batchCredentialIssuance {
 Change `batchSize` to adjust the limit, or remove the `batchCredentialIssuance` block
 to disable multiple-proof requests. Single-credential issuance remains available.
 
-Each Credential Request selects one configuration and dataset and issues one copy for each holder proof. A multi-selection offer is redeemed through separate Credential Requests. Holder keys may repeat; using distinct cryptographic data is recommended by OpenID4VCI, not required.
+Each Credential Request selects one configuration and dataset. The issuer signs a copy for each
+verified holder binding. One key attestation can cover several holder keys. A wallet redeems a
+multi-selection offer through separate Credential Requests.
 
-Supply status through the existing `runtimeOverrides.credentialStatus` field, either on a
-single-profile offer or inside each `credentials[]` item. A runtime value takes precedence
-over the profile's configured status. Issuer2 embeds this supplied value in every copy of the
-selected item. The caller is responsible for allocating status entries, publishing their
-lists, and updating their values. Issuer2 does not allocate a new entry for each proof.
+For both offered and offerless issuance, the wallet must supply a distinct holder key for
+each copy in a batch. If two copies would bind to the same public key, issuer2 returns
+HTTP 400 `invalid_proof` before reserving status entries, signing, or accepting a deferred
+transaction. The wallet can retry with distinct keys. An offer pinned to a single
+`expectedCredentialProofKeyJwk` can issue one copy per request. Configure per-copy status
+entries as well to avoid correlating copies by their status.
+See [OpenID4VCI batch issuance](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#section-3.3.2)
+and [SD-JWT unlinkability considerations](https://www.rfc-editor.org/rfc/rfc9901.html#section-10.1).
+
+Supply status through a profile's `credentialStatus` or the existing
+`runtimeOverrides.credentialStatus` field, either on a single-profile offer or inside each
+`credentials[]` item. A runtime value takes precedence over the profile's configured status.
+The caller allocates the entries, publishes the lists, and manages status updates.
+
+The shape of `credentialStatus` determines how issuer2 uses the supplied values:
+
+| Shape | Meaning |
+|---|---|
+| A JSON object | Fixed status, embedded unchanged in every copy |
+| A flat array of SD-JWT VC/mdoc status objects | Preallocated entries, consumed once per issued copy |
+| A flat array of W3C status objects | Fixed status group, embedded unchanged in every copy |
+| An array of arrays of W3C status objects | Preallocated groups, consumed once per issued copy |
 
 All credentials referencing the same status entry share its status: revoking it revokes
 every such credential, including copies issued by later requests. The shared reference
 also makes those copies linkable. Different offered items can supply different entries,
 so revoking one item's entry does not revoke items using another entry.
+
+### Preallocated status groups
+
+For SD-JWT VC and mdoc, supply a flat array of complete IETF Token Status List values,
+one entry per copy:
+
+```json
+{
+  "credentialStatus": [
+    {"status_list": {"uri": "https://status.example.com/list/1", "idx": 583}},
+    {"status_list": {"uri": "https://status.example.com/list/1", "idx": 9204}}
+  ]
+}
+```
+
+For W3C JWT VC, use nested arrays. Each inner array contains the complete status group
+for one copy. It may contain both revocation and suspension entries. Issuer2 embeds the selected inner array as
+that credential's standard `credentialStatus` value. SD-JWT VC and mdoc embed the selected
+object as their status value. The outer per-copy array is issuer configuration and is never
+embedded in an issued credential.
+
+Configure groups on the profile for both offered and offerless issuance. Existing
+runtime overrides accept the same format-specific shapes for a particular offer. Offers and
+profile-derived authorization sessions snapshot the selected configuration; later
+configuration changes apply to newly created sessions.
+
+**Enable the existing Redis persistence backend before using preallocated groups.**
+Normal service startup and offer validation reject preallocated configurations when
+the configured backend is not Redis. No status-allocation HTTP service or
+new management endpoint is required.
+
+After proof validation, issuer2 atomically reserves one unused group for each selected
+holder key. If too few groups remain, a Credential Request fails before signing with
+`invalid_credential_request` and consumes no entries. Later successful
+requests and other sessions, including those using different profiles, consume additional
+unused groups from the same Redis consumption ledger.
+If a deferred poll fails for lack of groups, issuer2 returns `credential_request_denied`
+and invalidates that transaction ID.
+The wallet can submit a new Credential Request for the same item with fewer proofs.
+Invalid proofs consume no groups.
+
+Consumption is internal allocation bookkeeping: issuer2 does not modify the profile
+configuration or the published status list, and marking an entry used does not revoke it.
+
+Issuer2 identifies a used entry by its normalized HTTP(S) list URI and index across
+per-copy inventories sharing the same Redis store. For example, `https://status.example.com:443/list`
+and `https://status.example.com/list` identify the same list. Invalid list URLs and
+duplicate references within an inventory are rejected at profile load or offer creation.
+List URLs must omit user information and fragments.
+For per-copy mdoc status, issuer2 also writes the normalized URI into the signed credential.
+Publish the Status List Token with that exact URI as its subject. For example, use
+`https://status.example.com/list` as the subject when the configured URL explicitly includes port 443.
+Each ownership record retains the profile ID and issuance
+operation. An entry consumed through one profile is unavailable through another profile;
+the same operation can recover its reservation, but another operation cannot claim it.
+Changing profile IDs, reordering, removing, reintroducing, or appending configured entries
+does not reset consumption. To replenish, add freshly allocated groups to the profile
+configuration and restart the service. Retain the Redis data and configure Redis durability
+for the deployment. Fixed shared-status configurations retain their existing behavior.
+
+Redis stores ownership and pending operations as individual hash fields, rather than
+rewriting a profile's complete history for every reservation. A whole batch and its retry
+record commit in one atomic write. The ledger and expiry keys share a Redis Cluster slot,
+so one batch can contain entries from different status-list URIs.
+
+Pending retries reuse their reserved groups and prepared credential responses. Abandoned
+reservations are never automatically recycled. Unused groups and private processing
+checkpoints are omitted from session responses and notifications.
+
+Immediate issuance checkpoints temporarily contain complete signed credentials before wallet
+response encryption. Treat the session store and its backups as credential data. Restrict access
+to issuer2 and authorized operators, encrypt Redis storage and backups, and use an encrypted
+network or TLS tunnel for remote Redis traffic. The standard Redis connector uses a plain
+connection. Verify that backups and restores respect the retention policy for credential data.
+Immediate checkpoints are cleared on successful finalization or expire with the issuance session.
+The separate records of spent status entries must survive session expiry.
+
+Per-copy arrays and groups must be nonempty and contain only supported status objects.
+SD-JWT VC and mdoc entries contain one IETF status object; W3C supports
+`BitstringStatusListEntry` and `StatusList2021Entry` groups. Duplicate references, malformed indexes, mixed array
+nesting, and mappings that could overwrite managed status fields are rejected. Callers
+must avoid reusing allocations across independent Redis stores or outside this issuer's
+per-copy consumption path; those allocations require coordination by the caller.
+
+### Fixed status compatibility
 
 For example, this offer uses the same SD-JWT profile twice with two different status entries:
 
@@ -311,6 +415,9 @@ the first item's credential references index 94567 and the second item's credent
 ## API Endpoints
 
 ### Management API
+
+Profile and session reads and generated OpenAPI profile examples report signing keys as
+`{"type":"redacted"}`.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -456,7 +563,7 @@ Public session reads and webhook/SSE snapshots depend on original selection coun
 - Several original selections use `issuanceRequests` and `issuanceResults`, even when
   the grant selects only one of them. Original identifiers and request order are retained.
 - A single proof key uses `expectedCredentialProofKeyJwk`. Multiple proof copies use
-  `expectedCredentialProofKeyJwks` in response order, preserving duplicate keys.
+  `expectedCredentialProofKeyJwks` in response order.
 
 `authorizedCredentialIdentifiers` records the established session selection in the
 current stored model. Absent/null means unrecorded; an empty list authorizes nothing.
@@ -488,11 +595,12 @@ type = "redis"
 nodes = [{ host = "127.0.0.1", port = 6379 }]
 ```
 
-Redis repository tests are excluded from the default test task. Run them explicitly with:
+The issuer2 `check` and `build` tasks run the Redis repository tests in a separate test JVM.
+Start Docker before running them. Testcontainers starts and stops Redis 7 for the suite.
+Run the Redis suite on its own with `./gradlew :waltid-services:waltid-issuer-api2:redisTest`.
 
-```bash
-ISSUER2_REDIS_HOST=127.0.0.1 ./gradlew :waltid-services:waltid-issuer-api2:redisTest
-```
+The standard `test` task runs without Docker. For a Docker-free `check` or `build`, pass
+`-PskipIssuer2RedisTests=true`.
 
 ## Building and Testing
 

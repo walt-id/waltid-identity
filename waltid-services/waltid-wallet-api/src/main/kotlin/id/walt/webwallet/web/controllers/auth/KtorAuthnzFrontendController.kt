@@ -48,6 +48,7 @@ private suspend fun ktorAuthnzCreateAccount(
     name: String,
     email: String?
 ): Uuid {
+    val preparedData = storedData?.transformSavable()
     val createdAccountId = transaction {
         Accounts.insert {
             it[Accounts.tenant] = ""
@@ -62,8 +63,8 @@ private suspend fun ktorAuthnzCreateAccount(
 
     KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(createdAccountId.toString(), identifier)
 
-    if (storedData != null) {
-        KtorAuthnzManager.accountStore.addAccountStoredData(createdAccountId.toString(), method, storedData)
+    if (preparedData != null) {
+        KtorAuthnzManager.accountStore.addAccountStoredData(createdAccountId.toString(), method, preparedData)
     }
 
     AccountsService.initializeUserAccount(tenant = "", name = name, registeredUserId = createdAccountId)

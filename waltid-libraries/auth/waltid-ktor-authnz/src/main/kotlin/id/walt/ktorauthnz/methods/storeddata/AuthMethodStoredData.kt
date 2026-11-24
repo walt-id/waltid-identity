@@ -1,6 +1,7 @@
 package id.walt.ktorauthnz.methods.storeddata
 
 import id.walt.ktorauthnz.methods.AuthenticationMethod
+import id.walt.ktorauthnz.security.PasswordHash
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -12,4 +13,10 @@ sealed interface AuthMethodStoredData {
      * passed as information (e.g. salting)
      */
     suspend fun transformSavable() = this
+}
+
+@Serializable
+sealed interface PasswordStoredData : AuthMethodStoredData {
+    val passwordHash: String?
+    fun withPasswordHash(hash: PasswordHash): PasswordStoredData
 }

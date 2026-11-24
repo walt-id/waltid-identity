@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.ProximityUnsatisfiedDocument
+import id.walt.wallet2.mobile.ProximityUnsatisfiedRequest
 import kotlinx.io.bytestring.ByteString
 import id.walt.wallet2.mobile.ProximityApproval
 import id.walt.wallet2.mobile.ProximityBleConfiguration
@@ -1024,9 +1026,14 @@ class WalletDemoProximityControllerTest {
         val controller = controller(FakeBackend(session))
         startExchange(controller)
         advanceUntilIdle()
-        session.mutableState.value = ProximityState.NoData(2)
+        val summary = ProximityUnsatisfiedRequest(listOf(
+            ProximityUnsatisfiedDocument(0, "org.example.photoid", listOf(
+                ProximityRequestedElement("org.example.identity", "portrait", true),
+            )),
+        ))
+        session.mutableState.value = ProximityState.NoData(2, summary)
         advanceUntilIdle()
-        assertEquals(ProximityState.NoData(2), controller.state.value.sessionState)
+        assertEquals(ProximityState.NoData(2, summary), controller.state.value.sessionState)
         assertTrue(controller.state.value.isTerminal)
         controller.dismiss()
         advanceUntilIdle()

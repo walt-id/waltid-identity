@@ -7,9 +7,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -22,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import id.walt.wallet2.mobile.ProximityError
 import id.walt.wallet2.mobile.ProximityRecovery
 import id.walt.wallet2.mobile.ProximityRemediationAction
+import id.walt.wallet2.mobile.ProximityUnsatisfiedRequest
 import id.walt.wallet2.mobile.ProximityState
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.ui.components.ReviewMetadataSection
@@ -58,6 +64,36 @@ internal fun ProximityTerminalContent(
         Text(message)
         details?.invoke()
 
+    }
+}
+
+@Composable
+internal fun ProximityUnsatisfiedRequestContent(request: ProximityUnsatisfiedRequest) {
+    var visibleDocuments by remember(request) { mutableStateOf(5) }
+    val documents = request.documents
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.testTag("proximity-unsatisfied-request")) {
+        Text(stringResource(Res.string.proximity_reader_not_evaluated), style = MaterialTheme.typography.bodySmall)
+        documents.take(visibleDocuments).forEach { document ->
+            var visibleElements by remember(request, document.requestIndex) { mutableStateOf(20) }
+            val elements = document.requestedElements
+            ReviewMetadataSection(stringResource(Res.string.proximity_document_request, document.requestIndex + 1)) {
+                Text(document.docType, style = MaterialTheme.typography.bodySmall)
+                elements.take(visibleElements).forEach { element ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(humanizedElementIdentifier(element.elementIdentifier), fontWeight = FontWeight.SemiBold)
+                        Text(element.namespace, style = MaterialTheme.typography.bodySmall)
+                        if (element.intentToRetain) Text(stringResource(Res.string.proximity_reader_retention),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                if (elements.size > visibleElements) TextButton(onClick = { visibleElements += 20 }) {
+                    Text(stringResource(Res.string.proximity_more_requested_fields))
+                }
+            }
+        }
+        if (documents.size > visibleDocuments) TextButton(onClick = { visibleDocuments += 5 }) {
+            Text(stringResource(Res.string.proximity_more_requested_documents))
+        }
     }
 }
 
