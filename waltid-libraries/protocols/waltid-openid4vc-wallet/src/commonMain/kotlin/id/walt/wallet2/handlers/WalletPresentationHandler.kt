@@ -37,6 +37,7 @@ import id.walt.holderpolicies.HolderPolicy
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier.openid.transactiondata.DecodedTransactionData
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.wallet2.data.StoredCredential
@@ -366,6 +367,9 @@ data class SubmitDcApiPresentationRequest(
 
 class MissingPresentationPreviewException :
     IllegalStateException("Presentation request preview expired or was not found; preview the request again before responding.")
+
+class InvalidPresentationTransactionDataException(val reason: String) :
+    IllegalStateException("Presentation request is invalid (invalid_transaction_data): $reason")
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -1700,7 +1704,7 @@ object WalletPresentationHandler {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
-        val resolvedAuthorizationRequest = resolveAndValidatePresentationRequest(
+        val (resolvedAuthorizationRequest, validatedTransactionData) = resolveAndValidatePresentationRequest(
             requestUrl = request.requestUrl,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             formatCapabilities = { keyMaterial.presentationCapabilities() },
@@ -1751,7 +1755,7 @@ object WalletPresentationHandler {
         }
 
         if (holderPoliciesToRun != null) {
-            WalletPresentFunctionality2.requireHolderPoliciesAllow(holderPoliciesToRun, selected)
+            WalletPresentFunctionality2.requireHolderPoliciesAllow(holderPoliciesToRun, selected, validatedTransactionData)
         }
 
         val crypto2Key = keyMaterial.crypto2Key
@@ -1761,6 +1765,7 @@ object WalletPresentationHandler {
                 matchedCredentials = selected,
                 holderKey = crypto2Key,
                 holderDid = did,
+                transactionDataTypeRegistry = transactionDataTypeRegistry,
                 clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
                 credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
                 scaAuthorizer = scaAuthorizer?.forKey(crypto2Key),
@@ -1821,7 +1826,7 @@ object WalletPresentationHandler {
             requestUrl = request.requestUrl,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolveAuthorizationRequest = resolveAuthorizationRequest,
-        )
+        ).resolved
         return WalletPresentFunctionality2.sendAuthorizationResponse(
             authorizationRequest = resolvedAuthorizationRequest.authorizationRequest,
             vpToken = request.vpToken,
@@ -2235,7 +2240,7 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         formatCapabilities: (() -> WalletPresentationFormatRegistry.RuntimeCapabilities)? = null,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
-    ): ResolvedAuthorizationRequest {
+    ): ValidatedPresentationRequest {
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(requestUrl)
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedAuthorizationRequest,
@@ -2243,12 +2248,23 @@ object WalletPresentationHandler {
             formatCapabilities = formatCapabilities,
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
+            if (validation.error.code == WalletPresentFunctionality2.OID4VPErrorCode.INVALID_TRANSACTION_DATA) {
+                throw InvalidPresentationTransactionDataException(validation.error.message)
+            }
             error(
                 "Presentation request is invalid (${validation.error.code.code}): ${validation.error.message}"
             )
         }
-        return resolvedAuthorizationRequest
+        return ValidatedPresentationRequest(
+            resolvedAuthorizationRequest,
+            (validation as PresentationRequestValidationResult.Valid).transactionData,
+        )
     }
+
+    private data class ValidatedPresentationRequest(
+        val resolved: ResolvedAuthorizationRequest,
+        val transactionData: List<DecodedTransactionData>,
+    )
 
     internal suspend fun rememberPreviewedAuthorizationRequest(
         wallet: Wallet,
