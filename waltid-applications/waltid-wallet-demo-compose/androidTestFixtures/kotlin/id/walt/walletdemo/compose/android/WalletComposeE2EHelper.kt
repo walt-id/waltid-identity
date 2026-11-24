@@ -468,7 +468,7 @@ internal object WalletComposeE2EHelper {
         device.findObjects(By.pkg(walletPackage).text(Pattern.compile(texts.joinToString("|") { Pattern.quote(it) })))
             .firstOrNull { it.isVisibleOn(device) }
 
-    private fun findVisibleResource(device: UiDevice, tag: String): UiObject2? =
+    fun findVisibleResource(device: UiDevice, tag: String): UiObject2? =
         device.findObjects(By.pkg(walletPackage).res(tag)).firstOrNull { it.isVisibleOn(device) }
 
     fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {

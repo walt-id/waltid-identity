@@ -19,8 +19,8 @@ The three invocation cases require the credential ID from a successful VCI-006 s
 Before invoking the wallet, the runner checks that the request uses the advertised scheme;
 an unrelated offer or scheme fails the case and triggers owned-session cleanup.
 Passing requires both wallet success and that exact session's terminal ITB success.
-App runs use Android's registered intent filter and real wallet consent. The desktop
-decodes the portal QR before opening the link. Camera scanning and browser
+App runs use Android's registered intent filter and real wallet consent. The runner
+opens the original URI from the portal's `VP request` field. Camera scanning and browser
 invocation are independent of these URL-based cases.
 
 The deployed VP-011/012/013 descriptions explicitly limit their scope to the

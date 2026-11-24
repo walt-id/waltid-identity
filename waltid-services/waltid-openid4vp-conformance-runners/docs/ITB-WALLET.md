@@ -75,8 +75,9 @@ its prerequisite fails. Select the six payments using the
 
 Select a reference issuance case with its qualified ID in `ITB_CASES` locally
 or `cases` in the live workflow. These cases use the Android Preview app and
-the same QR attachment path as core issuance. Reconi's authorization flow opens
-Chrome on the device.
+the same raw offer field as core issuance. Reconi's authorization flow opens
+Chrome on the device. For `recweb_issue_02` the runner also reads the separate
+`Transaction Code` field from the same dialog.
 
 Running `./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet`
 without a device bridge selects the JVM protocol diagnostics. This driver uses a
@@ -114,21 +115,20 @@ code and leave initialized case reports as `NOT_RUN`.
 The bridge authenticates to the portal and selects the exact statement, suite
 and case in **Interactive execution** mode. Each case starts from a fresh portal
 document, so prior dialogs and asynchronously updated session lists cannot
-select another interaction. The bridge downloads the expected attachment from the
-owned dialog once for each wallet interaction. For offer and presentation links,
-it decodes the wallet-facing QR image and passes the original URI to the wallet,
-preserving its authority and query encoding. The portal can also display a derived
-text value containing an erroneous EAN/UPC decode.
-Any transaction code comes from the same dialog. The case-specific invocation
-scheme and wallet verification still apply. For DC API cases, the bridge reads the
-declarative inputs in the downloaded instruction script. Each download is limited
-to 1 MiB and removed after reading. QR images are limited to 2048 by 2048 pixels.
+select another interaction. The bridge reads the unique `VCI request` or
+`VP request` field from the owned dialog. It reads the complete inline text
+when the portal shows Copy and downloads longer values once. The URI retains
+its original authority and query encoding. Each invocation case checks its
+expected scheme before opening the wallet. DC API cases download the instruction
+script and read its declarative inputs. Downloads are limited to 1 MiB and
+removed after reading.
 
 For DC API cases, the app
 driver uses Chrome at the counterpart's origin and the Android credential picker.
 Both demo modes confirm Chrome's disclosure prompt and Android's sharing
-sheet when the displayed origin matches the configured ITB host. The operator
-reviews and approves each payment in the wallet and authenticates on the phone.
+sheet when the displayed origin matches the configured ITB host. The driver checks
+the payee, currency and amount in the wallet and submits the review if allowed.
+The operator supplies the native biometric approval.
 The unattended driver declines Chrome's separate notification onboarding if it
 appears during the credential flow.
 The hosted emulator enables Chrome's Digital Credentials issuance feature. This
@@ -137,7 +137,8 @@ is required on the image's Chrome 145 and enabled by default from Chrome 155.
 The full matrix starts with VCI-006 and `tc15`, so Android's system picker has
 only the prerequisite PID when it selects credentials for `tc15`.
 VP-007 runs after VCI-008 and before VCI-005 so the wallet's single-match query
-selects the mdoc issued by its prerequisite.
+selects the mdoc issued by its prerequisite. Each TS12 issuance immediately
+precedes its two payments so they use the freshly issued credential.
 For CS-07 issuance, the wallet uses a Custom Tab for issuer authorization so the
 original provider request can finish in Chrome. The driver requires the app's new
 PID, the browser's create response and an `issued` result from the same offer's
@@ -253,7 +254,7 @@ execution report and of the normative specification version.
 | CS-10 | `cs10-test-suite` | RV-ISS-01/02 (2) | 1.1 |
 | CS-12 / TS12 | `ts12` | 3 issuance, 3 payment, 3 DC API payment (9) | 1.0 |
 | OneSpan, opt-in | `onespan_com` | `onespan_vci_01`, `onespan_vci_03` | 1.0 |
-| Reconi, opt-in | `rec` | `recweb_issue_01` | 1.0 |
+| Reconi, opt-in | `rec` | `recweb_issue_01`, `recweb_issue_02` | 1.0 |
 
 ### Follow-up coverage
 
@@ -285,7 +286,6 @@ outside the wallet inventory.
 | Intesi (`generated_suite`) | `webuild_issuer_request_001`, `webuild_issuer_request_002` | The offer endpoint status assertion failed before the wallet had an interaction. These fixtures exercise issuer endpoints. Wallet coverage needs an offer handoff and an assertion about the wallet flow. |
 | Procivis (`ts01`) | `tc001`, `tc002` | The issuer returned HTTP 400 `invalid_client` at token exchange. Recheck the test client's issuer registration and authentication requirements. |
 | Procivis (`ts01`) | `tc003`, `tc004` | Both signed requests failed leaf certificate hash binding. Recheck that `x509_hash` matches the DER-encoded leaf in `x5c`. The deployed cases share a title, so the bridge also needs an unambiguous case selector. |
-| Reconi (`rec`) | `recweb_issue_02` | The wallet stored the credential and a subsequent report had terminal `SUCCESS`, but the runner errored while reading the verdict. Retries then stalled before session creation, including the base VCI-006 control. Qualify with the separate `Transaction Code` field, bounded verdict reads and a fresh end-to-end pass. |
 | Trust Framework (`tf-test-suite`) | `tc_vci_001`, `tc_vci_005`, `tc_vci_006`, `tc_vci_007`, `tc_vci_008` | The issuer returned HTTP 401 `invalid_client` at token exchange. Recheck test client onboarding before qualifying wallet trust evaluation. |
 | Trust Framework (`tf-test-suite`) | `tc_vp_001`, `tc_vp_002` | The sessions exposed no usable wallet input. Recheck with a deployed request attachment. |
 | Trust Framework (`tf-test-suite`) | `tc_vp_003`, `tc_vp_004`, `tc_vp_007`, `tc_vp_011`, `tc_vp_012` | Both attempts timed out before an interactive session ID appeared. Recheck portal startup before assessing wallet behavior. |

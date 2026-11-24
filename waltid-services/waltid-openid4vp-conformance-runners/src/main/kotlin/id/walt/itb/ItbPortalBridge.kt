@@ -11,6 +11,7 @@ import com.microsoft.playwright.options.WaitUntilState
 import io.ktor.http.Url
 import java.net.URI
 import java.net.URISyntaxException
+import java.nio.charset.CharacterCodingException
 import java.nio.file.Files
 import java.util.function.Consumer
 import java.util.regex.Pattern
@@ -22,14 +23,10 @@ internal class ItbPortalExecutionError : IllegalStateException("The ITB portal c
 internal class ItbPortalInputError(val reason: Reason) : IllegalArgumentException(reason.name) {
     enum class Reason {
         INTERACTION_DOWNLOAD_SIZE,
-        WALLET_QR_IMAGE_FORMAT,
-        WALLET_QR_IMAGE_DIMENSIONS,
-        WALLET_QR_IMAGE_READ,
-        WALLET_QR_UNREADABLE,
-        WALLET_QR_INVALID_URL,
-        ATTACHMENT_COUNT,
-        ISSUANCE_OFFER_INVALID_URL,
-        TRANSACTION_CODE_MISSING,
+        FIELD_COUNT,
+        FIELD_VALUE_INVALID,
+        WALLET_LINK_INVALID,
+        TRANSACTION_CODE_INVALID,
     }
 }
 
@@ -45,21 +42,15 @@ internal class ItbPortalStepTimeout(val step: Step) : IllegalStateException("The
 internal class ItbPortalDefinitionFailure(val status: Int) :
     IllegalStateException("ITB test definition returned HTTP $status")
 
-internal enum class PortalAttachment(vararg names: String, val usesDcApi: Boolean = false) {
-    OFFER("Credential QR code", "VCI request QR code", "Credential Offer QR code", "QR code"),
-    PRESENTATION("Credential QR code"),
-    PAYMENT("VP request QR code"),
+internal enum class PortalInput(val label: String, val usesDcApi: Boolean = false) {
+    OFFER("VCI request"),
+    PRESENTATION("VP request"),
     DC_ISSUANCE("Prepare offer and invoke wallet for PID issuance", usesDcApi = true),
     DC_PRESENTATION("Digital Credentials API presentation request", usesDcApi = true),
     DC_PAYMENT("TS12 payment Digital Credentials API presentation request", usesDcApi = true);
 
-    val label: Pattern = Pattern.compile(
-        names.joinToString("|", "^\\s*(?:", ")\\s*$"),
-        Pattern.CASE_INSENSITIVE,
-    )
-
     companion object {
-        fun forCase(suite: String, case: String): PortalAttachment = when (suite) {
+        fun forCase(suite: String, case: String): PortalInput = when (suite) {
             "cs01v1", "cs10-test-suite" -> OFFER
             "cs02v1" -> PRESENTATION
             "onespan_com" -> when (case) {
@@ -67,7 +58,7 @@ internal enum class PortalAttachment(vararg names: String, val usesDcApi: Boolea
                 else -> error("Unknown OneSpan wallet case")
             }
             "rec" -> when (case) {
-                "recweb_issue_01" -> OFFER
+                "recweb_issue_01", "recweb_issue_02" -> OFFER
                 else -> error("Unknown Reconi wallet case")
             }
             "cts07" -> when (case) {
@@ -78,7 +69,7 @@ internal enum class PortalAttachment(vararg names: String, val usesDcApi: Boolea
             "ts12" -> when {
                 case.startsWith("ts12_issue_") -> OFFER
                 case.startsWith("ts12_pay_dc_api_") -> DC_PAYMENT
-                case.startsWith("ts12_pay_") -> PAYMENT
+                case.startsWith("ts12_pay_") -> PRESENTATION
                 else -> error("Unknown TS-12 wallet case")
             }
             else -> error("Unknown ITB wallet suite")
@@ -215,56 +206,76 @@ class ItbPortalBridge(
 
     override suspend fun readNext(session: ItbSession): ItbWalletInteraction {
         val dialog = dialog()
-        val attachment = PortalAttachment.forCase(session.testSuite, session.testCase)
-        val field = dialog.locator("app-any-content-view .content-name").filter(
-            Locator.FilterOptions().setHasText(attachment.label),
-        )
+        val input = PortalInput.forCase(session.testSuite, session.testCase)
+        val fields = dialog.locator("app-any-content-view .content-name")
         val portalError = page.getByText("Unexpected Error", Page.GetByTextOptions().setExact(true))
         // Some reference-service starts take longer than the ordinary 15-second DOM timeout.
         // Wait for this owned session's interaction, without clicking Start or creating a session again.
         step(ItbPortalStepTimeout.Step.INTERACTION) {
             page.waitForCondition(
-                { field.count() > 0 || portalError.count() > 0 },
+                { fields.count() > 0 || portalError.count() > 0 },
                 Page.WaitForConditionOptions().setTimeout(45_000.0),
             )
         }
         verifySession(session)
+        val field = fieldNamed(dialog, input.label)
         val count = field.count()
         if (count == 0 && portalError.count() > 0) throw ItbPortalExecutionError()
-        if (count != 1) throw ItbPortalInputError(ItbPortalInputError.Reason.ATTACHMENT_COUNT)
-        val content = download(field.locator("xpath=ancestor::app-any-content-view[1]"))
-        return when (attachment) {
-            PortalAttachment.OFFER -> {
-                val url = walletLink(content)
-                if (!url.scheme.equals("openid-credential-offer", ignoreCase = true)) {
-                    throw ItbPortalInputError(ItbPortalInputError.Reason.ISSUANCE_OFFER_INVALID_URL)
-                }
-                val text = step(ItbPortalStepTimeout.Step.DIALOG) { dialog.innerText() }
-                val pin = Regex("""\bPIN\s+([0-9]+)\b""").find(text)?.groupValues?.get(1)
-                if (session.testSuite == "cs01v1" && session.testCase == "tc_vci_007" && pin == null) {
-                    throw ItbPortalInputError(ItbPortalInputError.Reason.TRANSACTION_CODE_MISSING)
-                }
-                ItbWalletInteraction.Offer(url, pin)
-            }
-            PortalAttachment.PRESENTATION, PortalAttachment.PAYMENT ->
-                ItbWalletInteraction.Presentation(walletLink(content))
-            PortalAttachment.DC_ISSUANCE -> parseDigitalIssuance(content.decodeToString(throwOnInvalidSequence = true))
-            PortalAttachment.DC_PRESENTATION, PortalAttachment.DC_PAYMENT ->
-                parseDigitalCredentials(
-                    content.decodeToString(throwOnInvalidSequence = true),
-                    isPayment = attachment == PortalAttachment.DC_PAYMENT,
-                )
+        if (count != 1) throw ItbPortalInputError(ItbPortalInputError.Reason.FIELD_COUNT)
+        val row = field.locator("xpath=ancestor::app-any-content-view[1]")
+        val content = if (input.usesDcApi) downloadText(row) else readText(row)
+        return when (input) {
+            PortalInput.OFFER -> ItbWalletInteraction.Offer(
+                walletLink(content, "openid-credential-offer"), transactionCode(dialog, session),
+            )
+            PortalInput.PRESENTATION ->
+                ItbWalletInteraction.Presentation(walletLink(content, "openid4vp", "eu-eaap", "haip-vp"))
+            PortalInput.DC_ISSUANCE -> parseDigitalIssuance(content)
+            PortalInput.DC_PRESENTATION, PortalInput.DC_PAYMENT ->
+                parseDigitalCredentials(content, isPayment = input == PortalInput.DC_PAYMENT)
         }
     }
 
-    private fun walletLink(content: ByteArray): URI = try {
-        URI(ItbWalletQr.decode(content)).takeIf { it.isAbsolute }
-            ?: throw ItbPortalInputError(ItbPortalInputError.Reason.WALLET_QR_INVALID_URL)
-    } catch (_: URISyntaxException) {
-        throw ItbPortalInputError(ItbPortalInputError.Reason.WALLET_QR_INVALID_URL)
+    private fun fieldNamed(dialog: Locator, label: String): Locator =
+        dialog.getByText(label, Locator.GetByTextOptions().setExact(true))
+            .and(dialog.locator("app-any-content-view .content-name"))
+
+    private fun transactionCode(dialog: Locator, session: ItbSession): String? {
+        val code = when ("${session.testSuite}/${session.testCase}") {
+            "cs01v1/tc_vci_007" -> {
+                val text = step(ItbPortalStepTimeout.Step.DIALOG) { dialog.innerText() }
+                Regex("""\bPIN\s+([0-9]+)\b""").findAll(text).singleOrNull()?.groupValues?.get(1)
+            }
+            "rec/recweb_issue_02" -> {
+                val field = fieldNamed(dialog, "Transaction Code")
+                if (field.count() != 1) throw ItbPortalInputError(ItbPortalInputError.Reason.TRANSACTION_CODE_INVALID)
+                readText(field.locator("xpath=ancestor::app-any-content-view[1]")).takeIf { it.matches(Regex("[0-9]{3,12}")) }
+            }
+            else -> return null
+        }
+        return code ?: throw ItbPortalInputError(ItbPortalInputError.Reason.TRANSACTION_CODE_INVALID)
     }
 
-    private fun download(row: Locator): ByteArray {
+    private fun walletLink(content: String, vararg schemes: String): URI = try {
+        URI(content).takeIf { uri -> schemes.any { it.equals(uri.scheme, ignoreCase = true) } }
+            ?: throw ItbPortalInputError(ItbPortalInputError.Reason.WALLET_LINK_INVALID)
+    } catch (_: URISyntaxException) {
+        throw ItbPortalInputError(ItbPortalInputError.Reason.WALLET_LINK_INVALID)
+    }
+
+    private fun readText(row: Locator): String {
+        val control = row.locator("button[ngbtooltip=Copy], button[ngbtooltip=Download]")
+        step(ItbPortalStepTimeout.Step.DOWNLOAD_CONTROL) {
+            control.first().waitFor(Locator.WaitForOptions().setTimeout(45_000.0))
+        }
+        if (control.count() != 1) throw ItbPortalInputError(ItbPortalInputError.Reason.FIELD_COUNT)
+        if (control.getAttribute("ngbtooltip") == "Download") return downloadText(row)
+        // GITB renders short fields in full beside Copy. Reading the row preserves the clipboard.
+        return row.locator(".content-value").innerText().trim().takeIf { it.length in 1..100 }
+            ?: throw ItbPortalInputError(ItbPortalInputError.Reason.FIELD_VALUE_INVALID)
+    }
+
+    private fun downloadText(row: Locator): String {
         // CodeMirror virtualizes long scripts, so rendered lines can omit payment inputs.
         val download = step(ItbPortalStepTimeout.Step.DOWNLOAD_EVENT) {
             // The portal may prepare this one file after its interaction dialog appears.
@@ -280,7 +291,9 @@ class ItbPortalBridge(
             if (Files.size(path) !in 1..1024 * 1024) {
                 throw ItbPortalInputError(ItbPortalInputError.Reason.INTERACTION_DOWNLOAD_SIZE)
             }
-            Files.readAllBytes(path)
+            Files.readAllBytes(path).decodeToString(throwOnInvalidSequence = true).trim()
+        } catch (_: CharacterCodingException) {
+            throw ItbPortalInputError(ItbPortalInputError.Reason.FIELD_VALUE_INVALID)
         } finally {
             download.delete()
         }

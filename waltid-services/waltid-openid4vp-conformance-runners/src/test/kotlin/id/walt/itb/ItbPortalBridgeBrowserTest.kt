@@ -17,7 +17,7 @@ class ItbPortalBridgeBrowserTest {
     private val case = suite.cases.single { it.id == "tc_vp_001" }
     // Observed portal label; keep independent from the catalogue under test.
     private val deployedCaseName = "VP-001: CS-02 hash presentation with default encrypted response mode [Wallet SUT]"
-    private val presentationUrl = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest&state=Ab%2Bc%252F"
+    private val presentationUrl = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest&state=Ab%2Bc%252F" + "1234567890".repeat(4)
     private val statementsUrl = "https://itb.example/app#/organisation/conformance/20"
 
     @Test
@@ -39,9 +39,9 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
-    fun readsTheIssuanceQrAndPinWithoutDerivedText() = runBlocking<Unit> {
+    fun readsTheIssuanceLinkAndItsPin() = runBlocking<Unit> {
         val offerUrl = "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer"
-        withPage(attachment = ItbQrFixtures.qr(offerUrl), transactionCode = "012345") { page ->
+        withPage(attachment = offerUrl.encodeToByteArray(), attachmentLabel = "VCI request", transactionCode = "012345") { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val session = bridge.prepare(suite.copy(id = "cs01v1"), case.copy(id = "tc_vci_007"))
             val delivered = ItbDeviceWire.decode(ItbDeviceWire.encode(bridge.read(session)))
@@ -53,14 +53,14 @@ class ItbPortalBridgeBrowserTest {
     }
 
     @Test
-    fun scopesTheReferenceSuiteFilterAndReadsItsOfferQr() = runBlocking<Unit> {
+    fun scopesTheReferenceSuiteFilterAndReadsItsOffer() = runBlocking<Unit> {
         val reference = catalogue.suites.single { it.id == "rec" }
         val referenceCase = reference.cases.single { it.id == "recweb_issue_01" }
         val offerUrl = "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer"
         withPage(
             referenceSuite = true,
-            attachment = ItbQrFixtures.qr(offerUrl),
-            attachmentLabel = "Credential offer QR code",
+            attachment = offerUrl.encodeToByteArray(),
+            attachmentLabel = "VCI request",
         ) { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val session = bridge.prepare(reference, referenceCase)
@@ -74,68 +74,65 @@ class ItbPortalBridgeBrowserTest {
 
     @Test
     fun ambiguousOfferRowsFailBeforeEitherDownload() = runBlocking<Unit> {
-        withPage(otherLabel = "VCI request QR code") { page ->
+        withPage(attachmentLabel = "VCI request", otherLabel = "VCI request") { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val session = bridge.prepare(suite.copy(id = "cs10-test-suite"), case.copy(id = "rv_iss_01"))
             val error = assertFailsWith<ItbPortalInputError> { bridge.read(session) }
-            assertEquals(ItbPortalInputError.Reason.ATTACHMENT_COUNT, error.reason)
+            assertEquals(ItbPortalInputError.Reason.FIELD_COUNT, error.reason)
             assertEquals(0, page.evaluate("window.attachmentDownloads + window.otherDownloads"))
         }
     }
 
     @Test
-    fun rejectsAPresentationQrInAnIssuanceCaseEvenWithAValidTextOffer() = runBlocking<Unit> {
-        withPage(
-            inlineInteraction = "openid-credential-offer://?credential_offer_uri=https://issuer.example/offer",
-            interactionLabel = "VCI request",
-            attachmentLabel = "VCI request QR code",
-        ) { page ->
-            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
-            val session = bridge.prepare(suite.copy(id = "ts12"), case.copy(id = "ts12_issue_01"))
-            val failure = assertFailsWith<ItbPortalInputError> { bridge.read(session) }
-            assertEquals(ItbPortalInputError.Reason.ISSUANCE_OFFER_INVALID_URL, failure.reason)
-            assertEquals(1, page.evaluate("window.attachmentDownloads"))
-            assertEquals(0, page.evaluate("window.copyCount"))
-        }
-    }
-
-    @Test
-    fun readsThePresentationQrWhenDerivedTextIsANumericBarcode() = runBlocking<Unit> {
-        withPage(inlineInteraction = "12345678") { page ->
-            val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
-            val interaction = assertIs<ItbWalletInteraction.Presentation>(bridge.read(bridge.prepare(suite, case)))
-            assertEquals(presentationUrl, interaction.url.toString())
-            assertEquals(1, page.evaluate("window.attachmentDownloads"))
-            assertEquals(0, page.evaluate("window.otherDownloads"))
-            assertEquals(0, page.evaluate("window.copyCount"))
-            assertEquals(1, page.evaluate("window.startCount"))
-        }
-    }
-
-    @Test
-    fun readsTheTs12PaymentQrFromItsDeployedRow() = runBlocking<Unit> {
-        withPage(inlineInteraction = "12345678", attachmentLabel = "VP request QR code") { page ->
+    fun readsTheInlinePaymentLinkWithoutCopyingOrDownloadingItsQr() = runBlocking<Unit> {
+        val inlineUrl = "openid4vp://?request_uri=https%3A%2F%2Fitb.example%2Fr&state=Ab%2Bc%252F"
+        withPage(inlineInteraction = inlineUrl, attachmentLabel = "VP request QR code") { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
             val session = bridge.prepare(suite.copy(id = "ts12"), case.copy(id = "ts12_pay_02"))
             val interaction = assertIs<ItbWalletInteraction.Presentation>(bridge.read(session))
-            assertEquals(presentationUrl, interaction.url.toString())
-            assertEquals(1, page.evaluate("window.attachmentDownloads"))
-            assertEquals(0, page.evaluate("window.otherDownloads"))
+            assertEquals(inlineUrl, interaction.url.toString())
+            assertEquals(0, page.evaluate("window.attachmentDownloads + window.otherDownloads + window.copyCount"))
         }
     }
 
     @Test
-    fun neverFallsBackToTextWhenThePresentationQrIsInvalid() = runBlocking<Unit> {
-        withPage(
-            inlineInteraction = "openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Fshort",
-            attachment = byteArrayOf(1, 2, 3),
-        ) { page ->
+    fun rejectsMalformedLinksAndWrongSchemesWithoutTryingAnotherField() = runBlocking<Unit> {
+        for (invalid in listOf("openid4vp://?state=%zz", "openid-credential-offer://?credential_offer_uri=example", "12345678")) {
+            withPage(inlineInteraction = invalid, attachmentLabel = "VP request QR code") { page ->
+                val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+                val failure = assertFailsWith<ItbPortalInputError> { bridge.read(bridge.prepare(suite, case)) }
+                assertEquals(ItbPortalInputError.Reason.WALLET_LINK_INVALID, failure.reason)
+                assertEquals(0, page.evaluate("window.attachmentDownloads + window.otherDownloads"))
+            }
+        }
+    }
+
+    @Test
+    fun readsReconiCodeFromItsOwnUniqueField() = runBlocking<Unit> {
+        val offer = "openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer"
+        for ((value, otherLabel) in listOf("001234" to "QR code", null to "QR code", "001234" to "Transaction Code")) {
+            withPage(attachment = offer.encodeToByteArray(), attachmentLabel = "VCI request",
+                inlineInteraction = value, interactionLabel = "Transaction Code", otherLabel = otherLabel,
+                transactionCode = "888888") { page ->
+                val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
+                val session = bridge.prepare(suite.copy(id = "rec"), case.copy(id = "recweb_issue_02"))
+                if (value != null && otherLabel != "Transaction Code") {
+                    assertEquals(value, assertIs<ItbWalletInteraction.Offer>(bridge.read(session)).transactionCode)
+                } else {
+                    assertEquals(ItbPortalInputError.Reason.TRANSACTION_CODE_INVALID,
+                        assertFailsWith<ItbPortalInputError> { bridge.read(session) }.reason)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun missingPresentationFieldNeverConsumesTheQr() = runBlocking<Unit> {
+        withPage(attachmentLabel = "VP request QR code") { page ->
             val bridge = ItbPortalBridge(page, statementsUrl, catalogue.systemName)
-            val rejection = assertFailsWith<ItbPortalInputError> { bridge.read(bridge.prepare(suite, case)) }
-            assertEquals(ItbPortalInputError.Reason.WALLET_QR_IMAGE_FORMAT, rejection.reason)
-            assertEquals(1, page.evaluate("window.attachmentDownloads"))
-            assertEquals(0, page.evaluate("window.otherDownloads"))
-            assertEquals(1, page.evaluate("window.startCount"))
+            val failure = assertFailsWith<ItbPortalInputError> { bridge.read(bridge.prepare(suite, case)) }
+            assertEquals(ItbPortalInputError.Reason.FIELD_COUNT, failure.reason)
+            assertEquals(0, page.evaluate("window.attachmentDownloads + window.otherDownloads"))
         }
     }
 
@@ -406,9 +403,9 @@ class ItbPortalBridgeBrowserTest {
         applicationDelayMillis: Int = 0,
         inlineInteraction: String? = null,
         interactionLabel: String = "VP request",
-        attachment: ByteArray = ItbQrFixtures.qr(presentationUrl),
-        attachmentLabel: String = "Credential QR code",
-        otherLabel: String = if (attachmentLabel == "VP request QR code") "Credential QR code" else "VP request QR code",
+        attachment: ByteArray = presentationUrl.encodeToByteArray(),
+        attachmentLabel: String = "VP request",
+        otherLabel: String = "Credential QR code",
         transactionCode: String? = null,
         referenceSuite: Boolean = false,
         interactionDelayMillis: Int = 30,

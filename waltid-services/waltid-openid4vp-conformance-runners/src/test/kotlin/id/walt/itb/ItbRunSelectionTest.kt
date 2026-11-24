@@ -12,6 +12,10 @@ class ItbRunSelectionTest {
         assertEquals(mapOf("cs01v1" to 7, "cs02v1" to 7, "cts07" to 1, "ts12" to 9),
             selected.groupingBy { it.first.id }.eachCount())
         assertEquals(24, selected.size)
+        val paymentOrder = listOf("01", "02", "03").flatMap { id ->
+            listOf("ts12_issue_$id", "ts12_pay_$id", "ts12_pay_dc_api_$id")
+        }
+        assertEquals(paymentOrder, selected.filter { it.first.id == "ts12" }.map { it.second.id })
     }
 
     @Test
@@ -79,7 +83,7 @@ class ItbRunSelectionTest {
 
     @Test
     fun referenceCasesRequireAnExplicitSelectionAndTheDemoApp() {
-        val references = listOf("onespan_com/onespan_vci_01", "onespan_com/onespan_vci_03", "rec/recweb_issue_01")
+        val references = listOf("onespan_com/onespan_vci_01", "onespan_com/onespan_vci_03", "rec/recweb_issue_01", "rec/recweb_issue_02")
         fun caseKeys(selection: String?) = ItbRunSelection.select(catalogue, selection, unattendedOnly = true, demoApp = true)
             .map { (suite, case) -> "${suite.id}/${case.id}" }
 
@@ -90,7 +94,7 @@ class ItbRunSelectionTest {
 
     @Test
     fun unknownAndEmptySelectionsAreErrors() {
-        listOf("", "tc_vp_004", "tc_vci_006,", "rec/recweb_issue_02").forEach { invalid ->
+        listOf("", "tc_vp_004", "tc_vci_006,", "rec/recweb_issue_99").forEach { invalid ->
             assertFailsWith<IllegalArgumentException> { ItbRunSelection.select(catalogue, invalid) }
         }
     }

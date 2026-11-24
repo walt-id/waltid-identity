@@ -443,24 +443,31 @@ private class DemoInteractions(
             }
             device.hasObject(done) && (!presentation || device.hasObject(confirmation))
         }
-        if (presentation && !attended) {
-            var clicked = false
-            var resumedDuringCleanup = false
-            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_receipt_not_closed") {
-                if (!resumedDuringCleanup && resumeWalletFromChrome()) {
-                    resumedDuringCleanup = true
-                    return@waitUntil false
+        var dismissed = false
+        var resumed = false
+        var screen = "unknown"
+        val operation = if (presentation) "presentation" else "issuance"
+        waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_${operation}_home_not_restored", { "_$screen" }) {
+            when (device.currentPackageName) {
+                CHROME_PACKAGE -> {
+                    screen = "chrome"
+                    if (presentation && !resumed) resumed = resumeWalletFromChrome()
                 }
-                if (device.currentPackageName != context.packageName) return@waitUntil false
-                if (!device.hasObject(done)) return@waitUntil true
-                // The app may dismiss a success receipt while the test is locating Done.
-                if (!clicked) clicked = WalletComposeE2EHelper.clickVisibleResource(device, tag)
-                false
+                context.packageName -> {
+                    if (device.hasObject(done)) {
+                        screen = "receipt"
+                        if (!dismissed) dismissed = WalletComposeE2EHelper.clickVisibleResource(device, tag)
+                    } else if (device.hasObject(By.pkg(context.packageName).res("wallet.pinInput"))) {
+                        screen = "locked"
+                    } else {
+                        screen = "wallet"
+                        return@waitUntil WalletComposeE2EHelper.findVisibleResource(device, "wallet.scanButton") != null
+                    }
+                }
+                else -> screen = "other"
             }
-        } else {
-            clickByTag(device, tag)
+            false
         }
-        waitFor("wallet.scanButton", code = if (presentation) "demo_presentation_home_not_restored" else "demo_issuance_home_not_restored")
     }
 
     private fun resumeWalletFromChrome(): Boolean {
@@ -511,7 +518,9 @@ private class DemoInteractions(
         }
     }
 
-    private suspend fun waitUntil(timeout: Long, code: String, condition: suspend () -> Boolean) {
+    private suspend fun waitUntil(
+        timeout: Long, code: String, detail: () -> String = { "" }, condition: suspend () -> Boolean,
+    ) {
         val ready = withTimeoutOrNull(timeout) {
             while (true) {
                 try {
@@ -524,7 +533,7 @@ private class DemoInteractions(
             @Suppress("UNREACHABLE_CODE")
             false
         }
-        if (ready != true) throw ItbWalletRejection(code)
+        if (ready != true) throw ItbWalletRejection(code + detail())
     }
 
     private fun UiObject2.clickableAncestor(): UiObject2? =

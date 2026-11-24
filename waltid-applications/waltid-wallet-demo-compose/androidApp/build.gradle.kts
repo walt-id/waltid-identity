@@ -92,10 +92,10 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
-    sourceSets["androidTest"].kotlin.directories.addAll(listOf(
-        "../androidTestFixtures/kotlin",
+    sourceSets["androidTest"].kotlin.directories.add("../androidTestFixtures/kotlin")
+    sourceSets.maybeCreate("androidTestPreviewDebug").kotlin.directories.add(
         "../../../waltid-services/waltid-openid4vp-conformance-runners/src/deviceShared/kotlin",
-    ))
+    )
 }
 
 // The reference payment issuer is trusted only by a deliberately built Preview Debug APK.

@@ -106,7 +106,7 @@ private suspend fun runItb(): Int {
                         )
                     }
                     val chromePort = if (demoMode != null && selected.any { (suite, case) ->
-                        PortalAttachment.forCase(suite.id, case.id).usesDcApi
+                        PortalInput.forCase(suite.id, case.id).usesDcApi
                     }) required("ITB_CHROME_PORT").toInt().also { require(it in 1024..65535) } else null
                     try {
                         val driver = native?.let { it::execute } ?: ItbWalletDriver.create(
