@@ -218,6 +218,52 @@ class StatusMaintenanceIntegrationTest {
     }
 
     @Test
+    fun aWorkerCanRetainAnAcknowledgedSessionWarningWithoutShowingItAgain() = withWallet {
+        val issuer = add("a", cache = "no-store", value = 2u)
+        val policy = managedCredentialStatusTrustPolicy()
+        service(policy).use { foreground ->
+            foreground.refresh()
+            val warning = foreground.snapshot().pendingNotices.single()
+            foreground.acknowledgeNotice(warning.reference, warning.version)
+            assertNull(store.readCredentialStatus("a"))
+            assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+
+            setList(issuer, value = 2u, cache = "max-age=600")
+            assertTrue(assertIs<CredentialStatusMaintenanceResult.Finished>(wake()).hasNewNotice)
+            val retained = assertNotNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+            assertFalse(retained.acknowledged)
+
+            // Local status reads can see the new evidence before Home reads the notice.
+            foreground.selectedStatuses(setOf("a"))
+            assertTrue(foreground.snapshot().pendingNotices.isEmpty())
+            assertEquals(retained.copy(acknowledged = true), assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+        }
+        service(policy).use { reopened -> assertTrue(reopened.snapshot().pendingNotices.isEmpty()) }
+    }
+
+    @Test
+    fun aRecoveryCommittedByAnotherWorkerKeepsTheNextSuspensionVisible() = withWallet {
+        val issuer = add("a", cache = "no-store", value = 2u)
+        service(managedCredentialStatusTrustPolicy()).use { foreground ->
+            foreground.refresh()
+            val first = foreground.snapshot().pendingNotices.single()
+            foreground.acknowledgeNotice(first.reference, first.version)
+
+            setList(issuer, value = 0u, cache = "max-age=0")
+            assertEquals(1, assertIs<CredentialStatusMaintenanceResult.Finished>(wake()).checked)
+            assertNotNull(store.readCredentialStatus("a"))
+            assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+
+            // The foreground wallet reads neither the clear result nor the next suspension until here.
+            setList(issuer, value = 2u, cache = "max-age=600")
+            assertTrue(assertIs<CredentialStatusMaintenanceResult.Finished>(wake()).hasNewNotice)
+            val next = foreground.snapshot().pendingNotices.single()
+            assertEquals(StatusMeaning.SUSPENDED, next.kind)
+            assertNotEquals(first.version, next.version)
+        }
+    }
+
+    @Test
     fun aCustomStoreWithNoticesCanReadAndAcknowledgeThemWithoutPaging() = withWallet {
         add("a", value = 2u)
         val custom = object : WalletCredentialStore by store, CredentialStatusNoticeStore by store {}

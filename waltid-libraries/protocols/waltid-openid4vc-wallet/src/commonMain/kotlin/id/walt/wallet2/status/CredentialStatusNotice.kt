@@ -20,6 +20,8 @@ data class CredentialStatusNoticeState(
     val kind: StatusMeaning,
     val checkedAt: Instant,
     val acknowledged: Boolean = false,
+    // An opaque evidence fence immediately before this retainable notice first appeared.
+    val previousEvidenceRevision: String? = null,
 ) {
     init { require(kind in adverseNoticeKinds) }
 }

@@ -145,7 +145,7 @@ class WalletDemoController(
         scope.launch(dispatcher) {
             combine(state, foregroundSession, externalStatusReview, reconciledStatusOwner, automaticStatusCheck) { ui, foreground, externalReview, reconciled, automatic ->
                 val ready = ui.session as? WalletSessionState.Ready
-                if (ready == null || !automaticStatusChecksAllowed(ui, foreground, externalReview, reconciled) ||
+                if (ready == null || automaticStatusCheckOwner(ui, foreground, externalReview, reconciled) == null ||
                     (supportsBackgroundStatusChecks && ui.credentialStatuses.readState != WalletDemoStatusReadState.Available) ||
                     ui.checkingCredentialStatuses) return@combine null
                 val inventory = ready.credentials.mapTo(mutableSetOf()) { it.id }
@@ -282,14 +282,13 @@ class WalletDemoController(
             StatusObservationOwner(foreground, ui.credentialStatusContext)
         } else null
 
-    private fun automaticStatusChecksAllowed(
+    private fun automaticStatusCheckOwner(
         ui: WalletDemoUiState,
         foreground: Any? = foregroundSession.value,
         externalReview: Boolean = externalStatusReview.value,
         reconciled: StatusObservationOwner? = reconciledStatusOwner.value,
-    ): Boolean {
-        val owner = statusObservationOwner(ui, foreground) ?: return false
-        return ui.automaticCredentialStatusChecks && (!supportsBackgroundStatusChecks || reconciled == owner) &&
+    ): StatusObservationOwner? = statusObservationOwner(ui, foreground)?.takeIf { owner ->
+        ui.automaticCredentialStatusChecks && (!supportsBackgroundStatusChecks || reconciled == owner) &&
             !externalReview && ui.selectedTab == WalletDemoTab.Credentials && ui.externalFlow == null &&
             ui.presentationReview == null && !ui.isBusy && !ui.credentialStatuses.legacySubmission
     }
@@ -394,13 +393,17 @@ class WalletDemoController(
         }
     }
 
-    /** A detail check joins the same SDK flights as wallet-wide work. Closing the screen releases its owner. */
-    suspend fun checkCredentialStatusOnDetails(credentialId: String) = withContext(dispatcher) {
-        if (!automaticStatusChecksAllowed(state.value)) return@withContext
-        try {
-            wallet.refreshCredentialStatuses(setOf(credentialId), force = false)
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { /* The local observation remains visible, with manual retry available. */ }
+    /** The visible Details screen owns this check, including the wait for enrollment recovery. */
+    suspend fun checkCredentialStatusWhileViewingDetails(credentialId: String) = withContext(dispatcher) {
+        combine(state, foregroundSession, externalStatusReview, reconciledStatusOwner, ::automaticStatusCheckOwner)
+            .distinctUntilChanged()
+            .collectLatest { owner ->
+                if (owner == null || owner != automaticStatusCheckOwner(state.value)) return@collectLatest
+                try {
+                    wallet.refreshCredentialStatuses(setOf(credentialId), force = false)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { /* Details retains the local observation and offers manual retry. */ }
+            }
     }
 
     fun checkCredentialStatuses(ids: Set<String>? = null, force: Boolean = true) {
@@ -447,7 +450,7 @@ class WalletDemoController(
             if (statusObservationOwner(current) == null || current.session !is WalletSessionState.Ready ||
                 current.checkingCredentialStatuses || current.presentationStatusRefresh != null || credentialStatusRefreshJob?.isActive == true) return
             if (reviewOwner != null && !reviewOwner.matches(current)) return
-            if (!force && !automaticStatusChecksAllowed(current)) return
+            if (!force && automaticStatusCheckOwner(current) == null) return
             if (_state.compareAndSet(current, current.copy(checkingCredentialStatuses = true, presentationStatusRefresh = reviewRefresh,
                 credentialStatusSummary = if (settingsBatch) null else current.credentialStatusSummary,
                 credentialStatusBatchError = if (settingsBatch) null else current.credentialStatusBatchError,
@@ -467,7 +470,7 @@ class WalletDemoController(
                 (reviewOwner == null || reviewOwner.matches(_state.value))
             try {
                 if (!currentRequest()) throw CancellationException("The credential status owner changed")
-                if (!force && !automaticStatusChecksAllowed(_state.value)) return@launch
+                if (!force && automaticStatusCheckOwner(_state.value) == null) return@launch
                 val summary = wallet.refreshCredentialStatuses(ids, force)
                 currentCoroutineContext().ensureActive()
                 val snapshot = wallet.credentialStatusSnapshot()

@@ -687,7 +687,7 @@ internal class WalletVisualScenarios(
         content {
             Column(Modifier.fillMaxSize()) {
                 WalletHeader(state, onSettings = {}, onScan = {}, onShareNearby = {})
-                CredentialsTab(state, modifier = Modifier.weight(1f), showFeedback = true)
+                CredentialsTab(state, modifier = Modifier.weight(1f), isVisible = true)
             }
         }
         if (notice != null) {

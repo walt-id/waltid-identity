@@ -35,11 +35,6 @@ public extension AnnexCPresentationWallet {
     func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? { nil }
     func cachedCredentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { AsyncThrowingStream { $0.finish() } }
     func closeStatusWallet() async throws {}
-    func submitStatusReviewedAnnexCPresentation(reviewedStatus: [String: String], requestID: String, verifiedOrigin: String,
-        deviceRequestBase64URL: String, encryptionInfoBase64URL: String, selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse {
-        try await submitAnnexCPresentation(requestID: requestID, verifiedOrigin: verifiedOrigin, deviceRequestBase64URL: deviceRequestBase64URL,
-            encryptionInfoBase64URL: encryptionInfoBase64URL, selectedCredentialOptions: selectedCredentialOptions)
-    }
 }
 extension Wallet: AnnexCPresentationWallet {
     public func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? { try await credentialStatusSnapshot() }

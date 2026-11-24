@@ -8,6 +8,47 @@ import WalletDemoSharingUI
 
 @MainActor
 final class WalletViewModelCredentialStatusTests: XCTestCase {
+    func testVisibleDetailsCanCheckOnceEnrollmentRecoveryEnablesAutomaticChecks() async throws {
+        let walletID = "status-details-recovery-\(UUID())"
+        let key = "wallet.\(walletID).status.automatic"
+        UserDefaults.standard.set(true, forKey: key)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: walletID))
+        let recovery = StatusRefreshBarrier()
+        let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [], refreshingCredentialIDs: [])
+        let client = MockWalletClient(credentialStatusSnapshot: snapshot, reconcileStatus: { _, _ in
+            await recovery.wait()
+            return CredentialStatusMaintenanceEnrollment(preference: .enabled, binding: "new-grant")
+        })
+        let scheduler = WalletDemoBackgroundStatusScheduler(defaults: defaults, cancelRequest: { _ in })
+        let model = WalletViewModel(walletID: walletID, walletClient: client, backgroundStatusScheduler: scheduler,
+            readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(), identityDocumentRegistrationUpdate: {},
+            pinStore: InMemoryDemoPinStore(), biometricAuthenticator: FakeDemoBiometricAuthenticator(isAvailable: false),
+            statusSleep: { _ in try await Task.sleep(nanoseconds: 60_000_000_000) })
+        defer {
+            model.handleApplicationEnteredBackground()
+            Task { await recovery.resume() }
+            UserDefaults.standard.removeObject(forKey: key)
+            defaults.removePersistentDomain(forName: walletID)
+        }
+        model.auth = .unlocked
+        model.isReady = true
+        model.handleApplicationBecameActive()
+        try await waitUntil { await recovery.started }
+        XCTAssertFalse(model.automaticStatusChecksAllowed)
+        await model.checkCredentialStatusOnDetails("selected-credential")
+        let earlyCalls = await client.statusRefreshCalls
+        XCTAssertEqual(earlyCalls, 0)
+
+        await recovery.resume()
+        try await waitUntil { model.automaticStatusChecksAllowed }
+        let closedDetails = Task { await model.checkCredentialStatusOnDetails("closed-credential") }
+        closedDetails.cancel()
+        await closedDetails.value
+        await model.checkCredentialStatusOnDetails("selected-credential")
+        let completedCalls = await client.statusRefreshCalls
+        XCTAssertEqual(completedCalls, 1)
+    }
+
     func testAnInterruptedPauseIsRestoredBeforeAnyAutomaticRefresh() async throws {
         let walletID = "status-recover-pause-\(UUID())"
         let key = "wallet.\(walletID).status.automatic"

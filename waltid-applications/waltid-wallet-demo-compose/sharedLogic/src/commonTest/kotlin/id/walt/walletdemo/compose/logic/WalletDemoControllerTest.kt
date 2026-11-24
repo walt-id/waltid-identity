@@ -59,7 +59,7 @@ class WalletDemoControllerTest {
         val controller = unlockedControllerWith(wallet, this, reconcileBackgroundStatusSchedule = {})
         assertTrue(recovering)
         assertTrue(controller.state.value.credentialStatuses.available)
-        backgroundScope.launch { controller.checkCredentialStatusOnDetails(sampleCredential.id) }
+        val details = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(sampleCredential.id) }
         runCurrent()
         assertTrue(refreshes.isEmpty(), "A due check must wait for the saved pause")
 
@@ -74,9 +74,42 @@ class WalletDemoControllerTest {
         runCurrent()
         assertEquals(1, controller.state.value.credentialStatusSummary?.completed)
 
+        details.cancel()
         controller.setAutomaticCredentialStatusChecks(true)
         runCurrent()
         assertEquals(listOf(true, false), refreshes)
+    }
+
+    @Test
+    fun onlyTheVisibleDetailsCredentialChecksAfterEnabledRecovery() = runTest {
+        val recovery = CompletableDeferred<Unit>()
+        val selected = sampleCredential.copy(id = "selected-credential")
+        val base = FakeDemoWallet(credentials = listOf(sampleCredential, selected))
+        val requests = mutableListOf<Set<String>?>()
+        val wallet = object : DemoWallet by base {
+            override suspend fun reconcileBackgroundStatus(automaticChecks: Boolean, resumePaused: Boolean): DemoBackgroundStatusEnrollment {
+                recovery.await()
+                return DemoBackgroundStatusEnrollment(DemoBackgroundStatusPreference.ENABLED, "new-grant")
+            }
+
+            override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                assertFalse(force)
+                requests += ids
+                return WalletDemoStatusRefreshSummary(0, 1, 0, 0)
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this, reconcileBackgroundStatusSchedule = {})
+        val previous = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(sampleCredential.id) }
+        runCurrent()
+        previous.cancel()
+        val details = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(selected.id) }
+        runCurrent()
+        assertTrue(requests.isEmpty())
+
+        recovery.complete(Unit)
+        runCurrent()
+        assertEquals(listOf(setOf(selected.id)), requests.filterNotNull())
+        details.cancel()
     }
 
     @Test
@@ -103,14 +136,14 @@ class WalletDemoControllerTest {
         assertTrue(controller.closeExternalFlow())
         runCurrent()
         assertEquals(listOf<Set<String>?>(null), calls)
-        val details = backgroundScope.launch { controller.checkCredentialStatusOnDetails(sampleCredential.id) }
+        val details = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(sampleCredential.id) }
         runCurrent()
-        details.join()
         assertEquals(listOf(null, setOf(sampleCredential.id)), calls)
         controller.setAutomaticCredentialStatusChecks(false)
-        val disabledDetails = backgroundScope.launch { controller.checkCredentialStatusOnDetails(sampleCredential.id) }
+        details.cancel()
+        val disabledDetails = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(sampleCredential.id) }
         runCurrent()
-        disabledDetails.join()
+        disabledDetails.cancel()
         assertEquals(2, calls.size)
     }
 

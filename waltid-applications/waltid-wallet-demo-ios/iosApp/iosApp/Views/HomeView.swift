@@ -18,6 +18,8 @@ struct HomeView: View {
     }
 
     var body: some View {
+        let detailsToCheck = credentialContentVisible && viewModel.automaticStatusChecksAllowed
+            ? selectedCredentialDetailsID : nil
         Group {
             if !viewModel.isReady {
                 if let model = viewModel.identityScreen {
@@ -93,8 +95,8 @@ struct HomeView: View {
         .onReceive(viewModel.proximityPresentation.$active) { active in
             if !active { Task { @MainActor in viewModel.scheduleCredentialStatusCheck() } }
         }
-        .task(id: selectedCredentialDetailsID) {
-            if let id = selectedCredentialDetailsID { await viewModel.checkCredentialStatusOnDetails(id) }
+        .task(id: detailsToCheck) {
+            if let detailsToCheck { await viewModel.checkCredentialStatusOnDetails(detailsToCheck) }
         }
         .task(id: canOpenStatusNotification) {
             if canOpenStatusNotification {
@@ -116,9 +118,13 @@ struct HomeView: View {
     private var canShowStatusNotice: Bool {
         viewModel.isReady && viewModel.auth == .unlocked && !viewModel.isLoading &&
             viewModel.selectedTab == .credentials && viewModel.presentationReview == nil &&
-            viewModel.externalFlow == nil && viewModel.offerPreview == nil && !viewModel.statusNotificationOpened &&
-            !showingSettings && !dismissingSettings && !showingTaskSheet && !nearbySheet.keepsHomeVisible &&
+            viewModel.externalFlow == nil && viewModel.offerPreview == nil && credentialContentVisible &&
             selectedCredentialDetailsID == nil
+    }
+
+    private var credentialContentVisible: Bool {
+        !showingSettings && !dismissingSettings && !showingTaskSheet && !nearbySheet.keepsHomeVisible &&
+            !viewModel.statusNotificationOpened
     }
 
     private func openSettings() {

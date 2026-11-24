@@ -131,11 +131,11 @@ class WalletViewModel: ObservableObject {
     private var backgroundStatusTask: Task<Void, Never>?
 
     private var statusPreferenceKey = "wallet.status.automatic"
-    private var applicationForeground = true
+    @Published private var applicationForeground = true
     private let statusNow: @MainActor () -> Date
     private let statusSleep: @MainActor (TimeInterval) async throws -> Void
     private var credentialStatusGeneration = 0
-    private var reconciledStatusGeneration: Int?
+    @Published private var reconciledStatusGeneration: Int?
     private var credentialStatusTimer: Task<Void, Never>?
     private var nextCredentialStatusRefreshAt: Date?
     private var lastAutomaticStatusCheckAt: Date?
@@ -578,7 +578,7 @@ class WalletViewModel: ObservableObject {
         startCredentialStatusRefresh(ids: ids, force: force)
     }
 
-    private var automaticStatusChecksAllowed: Bool {
+    var automaticStatusChecksAllowed: Bool {
         applicationForeground && isReady && auth == .unlocked && automaticCredentialStatusChecks &&
             (backgroundStatusScheduler == nil || reconciledStatusGeneration == credentialStatusGeneration) &&
             selectedTab == .credentials && externalFlow == nil && presentationReview == nil &&
@@ -586,7 +586,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func checkCredentialStatusOnDetails(_ credentialID: String) async {
-        guard automaticStatusChecksAllowed else { return }
+        guard !Task.isCancelled, automaticStatusChecksAllowed else { return }
         _ = try? await walletClient.refreshCredentialStatuses(ids: [credentialID], force: false)
     }
 

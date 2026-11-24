@@ -90,8 +90,8 @@ internal fun CredentialsTab(
     modifier: Modifier = Modifier,
     onDeleteCredential: ((String) -> Unit)? = null,
     onDetailsChromeChange: (CredentialDetailsChrome?) -> Unit = {},
-    onDetailsOpened: suspend (String) -> Unit = {},
-    showFeedback: Boolean = false,
+    onDetailsVisible: suspend (String) -> Unit = {},
+    isVisible: Boolean = false,
     onDismissStatus: () -> Unit = {},
     onToggleStatusExpanded: () -> Unit = {},
     onDismissStatusMessage: (String) -> Unit = {},
@@ -127,8 +127,9 @@ internal fun CredentialsTab(
     fun requestClose() { technicalOpen = false; expandedId = null }
     fun toggleCard(id: String) { expandedId = id.takeUnless { it == expandedId } }
 
-    LaunchedEffect(selectedCredential?.id) {
-        selectedCredential?.id?.let { onDetailsOpened(it) }
+    val visibleDetailsId = selectedCredential?.id?.takeIf { isVisible }
+    LaunchedEffect(visibleDetailsId) {
+        visibleDetailsId?.let { onDetailsVisible(it) }
     }
     LaunchedEffect(openStatusNoticeOnHome) {
         if (openStatusNoticeOnHome) {
@@ -226,7 +227,7 @@ internal fun CredentialsTab(
                 }
             }
         }
-        if (showFeedback && !confirmDelete) {
+        if (isVisible && !confirmDelete) {
             CredentialScreenFeedback(
                 state, cards, showingDetails, onDismissStatus, onToggleStatusExpanded, onDismissStatusMessage,
                 onAcknowledgeStatusNotice, onOpenDetails = { expandedId = it },

@@ -154,6 +154,7 @@ class WalletCredentialStatusService private constructor(
         val fingerprint = credential.statusFingerprint()
         suspend fun current(): StoredCredential? = (source.read(credential.id) as? CredentialStatusInput.Signed)?.credential
     }
+    private data class SessionNotice(val value: CredentialStatusNoticeState, val evidenceRevision: String?)
     private data class State(
         val store: Any,
         val fingerprint: String,
@@ -162,7 +163,7 @@ class WalletCredentialStatusService private constructor(
         val nonPersistentReferenceIds: Set<String> = emptySet(),
         val persisted: CredentialStatusStoredRecord? = null,
         val policy: String? = null,
-        val sessionNotice: CredentialStatusNoticeState? = null,
+        val sessionNotice: SessionNotice? = null,
     )
     private class Flight(val result: Deferred<CredentialStatusRefreshResult>, var owners: Int = 0)
 
@@ -286,16 +287,27 @@ class WalletCredentialStatusService private constructor(
         }
     }
 
-    private fun pendingNotice(candidate: Candidate, state: State, at: Instant): PendingCredentialStatusNotice? {
+    private suspend fun pendingNotice(candidate: Candidate, state: State, at: Instant): PendingCredentialStatusNotice? {
         val input = candidate.input as CredentialStatusInput.Signed
+        val saved = input.storedStatus?.snapshot
         val retained = input.notice?.takeIf {
-            val saved = input.storedStatus?.snapshot
             saved?.schemaVersion == 2 && saved.credentialFingerprint == state.fingerprint
         }
         if (state.sessionNotice == null && (retained == null || retained.acknowledged)) return null
         val entries = state.metadata.entries
-        val live = state.sessionNotice?.takeIf { notice ->
+        val live = state.sessionNotice?.value?.takeIf { notice ->
             entries.any { it.referenceId == notice.referenceId && it.meaning == notice.kind }
+        }
+        // Only carry a dismissal over the write that directly followed the live evidence.
+        // An intervening recovery can create a new notice with the same meaning.
+        if (retained != null && live?.acknowledged == true && live.kind == retained.kind &&
+            live.referenceId == retained.referenceId && state.policy != null && state.policy == saved?.trustPolicyId &&
+            retained.previousEvidenceRevision != null && retained.previousEvidenceRevision == state.sessionNotice.evidenceRevision
+        ) {
+            if (!retained.acknowledged) {
+                candidate.source.notices?.acknowledgeStatusNotice(candidate.reference.credentialId, retained.version)
+            }
+            return null
         }
         val notice = listOfNotNull(retained, live).minByOrNull { adverseNoticeKinds.indexOf(it.kind) }
             ?.takeUnless { it.acknowledged } ?: return null
@@ -310,9 +322,11 @@ class WalletCredentialStatusService private constructor(
         val acknowledged = mutex.withLock {
             val committed = (store as? CredentialStatusNoticeStore)?.acknowledgeStatusNotice(reference.credentialId, version) == true
             val state = states[reference] ?: return@withLock committed
-            val notice = state.sessionNotice?.takeIf { it.version == version && !it.acknowledged && state.store === store }
+            val session = state.sessionNotice?.takeIf {
+                it.value.version == version && !it.value.acknowledged && state.store === store
+            }
                 ?: return@withLock committed
-            states[reference] = state.copy(sessionNotice = notice.copy(acknowledged = true))
+            states[reference] = state.copy(sessionNotice = session.copy(value = session.value.copy(acknowledged = true)))
             true
         }
         if (acknowledged) changes.tryEmit(Unit)
@@ -610,10 +624,15 @@ class WalletCredentialStatusService private constructor(
                         var transferred: CredentialStatusNoticeState? = null
                         val commit = snapshotStore.compareAndSetCredentialStatusAndNotice(current, expected, updated) { previous ->
                             val next = persistent.noticeTransition(previous, resolved.metadata, at)
-                            val live = state.sessionNotice
                             // Reuse the acknowledgement, with the timestamp from the newly retainable evidence.
-                            val retained = if (next != null && next.version != previous?.version && live?.kind == next.kind) {
-                                next.copy(version = live.version, acknowledged = live.acknowledged)
+                            val retained = if (next != null && next.version != previous?.version) {
+                                val live = state.sessionNotice?.takeIf { it.evidenceRevision == expected?.revision }
+                                    ?.value?.takeIf { it.kind == next.kind }
+                                next.copy(
+                                    version = live?.version ?: next.version,
+                                    acknowledged = live?.acknowledged ?: next.acknowledged,
+                                    previousEvidenceRevision = expected?.revision,
+                                )
                             } else next
                             transferred = previous?.takeIf {
                                 it.referenceId in merged.nonPersistentReferenceIds && it.version != retained?.version
@@ -625,7 +644,7 @@ class WalletCredentialStatusService private constructor(
                             val sessionEvidence = CredentialStatus.references(merged.metadata.entries.filter {
                                 it.referenceId in merged.nonPersistentReferenceIds
                             })
-                            val sessionNotice = sessionEvidence.noticeTransition(state.sessionNotice, resolved.metadata, at, transferred)
+                            val sessionNotice = sessionEvidence.noticeTransition(state.sessionNotice?.value, resolved.metadata, at, transferred)
                             return finishRefresh(record.reference, merged, updated, sessionNotice)
                         }
                     }
@@ -655,7 +674,7 @@ class WalletCredentialStatusService private constructor(
         currentCoroutineContext().ensureActive()
         return mutex.withLock {
             val state = currentRefreshState(record, version) ?: return@withLock removed(record)
-            val sessionNotice = merged.metadata.noticeTransition(state.sessionNotice, resolved.metadata, now())
+            val sessionNotice = merged.metadata.noticeTransition(state.sessionNotice?.value, resolved.metadata, now())
             finishRefresh(record.reference, merged, committed, sessionNotice)
         }
     }
@@ -677,7 +696,10 @@ class WalletCredentialStatusService private constructor(
         stored: CredentialStatusStoredRecord?,
         sessionNotice: CredentialStatusNoticeState?,
     ): CredentialStatusRefreshResult {
-        states[reference] = state.copy(persisted = stored, sessionNotice = sessionNotice)
+        states[reference] = state.copy(
+            persisted = stored,
+            sessionNotice = sessionNotice?.let { SessionNotice(it, stored?.revision) },
+        )
         if (state.metadata.hasCheckError) retryAfter[reference] = now() + 30.seconds
         else retryAfter.remove(reference)
         changes.tryEmit(Unit)
