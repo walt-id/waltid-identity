@@ -27,6 +27,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResourceAfterScrolling
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewTestTags
 import io.github.oshai.kotlinlogging.DirectLoggerFactory
 import io.github.oshai.kotlinlogging.KotlinLoggingConfiguration
 import io.github.oshai.kotlinlogging.Level
@@ -140,12 +141,16 @@ private class DemoInteractions(
         is ItbWalletInteraction.Offer -> ui("offer") { receive(interaction) }
         is ItbWalletInteraction.CheckStatus -> ui("status") { status(interaction) }
         is ItbWalletInteraction.Presentation -> ui("presentation") {
+            val payment = if (interaction.attended) {
+                interaction.paymentReview ?: throw ItbWalletRejection("demo_payment_review_expectation_missing")
+            } else null
             open(interaction.url.toString())
-            present(interaction.credentialId, interaction.attended, provider = false)
+            present(interaction.credentialId, payment, provider = false)
         }
         is ItbWalletInteraction.DigitalCredentials -> ui("dc_presentation") {
-            enterProviderReview("wallet.presentationSubmitButton")
-            present(interaction.credentialId, interaction.payment != null, provider = true)
+            val payment = interaction.payment?.review
+            enterProviderReview(WalletDemoSharingReviewTestTags.ShareButton, payment = payment != null)
+            present(interaction.credentialId, payment, provider = true)
         }
         is ItbWalletInteraction.DigitalIssuance -> ui("dc_issuance") {
             val before = storedIds()
@@ -178,29 +183,28 @@ private class DemoInteractions(
         return ItbWalletResult(issuedCredentialIds = listOf(credential.id))
     }
 
-    private suspend fun present(credentialId: String?, payment: Boolean, provider: Boolean): ItbWalletResult {
-        val submit = "wallet.presentationSubmitButton"
-        waitFor(submit, code = "demo_presentation_review_missing")
-        if (credentialId != null) selectCredential(credentialId)
-        if (payment) {
-            check(attended) { "Payment requires operator consent" }
-            if (waitForResourceAfterScrolling(device, "payment-consent") == null) {
-                val reason = when {
-                    device.hasObject(By.res("payment-consent-blocked")) -> "demo_payment_review_blocked"
-                    device.hasObject(By.res("payment-consent-loading")) -> "demo_payment_review_loading"
-                    device.hasObject(By.text("Couldn't update the information to share.")) -> "demo_payment_claim_review_failed"
-                    else -> "demo_payment_review_missing"
-                }
-                throw ItbWalletRejection(reason)
-            }
-            println("ITB_OPERATOR: review the payee and amount in the wallet, then confirm and approve the native signing prompt.")
+    private suspend fun present(
+        credentialId: String?,
+        payment: ItbWalletInteraction.PaymentReview?,
+        provider: Boolean,
+    ): ItbWalletResult {
+        val submit = WalletDemoSharingReviewTestTags.ShareButton
+        if (payment == null) {
+            waitFor(submit, code = "demo_presentation_review_missing")
         } else {
-            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_submit_disabled") {
-                device.hasObject(By.pkg(context.packageName).res(submit).enabled(true))
+            waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_review_missing") {
+                device.hasObject(By.pkg(context.packageName).res(submit)) || device.hasObject(blockedPaymentReview)
             }
-            click(submit, "demo_presentation_submit_not_clickable")
         }
-        val timeout = if (payment) 165_000L else WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
+        if (credentialId != null) selectCredential(credentialId)
+        if (payment != null) verifyPaymentReview(payment)
+        waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_submit_disabled") {
+            if (payment != null) checkPaymentReview()
+            device.hasObject(By.pkg(context.packageName).res(submit).enabled(true))
+        }
+        if (payment != null) println("ITB_OPERATOR: wallet review verified. Approve the native signing prompt.")
+        click(submit, "demo_presentation_submit_not_clickable")
+        val timeout = if (payment != null) 165_000L else WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
         if (provider) {
             waitUntil(timeout, "demo_provider_presentation_not_completed") {
                 requireProviderScreen()
@@ -209,6 +213,42 @@ private class DemoInteractions(
         } else completeReceipt("wallet.presentationDone", "Present failed", timeout)
         return ItbWalletResult()
     }
+
+    private fun verifyPaymentReview(payment: ItbWalletInteraction.PaymentReview) {
+        check(attended) { "Payment requires attended biometric signing" }
+        if (waitForResourceAfterScrolling(device, "payment-consent", onPoll = ::checkPaymentReview) == null) {
+            checkPaymentReview()
+            val code = if (device.hasObject(By.res("payment-consent-loading"))) "demo_payment_review_loading"
+                else "demo_payment_review_missing"
+            throw ItbWalletRejection(code)
+        }
+        val payee = paymentFieldTexts("payee.name")
+        if (payment.merchant !in payee) throw ItbWalletRejection("demo_payment_review_unexpected_payee")
+        val total = paymentFieldTexts("amount")
+        val amount = payment.amount.toBigDecimalOrNull()
+            ?: throw ItbWalletRejection("demo_payment_review_expectation_invalid")
+        if (payment.currency !in total || total.none { it.toBigDecimalOrNull()?.compareTo(amount) == 0 }) {
+            throw ItbWalletRejection("demo_payment_review_unexpected_total")
+        }
+    }
+
+    private fun paymentFieldTexts(field: String): List<String> = WalletComposeE2EHelper.readClaimTextsAfterScrolling(
+        device, "transactionData[0].details.payload.$field", ::checkPaymentReview,
+    )
+
+    private fun checkPaymentReview() {
+        device.findObject(blockedPaymentReview)?.let {
+            throw ItbWalletRejection.blockedPaymentReview(it.text?.trim())
+        }
+        if (device.hasObject(By.pkg(context.packageName).res("payment-unsigned-warning"))) {
+            throw ItbWalletRejection("demo_payment_review_unsigned_request")
+        }
+        if (device.hasObject(By.pkg(context.packageName).text("Couldn't update the information to share."))) {
+            throw ItbWalletRejection("demo_payment_claim_review_failed")
+        }
+    }
+
+    private val blockedPaymentReview = By.pkg(context.packageName).res("payment-consent-blocked")
 
     private suspend fun selectCredential(credentialId: String) {
         val suffix = "${credentialId.length}:$credentialId"
@@ -307,7 +347,7 @@ private class DemoInteractions(
         // The caller scrolls to the Check status control keyed to this exact credential.
     }
 
-    private suspend fun enterProviderReview(reviewTag: String) {
+    private suspend fun enterProviderReview(reviewTag: String, payment: Boolean = false) {
         val picker = By.pkg("com.google.android.gms")
         val shareWithHost = Pattern.compile("Share\\s+info\\s+with\\s+${Pattern.quote(itbHost)}\\?")
         var selected = false
@@ -321,14 +361,20 @@ private class DemoInteractions(
                     return@waitUntil false
                 }
             }
-            if (device.hasObject(By.pkg(context.packageName).res(reviewTag))) true else {
+            if (device.hasObject(By.pkg(context.packageName).res(reviewTag)) ||
+                payment && device.hasObject(blockedPaymentReview)
+            ) true else {
                 val combinedHeading = device.hasObject(By.copy(picker).textStartsWith("Share info with"))
                 val shareSheet = combinedHeading || device.hasObject(By.copy(picker).text("Share info"))
+                val transactionSheet = device.hasObject(By.copy(picker).text("Confirm transaction"))
+                val originConfirmation = shareSheet || transactionSheet
                 val candidate = device.findObject(By.copy(picker).textContains(previewWalletLabel))
-                val confirm = if (shareSheet) {
-                    val approvedOrigin = if (combinedHeading) {
-                        device.hasObject(By.copy(picker).text(shareWithHost))
-                    } else device.hasObject(By.copy(picker).text(itbHost))
+                val confirm = if (originConfirmation) {
+                    val approvedOrigin = when {
+                        transactionSheet -> attended && payment && device.hasObject(By.copy(picker).text(itbHost))
+                        combinedHeading -> device.hasObject(By.copy(picker).text(shareWithHost))
+                        else -> device.hasObject(By.copy(picker).text(itbHost))
+                    }
                     if (approvedOrigin) {
                         device.findObject(By.copy(picker).text("Agree and continue"))
                     } else null
@@ -337,9 +383,9 @@ private class DemoInteractions(
                         ?: device.findObject(By.copy(picker).text("Continue"))
                 }
                 when {
-                    confirm?.isEnabled == true && (shareSheet || candidate != null || selected) ->
+                    confirm?.isEnabled == true && (originConfirmation || candidate != null || selected) ->
                         (confirm.clickableAncestor() ?: confirm).click()
-                    !shareSheet && !selected && candidate != null ->
+                    !originConfirmation && !selected && candidate != null ->
                         (candidate.clickableAncestor() ?: candidate).click().also { selected = true }
                 }
                 false

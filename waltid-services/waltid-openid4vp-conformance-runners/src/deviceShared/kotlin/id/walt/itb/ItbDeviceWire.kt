@@ -81,6 +81,7 @@ internal object ItbDeviceWire {
                 put("url", interaction.url.toString())
                 interaction.credentialId?.let { put("credentialId", it) }
                 put("attended", interaction.attended)
+                interaction.paymentReview?.let { put("paymentReview", Json.encodeToJsonElement(ItbWalletInteraction.PaymentReview.serializer(), it)) }
             }
             is ItbWalletInteraction.DigitalCredentials -> {
                 put("kind", "dc")
@@ -121,6 +122,7 @@ internal object ItbDeviceWire {
             )
             "presentation" -> ItbWalletInteraction.Presentation(
                 URI(value.text("url")), credentialId, value.getValue("attended").jsonPrimitive.boolean,
+                value["paymentReview"]?.let { Json.decodeFromJsonElement(ItbWalletInteraction.PaymentReview.serializer(), it) },
             )
             "dc" -> ItbWalletInteraction.DigitalCredentials(
                 Url(value.text("endpoint")), value.text("validationSession"), value.text("profile"), value.text("protocol"),

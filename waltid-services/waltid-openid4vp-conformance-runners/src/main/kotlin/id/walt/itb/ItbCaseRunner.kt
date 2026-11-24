@@ -132,6 +132,7 @@ class ItbCaseRunner(
                     is ItbWalletInteraction.Presentation -> interaction.copy(
                         credentialId = prerequisiteCredentialId,
                         attended = case.attended,
+                        paymentReview = case.paymentReview,
                     )
                     is ItbWalletInteraction.DigitalCredentials -> interaction.copy(credentialId = prerequisiteCredentialId)
                     else -> interaction

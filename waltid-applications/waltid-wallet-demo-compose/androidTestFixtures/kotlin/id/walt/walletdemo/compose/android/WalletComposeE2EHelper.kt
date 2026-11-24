@@ -495,12 +495,14 @@ internal object WalletComposeE2EHelper {
         device: UiDevice,
         tag: String,
         timeoutMs: Long = UI_ELEMENT_TIMEOUT,
+        onPoll: () -> Unit = {},
     ): UiObject2? {
         val deadline = System.currentTimeMillis() + timeoutMs
         var towardBottom = true
         var stepsInDirection = 0
         while (System.currentTimeMillis() < deadline) {
             try {
+                onPoll()
                 findVisibleResource(device, tag)?.let { return it }
                 if (towardBottom) device.scrollDown() else device.scrollUp()
                 stepsInDirection++
@@ -515,6 +517,9 @@ internal object WalletComposeE2EHelper {
         }
         return null
     }
+
+    fun readClaimTextsAfterScrolling(device: UiDevice, path: String, onPoll: () -> Unit): List<String> =
+        waitForResourceAfterScrolling(device, claimTag(path), onPoll = onPoll)?.visibleTexts().orEmpty()
 
     fun assertResourceVisibleAfterScrolling(
         device: UiDevice,

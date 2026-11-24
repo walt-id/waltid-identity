@@ -5,6 +5,7 @@ import com.microsoft.playwright.Locator
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.Route
 import com.microsoft.playwright.TimeoutError
+import com.microsoft.playwright.impl.TargetClosedError
 import io.ktor.client.HttpClient
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
@@ -114,7 +115,9 @@ internal class ItbAndroidBrowser(
         return try {
             execute(interaction)
         } catch (error: ItbWalletRejection) {
-            requireBrowserSuccess(page)
+            if (!error.code.startsWith("demo_payment_") && !page.isClosed && chrome.isConnected) {
+                requireBrowserSuccess(page)
+            }
             throw error
         }
     }
@@ -170,7 +173,11 @@ internal class ItbAndroidBrowser(
             )
             return run(page)
         } finally {
-            page.close()
+            try {
+                if (!page.isClosed && chrome.isConnected) page.close()
+            } catch (_: TargetClosedError) {
+                // Chrome already closed the test tab during the handoff.
+            }
         }
     }
 

@@ -45,6 +45,12 @@ class ItbDeviceWireTest {
         val inputs = listOf(
             ItbWalletInteraction.Offer(URI("openid-credential-offer://?credential_offer_uri=https%3A%2F%2Fissuer.example%2Foffer"), "123456"),
             ItbWalletInteraction.Presentation(URI("openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Frequest")),
+            ItbWalletInteraction.Presentation(
+                URI("openid4vp://?request_uri=https%3A%2F%2Fverifier.example%2Fpayment"),
+                credentialId = "credential-1",
+                attended = true,
+                paymentReview = ItbWalletInteraction.PaymentReview("Coffee Shop", "EUR", "12.34"),
+            ),
             ItbWalletInteraction.DigitalCredentials(
                 Url("https://verifier.example/descriptor"), "session", "profile", "openid4vp-v1-signed",
                 ItbWalletInteraction.Payment("sca-iban", "Merchant", "payee", "EUR", "12.95", "transaction"),

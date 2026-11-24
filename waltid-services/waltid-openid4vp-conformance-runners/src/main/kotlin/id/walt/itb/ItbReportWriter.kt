@@ -49,7 +49,7 @@ object ItbReportWriter {
                     result.adapterInvoked -> "incomplete"
                     else -> "not run"
                 }
-                val reason = result.errorCode ?: result.errorType ?: "—"
+                val reason = rejectionReason(result) ?: "—"
                 appendLine("| ${result.suite} | ${result.case} | ${result.outcome} | $reason | $wallet | ${result.testBedVerdict ?: "unavailable"} | ${result.session ?: "not started"} |")
             }
             appendLine()
@@ -64,7 +64,7 @@ object ItbReportWriter {
             report.cases.forEach { result ->
                 appendLine("  <testcase classname=\"${escape(result.suite)}\" name=\"${escape(result.case)}\">")
                 if (result.outcome != ItbCaseResult.Outcome.PASSED) {
-                    appendLine("    <failure type=\"${result.outcome}\" message=\"${result.phase}: ${escape(result.errorType ?: result.outcome.name)}\">" +
+                    appendLine("    <failure type=\"${result.outcome}\" message=\"${result.phase}: ${escape(rejectionReason(result) ?: result.outcome.name)}\">" +
                         "ITB=${result.testBedVerdict ?: "unavailable"}; session=${escape(result.session ?: "not started")}; " +
                         "adapterInvoked=${result.adapterInvoked}; cleanupFailed=${result.cleanupFailed}</failure>")
                 }
@@ -73,6 +73,12 @@ object ItbReportWriter {
             appendLine("</testsuite>")
         })
     }
+
+    private fun rejectionReason(result: ItbCaseResult): String? =
+        ItbWalletRejection.describe(result.errorCode) ?: result.errorCode ?: when (result.errorType) {
+            "TargetClosedError" -> "The browser closed the test tab or disconnected."
+            else -> result.errorType
+        }
 
     private fun escape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         .replace("\"", "&quot;").replace("'", "&apos;")

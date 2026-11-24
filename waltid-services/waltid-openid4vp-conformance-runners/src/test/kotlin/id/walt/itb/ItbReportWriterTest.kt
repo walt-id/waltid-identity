@@ -7,6 +7,27 @@ import kotlin.test.*
 
 class ItbReportWriterTest {
     @Test
+    fun walletPaymentReviewUsesOnlyWalletOwnedExplanations() {
+        val directory = Files.createTempDirectory("itb-payment-report-test-")
+        try {
+            val explanation = "The issuer's payment instructions are invalid."
+            val known = ItbWalletRejection.blockedPaymentReview(explanation)
+            val unknown = ItbWalletRejection.blockedPaymentReview("Unrecognized issuer content")
+            assertEquals("demo_payment_review_invalid_metadata", known.code)
+            assertEquals("demo_payment_review_blocked", unknown.code)
+            val payment = ItbCaseResult("ts12", "ts12_pay_dc_api_03", null, ItbCaseResult.Outcome.WALLET_FAILED,
+                ItbCaseResult.Phase.WALLET, true, false, null, true, null,
+                "2026-11-24T11:00:00Z", "2026-11-24T11:00:01Z", errorCode = known.code)
+            ItbReportWriter.write(directory, ItbRunReport("0".repeat(40), "2026-11-24", listOf(payment),
+                keyAttestation = ItbRunReport.KeyAttestation.SYNTHETIC_TEST_FIXTURE))
+            assertContains(Files.readString(directory.resolve("summary.md")), explanation)
+            assertContains(Files.readString(directory.resolve("junit.xml")), "The issuer&apos;s payment instructions are invalid.")
+        } finally {
+            directory.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
     fun unexecutedCasesRemainFailuresInAnInterruptedRunReport() {
         val directory = Files.createTempDirectory("itb-report-test-")
         try {

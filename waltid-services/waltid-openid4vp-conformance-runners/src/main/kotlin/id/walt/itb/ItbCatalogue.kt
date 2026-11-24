@@ -37,6 +37,7 @@ data class ItbCatalogue(
         val prerequisite: String? = null,
         val attended: Boolean = false,
         val demoOnly: Boolean = false,
+        val paymentReview: ItbWalletInteraction.PaymentReview? = null,
     ) {
         init {
             require(invocationScheme == null || invocationScheme in setOf("openid4vp", "eu-eaap", "haip-vp")) {

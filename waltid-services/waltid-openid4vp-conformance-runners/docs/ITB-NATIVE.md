@@ -1,8 +1,9 @@
 # Operator-assisted Android ITB execution
 
 The attended path drives the actual Compose Wallet Preview Debug app on a
-physical Android phone. The operator reviews the payee and amount in the app and
-confirms each transaction with fresh biometric authentication. The hardware-backed
+physical Android phone. The runner checks the expected payee, currency, and amount
+in the wallet review and submits it. The operator approves the native biometric
+prompt for each test payment. The hardware-backed
 test keys allow 10-second biometric reuse for ordinary signing. The test
 uses the same browser and provider entry points as the unattended runs for DC API
 interactions. The desktop retains portal and organisation credentials, ITB session
@@ -30,9 +31,10 @@ Provide the usual [ITB environment](ITB-WALLET.md#hosted-cases). Use a fresh
 Preview installation and unlock the phone before starting. The driver dismisses
 the optional biometric unlock prompt and selects **Use PIN only**. It selects
 hardware-backed signing with timed approval. Follow the on-device prompts to
-create the key. Review each DC API or wallet-link payment in the wallet, then
-approve the native signing prompt. The selected payments pull in their issuance
+create the key. Approve the native signing prompts. The selected payments pull in their issuance
 prerequisites, and every case reports its own ITB session.
+When the wallet blocks payment review, the runner stops the owned session and
+records the wallet-owned reason in the local report when available.
 For a watched run of all 27 selected cases on the phone, leave `ITB_CASES` unset,
 set `ITB_SHOW_BROWSER=true` and open `android device hub --device <physical-serial>`.
 The desktop browser shows the portal. The mirror shows the wallet, Android Chrome

@@ -1,5 +1,7 @@
 package id.walt.itb
 
+import id.walt.wallet2.consent.PaymentConsentException
+import id.walt.wallet2.consent.PaymentConsentFailure
 import io.ktor.http.Url
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
@@ -10,7 +12,12 @@ import java.net.URI
 sealed interface ItbWalletInteraction {
     data class Offer(val url: URI, val transactionCode: String? = null) : ItbWalletInteraction
     data class CheckStatus(val credentialIds: List<String>, val expected: ItbExpectedStatus) : ItbWalletInteraction
-    data class Presentation(val url: URI, val credentialId: String? = null, val attended: Boolean = false) : ItbWalletInteraction
+    data class Presentation(
+        val url: URI,
+        val credentialId: String? = null,
+        val attended: Boolean = false,
+        val paymentReview: PaymentReview? = null,
+    ) : ItbWalletInteraction
     data class DigitalCredentials(
         val endpoint: Url,
         val validationSession: String,
@@ -30,7 +37,12 @@ sealed interface ItbWalletInteraction {
     data class Payment(
         val attestationType: String, val merchant: String, val payeeId: String,
         val currency: String, val amount: String, val transactionId: String,
-    )
+    ) {
+        val review: PaymentReview get() = PaymentReview(merchant, currency, amount)
+    }
+
+    @Serializable
+    data class PaymentReview(val merchant: String, val currency: String, val amount: String)
 }
 
 internal fun ItbWalletInteraction.DigitalCredentials.descriptorRequest() = buildJsonObject {
@@ -71,4 +83,28 @@ data class ItbWalletResult(
     }
 }
 
-class ItbWalletRejection(val code: String) : IllegalStateException("The ITB wallet operation failed ($code)")
+class ItbWalletRejection(val code: String) : IllegalStateException("The ITB wallet operation failed ($code)") {
+    companion object {
+        private val paymentReviewFailures = PaymentConsentFailure.entries.associate { reason ->
+            "demo_payment_review_${reason.name.lowercase()}" to requireNotNull(PaymentConsentException(reason).message)
+        }
+
+        fun blockedPaymentReview(message: String?) = ItbWalletRejection(
+            paymentReviewFailures.entries.firstOrNull { it.value == message }?.key ?: "demo_payment_review_blocked",
+        )
+
+        fun describe(code: String?): String? = code?.let(paymentReviewFailures::get) ?: when (code) {
+            "demo_payment_review_blocked" -> "The wallet blocked payment review."
+            "demo_payment_review_loading" -> "The wallet timed out loading payment instructions."
+            "demo_payment_review_missing" -> "The wallet did not display a payment review."
+            "demo_payment_claim_review_failed" -> "The wallet could not update the information to share."
+            "demo_payment_review_unexpected_payee" -> "The wallet review did not display the expected payee."
+            "demo_payment_review_unexpected_total" -> "The wallet review did not display the expected amount and currency."
+            "demo_payment_review_unsigned_request" -> "The wallet displayed an unsigned payment request warning."
+            "demo_payment_review_expectation_missing" -> "The test case did not supply the expected payment details."
+            "demo_payment_review_expectation_invalid" -> "The test case supplied an invalid expected amount."
+            "demo_dc_picker_or_review_missing" -> "The Android credential sheet did not lead to wallet review."
+            else -> null
+        }
+    }
+}
