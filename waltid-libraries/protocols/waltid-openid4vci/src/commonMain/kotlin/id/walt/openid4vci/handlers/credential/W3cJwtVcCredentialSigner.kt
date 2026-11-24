@@ -15,6 +15,7 @@ import id.walt.sdjwt.SDMap
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType
 import id.walt.w3c.issuance.Issuer.kidForIssuer
+import id.walt.w3c.schemes.JwsSignatureScheme.JwsOption
 import id.walt.w3c.vc.vcs.W3CVC
 import id.walt.w3c.vc.vcs.applyIssuedV2Context
 import kotlinx.coroutines.withContext
@@ -143,6 +144,20 @@ object W3cJwtVcCredentialSigner {
                 display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
             )
         }
+        val subjectMapping = dataMapping?.get("credentialSubject") as? JsonObject
+        val subjectDisclosure = selectiveDisclosure?.get("credentialSubject")
+        // A v1.1 decoder uses sub to reconstruct the subject ID. Copy only an ID visible without disclosure.
+        val mappedSubjectId = if (!mappedVc.isV2() && subjectMapping?.containsKey("id") == true &&
+            subjectDisclosure?.sd != true && subjectDisclosure?.children?.get("id")?.sd != true
+        ) {
+            val subject = mappedVc["credentialSubject"] as? JsonObject
+            (subject?.get("id") as? JsonPrimitive)?.takeIf { it.isString && it.content.isNotBlank() }
+        } else null
+        val explicitSubject = jwtOptions[JwsOption.SUBJECT]
+        require(mappedSubjectId == null || explicitSubject == null || explicitSubject == mappedSubjectId) {
+            "W3C v1.1 JWT sub must match the mapped credentialSubject.id"
+        }
+        val signingSubject = mappedSubjectId?.content ?: subjectDid
 
         val issuerKid = when (issuerSigningKey) {
             is IssuerSigningKey.Legacy -> kidForIssuer(issuerSigningKey.key, issuerId)
@@ -154,7 +169,7 @@ object W3cJwtVcCredentialSigner {
                     issuerKey = issuerSigningKey.key,
                     issuerId = issuerId,
                     issuerKid = issuerKid,
-                    subjectDid = subjectDid,
+                    subjectDid = signingSubject,
                     additionalJwtHeader = additionalJwtHeaders,
                     additionalJwtOptions = jwtOptions,
                 )
@@ -163,7 +178,7 @@ object W3cJwtVcCredentialSigner {
                     algorithm = issuerSigningKey.algorithm,
                     issuerId = issuerId,
                     issuerKid = issuerKid,
-                    subjectDid = subjectDid,
+                    subjectDid = signingSubject,
                     additionalJwtHeader = additionalJwtHeaders,
                     additionalJwtOptions = jwtOptions,
                 )
@@ -176,7 +191,7 @@ object W3cJwtVcCredentialSigner {
                 issuerKey = issuerSigningKey.key,
                 issuerId = issuerId,
                 issuerKid = issuerKid,
-                subjectDid = subjectDid,
+                subjectDid = signingSubject,
                 disclosureMap = selectiveDisclosure,
                 additionalJwtHeaders = sdJwtHeaders,
                 additionalJwtOptions = jwtOptions,
@@ -186,7 +201,7 @@ object W3cJwtVcCredentialSigner {
                 algorithm = issuerSigningKey.algorithm,
                 issuerId = issuerId,
                 issuerKid = issuerKid,
-                subjectDid = subjectDid,
+                subjectDid = signingSubject,
                 disclosureMap = selectiveDisclosure,
                 additionalJwtHeaders = sdJwtHeaders,
                 additionalJwtOptions = jwtOptions,

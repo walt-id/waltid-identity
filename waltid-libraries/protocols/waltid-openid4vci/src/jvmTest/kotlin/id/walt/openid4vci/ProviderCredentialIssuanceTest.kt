@@ -99,6 +99,59 @@ class ProviderCredentialIssuanceTest {
     }
 
     @Test
+    fun `W3C v1 signs the mapped subject ID in plain and selectively disclosed JWTs`() = runBlocking {
+        val holder = p256Key("wallet")
+        val issuer = p256Key("issuer")
+        val credentialData = buildJsonObject {
+            putJsonArray("@context") { add("https://www.w3.org/2018/credentials/v1") }
+            putJsonArray("type") { add("VerifiableCredential") }
+            putJsonObject("credentialSubject") { put("name", "Alice") }
+        }
+        val subjectMapping = buildJsonObject {
+            putJsonObject("credentialSubject") { put("id", "<subjectDid>") }
+        }
+        val expectedSubject = JsonPrimitive(Crypto2DidService.registerByKey(method = "jwk", key = holder).did)
+
+        suspend fun issue(mapping: JsonObject, disclosure: SDMap?) = W3cJwtVcCredentialSigner.generateW3CJwtVC(
+            verifiedBinding = VerifiedCredentialBinding(holderKey = holder),
+            credentialData = credentialData,
+            issuerKey = issuer,
+            algorithm = JwsAlgorithm.ES256,
+            issuerId = "https://issuer.example",
+            dataMapping = mapping,
+            selectiveDisclosure = disclosure,
+        )
+
+        val discloseName = SDMap.generateSDMap(listOf("credentialSubject.name"))
+        for (disclosure in listOf(null, discloseName)) {
+            val signed = issue(subjectMapping, disclosure)
+            val payload = CompactJws.verify(signed.substringBefore('~'), issuer, JwsAlgorithm.ES256).payload
+            val claims = Json.parseToJsonElement(payload.decodeToString()).jsonObject
+            assertEquals(expectedSubject, claims.getValue("vc").jsonObject["credentialSubject"]?.jsonObject?.get("id"))
+            assertEquals(expectedSubject, claims["sub"])
+            if (disclosure != null) {
+                val parsed = SDJwt.parse(signed)
+                assertNull(claims.getValue("vc").jsonObject["credentialSubject"]?.jsonObject?.get("name"))
+                assertEquals(JsonPrimitive("Alice"), parsed.fullPayload.getValue("vc").jsonObject["credentialSubject"]?.jsonObject?.get("name"))
+            }
+        }
+
+        val matchingMapping = JsonObject(subjectMapping + ("jwt:sub" to JsonPrimitive("<context:subjectDid>")))
+        val matched = CompactJws.verify(issue(matchingMapping, null), issuer, JwsAlgorithm.ES256).payload
+        assertEquals(expectedSubject, Json.parseToJsonElement(matched.decodeToString()).jsonObject["sub"])
+
+        val conflictingMapping = JsonObject(subjectMapping + ("jwt:sub" to JsonPrimitive("<context:issuerId>")))
+        val conflict = assertFailsWith<IllegalArgumentException> { issue(conflictingMapping, null) }
+        assertEquals("W3C v1.1 JWT sub must match the mapped credentialSubject.id", conflict.message)
+
+        val discloseId = SDMap.generateSDMap(listOf("credentialSubject.id"))
+        val hidden = SDJwt.parse(issue(subjectMapping, discloseId))
+        assertNotEquals(expectedSubject, hidden.undisclosedPayload["sub"])
+        assertNull(hidden.undisclosedPayload.getValue("vc").jsonObject["credentialSubject"]?.jsonObject?.get("id"))
+        assertEquals(expectedSubject, hidden.fullPayload.getValue("vc").jsonObject["credentialSubject"]?.jsonObject?.get("id"))
+    }
+
+    @Test
     fun `selectively disclosed W3C credential binds sub to the holder key and conceals the name`() = runBlocking {
         val holderJwk = p256Key("wallet").exportPublicJwk()
         val holderThumbprint = Jwk.sha256Thumbprint(holderJwk)
