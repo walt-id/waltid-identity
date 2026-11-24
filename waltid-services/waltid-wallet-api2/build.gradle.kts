@@ -1,4 +1,3 @@
-import com.google.cloud.tools.jib.gradle.JibExtension
 import io.ktor.plugin.features.*
 
 plugins {
@@ -81,16 +80,8 @@ buildConfig {
     packageName("id.walt.wallet2")
 }
 
-// Use a Java 21 release base without Ubuntu's Pebble helper (GO-2026-6859).
-val walletBaseImage = "amazoncorretto:21-al2023-headless"
-
 ktor {
     docker {
-        customBaseImage.set(walletBaseImage)
         portMappings.set(listOf(DockerPortMapping(4000, 4000, DockerPortMappingProtocol.TCP)))
     }
-}
-
-configure<JibExtension> {
-    from.image = walletBaseImage
 }

@@ -1,4 +1,3 @@
-import com.google.cloud.tools.jib.gradle.JibExtension
 import io.ktor.plugin.features.*
 
 plugins {
@@ -91,18 +90,10 @@ buildConfig {
     packageName("id.walt.issuer2")
 }
 
-// Use a Java 21 release base without Ubuntu's Pebble helper (GO-2026-6859).
-val issuerBaseImage = "amazoncorretto:21-al2023-headless"
-
 ktor {
     docker {
-        customBaseImage.set(issuerBaseImage)
         portMappings.set(listOf(DockerPortMapping(7002, 7002, DockerPortMappingProtocol.TCP)))
     }
-}
-
-configure<JibExtension> {
-    from.image = issuerBaseImage
 }
 
 fun selectedPlaywrightBrowser(): String = when (System.getenv("PLAYWRIGHT_BROWSER")?.trim()?.lowercase()) {

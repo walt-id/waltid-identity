@@ -1,4 +1,3 @@
-import com.google.cloud.tools.jib.gradle.JibExtension
 import io.ktor.plugin.features.*
 
 plugins {
@@ -113,16 +112,8 @@ buildConfig {
     packageName("id.walt.verifier2")
 }
 
-// Use a Java 21 release base without Ubuntu's Pebble helper (GO-2026-6859).
-val verifierBaseImage = "amazoncorretto:21-al2023-headless"
-
 ktor {
     docker {
-        customBaseImage.set(verifierBaseImage)
         portMappings.set(listOf(DockerPortMapping(7003, 7003, DockerPortMappingProtocol.TCP)))
     }
-}
-
-configure<JibExtension> {
-    from.image = verifierBaseImage
 }
