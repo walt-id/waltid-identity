@@ -28,8 +28,7 @@ import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.openid4vp.clientidprefix.ClientIdPrefix
 import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
-import id.walt.policies2.vc.VCPolicyList
-import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.VerificationPolicyManager
 import id.walt.policies2.vp.policies.*
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -543,9 +542,7 @@ object VerificationSessionCreator {
             .withMandatoryTransactionDataPolicies(transactionDataFormats)
         val effectivePolicies = Verification2Session.DefinedVerificationPolicies(
             vp_policies = effectiveVpPolicies,
-            vc_policies = setup.core.policies.vc_policies ?: VCPolicyList(
-                policies = listOf(CredentialSignaturePolicy())
-            ),
+            vc_policies = setup.core.policies.vc_policies ?: VerificationPolicyManager.defaultCredentialPolicies(),
             specific_vc_policies = setup.core.policies.specific_vc_policies
         )
 
