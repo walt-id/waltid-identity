@@ -3,6 +3,8 @@ package id.walt.ktorauthnz.accounts
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.PasswordStoredData
+import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.ktorauthnz.tenants.currentAuthnzTenant
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.uuid.ExperimentalUuidApi
@@ -16,7 +18,7 @@ import kotlin.uuid.Uuid
  * [currentAuthnzTenant]), so `alice` of one tenant is not `alice` of another. Outside a scope it works on the accounts
  * of no tenant. Set accounts up for a tenant with `inAuthnzTenant("org1") { store.addAccount(...) }`.
  */
-class InMemoryAccountStore : EditableAccountStore {
+class InMemoryAccountStore : PasswordHashUpgradeStore {
 
     private data class Scoped<T>(val tenant: String?, val key: T)
 
@@ -74,6 +76,10 @@ class InMemoryAccountStore : EditableAccountStore {
 
     override suspend fun updateAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String, data: AuthMethodStoredData) {
         identifierData[scoped(accountIdentifier to method)] = data.transformSavable()
+    }
+
+    override suspend fun upgradePasswordHash(identifier: AccountIdentifier, verified: PasswordStoredData, replacement: PasswordHash) {
+        identifierData.replace(scoped(identifier to verified.authMethod().id), verified, verified.withPasswordHash(replacement))
     }
 
     override suspend fun deleteAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String) {

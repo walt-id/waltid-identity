@@ -2,10 +2,13 @@ package id.walt.verifier2
 
 import id.walt.commons.web.plugins.configureStatusPages
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationVerificationUnavailableException
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.VerificationSessionUsage
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
+import io.ktor.client.statement.bodyAsText
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
@@ -16,6 +19,7 @@ import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.sse.SSE
 import io.ktor.server.testing.testApplication
@@ -386,6 +390,68 @@ class VerificationSessionRepositoryTest {
         assertEquals(HttpStatusCode.BadRequest, response.status)
         assertEquals(Verification2Session.VerificationSessionStatus.ACTIVE, repository.get("malformed")!!.session.status)
         repository.claimForProcessing("malformed")
+    }
+
+    @Test
+    fun `malformed wallet responses return neutral protocol errors and release processing claims`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        val inputs = listOf(
+            ContentType.Application.Json to "{",
+            ContentType.Application.FormUrlEncoded to "",
+            ContentType.Application.FormUrlEncoded to "state=s&vp_token=PRIVATE-INVALID-CREDENTIAL",
+            ContentType.Application.FormUrlEncoded to "state=s&response=PRIVATE-INVALID-JWE",
+        )
+        inputs.indices.forEach { repository.create(session("invalid-$it")) }
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+
+        inputs.forEachIndexed { index, (type, body) ->
+            val response = client.post("/verification-session/invalid-$index/response") {
+                contentType(type)
+                setBody(body)
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals(
+                Json.parseToJsonElement("""{"error":"invalid_request","error_description":"Invalid presentation response"}"""),
+                Json.parseToJsonElement(response.bodyAsText()),
+            )
+            assertEquals(Verification2Session.VerificationSessionStatus.ACTIVE, repository.get("invalid-$index")!!.session.status)
+            repository.claimForProcessing("invalid-$index")
+        }
+    }
+
+    @Test
+    fun `verification outages keep 503 without exposing internal details`() = testApplication {
+        var cleanupCalls = 0
+        application {
+            install(ContentNegotiation) { json() }
+            routing {
+                post("/response") {
+                    call.respondHandleDirectPostResponse(
+                        verificationSession = session("outage"),
+                        updateSessionCallback = { _, _, _ ->
+                            throw PresentationVerificationUnavailableException("PRIVATE database failure")
+                        },
+                        failSessionCallback = { _, _, _ -> error("unused") },
+                        beforeRespond = { _: Boolean -> cleanupCalls++ },
+                    )
+                }
+            }
+        }
+        val response = client.post("/response") {
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody("error=access_denied")
+        }
+        assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+        assertEquals(
+            Json.parseToJsonElement("""{"error":"temporarily_unavailable","error_description":"Verification temporarily unavailable"}"""),
+            Json.parseToJsonElement(response.bodyAsText()),
+        )
+        assertEquals(1, cleanupCalls)
     }
 
     private fun session(id: String) = Verification2Session(
