@@ -3,6 +3,26 @@
 package id.walt.wallet2.mobile
 
 import kotlinx.io.bytestring.ByteString
+import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.EcCurve
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.mdoc.crypto.MdocCryptoHelper
+import id.walt.mdoc.encoding.ByteStringWrapper
+import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.objects.engagement.DeviceEngagement
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.edition2.deviceretrieval.DeviceResponse
+import id.walt.mdoc.objects.session.SessionData
+import id.walt.mdoc.objects.session.SessionEstablishment
+import id.walt.mdoc.proximity.MdocSessionCipher
 import id.walt.mdoc.objects.engagement.BleCentralMode
 import id.walt.mdoc.objects.engagement.BlePeripheralMode
 import id.walt.mdoc.objects.engagement.DeviceRetrievalMethod
@@ -38,6 +58,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -49,6 +71,57 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class ProximityCoordinatorTest {
+    @Test
+    fun `encrypted unmatched request reaches the public terminal state after closing the session`() = runTest {
+        withContext(Dispatchers.Default) {
+            withTimeout(10.seconds) {
+                val factory = RecordingTransportFactory(BleProximityAvailability.Available)
+                val coordinator = ProximityCoordinator(Wallet("unmatched-request"), factory)
+                val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+                val session = coordinator.start(ProximityConfiguration())
+                try {
+                    val qr = session.awaitEngagements().filterIsInstance<ProximityEngagement.Qr>().single()
+                    val engagementBytes = qr.payload.removePrefix("mdoc:").decodeFromBase64Url()
+                    val engagement = coseCompliantCbor.decodeFromByteArray<DeviceEngagement>(engagementBytes)
+                    val readerKey = runtime.generateSoftwareKey(GenerateSoftwareKeyRequest(
+                        KeyId("unmatched-reader"), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.KEY_AGREEMENT),
+                    ))
+                    val readerPublic = assertIs<EncodedKey.Jwk>(readerKey.capabilities.publicKeyExporter!!.exportPublicKey()).toCoseKey()
+                    val readerBytes = coseCompliantCbor.encodeToByteArray(readerPublic)
+                    val transcript = SessionTranscript.forQr(engagementBytes, readerBytes)
+                    val cipher = MdocSessionCipher.establishForReader(readerKey, engagement.security.eDeviceKey.value,
+                        MdocCryptoHelper.buildSessionTranscriptBytes(transcript))
+                    try {
+                        val reader = factory.loopbacks.single().reader
+                        val request = DeviceRequest("org.example.photoid", mapOf("org.example.identity" to listOf("portrait")), intentToRetain = true)
+                        reader.send(ByteString(coseCompliantCbor.encodeToByteArray(SessionEstablishment(
+                            ByteStringWrapper(readerPublic, readerBytes), cipher.encrypt(coseCompliantCbor.encodeToByteArray(request)),
+                        ))))
+                        val terminal = assertIs<ProximityState.NoData>(session.state.first {
+                            it is ProximityState.NoData || it is ProximityState.Failed
+                        })
+                        assertEquals(1, terminal.exchange)
+                        val document = terminal.unsatisfiedRequest.documents.single()
+                        assertEquals("org.example.photoid", document.docType)
+                        assertEquals(listOf(ProximityRequestedElement("org.example.identity", "portrait", true)), document.requestedElements)
+                        val messages = mutableListOf<SessionData>()
+                        while (true) messages += coseCompliantCbor.decodeFromByteArray<SessionData>((reader.receive() ?: break).toByteArray())
+                        assertEquals(20u, messages.last().status)
+                        val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(cipher.decrypt(messages.mapNotNull { it.data }.single()))
+                        assertEquals(0u, response.status)
+                        assertEquals(null, response.documents)
+                        assertTrue(terminal.legalActions.isEmpty())
+                        session.close()
+                        assertEquals(terminal, session.state.value)
+                    } finally { cipher.close() }
+                } finally {
+                    session.close()
+                    runtime.close()
+                }
+            }
+        }
+    }
+
     @Test
     fun `wallet shutdown closes the session and permanently rejects new admission`() = runTest {
         val coordinator = ProximityCoordinator(Wallet("deleting"), RecordingTransportFactory(
@@ -663,6 +736,7 @@ class ProximityCoordinatorTest {
     ) : BleProximityTransportFactory {
         var capabilityCalls: Int = 0
         val configurations: MutableList<BleProximityTransportConfiguration> = mutableListOf()
+        val loopbacks: MutableList<FakeProximityLoopback> = mutableListOf()
 
         override suspend fun capability(roles: BleMdocRoleSelection): BleProximityAvailability {
             capabilityCalls++
@@ -672,6 +746,7 @@ class ProximityCoordinatorTest {
         override fun create(configuration: BleProximityTransportConfiguration): ReaderSelectedTransportProvider {
             configurations += configuration
             val loopback = FakeProximityLoopback.create()
+            loopbacks += loopback
             return FakeTransportProvider(
                 method = when (val roles = configuration.roles) {
                     is BleMdocRoles.CentralClient -> DeviceRetrievalMethod.Ble(

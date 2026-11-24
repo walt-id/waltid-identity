@@ -43,6 +43,49 @@ struct ProximityTerminalContent: View {
     }
 }
 
+struct ProximityUnsatisfiedRequestContent: View {
+    let request: ProximityUnsatisfiedRequest
+    @State private var visibleDocuments = 5
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Reader authentication was not evaluated for this request.").font(.caption).foregroundStyle(.secondary)
+            ForEach(Array(request.documents.prefix(visibleDocuments)), id: \.requestIndex) { document in
+                ProximityUnsatisfiedDocumentContent(document: document)
+            }
+            if request.documents.count > visibleDocuments {
+                Button("Show more requested documents") { visibleDocuments += 5 }
+            }
+        }
+        .accessibilityIdentifier("proximity-unsatisfied-request")
+        .onChange(of: request) { _ in visibleDocuments = 5 }
+    }
+}
+
+private struct ProximityUnsatisfiedDocumentContent: View {
+    let document: ProximityUnsatisfiedDocument
+    @State private var visibleElements = 20
+
+    var body: some View {
+        ReviewMetadataSection(title: String(localized: "Document request \(document.requestIndex + 1)")) {
+            Text(document.documentType).font(.caption).foregroundStyle(.secondary)
+            ForEach(Array(document.requestedElements.prefix(visibleElements).enumerated()), id: \.offset) { _, element in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(CredentialDisplayVocabulary.humanizedLabel(element.elementIdentifier)).fontWeight(.semibold)
+                    Text(element.namespace).font(.caption).foregroundStyle(.secondary)
+                    if element.intentToRetain {
+                        Text("Reader intends to retain this data").font(.caption)
+                    }
+                }
+            }
+            if document.requestedElements.count > visibleElements {
+                Button("Show more requested fields") { visibleElements += 20 }
+            }
+        }
+        .onChange(of: document) { _ in visibleElements = 20 }
+    }
+}
+
 struct ProximityFailureContent: View {
     let message: String
 
