@@ -4,17 +4,16 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
@@ -22,8 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,26 +40,28 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatusNotice
+import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.WalletStatusKind
+import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.statusBanner
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.ui.LocalWalletTimeFormatter
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.components.CredentialCardMaxWidth
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import id.walt.walletdemo.compose.ui.components.CredentialTechnicalInformation
@@ -68,30 +69,38 @@ import id.walt.walletdemo.compose.ui.components.Id1AspectRatio
 import id.walt.walletdemo.compose.ui.components.walletNavigationMotion
 import id.walt.walletdemo.compose.ui.components.WalletMotion
 import id.walt.walletdemo.compose.ui.components.WalletCredentialContentMaxWidth
-import id.walt.walletdemo.compose.ui.components.WalletIcon
-import id.walt.walletdemo.compose.ui.components.WalletSymbol
+import id.walt.walletdemo.compose.ui.components.StatusCard
+import id.walt.walletdemo.compose.ui.components.WalletFooter
+import id.walt.walletdemo.compose.ui.components.WalletNoticeCard
+import id.walt.walletdemo.compose.ui.components.WalletNoticeClose
+import id.walt.walletdemo.compose.ui.components.WalletNoticeTone
 import id.walt.walletdemo.compose.ui.components.walletNavigationBackground
 import id.walt.walletdemo.compose.ui.plainTextClipEntry
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
 
 @Composable
 internal fun CredentialsTab(
-    session: WalletSessionState,
+    state: WalletDemoUiState,
     modifier: Modifier = Modifier,
     onDeleteCredential: ((String) -> Unit)? = null,
     onDetailsChromeChange: (CredentialDetailsChrome?) -> Unit = {},
     onDetailsOpened: suspend (String) -> Unit = {},
-    statusNotices: List<WalletDemoCredentialStatusNotice> = emptyList(),
+    showFeedback: Boolean = false,
+    onDismissStatus: () -> Unit = {},
+    onToggleStatusExpanded: () -> Unit = {},
+    onDismissStatusMessage: (String) -> Unit = {},
     onAcknowledgeStatusNotice: (WalletDemoCredentialStatusNotice) -> Unit = {},
     openStatusNoticeOnHome: Boolean = false,
     onStatusNoticeOpenedOnHome: () -> Unit = {},
 ) {
+    val session = state.session
     val credentials = (session as? WalletSessionState.Ready)?.credentials.orEmpty()
     val cards by produceState<List<CredentialCardDisplayData>>(emptyList(), credentials) {
         value = emptyList()
@@ -218,22 +227,11 @@ internal fun CredentialsTab(
                 }
             }
         }
-        if (!showingDetails && !confirmDelete) {
-            statusNotices.firstNotNullOfOrNull { notice ->
-                cards.firstOrNull { it.id == notice.credentialId }?.let { notice to it.title }
-            }?.let { (notice, title) ->
-                key(notice.credentialId, notice.version) {
-                    CredentialStatusHomeNotice(
-                        title = title,
-                        notice = notice,
-                        onOpen = {
-                            expandedId = notice.credentialId
-                            onAcknowledgeStatusNotice(notice)
-                        },
-                        onDismiss = { onAcknowledgeStatusNotice(notice) },
-                    )
-                }
-            }
+        if (showFeedback && !showingDetails && !confirmDelete) {
+            WalletHomeFeedback(
+                state, cards, onDismissStatus, onToggleStatusExpanded, onDismissStatusMessage,
+                onAcknowledgeStatusNotice, onOpenDetails = { expandedId = it },
+            )
         }
     }
 
@@ -268,9 +266,74 @@ internal fun CredentialsTab(
 }
 
 @Composable
+private fun WalletHomeFeedback(
+    state: WalletDemoUiState,
+    cards: List<CredentialCardDisplayData>,
+    onDismissStatus: () -> Unit,
+    onToggleStatusExpanded: () -> Unit,
+    onDismissStatusMessage: (String) -> Unit,
+    onAcknowledgeStatusNotice: (WalletDemoCredentialStatusNotice) -> Unit,
+    onOpenDetails: (String) -> Unit,
+) {
+    val operation = state.statusBanner()?.takeUnless { it.key == state.statusDismissedKey }
+    val allowStatus = state.externalFlow == null && state.presentationReview == null && state.offerPreview == null && !state.isBusy
+    val credentialNotices = if (allowStatus && state.credentialStatuses.available) {
+        state.credentialStatuses.pendingNotices.orEmpty().mapNotNull { notice ->
+            cards.firstOrNull { it.id == notice.credentialId }?.let { notice to it.title }
+        }
+    } else emptyList()
+    val credentialNotice = credentialNotices.firstOrNull()
+    val statusMessage = state.credentialStatusNotice.takeIf { allowStatus }
+    if (operation == null && credentialNotice == null && statusMessage == null) return
+
+    WalletFooter(feedback = {
+        Box(Modifier.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = CredentialCardMaxWidth)) {
+            when {
+                operation?.kind == WalletStatusKind.Busy || operation?.kind == WalletStatusKind.Error ->
+                    StatusCard(state, onDismissStatus, onToggleStatusExpanded)
+                credentialNotice != null -> {
+                    val (notice, title) = credentialNotice
+                    key(notice.credentialId, notice.version) {
+                        CredentialStatusHomeNotice(
+                            title = title,
+                            notice = notice,
+                            remaining = credentialNotices.size - 1,
+                            onOpen = {
+                                onOpenDetails(notice.credentialId)
+                                onAcknowledgeStatusNotice(notice)
+                            },
+                            onDismiss = { onAcknowledgeStatusNotice(notice) },
+                        )
+                    }
+                }
+                statusMessage != null -> key(statusMessage) {
+                    val timeout = LocalAccessibilityManager.current?.calculateRecommendedTimeoutMillis(
+                        4_000, containsIcons = true, containsText = true, containsControls = true,
+                    ) ?: 4_000
+                    LaunchedEffect(timeout) {
+                        delay(timeout)
+                        onDismissStatusMessage(statusMessage)
+                    }
+                    val dismiss = { onDismissStatusMessage(statusMessage) }
+                    WalletNoticeCard(tone = WalletNoticeTone.Warning, onDismiss = dismiss) {
+                        Row(Modifier.fillMaxWidth().padding(start = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(statusMessage, Modifier.weight(1f).padding(vertical = 12.dp),
+                                style = MaterialTheme.typography.bodyMedium)
+                            WalletNoticeClose(stringResource(Res.string.credential_status_notice_dismiss), dismiss)
+                        }
+                    }
+                }
+                else -> StatusCard(state, onDismissStatus, onToggleStatusExpanded)
+            }
+        }
+    })
+}
+
+@Composable
 private fun CredentialStatusHomeNotice(
     title: String,
     notice: WalletDemoCredentialStatusNotice,
+    remaining: Int,
     onOpen: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -282,23 +345,14 @@ private fun CredentialStatusHomeNotice(
     val instant = Instant.parse(notice.checkedAt)
     val minute = Instant.fromEpochSeconds(instant.epochSeconds - instant.epochSeconds.mod(60))
     val checked = LocalWalletTimeFormatter.current(minute).fullText
-    val dark = isSystemInDarkTheme()
-    val background = if (dark) Color(0xFF342A1B) else Color(0xFFFDF0D5)
-    val border = if (dark) Color(0xFF8E754D) else Color(0xFFC6A35C)
-    val foreground = if (dark) Color(0xFFFFE5AE) else Color(0xFF4B3208)
-    Surface(
-        onClick = onOpen,
-        modifier = Modifier.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally)
-            .widthIn(max = WalletCredentialContentMaxWidth).padding(horizontal = 20.dp, vertical = 12.dp)
-            .testTag(WalletUiTestTags.CredentialStatusNotice).semantics { role = Role.Button },
-        color = background,
-        contentColor = foreground,
-        border = BorderStroke(1.dp, border),
-        shape = MaterialTheme.shapes.medium,
+    WalletNoticeCard(
+        modifier = Modifier.testTag(WalletUiTestTags.CredentialStatusNotice),
+        tone = WalletNoticeTone.Warning,
+        onDismiss = onDismiss,
     ) {
         Box {
             Column(
-                Modifier.fillMaxWidth().padding(start = 14.dp, end = 50.dp, top = 12.dp, bottom = 12.dp),
+                Modifier.fillMaxWidth().padding(start = 14.dp, end = 50.dp, top = 12.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(stringResource(Res.string.credential_status_notice_title, title, kind),
@@ -306,19 +360,29 @@ private fun CredentialStatusHomeNotice(
                 Text(stringResource(if (notice.historical) Res.string.credential_status_notice_historical
                     else Res.string.credential_status_notice_checked, checked),
                     style = MaterialTheme.typography.bodySmall)
-                Text(stringResource(Res.string.credential_status_notice_view),
-                    modifier = Modifier.padding(top = 4.dp)
-                        .background(foreground.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val foreground = LocalContentColor.current
+                    TextButton(
+                        onClick = onOpen,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = foreground.copy(alpha = 0.12f), contentColor = foreground,
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                    ) {
+                        Text(stringResource(Res.string.credential_status_notice_view), fontWeight = FontWeight.SemiBold)
+                    }
+                    if (remaining > 0) {
+                        Text(stringResource(Res.string.credential_status_notice_remaining, remaining),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.align(Alignment.TopEnd),
-                colors = IconButtonDefaults.iconButtonColors(contentColor = foreground),
-            ) {
-                WalletIcon(WalletSymbol.Decline, stringResource(Res.string.credential_status_notice_dismiss), Modifier.size(18.dp))
-            }
+            WalletNoticeClose(stringResource(Res.string.credential_status_notice_dismiss), onDismiss,
+                Modifier.align(Alignment.TopEnd))
         }
     }
 }

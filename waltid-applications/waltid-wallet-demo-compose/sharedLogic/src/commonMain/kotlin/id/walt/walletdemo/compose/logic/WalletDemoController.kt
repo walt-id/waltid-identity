@@ -365,7 +365,11 @@ class WalletDemoController(
         else if (!supportsBackgroundStatusChecks) checkCredentialStatuses(force = false)
     }
 
-    fun dismissCredentialStatusNotice() { _state.update { it.copy(credentialStatusNotice = null) } }
+    fun dismissCredentialStatusNotice(message: String) {
+        _state.update { current ->
+            if (current.credentialStatusNotice == message) current.copy(credentialStatusNotice = null) else current
+        }
+    }
 
     fun handleCredentialStatusNotification() {
         _state.update { it.copy(statusNotificationOpened = true) }

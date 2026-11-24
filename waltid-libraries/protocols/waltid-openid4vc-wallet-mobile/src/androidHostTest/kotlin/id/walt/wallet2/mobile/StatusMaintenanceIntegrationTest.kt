@@ -19,6 +19,7 @@ import id.walt.wallet2.status.CredentialStatusRefreshOutcome
 import id.walt.wallet2.status.CredentialStatusSnapshotStore
 import id.walt.wallet2.status.CredentialStatusStoredRecord
 import id.walt.wallet2.status.WalletCredentialStatusService
+import id.walt.wallet2.status.WalletCredentialReference
 import id.walt.wallet2.status.reviewGuard
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -43,6 +44,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 class StatusMaintenanceIntegrationTest {
@@ -57,6 +59,31 @@ class StatusMaintenanceIntegrationTest {
         assertNull(store.readCredentialStatus("a"))
         assertNotNull(store.readCredentialStatus("b"))
         assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+    }
+
+    @Test
+    fun multiplePendingNoticesKeepCheckOrderAndAcknowledgeIndependently() = withWallet {
+        add("z", value = 2u)
+        add("a", value = 1u)
+        val first = WalletCredentialReference(0, "z")
+        val second = WalletCredentialReference(0, "a")
+        val policy = managedCredentialStatusTrustPolicy()
+        var now = Clock.System.now()
+        fun openService() = WalletCredentialStatusService(
+            Wallet("review", credentialStores = listOf(store)), client, now = { now }, trustPolicyId = policy,
+        )
+        openService().use { wallet ->
+            wallet.refresh(setOf(first))
+            now += 1.seconds
+            wallet.refresh(setOf(second))
+            val pending = wallet.snapshot().pendingNotices
+            assertEquals(listOf(first, second), pending.map { it.reference })
+            wallet.acknowledgeNotice(first, pending.first().version)
+            assertEquals(listOf(pending.last()), wallet.snapshot().pendingNotices)
+        }
+        openService().use { wallet ->
+            assertEquals(second, wallet.snapshot().pendingNotices.single().reference)
+        }
     }
 
     @Test

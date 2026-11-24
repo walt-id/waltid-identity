@@ -1409,7 +1409,7 @@
       "id": "status.home.notice",
       "title": "Dated revocation notice on unlocked Home",
       "requirements": [
-        "A light warning surface shows the credential and status, localized check time, View credential action and close icon on unlocked Home"
+        "The single light notice shows the credential, status, local check time, View credential, a close icon and the count of other pending notices"
       ],
       "composeTest": "credentialStatusHomeNotice",
       "swiftTest": "testCredentialStatusHomeNotice"
@@ -1418,7 +1418,7 @@
       "id": "status.home.notice.dark",
       "title": "Dated revocation notice on unlocked Home in dark mode",
       "requirements": [
-        "The same notice separates clearly from the dark Home background and preserves the dated message and both actions"
+        "The same notice separates from the dark Home background with the same content, remaining count and controls"
       ],
       "composeTest": "credentialStatusHomeNoticeDark",
       "swiftTest": "testCredentialStatusHomeNoticeDark",

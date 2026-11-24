@@ -20,7 +20,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
@@ -31,10 +30,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.canDismissExternalFlow
 import id.walt.walletdemo.compose.ui.WalletReviewHost
-import id.walt.walletdemo.compose.logic.isStatusVisible
 import id.walt.walletdemo.compose.logic.isBusy
-import id.walt.walletdemo.compose.ui.components.StatusCard
-import id.walt.walletdemo.compose.ui.components.WalletFooter
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 
 @Composable
@@ -52,7 +48,6 @@ internal fun WalletScreen(
     allowWalletReset: Boolean = true,
     allowCredentialDelete: Boolean = true,
     serverSettingsContent: (@Composable () -> Unit)? = null,
-    statusSnackbar: SnackbarHostState? = null,
 ) {
     val setup = state.session as? WalletSessionState.IdentitySetup
     if (setup != null) {
@@ -97,16 +92,6 @@ internal fun WalletScreen(
         state.authorizationRequestUrl?.let { authorizationUrl ->
             openAuthorizationRequest(authorizationUrl)
             controller.authorizationRequestOpened()
-        }
-    }
-
-    val showStatusNotices = !openingStatusNotice && !showingScanner && !showingFlow && presentationContent == null &&
-        state.externalFlow == null && state.presentationReview == null && state.offerPreview == null && !state.isBusy
-    val transientStatusNotice = state.credentialStatusNotice.takeIf { showStatusNotices }
-    LaunchedEffect(statusSnackbar, transientStatusNotice) {
-        if (statusSnackbar != null && transientStatusNotice != null) {
-            statusSnackbar.showSnackbar(transientStatusNotice)
-            controller.dismissCredentialStatusNotice()
         }
     }
 
@@ -168,13 +153,6 @@ internal fun WalletScreen(
                 }
             }
         },
-        bottomBar = {
-            if (!showingScanner && !showingFlow && presentationContent == null && detailsChrome == null && state.isStatusVisible) {
-                WalletFooter(feedback = {
-                    StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded)
-                })
-            }
-        },
     ) { contentPadding ->
         val modifier = Modifier
             .fillMaxSize()
@@ -188,12 +166,14 @@ internal fun WalletScreen(
                     icon = { WalletIcon(WalletSymbol.Receive, null) })
             }
             CredentialsTab(
-                session = state.session,
+                state = collectionState,
                 onDeleteCredential = if (allowCredentialDelete) controller::deleteCredential else null,
                 onDetailsChromeChange = { detailsChrome = it },
                 onDetailsOpened = controller::checkCredentialStatusOnDetails,
-                statusNotices = state.credentialStatuses.pendingNotices.orEmpty()
-                    .takeIf { showStatusNotices && state.credentialStatuses.available }.orEmpty(),
+                showFeedback = !openingStatusNotice && !showingScanner && !showingFlow && presentationContent == null,
+                onDismissStatus = controller::dismissStatus,
+                onToggleStatusExpanded = controller::toggleStatusExpanded,
+                onDismissStatusMessage = controller::dismissCredentialStatusNotice,
                 onAcknowledgeStatusNotice = controller::acknowledgeCredentialStatusNotice,
                 openStatusNoticeOnHome = openingStatusNotice && !showingFlow,
                 onStatusNoticeOpenedOnHome = controller::credentialStatusNotificationOpenedOnHome,

@@ -228,7 +228,7 @@ class WalletCredentialStatusService private constructor(
         changes.tryEmit(Unit)
     }
 
-    /** Returns every credential's local observation; stale state retains its original check time. */
+    /** Returns local observations and pending notices in oldest check time order. */
     suspend fun snapshot(): WalletCredentialStatusSnapshot {
         check(job.isActive) { "Credential status service is closed" }
         val candidates = candidates()
@@ -239,7 +239,7 @@ class WalletCredentialStatusService private constructor(
         }
         val notices = local.mapNotNull { (candidate, state) ->
             state?.let { pendingNotice(candidate, it, at) }
-        }
+        }.sortedWith(compareBy({ it.checkedAt }, { it.reference.storeIndex }, { it.reference.credentialId }))
         mutex.withLock {
             val retained = candidates.mapTo(mutableSetOf(), Candidate::reference)
             states.keys.filter { it !in retained }.forEach {

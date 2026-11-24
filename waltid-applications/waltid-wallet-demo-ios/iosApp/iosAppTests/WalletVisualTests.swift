@@ -56,19 +56,24 @@ final class WalletVisualTests: XCTestCase {
         let fixtures = try WalletVisualFixtures()
         let credential = try fixtures.credential()
         let status = try fixtures.credentialStatus("revoked_current")
+        let suspended = try fixtures.credentialStatus("suspended")
         let checkedAt = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-20T12:00:37Z"))
         let notice = PendingCredentialStatusNotice(credentialID: credential.id, version: "revoked-v1",
             kind: .revoked, checkedAt: checkedAt, historical: false)
+        let other = Credential(id: "queued-credential", format: "jwt_vc_json", issuer: credential.issuer,
+            subject: nil, label: "Access card", addedAt: nil, credentialDataJSON: #"{"given_name":"Ada"}"#)
+        let queued = PendingCredentialStatusNotice(credentialID: other.id, version: "suspended-v1",
+            kind: .suspended, checkedAt: checkedAt.addingTimeInterval(23), historical: false)
         let model = makeModel()
-        model.credentials = [credential]
+        model.credentials = [credential, other]
         model.isReady = true
-        model.statusMessage = ""
+        model.statusMessage = "Wallet operation completed"
         let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
         let content = CredentialsTabView(viewModel: model, selectedDetailsID: .constant(nil), cards: cards,
-            onOpenSettings: {}, onScan: {}, onShareNearby: {}, statusNotices: [notice])
-            .environment(\.credentialStatusUI, CredentialStatusUIContext(values: [credential.id: status]))
+            onOpenSettings: {}, onScan: {}, onShareNearby: {}, statusNotices: [notice, queued])
+            .environment(\.credentialStatusUI, CredentialStatusUIContext(values: [credential.id: status, other.id: suspended]))
         try await captureWhenReady(content, id: dark ? "status.home.notice.dark" : "status.home.notice",
-            colorScheme: dark ? .dark : .light, isReady: { !cards.isEmpty }, failure: "The credential card must be rendered")
+            colorScheme: dark ? .dark : .light, isReady: { cards.count == 2 }, failure: "Both credential cards must be rendered")
     }
 
     func testCredentialStatusMixedArtwork() async throws { try await credentialStatusMixedArtwork() }

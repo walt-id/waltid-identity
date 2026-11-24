@@ -25,6 +25,8 @@ Disclosures and custom expanders share one height-animation policy per renderer,
 
 An idle, ready wallet has no generic success banner. Keep readiness as state, and preserve useful operation outcomes, progress and errors. Apple's provider host owns its close control; in-app task headers keep their own close action.
 
+Unlocked Home uses one footer slot. Active operation feedback and errors take precedence, followed by credential status notices and routine feedback. The same notice surface handles the close button and horizontal swipe. **View credential** opens Details. Multiple notices use the same slot with a count of the others waiting. Dismissal or returning from Details brings forward the next pending notice.
+
 Compose `ReviewScaffold` measures header and footer before the body. Its content scrolls behind the material with measured end clearance; focus scrolling reserves the footer, and the footer intercepts taps within its surface. Native hosts use a single `safeAreaInset` for the footer. The footer background extends through the bottom safe area; the sheet host handles only top/horizontal insets, and pages without a footer handle their own bottom inset. Parent-consumed insets are not added again. The final item must scroll fully clear of wrapped actions and the keyboard; do not substitute a fixed bottom spacer.
 
 | Renderer | Footer treatment and accessibility fallback |
