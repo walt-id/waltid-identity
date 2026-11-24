@@ -69,7 +69,9 @@ class Issuer2LegacySessionContinuationTest {
         for (authMethod in AuthenticationMethod.entries) for (tokenBeforeUpgrade in listOf(false, true)) for (legacySidecar in listOf(false, true)) {
             val offer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(authMethod = authMethod))
             val current = assertNotNull(repository.get(offer.offerId))
-            val baseline = Json.decodeFromJsonElement<PreBatchIssuanceSession>(current.toPublicJson())
+            val baseline = Json.decodeFromJsonElement<PreBatchIssuanceSession>(
+                JsonObject(current.toPublicJson() + ("issuerKey" to current.issuanceRequests.single().issuerKey)),
+            )
             val resolved = wallet.resolve(offer)
             suspend fun exchange(): String = if (authMethod == AuthenticationMethod.PRE_AUTHORIZED) {
                 wallet.exchangePreAuthorizedCode(resolved, null).access_token

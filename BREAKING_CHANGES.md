@@ -1,5 +1,20 @@
 # Breaking changes since 0.3.1
 
+## Mobile proximity no-data request context
+
+- Kotlin `ProximityState.NoData` requires `unsatisfiedRequest: ProximityUnsatisfiedRequest`.
+  Construction must supply the original request summary: `NoData(exchange, request)`.
+  Existing one-argument construction no longer compiles, and JVM constructor/generated `copy`
+  signatures change. Rebuild binary consumers. Java callers must pass a non-null summary too.
+- Swift `ProximityState.noData` requires the `unsatisfiedRequest` associated value.
+  Construct it as `.noData(exchange: exchange, unsatisfiedRequest: request)` and update switches
+  from `case .noData(let exchange)` to `case .noData(let exchange, let request)` (or `_`).
+- `NoData` represents an unmatched final request and always includes its original document
+  indices/types, namespaces, element identifiers and retention intent, without credential values.
+  Reader authentication was not evaluated on this path. Holder decline and sharing failures
+  continue to use their existing completion/failure states.
+- The lower proximity engine's contracts, empty response and transport termination are unchanged.
+
 ## OpenID4VCI claim metadata paths
 
 - `ClaimDescription.path` now uses `List<JsonElement>` to preserve string keys, integer indexes/map keys, and JSON null wildcards (OpenID4VCI Appendix C). Consumers reading or copying paths must handle these segment types instead of assuming every segment is a string; rebuild callers against the updated model. The Wallet2 detailed-offer claim path response uses the same typed segments.
