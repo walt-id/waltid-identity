@@ -1,5 +1,6 @@
 package id.walt.issuer2.application.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.openid4vci.attestation.*
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
@@ -218,7 +219,7 @@ data class OpenId4VciModule(
             return OpenId4VciModule(
                 oauth2Provider = provider,
                 pkceServiceConfig = pkceServiceConfig,
-                preAuthorizedCodeIssuer = provider.preAuthorizedCodeIssuer,
+                preAuthorizedCodeIssuer = provider.requirePreAuthorizedCodeIssuer(),
                 credentialNonceService = credentialNonceService,
                 crypto2TokenSigningKey = crypto2TokenKey,
                 attestationChallengeService = attestationChallengeService,

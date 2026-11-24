@@ -613,7 +613,7 @@ class Issuer2PARRouteTest {
 
     private object NoopPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
         override suspend fun save(record: PreAuthorizedCodeRecord) = Unit
-        override suspend fun get(code: String): PreAuthorizedCodeRecord? = null
+        override suspend fun getForRedemption(code: String): PreAuthorizedCodeRecord? = null
         override suspend fun compareAndSetRedemptionState(
             expected: PreAuthorizedCodeRecord,
             replacement: id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRedemptionState,

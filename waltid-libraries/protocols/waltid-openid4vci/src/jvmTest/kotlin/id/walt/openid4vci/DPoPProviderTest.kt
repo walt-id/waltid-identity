@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.ShaUtils
@@ -92,7 +93,7 @@ class DPoPProviderTest {
             dpopProofVerifier = dpopVerifier,
         )
         val provider = buildOAuth2Provider(config)
-        val code = provider.preAuthorizedCodeIssuer.issue(
+        val code = provider.requirePreAuthorizedCodeIssuer().issue(
             PreAuthorizedCodeIssueRequest(
                 scopes = setOf("credential"),
                 audience = setOf(ISSUER),

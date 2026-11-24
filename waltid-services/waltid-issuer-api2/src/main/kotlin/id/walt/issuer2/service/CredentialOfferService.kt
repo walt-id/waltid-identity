@@ -4,7 +4,6 @@ import id.walt.credentials.issuance.CredentialDataMergeUtils.validateMdocNamespa
 import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.sdjwt.metadata.type.validateIssuanceInput
 import id.walt.openid4vci.preauthorized.InvalidPreAuthorizedCodeLifetimeException
-import io.ktor.server.plugins.BadRequestException
 
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.models.CredentialOfferCreateRequest

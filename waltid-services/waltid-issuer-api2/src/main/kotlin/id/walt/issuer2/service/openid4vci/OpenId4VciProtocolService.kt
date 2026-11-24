@@ -694,7 +694,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
 
         return when (result) {
             is AccessTokenResponseResult.Failure -> {
-                val lockout = result.preAuthorizedCodeFailure as? PreAuthorizedCodeFailure.Locked
+                val lockout = result.grantFailure as? PreAuthorizedCodeFailure.Locked
                 val sessionId = lockout?.issuanceSessionId ?: result.request.session?.subject?.takeIf(String::isNotBlank)
                 val closedSession = if (lockout != null && sessionId != null) {
                     result.request.requestForm["pre-authorized_code"]?.firstOrNull()?.let { code ->
@@ -803,14 +803,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             "Token request has no issuance session"
         }
         val session = sessionService.getSession(sessionId)
-        if (GrantType.PreAuthorizedCode.value in accessTokenRequest.grantTypes) {
-            val currentCode = session.credentialOffer?.grants?.preAuthorizedCode?.preAuthorizedCode
-            if (currentCode == null || currentCode != accessTokenRequest.requestForm["pre-authorized_code"]?.singleOrNull()) {
-                throw InvalidTokenCredentialAuthorization(
-                    accessTokenRequest, "Pre-authorized code is invalid", OAuthErrorCodes.INVALID_GRANT,
-                )
-            }
-        }
         if (session.isClosed && !(session.deferredStatus == DeferredStatus.DENIED && refreshGrant != null)) {
             throw InvalidTokenCredentialAuthorization(
                 accessTokenRequest,
@@ -828,6 +820,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         } || session.authorizationRequest?.requestForm?.let(::credentialConfigurationIdsFromAuthorizationDetails)
             ?.isNotEmpty() == true
         return resolveTokenCredentialAuthorization(
+            currentOffer = session.credentialOffer,
             request = accessTokenRequest,
             candidates = session.issuanceRequests.map { it.toCredentialAuthorization() },
             grantConfigurationIds = authorizationConfigurations.ifEmpty {

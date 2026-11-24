@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.ShaUtils
@@ -78,7 +79,7 @@ class DPoPRefreshFlowTest {
             val code = assertIs<AuthorizationResponseResult.Success>(provider.createAuthorizationResponse(request, DefaultSession(subject = "offer"))).response.code
             mapOf("grant_type" to listOf(grant.value), "client_id" to listOf("wallet"), "code" to listOf(code), "redirect_uri" to listOf("https://wallet.example/callback"))
         } else {
-            val code = provider.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+            val code = provider.requirePreAuthorizedCodeIssuer().issue(PreAuthorizedCodeIssueRequest(
                 scopes = setOf("credential"), session = DefaultSession(subject = "offer"),
             )).code
             mapOf("grant_type" to listOf(grant.value), "pre-authorized_code" to listOf(code))

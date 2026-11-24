@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.crypto2.keys.*
@@ -119,7 +120,7 @@ class ProviderCredentialAuthenticationTest {
                 mapOf("grant_type" to listOf(GrantType.AuthorizationCode.value), "client_id" to listOf(CLIENT),
                     "code" to listOf(response.response.code), "redirect_uri" to listOf(CALLBACK))
             } else {
-                val issued = tokenProvider.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+                val issued = tokenProvider.requirePreAuthorizedCodeIssuer().issue(PreAuthorizedCodeIssueRequest(
                     clientId = if (anonymous) null else CLIENT, scopes = setOf("openid"), session = DefaultSession(subject = "offer"),
                 ))
                 mapOf("grant_type" to listOf(GrantType.PreAuthorizedCode.value), "pre-authorized_code" to listOf(issued.code)) +

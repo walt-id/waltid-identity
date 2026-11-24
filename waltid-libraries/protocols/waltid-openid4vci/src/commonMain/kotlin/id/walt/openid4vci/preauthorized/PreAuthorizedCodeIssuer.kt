@@ -1,5 +1,6 @@
 package id.walt.openid4vci.preauthorized
 
+import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.offers.TxCode
@@ -11,6 +12,17 @@ import org.kotlincrypto.random.CryptoRand
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+
+/** Optional capability of providers that compose a pre-authorized code issuer. */
+interface PreAuthorizedCodeProvider {
+    val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer
+}
+
+/** Obtain the configured issuer when wiring a service that creates pre-authorized offers. */
+fun OAuth2Provider.requirePreAuthorizedCodeIssuer(): PreAuthorizedCodeIssuer =
+    checkNotNull((this as? PreAuthorizedCodeProvider)?.preAuthorizedCodeIssuer) {
+        "This OAuth2 provider does not support pre-authorized code issuance"
+    }
 
 /**
  * Service API for issuing OpenID4VCI pre-authorized codes.

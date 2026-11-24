@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
@@ -35,12 +36,12 @@ class ProviderPreAuthorizedCodeConfigTest {
         )
 
         val before = Clock.System.now()
-        val issued = provider.preAuthorizedCodeIssuer.issue(request)
+        val issued = provider.requirePreAuthorizedCodeIssuer().issue(request)
         assertTrue(issued.expiresAt in (before + 40.seconds)..(Clock.System.now() + 40.seconds))
         assertFailsWith<InvalidPreAuthorizedCodeLifetimeException> {
-            provider.preAuthorizedCodeIssuer.issue(request.copy(lifetimeSeconds = 51))
+            provider.requirePreAuthorizedCodeIssuer().issue(request.copy(lifetimeSeconds = 51))
         }
-        val redeemable = provider.preAuthorizedCodeIssuer.issue(request.copy(lifetimeSeconds = 50))
+        val redeemable = provider.requirePreAuthorizedCodeIssuer().issue(request.copy(lifetimeSeconds = 50))
 
         suspend fun exchange(code: String, pin: String): AccessTokenResponseResult {
             val parsed = assertIs<AccessTokenRequestResult.Success>(provider.createAccessTokenRequest(mapOf(
@@ -84,7 +85,7 @@ class ProviderPreAuthorizedCodeConfigTest {
             txCodeValue = "123456",
         )
         val before = Clock.System.now()
-        val issued = provider.preAuthorizedCodeIssuer.issue(request)
+        val issued = provider.requirePreAuthorizedCodeIssuer().issue(request)
         assertEquals(1, issuerInvocations)
         assertTrue(issued.expiresAt in (before + 40.seconds)..(Clock.System.now() + 40.seconds))
 
@@ -94,7 +95,7 @@ class ProviderPreAuthorizedCodeConfigTest {
             "tx_code" to listOf("000000"),
         )))
         val failure = assertIs<AccessTokenResponseResult.Failure>(provider.createAccessTokenResponse(parsed.request))
-        assertEquals(PreAuthorizedCodeFailure.Locked("issuance-session"), failure.preAuthorizedCodeFailure)
+        assertEquals(PreAuthorizedCodeFailure.Locked("issuance-session"), failure.grantFailure)
         assertEquals("invalid_grant", failure.error.error)
     }
 

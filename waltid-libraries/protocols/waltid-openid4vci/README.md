@@ -243,13 +243,15 @@ This library implements **OpenID for Verifiable Credential Issuance 1.0** (final
 
 ### Basic Usage
 
-Build an OAuth2 provider with default handlers. Use `provider.preAuthorizedCodeIssuer`
+Build an OAuth2 provider with default handlers. Use `provider.requirePreAuthorizedCodeIssuer()`
 for offer creation. An optional `preAuthorizedCodeIssuerFactory` receives the provider's
 repository and settings resolver so custom issuance can use the same configuration as redemption.
 Set `PreAuthorizedCodeIssueRequest.lifetimeSeconds` to select a code lifetime within the
 issuer's configured bounds. At token exchange, applications may provide an immediate session's
 `TokenCredentialAuthorization.accessTokenDeadline` or the separate deferred `issuanceDeadline`.
-The code deadline controls redemption.
+The code deadline controls redemption. Providers that create pre-authorized offers implement
+`PreAuthorizedCodeProvider`. When resolving credential authorization for a pre-authorized request,
+pass the offer from the same session snapshot as the requested credentials.
 
 Pass the unchanged record instance returned by `get` or `getForRedemption` as the
 `expected` argument to `compareAndSetRedemptionState`. The in-memory repository
@@ -261,10 +263,12 @@ conditional update. Match the same grant (including the original expiry, or a st
 storage version) and the previous redemption state. Apply the state change only while
 the grant is active and unexpired. Keep the record through its original expiry. The default
 `consume` uses the same operation for trusted, already authenticated callers.
-The in-memory repository exposes application-specific payloads as `originalRecord`
-on snapshots after a state update. A token handler's structured lockout result can be used
-to close the issuer's business session. Repositories may return locked grants from
-`getForRedemption` to allow the issuer to reconcile an interrupted lockout.
+Read application-specific fields from `snapshot.originalRecord` and the current
+attempt count and status from `snapshot.redemptionState`. Pass the snapshot itself to
+`compareAndSetRedemptionState`. Custom adapters that wrap records must expose the original payload.
+Implement `getForRedemption` to return unexpired active and locked grants and to exclude
+redeemed grants. Returning a persisted lock lets the hosting service reconcile an interrupted
+session closure using `PreAuthorizedCodeFailure.Locked` in the token failure’s `grantFailure`.
 
 ```kotlin
 import id.walt.openid4vci.core.*

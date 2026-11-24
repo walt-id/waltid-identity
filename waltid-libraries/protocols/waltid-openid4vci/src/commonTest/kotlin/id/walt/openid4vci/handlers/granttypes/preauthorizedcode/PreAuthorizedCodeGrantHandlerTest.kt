@@ -256,7 +256,7 @@ class PreAuthorizedCodeGrantHandlerTest {
         repeat(2) {
             val request = createAccessRequestWithGrant(issued.code, txCode = "0000")
             val result = assertIs<AccessTokenResponseResult.Failure>(customHandler.handleTokenEndpointRequest(request))
-            assertEquals(PreAuthorizedCodeFailure.WrongTxCode, result.preAuthorizedCodeFailure)
+            assertEquals(PreAuthorizedCodeFailure.WrongTxCode, result.grantFailure)
         }
         val current = assertNotNull(customRepository.get(issued.code))
         assertEquals(2, current.redemptionState?.failedAttempts)
@@ -287,7 +287,7 @@ class PreAuthorizedCodeGrantHandlerTest {
         }.awaitAll()
 
         assertTrue(failures.all { it.error.error == "invalid_grant" })
-        assertEquals(4, failures.count { it.preAuthorizedCodeFailure == PreAuthorizedCodeFailure.WrongTxCode })
+        assertEquals(4, failures.count { it.grantFailure == PreAuthorizedCodeFailure.WrongTxCode })
         assertNull(repository.get(issued.code))
     }
 
@@ -304,13 +304,13 @@ class PreAuthorizedCodeGrantHandlerTest {
         val wrongPin = createAccessRequestWithGrant(issued.code, txCode = "0000")
         repeat(4) {
             val failure = assertIs<AccessTokenResponseResult.Failure>(handler.handleTokenEndpointRequest(wrongPin))
-            assertEquals(PreAuthorizedCodeFailure.WrongTxCode, failure.preAuthorizedCodeFailure)
+            assertEquals(PreAuthorizedCodeFailure.WrongTxCode, failure.grantFailure)
         }
 
         val tokenRequest = async(Dispatchers.Default) { handler.handleTokenEndpointRequest(wrongPin) }
         val trustedConsume = async(Dispatchers.Default) { repository.consume(issued.code) }
         val failure = assertIs<AccessTokenResponseResult.Failure>(tokenRequest.await())
-        val locked = failure.preAuthorizedCodeFailure == PreAuthorizedCodeFailure.Locked("issuance-session")
+        val locked = failure.grantFailure == PreAuthorizedCodeFailure.Locked("issuance-session")
         assertTrue(locked xor (trustedConsume.await() != null))
         assertNull(repository.get(issued.code))
     }

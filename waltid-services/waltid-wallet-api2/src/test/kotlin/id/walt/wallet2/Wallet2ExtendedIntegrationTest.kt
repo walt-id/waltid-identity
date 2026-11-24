@@ -1,5 +1,6 @@
 package id.walt.wallet2
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyType
@@ -750,7 +751,7 @@ class Wallet2ExtendedIntegrationTest {
 
                 testAndReturn("Full receive preserves the OAuth error code through transaction code lockout") {
                     val txCode = TxCode(length = 6)
-                    val grant = provider.preAuthorizedCodeIssuer.issue(
+                    val grant = provider.requirePreAuthorizedCodeIssuer().issue(
                         PreAuthorizedCodeIssueRequest(txCode = txCode, txCodeValue = "123456", session = session),
                     )
                     val pinOffer = CredentialOffer.withPreAuthorizedCodeGrant(

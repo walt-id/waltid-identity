@@ -12,13 +12,15 @@ interface PreAuthorizedCodeRepository {
     suspend fun save(record: PreAuthorizedCodeRecord)
 
     /** Read an unexpired, active grant and its current redemption state. */
-    suspend fun get(code: String): PreAuthorizedCodeRecord?
+    suspend fun get(code: String): PreAuthorizedCodeRecord? =
+        getForRedemption(code)?.takeIf { it.isRedeemableAt(Clock.System.now()) }
 
     /**
-     * Token-handler lookup. Adapters can include unexpired locked grants so callers can reconcile a
-     * terminal issuance session after an interrupted request. Redeemed grants are excluded.
+     * Return an unexpired active or locked grant. A subsequent request must observe a persisted lock
+     * even when the request that stored it stopped before the service closed the issuance session.
+     * Return null for missing, expired or redeemed grants.
      */
-    suspend fun getForRedemption(code: String): PreAuthorizedCodeRecord? = get(code)
+    suspend fun getForRedemption(code: String): PreAuthorizedCodeRecord?
 
     /**
      * Callers must pass the unchanged record instance returned by [get] or [getForRedemption]

@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
@@ -287,7 +288,7 @@ class ProviderRefreshTokenFlowTest {
             accessTokenIssuer = CountingTokenIssuer(),
         )
         val provider = buildOAuth2Provider(config)
-        val issued = provider.preAuthorizedCodeIssuer.issue(
+        val issued = provider.requirePreAuthorizedCodeIssuer().issue(
             PreAuthorizedCodeIssueRequest(
                 clientId = null,
                 scopes = setOf("openid"),
@@ -326,6 +327,27 @@ class ProviderRefreshTokenFlowTest {
     }
 
     @Test
+    fun `initial exchange rejects an elapsed session deadline before signing`() = runTest {
+        val signer = CountingTokenIssuer()
+        val provider = buildOAuth2Provider(createTestConfig(accessTokenIssuer = signer))
+        val grant = provider.requirePreAuthorizedCodeIssuer().issue(
+            PreAuthorizedCodeIssueRequest(session = DefaultSession(subject = "holder")),
+        )
+        val request = provider.createAccessTokenRequest(mapOf(
+            "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+            "pre-authorized_code" to listOf(grant.code),
+        ))
+        require(request is AccessTokenRequestResult.Success)
+        val options = TokenResponseOptions(credentialAuthorizationResolver = { _, _ ->
+            TokenCredentialAuthorization(emptyList(), false, accessTokenDeadline = Clock.System.now())
+        })
+        val result = provider.createAccessTokenResponse(request.request.withIssuer("test-issuer"), options)
+        assertTrue(result is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_grant", result.error.error)
+        assertTrue(signer.claims.isEmpty())
+    }
+
+    @Test
     fun `refresh past the access token deadline is rejected without rotating the refresh token`() = runTest {
         val refreshTokenRepository = InMemoryRefreshTokenRepository()
         val refreshTokenIssuer = TestRefreshTokenIssuer()
@@ -339,7 +361,7 @@ class ProviderRefreshTokenFlowTest {
         val options = TokenResponseOptions(credentialAuthorizationResolver = { _, _ ->
             TokenCredentialAuthorization(emptyList(), false, accessTokenDeadline = accessTokenDeadline)
         })
-        val issued = provider.preAuthorizedCodeIssuer.issue(
+        val issued = provider.requirePreAuthorizedCodeIssuer().issue(
             PreAuthorizedCodeIssueRequest(scopes = setOf("openid"), session = DefaultSession(subject = "holder")),
         )
         val accessRequest = provider.createAccessTokenRequest(mapOf(

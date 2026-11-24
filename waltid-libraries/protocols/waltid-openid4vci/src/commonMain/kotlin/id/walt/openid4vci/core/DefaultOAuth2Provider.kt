@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeProvider
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.openid4vci.attestation.*
@@ -123,7 +124,7 @@ import kotlin.time.Instant
 class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
     private val pkceService: PkceService = PkceService(config.pkceServiceConfig),
-) : OAuth2Provider {
+) : OAuth2Provider, PreAuthorizedCodeProvider {
     override val preAuthorizedCodeIssuer = config.preAuthorizedCodeIssuerFactory
         ?.invoke(config.preAuthorizedCodeRepository, config::resolvePreAuthorizedCodeConfig)
         ?: DefaultPreAuthorizedCodeIssuer(

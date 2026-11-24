@@ -209,6 +209,12 @@ class PreAuthorizedCodeTokenEndpoint(
             },
         )
 
+        if (expiresAt.epochSeconds <= Clock.System.now().epochSeconds) {
+            return AccessTokenResponseResult.Failure(
+                clientRequest,
+                OAuthError(OAuthErrorCodes.INVALID_GRANT, "Access token deadline has elapsed"),
+            )
+        }
         val accessToken = accessTokenIssuer.issue(claims)
         val refreshIssuer = clientRequest.issClaim ?: clientId.takeIf { it.isNotBlank() }
         val refreshToken = refreshIssuer?.let { issuer ->

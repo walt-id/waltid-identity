@@ -20,10 +20,12 @@
 - `ClaimDescription.path` now uses `List<JsonElement>` to preserve string keys, integer indexes/map keys, and JSON null wildcards (OpenID4VCI Appendix C). Consumers reading or copying paths must handle these segment types instead of assuming every segment is a string; rebuild callers against the updated model. The Wallet2 detailed-offer claim path response uses the same typed segments.
 - The string-only `ClaimDescription(path: Collection<String>, mandatory, display)` convenience constructor has been removed. Kotlin callers must construct typed paths explicitly, for example `ClaimDescription(path = listOf(JsonPrimitive("given_name")))`, or convert an existing string collection with `path.map { JsonPrimitive(it) }`. Use `JsonPrimitive(1)` for an integer segment and `JsonNull` for a wildcard. This is a source and binary API break: rebuild affected callers against the updated `waltid-openid4vci` library. JSON metadata and stored configuration formats are unchanged.
 - Repeated or contradictory claim descriptions (OpenID4VCI Appendix B.3), negative integers in paths of JSON-based credentials, and mdoc paths that do not start with a namespace and a data element identifier (Appendix C) are now rejected when issuer2 loads its configuration. Wallets ignore such claim descriptions for that credential configuration: offer previews and stored credentials carry no claim metadata for it, while issuance continues.
+
 ## OpenID4VCI pre-authorized code redemption
 
 - `OAuth2ProviderConfig` takes the repository and `PreAuthorizedCodeConfig` (or a configuration resolver).
-  Issue grants through `provider.preAuthorizedCodeIssuer`. Migrate custom issuer instances to
+  Providers that issue offers implement `PreAuthorizedCodeProvider`. Obtain the issuer with
+  `provider.requirePreAuthorizedCodeIssuer()`. Migrate custom issuer instances to
   `preAuthorizedCodeIssuerFactory`, which receives the repository and resolved-settings callback.
   Set `PreAuthorizedCodeIssueRequest.lifetimeSeconds` for explicit code validity. Set any
   issuance-session access-token ceiling when resolving credential authorization at token exchange.
@@ -31,7 +33,10 @@
   and retain the updated state through the original expiry. The update matches the same unexpired,
   active grant and its current redemption state. Use the default `consume` implementation or
   ensure any override performs the same conditional active-to-redeemed transition for already authenticated grants.
-  In-memory snapshots expose the application-defined grant through `originalRecord`.
+  Implement `getForRedemption` to return unexpired active and locked grants, including after a restart.
+  Return null for redeemed and expired grants. Read application fields from `snapshot.originalRecord`,
+  read the current attempt count and status from `snapshot.redemptionState`, and pass the snapshot itself to CAS.
+- Pass the current session’s credential offer to `resolveTokenCredentialAuthorization` during pre-authorized exchange.
 - New issuer2 pre-authorized offers require a positive lifetime within the configured maximum (300 seconds by default).
   Existing grants retain their stored expiry. Upgrade all token handlers sharing a repository to enforce the new attempt limit.
 
