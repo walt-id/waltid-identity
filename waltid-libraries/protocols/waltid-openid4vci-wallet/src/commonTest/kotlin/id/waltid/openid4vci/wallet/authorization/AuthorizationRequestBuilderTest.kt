@@ -11,6 +11,7 @@ import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertFailsWith
 
@@ -91,6 +92,20 @@ class AuthorizationRequestBuilderTest {
         )
         val pkceData = assertNotNull(pkce)
         assertEquals(pkceData.codeChallenge, params["code_challenge"])
+    }
+
+    @Test
+    fun `pushed authorization requests use fresh nonces separate from state`() {
+        val first = builder.buildPushedAuthorizationRequestState("pid", scope = "eu.europa.ec.eudi.pid.1")
+        val second = builder.buildPushedAuthorizationRequestState("pid", scope = "eu.europa.ec.eudi.pid.1")
+
+        val firstNonce = assertNotNull(first.parameters["nonce"], "Missing authorization nonce")
+        val secondNonce = assertNotNull(second.parameters["nonce"], "Missing authorization nonce")
+        assertTrue(firstNonce.isNotBlank())
+        assertTrue(secondNonce.isNotBlank())
+        assertNotEquals(first.state, firstNonce)
+        assertNotEquals(second.state, secondNonce)
+        assertNotEquals(firstNonce, secondNonce)
     }
 
     @Test
