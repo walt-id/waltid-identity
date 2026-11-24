@@ -9,7 +9,6 @@ import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.status.CredentialStatusInventory
-import id.walt.wallet2.status.CredentialStatusNoticeStore
 import id.walt.wallet2.persistence.db.Credentials
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import kotlinx.coroutines.flow.Flow
@@ -27,7 +26,7 @@ private val json = Json { ignoreUnknownKeys = true }
 public class SqlDelightCredentialStore private constructor(
     private val queries: WalletPersistenceQueries,
     status: SqlDelightStatusInventory,
-) : WalletCredentialStore, CredentialStatusInventory by status, CredentialStatusNoticeStore by status {
+) : WalletCredentialStore, CredentialStatusInventory by status {
     /** Opens the foreground credential store in the already-open database. */
     public constructor(queries: WalletPersistenceQueries) : this(queries, SqlDelightStatusInventory(queries))
 

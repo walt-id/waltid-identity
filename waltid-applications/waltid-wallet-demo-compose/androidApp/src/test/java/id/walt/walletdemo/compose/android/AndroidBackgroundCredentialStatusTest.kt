@@ -36,7 +36,19 @@ class AndroidBackgroundCredentialStatusTest {
     }
 
     @After
-    fun cancelScheduledWork(): Unit = runBlocking { scheduler.reconcile(context, null) }
+    fun cancelScheduledWork() {
+        workManager.cancelUniqueWork(WORK_NAME).result.get(5, TimeUnit.SECONDS)
+    }
+
+    @Test
+    fun reconcilingOptOutCancelsWorkAndClearsTheBinding(): Unit = runBlocking {
+        val work = enqueue("retired-grant")
+        scheduler.reconcile(context, null)
+        scheduler.reconcile(context, null)
+
+        assertNull(scheduler.binding(context))
+        assertEquals(WorkInfo.State.CANCELLED, state(work))
+    }
 
     @Test
     fun deferralRetainsTheScheduleAndIneligibilityRetiresIt(): Unit = runBlocking {
@@ -68,6 +80,8 @@ class AndroidBackgroundCredentialStatusTest {
         val preferences = context.getSharedPreferences(WORK_NAME, Context.MODE_PRIVATE)
         assertTrue(preferences.edit().remove("enrollment").commit())
 
+        scheduler.reconcile(context, null)
+        assertEquals(WorkInfo.State.ENQUEUED, state(work))
         scheduler.recordOutcome(context, work, null, CredentialStatusMaintenanceResult.Ineligible)
 
         assertEquals(WorkInfo.State.CANCELLED, state(work))

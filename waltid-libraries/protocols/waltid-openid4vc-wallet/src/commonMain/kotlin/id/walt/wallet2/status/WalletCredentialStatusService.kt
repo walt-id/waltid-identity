@@ -79,8 +79,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
  * Construction, reads and observation do not perform issuer networking.
  */
 class WalletCredentialStatusService private constructor(
-    private val owner: Wallet?,
-    private val maintenanceInventory: CredentialStatusInventory?,
+    private val owner: Owner,
     client: HttpClient?,
     private val now: () -> Instant,
     private val statusTrustPolicy: suspend () -> String?,
@@ -99,14 +98,19 @@ class WalletCredentialStatusService private constructor(
         referenceAuthorizer: CredentialStatusReferenceAuthorizer? = null,
         signerAuthorizer: StatusListSignerAuthorizer? = null,
         parentScope: CoroutineScope? = null,
-    ) : this(wallet, null, client, now, { trustPolicyId }, limits, referenceAuthorizer, signerAuthorizer, parentScope)
+    ) : this(Owner.Foreground(wallet), client, now, { trustPolicyId }, limits, referenceAuthorizer, signerAuthorizer, parentScope)
 
-    val wallet: Wallet get() = requireNotNull(owner)
+    val wallet: Wallet get() = (owner as Owner.Foreground).wallet
+
+    private sealed interface Owner {
+        class Foreground(val wallet: Wallet) : Owner
+        class Maintenance(val inventory: CredentialStatusInventory) : Owner
+    }
 
     companion object {
         /** Uses the same built-in status resolver as restricted maintenance. */
         fun managed(wallet: Wallet, trustPolicy: suspend () -> String?): WalletCredentialStatusService =
-            WalletCredentialStatusService(wallet, null, null, { Clock.System.now() }, trustPolicy,
+            WalletCredentialStatusService(Owner.Foreground(wallet), null, { Clock.System.now() }, trustPolicy,
                 CredentialStatusLimits(), null, null, null)
 
         /** One bounded, due-only pass over a restricted store, with progress recorded before each attempt. */
@@ -120,9 +124,10 @@ class WalletCredentialStatusService private constructor(
             onItem: (CredentialStatusRefreshOutcome) -> Unit,
             onNoticeCommitted: () -> Unit,
         ): Unit = coroutineScope {
-            WalletCredentialStatusService(null, inventory, client, { Clock.System.now() }, trustPolicy,
+            val owner = Owner.Maintenance(inventory)
+            WalletCredentialStatusService(owner, client, { Clock.System.now() }, trustPolicy,
                 CredentialStatusLimits(), null, null, this, onNoticeCommitted).use { service ->
-                service.maintenancePage(inventory, cursor, maxItems, advance, onItem)
+                service.maintenancePage(owner, cursor, maxItems, advance, onItem)
             }
         }
     }
@@ -132,8 +137,10 @@ class WalletCredentialStatusService private constructor(
         val snapshots: CredentialStatusSnapshotStore?,
         val read: suspend (String) -> CredentialStatusInput?,
     ) {
+        val notices = snapshots as? CredentialStatusNoticeStore
+
         constructor(store: WalletCredentialStore) : this(store, store as? CredentialStatusSnapshotStore, { id ->
-            if (store is CredentialStatusInventory) store.readStatusInput(id)
+            if (store is CredentialStatusNoticeStore) store.readStatusInput(id)
             else store.getCredential(id)?.let(CredentialStatusInput::Signed)
         })
     }
@@ -348,7 +355,9 @@ class WalletCredentialStatusService private constructor(
         }
         // Keep bounded retries useful for large inventories, including lists with immediate expiry.
         // Untouched records go first; then prefer the oldest attempt rather than fixed store order.
-        val selected = all.mapNotNull { it.record() }.map { it to local(it) }
+        val selected = all.mapNotNull { candidate ->
+            candidate.record()?.let { it to candidate.readLocalState(it).metadata }
+        }
             .sortedBy { (_, metadata) -> metadata.entries.flatMap { entry ->
                 listOfNotNull(entry.lastObservation()?.checkedAt, entry.lastAttemptAt)
             }.maxOrNull() }
@@ -393,22 +402,27 @@ class WalletCredentialStatusService private constructor(
                 addAll(page)
                 cursor = page.lastOrNull()?.id
             } while (page.size == 64)
-        } else store.listCredentials().toList().map(CredentialStatusInput::Signed)
+        } else store.listCredentials().toList().mapNotNull {
+            if (store is CredentialStatusNoticeStore) source.read(it.id) else CredentialStatusInput.Signed(it)
+        }
         inputs.map { Candidate(WalletCredentialReference(index, it.id), source, it) }
     }
 
     private suspend fun records(): List<Record> = candidates().mapNotNull(Candidate::record)
 
-    private fun currentStore(reference: WalletCredentialReference): Any? =
-        owner?.credentialStores?.getOrNull(reference.storeIndex) ?: maintenanceInventory
+    private fun currentStore(reference: WalletCredentialReference): Any? = when (owner) {
+        is Owner.Foreground -> owner.wallet.credentialStores.getOrNull(reference.storeIndex)
+        is Owner.Maintenance -> owner.inventory.takeIf { reference.storeIndex == 0 }
+    }
 
     private suspend fun maintenancePage(
-        inventory: CredentialStatusInventory,
+        owner: Owner.Maintenance,
         cursor: String?,
         maxItems: Int,
         advance: (String) -> Boolean,
         onItem: (CredentialStatusRefreshOutcome) -> Unit,
     ) {
+        val inventory = owner.inventory
         val limit = 64
         val tail = inventory.statusPage(cursor, limit)
         val page = if (tail.isEmpty() && cursor != null) inventory.statusPage(null, limit) else tail
@@ -420,8 +434,9 @@ class WalletCredentialStatusService private constructor(
                 currentCoroutineContext().ensureActive()
                 if (remaining == 0) break
                 val reference = WalletCredentialReference(0, input.id)
-                val record = Candidate(reference, source, input).record()
-                val cached = record?.let { local(it) } ?: unreadable
+                val candidate = Candidate(reference, source, input)
+                val record = candidate.record()
+                val cached = record?.let { candidate.readLocalState(it).metadata } ?: unreadable
                 if (!advance(input.id)) break
                 val outcome = when {
                     record == null -> {
@@ -441,9 +456,10 @@ class WalletCredentialStatusService private constructor(
         }
     }
 
-    private suspend fun Candidate.readLocalState(): State? {
-        val record = record() ?: return null
-        val stored = if (source.identity is CredentialStatusInventory) (input as CredentialStatusInput.Signed).storedStatus
+    private suspend fun Candidate.readLocalState(): State? = record()?.let { readLocalState(it) }
+
+    private suspend fun Candidate.readLocalState(record: Record): State {
+        val stored = if (source.notices != null) (input as CredentialStatusInput.Signed).storedStatus
             else source.snapshots?.readCredentialStatusRecord(input.id)
         return localState(record, stored)
     }
@@ -593,7 +609,12 @@ class WalletCredentialStatusService private constructor(
                         val at = now()
                         var transferred: CredentialStatusNoticeState? = null
                         val commit = snapshotStore.compareAndSetCredentialStatusAndNotice(current, expected, updated) { previous ->
-                            val retained = persistent.noticeTransition(previous, resolved.metadata, at)
+                            val next = persistent.noticeTransition(previous, resolved.metadata, at)
+                            val live = state.sessionNotice
+                            // Reuse the acknowledgement, with the timestamp from the newly retainable evidence.
+                            val retained = if (next != null && next.version != previous?.version && live?.kind == next.kind) {
+                                next.copy(version = live.version, acknowledged = live.acknowledged)
+                            } else next
                             transferred = previous?.takeIf {
                                 it.referenceId in merged.nonPersistentReferenceIds && it.version != retained?.version
                             }

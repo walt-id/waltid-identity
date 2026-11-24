@@ -16,6 +16,7 @@ import id.walt.wallet2.status.CredentialStatusNoticeState
 import id.walt.wallet2.status.CredentialStatusNoticeStore
 import id.walt.wallet2.status.CredentialStatusRefreshMode
 import id.walt.wallet2.status.CredentialStatusRefreshOutcome
+import id.walt.wallet2.status.CredentialStatusSnapshotStore
 import id.walt.wallet2.status.CredentialStatusStoredRecord
 import id.walt.wallet2.status.WalletCredentialStatusService
 import id.walt.wallet2.status.reviewGuard
@@ -82,9 +83,17 @@ class StatusMaintenanceIntegrationTest {
         val issuer = add("a")
         wake()
         val policy = assertNotNull(managedCredentialStatusTrustPolicy())
-        service(policy).use { foreground ->
+        var pointReads = 0
+        val inventory = object : WalletCredentialStore by store, CredentialStatusInventory by store {
+            override suspend fun readCredentialStatusRecord(credentialId: String): CredentialStatusStoredRecord? {
+                pointReads++
+                return store.readCredentialStatusRecord(credentialId)
+            }
+        }
+        service(policy, inventory).use { foreground ->
             assertEquals(CredentialStatusFreshness.FRESH, foreground.snapshot().credentials.single().presentation.freshness)
             assertEquals(CredentialStatusRefreshOutcome.UNCHANGED, foreground.refresh().single().outcome)
+            assertEquals(0, pointReads, "A fresh due check should reuse the evidence from the inventory page")
             assertEquals(listOf(issuer.uri), requests)
         }
         service("different-issuer-trust").use { changed ->
@@ -142,26 +151,72 @@ class StatusMaintenanceIntegrationTest {
     }
 
     @Test
-    fun anAcknowledgedStatusKeepsItsVersionWhenEvidenceBecomesSessionOnly() = withWallet {
-        val issuer = add("a", value = 2u)
-        service(managedCredentialStatusTrustPolicy()).use { foreground ->
-            foreground.refresh()
-            val original = foreground.snapshot().pendingNotices.single()
-            foreground.acknowledgeNotice(original.reference, original.version)
+    fun anAcknowledgedStatusKeepsItsVersionWhenEvidenceChangesRetention() {
+        val cacheable = "max-age=600"
+        val restricted = "no-store"
+        for ((initial, next) in listOf(cacheable to restricted, restricted to cacheable)) {
+            withWallet {
+                val issuer = add("a", cache = initial, value = 2u)
+                val policy = managedCredentialStatusTrustPolicy()
+                service(policy).use { foreground ->
+                    foreground.refresh()
+                    val original = foreground.snapshot().pendingNotices.single()
+                    foreground.acknowledgeNotice(original.reference, original.version)
 
-            setList(issuer, value = 2u, cache = "no-store")
-            foreground.refresh(mode = CredentialStatusRefreshMode.FORCE)
-            assertTrue(foreground.snapshot().pendingNotices.isEmpty())
-            assertNull(store.readCredentialStatus("a"))
-            assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+                    setList(issuer, value = 2u, cache = next)
+                    foreground.refresh(mode = CredentialStatusRefreshMode.FORCE)
+                    assertTrue(foreground.snapshot().pendingNotices.isEmpty(), "Duplicate warning for $initial to $next")
+                    val input = assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a"))
+                    if (next == restricted) {
+                        assertNull(input.storedStatus?.snapshot)
+                        assertNull(input.notice)
+                    } else {
+                        val notice = assertNotNull(input.notice)
+                        assertEquals(original.version, notice.version)
+                        assertTrue(notice.acknowledged)
+                        val latest = foreground.snapshot().credentials.single().presentation.lastCheckedAt
+                        assertEquals(latest, notice.checkedAt)
+                    }
 
-            setList(issuer, value = 1u, cache = "no-store")
-            foreground.refresh(mode = CredentialStatusRefreshMode.FORCE)
-            val change = foreground.snapshot().pendingNotices.single()
-            assertEquals(StatusMeaning.INVALID, change.kind)
-            assertNotEquals(original.version, change.version)
+                    setList(issuer, value = 1u, cache = next)
+                    foreground.refresh(mode = CredentialStatusRefreshMode.FORCE)
+                    val change = foreground.snapshot().pendingNotices.single()
+                    assertEquals(StatusMeaning.INVALID, change.kind)
+                    assertNotEquals(original.version, change.version)
+                    foreground.acknowledgeNotice(change.reference, change.version)
+                }
+                service(policy).use { reopened -> assertTrue(reopened.snapshot().pendingNotices.isEmpty()) }
+            }
         }
-        service().use { assertTrue(it.snapshot().pendingNotices.isEmpty()) }
+    }
+
+    @Test
+    fun aCustomStoreWithNoticesCanReadAndAcknowledgeThemWithoutPaging() = withWallet {
+        add("a", value = 2u)
+        val custom = object : WalletCredentialStore by store, CredentialStatusNoticeStore by store {}
+        val policy = managedCredentialStatusTrustPolicy()
+        service(policy, custom).use { foreground ->
+            foreground.refresh()
+            val notice = foreground.snapshot().pendingNotices.single()
+            val row = assertIs<CredentialStatusInput.Signed>(custom.readStatusInput("a"))
+            assertEquals(row.notice?.version, notice.version)
+            foreground.acknowledgeNotice(notice.reference, notice.version)
+        }
+        service(policy, custom).use { assertTrue(it.snapshot().pendingNotices.isEmpty()) }
+    }
+
+    @Test
+    fun aSnapshotOnlyStoreStillShowsSessionNotices() = withWallet {
+        add("a", value = 2u)
+        val custom = object : WalletCredentialStore by store, CredentialStatusSnapshotStore by store {}
+        val policy = managedCredentialStatusTrustPolicy()
+        service(policy, custom).use { foreground ->
+            foreground.refresh()
+            assertEquals(StatusMeaning.SUSPENDED, foreground.snapshot().pendingNotices.single().kind)
+        }
+        assertNotNull(store.readCredentialStatus("a"))
+        assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+        service(policy, custom).use { assertTrue(it.snapshot().pendingNotices.isEmpty()) }
     }
 
     @Test
@@ -170,8 +225,7 @@ class StatusMaintenanceIntegrationTest {
         val cleared = CompletableDeferred<Unit>()
         val completeCommit = CompletableDeferred<Unit>()
         val original = store
-        val storeAtHandoff = object : WalletCredentialStore by original, CredentialStatusInventory by original,
-            CredentialStatusNoticeStore by original {
+        val storeAtHandoff = object : WalletCredentialStore by original, CredentialStatusInventory by original {
             override suspend fun compareAndSetCredentialStatusAndNotice(
                 credential: StoredCredential,
                 expected: CredentialStatusStoredRecord?,

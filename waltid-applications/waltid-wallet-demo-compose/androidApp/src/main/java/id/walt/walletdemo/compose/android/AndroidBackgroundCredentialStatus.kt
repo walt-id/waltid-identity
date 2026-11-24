@@ -40,11 +40,14 @@ internal object AndroidBackgroundCredentialStatus {
         scheduleMutex.withLock {
             val preferences = preferences(context)
             val previous = preferences.getString(BINDING, null)
+            if (previous == null && binding == null) return@withLock
+
+            val workManager = WorkManager.getInstance(context)
             if (previous != binding) {
+                // Keep the old binding until cancellation completes so reconciliation can retry.
+                if (previous != null) workManager.cancelUniqueWork(WORK).await()
                 check(preferences.edit().putString(BINDING, binding).commit()) { "Could not save background status enrollment" }
             }
-            val workManager = WorkManager.getInstance(context)
-            if (previous != binding || binding == null) workManager.cancelUniqueWork(WORK).await()
             if (binding != null) {
                 val request = PeriodicWorkRequestBuilder<CredentialStatusWorker>(1, TimeUnit.HOURS)
                     .setInitialDelay(1, TimeUnit.HOURS)

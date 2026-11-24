@@ -559,7 +559,7 @@ final class id.walt.wallet2.persistence.stores/DriverFactory { // id.walt.wallet
     final fun useAppGroup(kotlin/String): id.walt.wallet2.persistence.stores/DriverFactory // id.walt.wallet2.persistence.stores/DriverFactory.useAppGroup|useAppGroup(kotlin.String){}[0]
 }
 
-final class id.walt.wallet2.persistence.stores/SqlDelightCredentialStore : id.walt.wallet2.data/WalletCredentialStore, id.walt.wallet2.status/CredentialStatusInventory, id.walt.wallet2.status/CredentialStatusNoticeStore { // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore|null[0]
+final class id.walt.wallet2.persistence.stores/SqlDelightCredentialStore : id.walt.wallet2.data/WalletCredentialStore, id.walt.wallet2.status/CredentialStatusInventory { // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore|null[0]
     constructor <init>(id.walt.wallet2.persistence.db/WalletPersistenceQueries) // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.<init>|<init>(id.walt.wallet2.persistence.db.WalletPersistenceQueries){}[0]
 
     final suspend fun acknowledgeStatusNotice(kotlin/String, kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.acknowledgeStatusNotice|acknowledgeStatusNotice(kotlin.String;kotlin.String){}[0]

@@ -103,3 +103,5 @@ retire the grant before cancelling the OS request. On unlock, reload the local o
 requesting another check. Show ``CredentialStatusSnapshot/pendingNotices`` on Home and acknowledge
 the displayed version with ``Wallet/acknowledgeCredentialStatusNotice(credentialID:version:)``.
 A generic alert can link to Home. Check that its binding is still current before posting it.
+Restricted observations can appear in a foreground session. A cold pass can leave a pending
+notice only when it can retain the observation.

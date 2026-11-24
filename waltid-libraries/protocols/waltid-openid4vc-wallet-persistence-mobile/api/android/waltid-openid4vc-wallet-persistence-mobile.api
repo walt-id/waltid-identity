@@ -507,7 +507,7 @@ public final class id/walt/wallet2/persistence/stores/DriverFactory {
 	public final fun openExistingEncryptedDriver (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;Ljava/lang/String;)Lapp/cash/sqldelight/db/SqlDriver;
 }
 
-public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore : id/walt/wallet2/data/WalletCredentialStore, id/walt/wallet2/status/CredentialStatusInventory, id/walt/wallet2/status/CredentialStatusNoticeStore {
+public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore : id/walt/wallet2/data/WalletCredentialStore, id/walt/wallet2/status/CredentialStatusInventory {
 	public fun <init> (Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;)V
 	public fun acknowledgeStatusNotice (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun addCredential (Lid/walt/wallet2/data/StoredCredential;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

@@ -7,7 +7,6 @@ import id.walt.wallet2.status.CredentialStatusCommit
 import id.walt.wallet2.status.CredentialStatusInput
 import id.walt.wallet2.status.CredentialStatusInventory
 import id.walt.wallet2.status.CredentialStatusNoticeState
-import id.walt.wallet2.status.CredentialStatusNoticeStore
 import id.walt.wallet2.status.CredentialStatusStoredRecord
 import id.walt.wallet2.status.statusFingerprint
 import kotlinx.coroutines.CancellationException
@@ -18,7 +17,7 @@ import kotlinx.serialization.json.Json
 internal class SqlDelightStatusInventory(
     private val queries: WalletPersistenceQueries,
     private val isAuthorized: () -> Boolean = { true },
-) : CredentialStatusInventory, CredentialStatusNoticeStore {
+) : CredentialStatusInventory {
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun readCredentialStatusRecord(credentialId: String): CredentialStatusStoredRecord? =
@@ -88,7 +87,7 @@ internal class SqlDelightStatusInventory(
             expected_credential = credential.credential.serializedForWalletPersistence(), expected_snapshot = raw)
         when {
             queries.credentialStatusChanges().executeAsOne() != 1L -> CredentialStatusCommit.LOST
-            notice != null && notice.version != previous?.version -> CredentialStatusCommit.NOTICE_CREATED
+            notice != null && !notice.acknowledged && notice.version != previous?.version -> CredentialStatusCommit.NOTICE_CREATED
             else -> CredentialStatusCommit.COMMITTED
         }
     }

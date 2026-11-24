@@ -36,10 +36,15 @@ data class PendingCredentialStatusNotice(
 
 enum class CredentialStatusCommit { LOST, COMMITTED, NOTICE_CREATED }
 
-/** Stores the notice transition in the same guarded transaction as its permitted evidence. */
-interface CredentialStatusNoticeStore {
+/** Durable holder notices with consistent reads and conditional writes alongside status evidence. */
+interface CredentialStatusNoticeStore : CredentialStatusSnapshotStore {
+    /** Reads the signed credential, stored evidence and current notice from one consistent view. */
+    suspend fun readStatusInput(id: String): CredentialStatusInput?
+
+    /** Acknowledges only the version displayed to the holder. */
     suspend fun acknowledgeStatusNotice(credentialId: String, version: String): Boolean
 
+    /** Runs the transition in the same guarded transaction that commits the permitted evidence. */
     suspend fun compareAndSetCredentialStatusAndNotice(
         credential: StoredCredential,
         expected: CredentialStatusStoredRecord?,

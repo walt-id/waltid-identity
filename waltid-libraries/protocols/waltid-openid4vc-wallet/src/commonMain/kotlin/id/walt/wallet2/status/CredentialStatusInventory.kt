@@ -18,8 +18,7 @@ sealed interface CredentialStatusInput {
     data class Unreadable(override val id: String) : CredentialStatusInput
 }
 
-/** A status-only view of a store. The page order must be stable by wallet-local ID. */
-interface CredentialStatusInventory : CredentialStatusSnapshotStore {
-    suspend fun readStatusInput(id: String): CredentialStatusInput?
+/** A pageable status-only view. The page order must be stable by wallet-local ID. */
+interface CredentialStatusInventory : CredentialStatusNoticeStore {
     suspend fun statusPage(afterId: String?, limit: Int): List<CredentialStatusInput>
 }

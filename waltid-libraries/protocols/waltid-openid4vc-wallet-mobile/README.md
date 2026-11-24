@@ -144,6 +144,8 @@ On unlock or resume, read local status first. After a same-process wake,
 snapshot. Show the snapshot’s `pendingNotices` in the unlocked app and use
 `acknowledgeCredentialStatusNotice(credentialId, version)` for the displayed notice.
 The app owns OS permission, local alert delivery and navigation after unlock.
+An issuer can restrict caching. A foreground session can show the restricted result. A cold pass
+cannot keep a pending notice from that result after it closes.
 
 ## Receiving credentials
 

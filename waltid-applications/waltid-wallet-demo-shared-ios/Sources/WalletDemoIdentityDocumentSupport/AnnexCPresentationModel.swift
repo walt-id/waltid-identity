@@ -167,10 +167,15 @@ public final class AnnexCPresentationModel: ObservableObject {
 
     private func startStatusReview(_ wallet: any AnnexCPresentationWallet) async throws {
         do {
-            if let snapshot = try await wallet.cachedCredentialStatuses() { installStatuses(snapshot) }
+            let snapshot = try await wallet.cachedCredentialStatuses()
+            try Task.checkCancellation()
+            guard phase != .finished else { return }
+            if let snapshot { installStatuses(snapshot) }
             else { credentialStatusReadState = .unavailable }
         } catch is CancellationError { throw CancellationError() }
         catch {
+            try Task.checkCancellation()
+            guard phase != .finished else { return }
             credentialStatusReadState = .unavailable
             statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
         }
@@ -209,13 +214,14 @@ public final class AnnexCPresentationModel: ObservableObject {
                         reviewedStatus: reviewedStatus, requestID: preview.requestID, verifiedOrigin: preview.verifiedOrigin,
                         deviceRequestBase64URL: rawRequest.deviceRequest, encryptionInfoBase64URL: rawRequest.encryptionInfo,
                         selectedCredentialOptions: selections)
-                } else { response = try await wallet.submitAnnexCPresentation(
-                    requestID: preview.requestID,
-                    verifiedOrigin: preview.verifiedOrigin,
-                    deviceRequestBase64URL: rawRequest.deviceRequest,
-                    encryptionInfoBase64URL: rawRequest.encryptionInfo,
-                    selectedCredentialOptions: selections
-                )
+                } else {
+                    response = try await wallet.submitAnnexCPresentation(
+                        requestID: preview.requestID,
+                        verifiedOrigin: preview.verifiedOrigin,
+                        deviceRequestBase64URL: rawRequest.deviceRequest,
+                        encryptionInfoBase64URL: rawRequest.encryptionInfo,
+                        selectedCredentialOptions: selections
+                    )
                 }
                 return try encryptedResponseData(fromResponseJSON: response.dataJSON)
             }
@@ -233,10 +239,18 @@ public final class AnnexCPresentationModel: ObservableObject {
             statusReviewNotice = credentialStatusAvailable ? WalletError.credentialStatusReviewChanged.localizedDescription
                 : String(localized: "Status changed, but its latest details are unavailable. Try again.")
             phase = .reviewing
+        } catch is CancellationError {
+            phase = .reviewing
+            cancel()
         } catch {
             log.error("Annex C response failed: \(error.localizedDescription, privacy: .public)")
             failure = error.localizedDescription
             phase = .reviewing
+            if reviewedStatus == nil && statusObservation == nil {
+                // A failed direct attempt opens interactive review. Load the evidence that review needs.
+                do { try await startStatusReview(wallet) }
+                catch { cancel() }
+            }
         }
     }
 
