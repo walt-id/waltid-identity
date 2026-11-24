@@ -9,12 +9,13 @@ import java.net.Socket
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** Opt-in operator fixture. The forwarded device executes whole wallet operations with a native key. */
+/** Carries wallet operations to the Android device used by the live runner. */
 internal class ItbAndroidWalletDriver private constructor(
     private val socket: Socket,
     private val ioDispatcher: CoroutineDispatcher,
     private val operationTimeoutMillis: Long,
 ) : AutoCloseable by socket {
+    val isClosed: Boolean get() = socket.isClosed
     private var sequence = 0
 
     suspend fun execute(interaction: ItbWalletInteraction): ItbWalletResult {

@@ -15,10 +15,7 @@ for the initial results.
 
 ## Batch issuance evidence
 
-The live app test accepts one copy per offer with one holder. Its success check requires stored credentials and no pending
-transaction; it does not assert multiple proofs, distinct holder bindings or
-presentation of every returned copy. A green live ITB run is therefore not batch
-issuance evidence.
+The live app accepts one copy per offer with one holder. The Android driver checks the issuance receipt and one newly stored credential. The SDK diagnostic also checks that no deferred transaction remains. Batch qualification requires distinct proofs and holder bindings and a presentation of each copy.
 
 Use the explicit two-holder wallet module described in [VCI-WALLET.md](VCI-WALLET.md)
 for batch conformance. A future live ITB batch case must expose a documented batch
@@ -99,7 +96,9 @@ The runner starts one session at a time, never retries an uncertain start, and
 records each prepared session ID before starting its test steps. After the wallet
 and portal steps, it retries a transient status or report read up to twice
 within the case timeout. Cleanup stops
-only that owned session. A stopped ITB session can
+only that owned session. If the Android wallet connection closes, the remaining
+cases are recorded as `NOT_RUN` with `device_connection_closed` before any more
+sessions are created. A stopped ITB session can
 have `UNDEFINED` rather than `FAILURE`; the separate wallet outcome is preserved.
 Reports contain identities, timestamps and error types/codes. A stalled test
 definition read appears as `test_definition`. A failed HTTP response for that

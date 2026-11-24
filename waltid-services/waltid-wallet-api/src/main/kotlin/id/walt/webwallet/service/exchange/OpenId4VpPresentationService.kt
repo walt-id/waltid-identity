@@ -69,6 +69,7 @@ class OpenId4VpPresentationService(
                     AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                         webResolveAuthReq = fetcher,
                         requestUri = requestUri,
+                        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                         requestUriMethod = requestUriMethod,
                         requestUriPostWalletMetadata = runtimeRequestUriPostWalletMetadata,
                     )

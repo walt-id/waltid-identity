@@ -32,8 +32,11 @@ class ItbCaseRunnerTest {
         var confirmed = false
         var nextInteraction: ItbWalletInteraction? = null
         var readFailure: Exception? = null
-        override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case) =
-            ItbSession(suite.id, case.id, session)
+        var prepared = 0
+        override suspend fun prepare(suite: ItbCatalogue.Suite, case: ItbCatalogue.Case): ItbSession {
+            prepared++
+            return ItbSession(suite.id, case.id, session)
+        }
         override suspend fun read(session: ItbSession): ItbWalletInteraction {
             reads++
             readFailure?.let { throw it }
@@ -108,6 +111,58 @@ class ItbCaseRunnerTest {
                 assertEquals(if (valid) 1 else 0, walletCalls)
                 assertEquals(!valid, stopped)
                 if (!valid) assertEquals(ItbCaseResult.Phase.INTERACTION, result.phase)
+            }
+        }
+    }
+
+    @Test
+    fun deviceDisconnectStopsFurtherSessionsWhileAWalletRejectionAllowsTheNextCase() = runBlocking {
+        val token = "a".repeat(64)
+        for (disconnect in listOf(true, false)) {
+            withTimeout(10_000) {
+                ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
+                    val peer = launch(Dispatchers.IO) {
+                        listener.accept().use { socket ->
+                            ItbDeviceWire.authenticate(ItbDeviceWire.read(socket), token)
+                            ItbDeviceWire.write(socket, buildJsonObject {
+                                put("ready", true); put("provider", "android-native-biometric")
+                            })
+                            if (disconnect) ItbDeviceWire.read(socket)
+                            else ItbDeviceWire.serve(socket) { throw ItbWalletRejection("demo_wallet_rejected") }
+                        }
+                    }
+                    val bridge = Bridge()
+                    var stops = 0
+                    HttpClient(MockEngine { request ->
+                        respond(when (request.url.encodedPath.substringAfterLast('/')) {
+                            "status" -> status(false)
+                            "stop" -> { stops++; "" }
+                            session -> report
+                            else -> error("Unexpected request")
+                        }, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                    }).use { client ->
+                        ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://itb.example"), null, Dispatchers.IO).use { device ->
+                            val runner = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "fixture"), bridge, device::execute,
+                                walletConnected = { !device.isClosed })
+                            val first = runner.run(suite, case)
+                            assertEquals(session, first.session)
+                            val next = suite.cases.first { it != case && it.prerequisite == null }
+                            val second = runner.run(suite, next)
+                            if (disconnect) {
+                                assertEquals(ItbCaseResult.Outcome.NOT_RUN, second.outcome)
+                                assertEquals("device_connection_closed", second.errorCode)
+                                assertNull(second.session)
+                                assertEquals(1, bridge.prepared)
+                                assertEquals(1, stops)
+                            } else {
+                                assertEquals("demo_wallet_rejected", second.errorCode)
+                                assertEquals(2, bridge.prepared)
+                                assertEquals(2, stops)
+                            }
+                        }
+                    }
+                    peer.join()
+                }
             }
         }
     }

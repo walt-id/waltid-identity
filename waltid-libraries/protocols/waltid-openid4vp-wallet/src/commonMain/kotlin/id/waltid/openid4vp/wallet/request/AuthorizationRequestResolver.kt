@@ -196,9 +196,9 @@ object AuthorizationRequestResolver {
         requestUriMethod: RequestUriHttpMethod?,
         requestUriPostWalletMetadata: String? = null,
         sendWalletMetadata: Boolean = true,
-    ): RequestUriFetchResponse = fetchRequestUri(
+    ): RequestUriFetchResponse = fetchRequestUriWithWebDataFetcher(
         webResolveAuthReq, requestUri, requestUriMethod, requestUriPostWalletMetadata,
-        sendWalletMetadata, audienceOverride = null,
+        sendWalletMetadata, unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
     )
 
     /**
@@ -212,18 +212,21 @@ object AuthorizationRequestResolver {
         requestUriPostWalletMetadata: String? = null,
         sendWalletMetadata: Boolean = true,
         expectedRequestObjectAudience: String,
-    ): RequestUriFetchResponse = fetchRequestUri(
+    ): RequestUriFetchResponse = fetchRequestUriWithWebDataFetcher(
         webResolveAuthReq, requestUri, requestUriMethod, requestUriPostWalletMetadata,
-        sendWalletMetadata, audienceOverride = expectedRequestObjectAudience,
+        sendWalletMetadata, unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        expectedRequestObjectAudience = expectedRequestObjectAudience,
     )
 
-    private suspend fun fetchRequestUri(
+    /** Use the resolver's signing policy when negotiating the request object representation. */
+    suspend fun fetchRequestUriWithWebDataFetcher(
         webResolveAuthReq: WebDataFetcher,
         requestUri: String,
         requestUriMethod: RequestUriHttpMethod?,
-        requestUriPostWalletMetadata: String?,
-        sendWalletMetadata: Boolean,
-        audienceOverride: String?,
+        requestUriPostWalletMetadata: String? = null,
+        sendWalletMetadata: Boolean = true,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+        expectedRequestObjectAudience: String? = null,
     ): RequestUriFetchResponse {
         if (requestUriMethod == RequestUriHttpMethod.POST) {
             val url = Url(requestUri)
@@ -246,18 +249,18 @@ object AuthorizationRequestResolver {
                 put("issuer", DEFAULT_REQUEST_OBJECT_AUDIENCE)
                 Json.parseToJsonElement(requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata)
                     .jsonObject.forEach { (name, value) -> put(name, value) }
-                audienceOverride?.let { put("issuer", it) }
+                expectedRequestObjectAudience?.let { put("issuer", it) }
             }.toString(),
         )
 
-        val response = when (requestUriMethod) {
-            null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri) {
-                header(HttpHeaders.Accept, "application/$REQUEST_OBJECT_TYPE, application/json;q=0.9")
-            }
-            RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
+        val requestObjectType = "application/$REQUEST_OBJECT_TYPE"
+        val acceptsJson = requestUriMethod != RequestUriHttpMethod.POST &&
+            unsignedRequestObjectPolicy == UnsignedRequestObjectPolicy.ALLOW_UNSIGNED
+        val response = webResolveAuthReq.rawFetch(requestUri) {
+            headers[HttpHeaders.Accept] = if (acceptsJson) "$requestObjectType, application/json;q=0.9" else requestObjectType
+            if (requestUriMethod == RequestUriHttpMethod.POST) {
                 method = HttpMethod.Post
                 contentType(ContentType.Application.FormUrlEncoded)
-                accept(ContentType.parse("application/oauth-authz-req+jwt"))
                 setBody(
                     buildRequestUriPostBody(
                         walletNonce = requireNotNull(walletNonce),

@@ -132,7 +132,10 @@ private suspend fun runItb(): Int {
                                 }
                                 val api = ItbRestClient(restClient, Url("${catalogue.testBed}/api/rest"), organisationKey)
                                 val bridge = ItbPortalBridge(page, "${catalogue.testBed}/app#/organisation/conformance/$organisationId", catalogue.systemName)
-                                val runner = ItbCaseRunner(api, bridge, executeWallet, caseTimeoutMillis = caseTimeoutMillis)
+                                val runner = ItbCaseRunner(
+                                    api, bridge, executeWallet, caseTimeoutMillis = caseTimeoutMillis,
+                                    walletConnected = { native?.isClosed != true },
+                                )
                                 val completed = mutableMapOf<String, ItbCaseResult>()
                                 selected.forEachIndexed { index, (suite, case) ->
                                     val prerequisite = case.prerequisite?.let { ItbRunSelection.prerequisiteCredential(completed[it]) }

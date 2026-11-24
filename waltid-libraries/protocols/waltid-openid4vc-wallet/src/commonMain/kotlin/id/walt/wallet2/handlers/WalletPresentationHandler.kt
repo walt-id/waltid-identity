@@ -2214,6 +2214,7 @@ object WalletPresentationHandler {
                 AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                     webResolveAuthReq = fetcher,
                     requestUri = requestUri,
+                    unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                     requestUriMethod = requestUriMethod,
                     expectedRequestObjectAudience = expectedRequestObjectAudience,
                     requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(

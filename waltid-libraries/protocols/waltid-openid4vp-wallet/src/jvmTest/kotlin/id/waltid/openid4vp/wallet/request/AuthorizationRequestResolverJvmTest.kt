@@ -12,6 +12,8 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.RequestConfiguration
 import id.waltid.openid4vp.wallet.PresentationRequestValidator
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.client.*
@@ -453,22 +455,29 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
-    fun `request URI GET prefers signed request objects and still accepts JSON`() = runBlocking {
-        val requestObjectType = "application/oauth-authz-req+jwt"
+    fun `request URI negotiation advertises only the representations supported by each policy`() = runBlocking {
+        val jwt = "application/oauth-authz-req+jwt"
+        val configuration = WebDataFetchingConfiguration(
+            request = RequestConfiguration(headers = mapOf(HttpHeaders.Accept to "application/json")),
+        )
+        val requests = mutableListOf<Pair<HttpMethod, List<String>?>>()
         HttpClient(MockEngine { request ->
-            assertEquals(HttpMethod.Get, request.method)
-            val accept = parseHeaderValue(request.headers.getAll(HttpHeaders.Accept).orEmpty().joinToString(","))
-            assertEquals(listOf(requestObjectType, "application/json"), accept.map { it.value })
-            assertTrue(accept[0].quality > accept[1].quality)
-            respond("signed-request-object", headers = headersOf(HttpHeaders.ContentType, requestObjectType))
-        }).use { client ->
-            val fetcher = WebDataFetcher.wrapping(client, id = "authorization-request-resolver-get-test")
-            for (method in listOf(null, RequestUriHttpMethod.GET)) {
-                val response = AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                    fetcher, "https://verifier.example/request.jwt", method,
-                )
-                assertEquals(HttpStatusCode.OK, response.status)
-                assertEquals(ContentType.parse(requestObjectType), response.contentType)
+            requests += request.method to request.headers.getAll(HttpHeaders.Accept)
+            respond("request-object", headers = headersOf(HttpHeaders.ContentType, jwt))
+        }) { configuration.applyConfigurationToHttpClient(this) }.use { client ->
+            val fetcher = WebDataFetcher.wrapping(client, "negotiation-test", configuration)
+            for (method in listOf(null, RequestUriHttpMethod.GET, RequestUriHttpMethod.POST)) {
+                for (policy in AuthorizationRequestResolver.UnsignedRequestObjectPolicy.entries) {
+                    AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        fetcher, "https://verifier.example/request", method,
+                        sendWalletMetadata = false, unsignedRequestObjectPolicy = policy,
+                    )
+                    val post = method == RequestUriHttpMethod.POST
+                    val accept = if (post || policy == AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED)
+                        jwt else "$jwt, application/json;q=0.9"
+                    assertEquals((if (post) HttpMethod.Post else HttpMethod.Get) to listOf(accept), requests.single())
+                    requests.clear()
+                }
             }
         }
     }

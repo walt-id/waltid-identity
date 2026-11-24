@@ -5,7 +5,10 @@ import android.content.Intent
 import android.hardware.biometrics.BiometricManager
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.TextView
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -46,6 +49,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -56,6 +61,35 @@ import java.util.regex.Pattern
 /** Opt-in instrumentation around the installed Preview app's real entry points, UI and store. */
 @RunWith(AndroidJUnit4::class)
 class ItbDemoWalletTest {
+    @Test
+    fun blockedPaymentWithoutSelectableCredentialsReportsTheWalletReason() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                activity.setContentView(TextView(activity).apply {
+                    text = "Payment instructions could not be retrieved."
+                    accessibilityDelegate = object : View.AccessibilityDelegate() {
+                        override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                            super.onInitializeAccessibilityNodeInfo(host, info)
+                            info.viewIdResourceName = "payment-consent-blocked"
+                        }
+                    }
+                })
+            }
+            val wallet = runBlocking { createAndroidDemoMobileWallet(context, demoWalletConfig()).wallet }
+            try {
+                val driver = DemoInteractions(context, UiDevice.getInstance(instrumentation), wallet, true, "itb.example")
+                val failure = assertThrows(ItbWalletRejection::class.java) {
+                    runBlocking { driver.present("fixture", ItbWalletInteraction.PaymentReview("Coffee", "EUR", "12.34"), false) }
+                }
+                assertEquals("demo_payment_review_metadata_unavailable", failure.code)
+            } finally {
+                runBlocking { wallet.close() }
+            }
+        }
+    }
+
     @Test
     fun runOwnedItbSessions() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
@@ -183,7 +217,7 @@ private class DemoInteractions(
         return ItbWalletResult(issuedCredentialIds = listOf(credential.id))
     }
 
-    private suspend fun present(
+    suspend fun present(
         credentialId: String?,
         payment: ItbWalletInteraction.PaymentReview?,
         provider: Boolean,
@@ -193,10 +227,11 @@ private class DemoInteractions(
             waitFor(submit, code = "demo_presentation_review_missing")
         } else {
             waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_review_missing") {
-                device.hasObject(By.pkg(context.packageName).res(submit)) || device.hasObject(blockedPaymentReview)
+                checkPaymentReview()
+                device.hasObject(By.pkg(context.packageName).res(submit))
             }
         }
-        if (credentialId != null) selectCredential(credentialId)
+        if (credentialId != null) selectCredential(credentialId) { if (payment != null) checkPaymentReview() }
         if (payment != null) verifyPaymentReview(payment)
         waitUntil(WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT, "demo_presentation_submit_disabled") {
             if (payment != null) checkPaymentReview()
@@ -250,25 +285,29 @@ private class DemoInteractions(
 
     private val blockedPaymentReview = By.pkg(context.packageName).res("payment-consent-blocked")
 
-    private suspend fun selectCredential(credentialId: String) {
+    private suspend fun selectCredential(credentialId: String, checkReview: () -> Unit) {
         val suffix = "${credentialId.length}:$credentialId"
         val options = By.res(Pattern.compile("wallet\\.presentationCredentialToggle\\..*" + Pattern.quote(suffix)))
-        var node = device.wait(Until.findObject(options), 5_000)
-        if (node == null) {
-            repeat(5) {
-                if (node == null) {
-                    with(WalletComposeE2EHelper) { device.scrollDown() }
-                    node = device.findObject(options)
-                }
+        var option: UiObject2? = null
+        var scrolls = 0
+        waitUntil(10_000, "demo_prerequisite_credential_not_available") {
+            checkReview()
+            option = device.findObject(options)
+            if (option == null && scrolls < 5) {
+                with(WalletComposeE2EHelper) { device.scrollDown() }
+                scrolls++
             }
+            option != null
         }
-        val option = node ?: throw ItbWalletRejection("demo_prerequisite_credential_not_available")
+        val row = checkNotNull(option)
         // The app renders a single required match as a read-only row without a selector.
-        if (!option.isClickable && !option.isCheckable) return
-        if (!option.isSelected && !option.isChecked) {
-            val tag = option.resourceName
+        if (!row.isClickable && !row.isCheckable) return
+        if (!row.isSelected && !row.isChecked) {
+            val tag = row.resourceName
+            checkReview()
             click(tag, "demo_prerequisite_credential_not_clickable")
             waitUntil(10_000, "demo_credential_not_selected") {
+                checkReview()
                 device.findObject(By.res(tag))?.let { it.isSelected || it.isChecked } == true
             }
         }
@@ -361,9 +400,8 @@ private class DemoInteractions(
                     return@waitUntil false
                 }
             }
-            if (device.hasObject(By.pkg(context.packageName).res(reviewTag)) ||
-                payment && device.hasObject(blockedPaymentReview)
-            ) true else {
+            if (payment) checkPaymentReview()
+            if (device.hasObject(By.pkg(context.packageName).res(reviewTag))) true else {
                 val combinedHeading = device.hasObject(By.copy(picker).textStartsWith("Share info with"))
                 val shareSheet = combinedHeading || device.hasObject(By.copy(picker).text("Share info"))
                 val transactionSheet = device.hasObject(By.copy(picker).text("Confirm transaction"))

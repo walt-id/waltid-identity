@@ -75,6 +75,7 @@ class ItbCaseRunner(
     private val executeWallet: suspend (ItbWalletInteraction) -> ItbWalletResult,
     private val caseTimeoutMillis: Long = 120_000,
     private val pollMillis: Long = 1_000,
+    private val walletConnected: () -> Boolean = { true },
 ) {
     init {
         require(caseTimeoutMillis > 0 && pollMillis > 0) { "ITB timeouts must be positive" }
@@ -86,6 +87,12 @@ class ItbCaseRunner(
         prerequisiteCredentialId: String? = null,
     ): ItbCaseResult {
         val start = Instant.now().toString()
+        if (!walletConnected()) {
+            return ItbCaseResult(
+                suite.id, case.id, null, ItbCaseResult.Outcome.NOT_RUN, ItbCaseResult.Phase.START,
+                false, false, null, false, null, start, start, errorCode = "device_connection_closed",
+            )
+        }
         if (case.prerequisite != null && prerequisiteCredentialId == null) {
             return ItbCaseResult(
                 suite.id, case.id, null, ItbCaseResult.Outcome.PREREQUISITE_FAILED, ItbCaseResult.Phase.START,
