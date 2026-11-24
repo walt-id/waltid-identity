@@ -87,6 +87,33 @@ object Issuer2RequestExamples {
         runtimeOverrides = CredentialOfferRuntimeOverrides(credentialStatus = tokenStatusEntry(94567)),
     )
 
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS =
+        PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS.copy(
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                credentialStatus = JsonArray(listOf(583, 9204, 172, 481, 7392).map(::tokenStatusEntry)),
+            ),
+        )
+
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_MDOC_STATUS =
+        PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS.copy(profileId = MDOC_MDL_PROFILE_ID)
+
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_W3C_STATUS =
+        PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS.copy(
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                credentialStatus = JsonArray(listOf(583, 9204, 172, 481, 7392).map { index ->
+                    JsonArray(listOf("revocation", "suspension").map { purpose ->
+                        buildJsonObject {
+                            put("id", "https://status.example.com/" + purpose + "#" + index)
+                            put("type", "BitstringStatusListEntry")
+                            put("statusPurpose", purpose)
+                            put("statusListIndex", index.toString())
+                            put("statusListCredential", "https://status.example.com/" + purpose)
+                        }
+                    })
+                }),
+            ),
+        )
+
     val PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES = MultiCredentialOfferCreateRequest(
         credentials = listOf(94567, 12345).map { index ->
             CredentialOfferCredential(
@@ -542,6 +569,9 @@ object Issuer2RequestExamples {
         "[pre-authorized][single][shared status][W3C]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_W3C_STATUS,
         "[pre-authorized][single][shared status][SD-JWT]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_SD_JWT_STATUS,
         "[pre-authorized][single][shared status][mdoc]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SHARED_MDOC_STATUS,
+        "[pre-authorized][single][preallocated status groups][W3C]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_W3C_STATUS,
+        "[pre-authorized][single][preallocated status groups][SD-JWT]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_SD_JWT_STATUS,
+        "[pre-authorized][single][preallocated status groups][mdoc]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_PREALLOCATED_MDOC_STATUS,
         "[pre-authorized][multiple][different statuses per item]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES,
         "[authorized][multiple][different statuses per item]" to PROFILE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_WITH_DISTINCT_STATUSES,
         "[pre-authorized][single][by-value]" to PROFILE_PRE_AUTHORIZED_OFFER_BY_VALUE,

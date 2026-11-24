@@ -35,6 +35,7 @@ data class CredentialOfferRuntimeOverrides(
     val msoData: MsoData? = null,
     val x5Chain: List<String>? = null,
     val notifications: IssuanceNotifications? = null,
+    /** Replaces profile status: shared object/flat W3C group, or per-copy SD-JWT/mdoc objects/W3C groups. */
     val credentialStatus: JsonElement? = null,
 )
 

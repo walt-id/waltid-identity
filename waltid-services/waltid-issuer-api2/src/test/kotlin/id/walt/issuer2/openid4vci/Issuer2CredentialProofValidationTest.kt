@@ -16,8 +16,8 @@ import id.walt.crypto2.jose.exportPublicJwk
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.issuer2.domain.IssuanceSessionStatus
-import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
+import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.testsupport.Issuer2CredentialScenario
 import id.walt.issuer2.testsupport.Issuer2CredentialFamily
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
@@ -268,6 +268,44 @@ class Issuer2CredentialProofValidationTest {
     }
 
     @Test
+    fun `batch checks the public keys bound to the signed copies`() = testApplication {
+        installIssuer2WithConfigFiles()
+        val flow = prepareFlow(apiClient())
+        val first = JWKKey.generate(KeyType.secp256r1)
+        val second = JWKKey.generate(KeyType.secp256r1)
+        suspend fun signedProof(key: Key, kid: String): String {
+            val jwk = JsonObject(key.getPublicKey().exportJWKObject() + ("kid" to JsonPrimitive(kid)))
+            return proof(key, flow.nonce(), jwk = jwk).jwt!!.single()
+        }
+        val firstProof = signedProof(first, "one")
+        val sameKey = signedProof(first, "two")
+        assertRejectedCredentialRequest(flow.request(Proofs(jwt = listOf(firstProof, sameKey))))
+
+        val issued = flow.request(Proofs(jwt = listOf(firstProof, signedProof(second, "one"))))
+        assertEquals(HttpStatusCode.OK, issued.status, issued.bodyAsText())
+        assertEquals(listOf(first.getThumbprint(), second.getThumbprint()), issued.sdJwtHolderThumbprints())
+
+        val single = flow.request(Proofs(jwt = listOf(sameKey)))
+        assertEquals(HttpStatusCode.OK, single.status, single.bodyAsText())
+    }
+
+    @Test
+    fun `an offer pinned to one key can issue a single copy`() = testApplication {
+        installIssuer2WithConfigFiles()
+        val holder = JWKKey.generate(KeyType.secp256r1)
+        val flow = prepareFlow(apiClient(), runtimeOverrides = CredentialOfferRuntimeOverrides(
+            expectedCredentialProofKeyJwk = holder.getPublicKey().exportJWKObject(),
+        ))
+        val pinned = proof(holder, flow.nonce())
+        val other = proof(JWKKey.generate(KeyType.secp256r1), flow.nonce())
+        assertRejectedCredentialRequest(flow.request(Proofs(jwt = pinned.jwt!! + other.jwt!!)))
+        assertRejectedCredentialRequest(flow.request(Proofs(jwt = pinned.jwt!! + pinned.jwt!!)))
+        val single = flow.request(pinned)
+        assertEquals(HttpStatusCode.OK, single.status, single.bodyAsText())
+        assertEquals(listOf(holder.getThumbprint()), single.sdJwtHolderThumbprints())
+    }
+
+    @Test
     fun `non-DID proof kid resolves attested bindings before acceptance and issuance`() = testApplication {
         val attester = JWKKey.generate(KeyType.secp256r1)
         val holders = List(3) { JWKKey.generate(KeyType.secp256r1) }
@@ -441,6 +479,11 @@ class Issuer2CredentialProofValidationTest {
         }
     }
 
+    private suspend fun HttpResponse.sdJwtHolderThumbprints() = body<JsonObject>().getValue("credentials").jsonArray.map {
+        val jwt = it.jsonObject.getValue("credential").jsonPrimitive.content
+        JWKKey.importJWK(requireNotNull(SDJwtVC.parse(jwt).holderKeyJWK).toString()).getOrThrow().getThumbprint()
+    }
+
     private suspend fun prepareFlow(
         client: HttpClient,
         scenario: Issuer2CredentialScenario = Issuer2CredentialScenarios.identitySdJwt,
@@ -472,6 +515,7 @@ class Issuer2CredentialProofValidationTest {
         type: String = "openid4vci-proof+jwt",
         kid: String? = null,
         includeJwk: Boolean = true,
+        jwk: JsonObject? = null,
     ): Proofs {
         val payload = buildJsonObject {
             put("aud", audience)
@@ -481,7 +525,7 @@ class Issuer2CredentialProofValidationTest {
         val header = buildJsonObject {
             put("typ", type)
             put("alg", key.keyType.jwsAlg)
-            if (includeJwk) put("jwk", key.getPublicKey().exportJWKObject())
+            if (includeJwk) put("jwk", jwk ?: key.getPublicKey().exportJWKObject())
             kid?.let { put("kid", it) }
         }
         return Proofs(jwt = listOf(signingKey.signJws(payload.toString().encodeToByteArray(), header)))
