@@ -71,6 +71,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api2"))
     testImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     testImplementation(identityLibs.junit.jupiter.api)
+    testImplementation(identityLibs.testcontainers.junit)
     testImplementation(identityLibs.playwright) {
         exclude(group = "org.junit.jupiter")
         exclude(group = "org.junit.platform")
@@ -160,8 +161,9 @@ tasks.register<Test>("browserTest") {
     shouldRunAfter(tasks.test)
 }
 
-tasks.register<Test>("redisTest") {
-    description = "Runs issuer2 Redis-backed repository tests. Requires ISSUER2_REDIS_HOST."
+// ConfiguredPersistence selects its backend once per JVM.
+val redisTest = tasks.register<Test>("redisTest") {
+    description = "Runs issuer2 Redis-backed repository tests with Testcontainers. Requires Docker."
     group = "verification"
 
     testClassesDirs = sourceSets["test"].output.classesDirs
@@ -171,6 +173,15 @@ tasks.register<Test>("redisTest") {
         includeTags("redis")
     }
     shouldRunAfter(tasks.test)
+
+    val runningInCi = providers.environmentVariable("CI").orNull.toBoolean()
+    outputs.upToDateWhen { !runningInCi }
+}
+
+if (!providers.gradleProperty("skipIssuer2RedisTests").orNull.toBoolean()) {
+    tasks.check {
+        dependsOn(redisTest)
+    }
 }
 
 // Public-service acceptance is explicit and must never reuse a cached successful run.

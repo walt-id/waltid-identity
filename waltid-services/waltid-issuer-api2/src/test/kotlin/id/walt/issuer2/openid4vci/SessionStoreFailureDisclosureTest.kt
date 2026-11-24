@@ -77,13 +77,16 @@ class SessionStoreFailureDisclosureTest {
         ), requestId = "token").payload.getValue("access_token").jsonPrimitive.content
 
         storeDown = true
-        val thrown = assertFails {
-            protocol.processCredentialRequest(
-                listOf("Bearer $token"), emptyList(),
-                buildJsonObject { put("credential_configuration_id", offer.credentialConfigurationIds.single()) },
-                "credential",
-            )
-        }
-        assertSame(storeFailure, thrown, "The store failure must reach the error handler, not become a protocol error")
+        val response = protocol.processCredentialRequest(
+            listOf("Bearer $token"), emptyList(),
+            buildJsonObject { put("credential_configuration_id", offer.credentialConfigurationIds.single()) },
+            "credential",
+        )
+        // invalid_token would tell the wallet to discard a valid token; the store's message names its host.
+        assertEquals(500, response.status)
+        val body = response.body.toString()
+        assertTrue("server_error" in body, body)
+        assertFalse("invalid_token" in body, body)
+        assertFalse("secret-host" in body, body)
     }
 }

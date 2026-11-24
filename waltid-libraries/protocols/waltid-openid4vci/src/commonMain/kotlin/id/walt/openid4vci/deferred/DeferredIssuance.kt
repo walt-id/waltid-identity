@@ -201,13 +201,24 @@ class DeferredIssuance(
         mutateClaim(sessionId, claim) { it.copy(claimId = null, claimExpiresAt = null) }
     }
 
+    /** Discard a claimed acceptance after the service definitively rejected issuance before committing resources. */
+    suspend fun discardUnissued(sessionId: String, claim: DeferredTransaction) {
+        mutateClaim(sessionId, claim) {
+            if (it.denied) denied()
+            check(it.response == null && it.progress == null) { "Deferred issuance already has a checkpoint" }
+            null
+        }
+    }
+
     fun pending(transactionId: String) = CredentialResponse(transactionId = transactionId, interval = config.pollingIntervalSeconds)
 
-    private suspend fun mutateClaim(sessionId: String, claim: DeferredTransaction, transform: (DeferredTransaction) -> DeferredTransaction) {
+    private suspend fun mutateClaim(sessionId: String, claim: DeferredTransaction, transform: (DeferredTransaction) -> DeferredTransaction?) {
         update(sessionId) { _, state ->
             val current = state.transactions[claim.id] ?: invalidTransaction()
             check(!current.consumed && current.claimId == claim.claimId && claim.claimId != null) { "Deferred transaction claim was lost" }
-            state.copy(transactions = state.transactions + (claim.id to transform(current)))
+            val replacement = transform(current)
+            state.copy(transactions = if (replacement == null) state.transactions - claim.id
+                else state.transactions + (claim.id to replacement))
         }
     }
 
