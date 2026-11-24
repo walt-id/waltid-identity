@@ -38,6 +38,46 @@ $ docker compose up
 *Note:* If you are facing issues with the containers, remove the existing ones with `docker compose down` (add `-v` to
 also drop the volumes) and run the command above again.
 
+### Upgrading an existing Wallet2 database
+
+Older Compose releases shipped a nested `wallet2-persistence.conf` that fell back to SQLite at
+`/waltid-wallet-api2/wallet2.db` inside the container. To keep using that database, stop Wallet2 and
+copy the file before replacing the container or starting it with the corrected PostgreSQL configuration.
+Run these commands from the Compose directory:
+
+```bash
+docker compose stop wallet-api2
+mkdir -p wallet-api2/data
+docker compose cp wallet-api2:/waltid-wallet-api2/wallet2.db ./wallet-api2/data/wallet2.db
+```
+
+If the stopped container also contains `wallet2.db-wal` or `wallet2.db-shm`, copy those files into
+the same directory. Set `wallet-api2/config/wallet2-persistence.conf` to the following:
+
+```hocon
+jdbcUrl = "jdbc:sqlite:/waltid-wallet-api2/data/wallet2.db"
+driverClassName = "org.sqlite.JDBC"
+```
+
+Add a `wallet2-sqlite.override.yaml` beside `docker-compose.yaml`:
+
+```yaml
+services:
+  wallet-api2:
+    volumes:
+      - ./wallet-api2/data:/waltid-wallet-api2/data
+```
+
+Use both files when starting Wallet2 or managing the upgraded stack:
+
+```bash
+docker compose -f docker-compose.yaml -f wallet2-sqlite.override.yaml up -d wallet-api2
+```
+
+Startup adds the account tables to the restored database and preserves its wallets and ownership
+links. Older releases kept password verifiers in memory, so the SQLite backup cannot restore those
+logins. Registering an email creates a new account with its own wallets.
+
 ### Stop the Services
 
 ```bash

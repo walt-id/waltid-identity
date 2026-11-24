@@ -20,7 +20,7 @@ object OSSWallet2FeatureCatalog : ServiceFeatureCatalog {
 
     /**
      * When enabled, wallet and auth account data are persisted to SQL (SQLite by default, Postgres optional).
-     * Configure via the `wallet2-persistence` HOCON block.
+     * Configure through the `wallet2-persistence.conf` file.
      * When disabled (default), an in-memory store is used - data is lost on restart.
      */
     val persistenceFeature =

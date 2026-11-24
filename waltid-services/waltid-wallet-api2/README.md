@@ -149,11 +149,9 @@ docker run --rm \
 
 Override `wallet2-persistence.conf` by placing a custom one in your mounted config directory:
 
-```
-wallet2-persistence {
-    jdbcUrl       = "jdbc:postgresql://db:5432/wallet2?user=wallet&password=secret"
-    driverClassName = "org.postgresql.Driver"
-}
+```hocon
+jdbcUrl = "jdbc:postgresql://db:5432/wallet2?user=wallet&password=secret"
+driverClassName = "org.postgresql.Driver"
 ```
 
 ```bash
