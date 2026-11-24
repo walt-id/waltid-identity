@@ -221,3 +221,7 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+### Failed same-device sessions
+
+Failed same-device sessions expose diagnostic summaries through info, session lists, webhooks and SSE: the failure category, failed policy names, and policy pass/fail outcomes. A response code is not required for these summaries. Raw presentation data, credential claims, policy payloads, raw exception messages and wallet-provided descriptions remain hidden. Successful same-device completion still requires the browser's callback response code. Stored operator details and cross-device views are unchanged.
