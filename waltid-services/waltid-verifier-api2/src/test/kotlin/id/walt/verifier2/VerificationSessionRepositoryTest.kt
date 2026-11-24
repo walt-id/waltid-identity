@@ -1,6 +1,10 @@
 package id.walt.verifier2
 
 import id.walt.commons.web.plugins.configureStatusPages
+import id.walt.ktornotifications.WebhookDelivery
+import id.walt.ktornotifications.WebhookNotifier
+import id.walt.ktornotifications.core.KtorSessionNotifications.WebhookRetryPolicy
+import java.nio.file.Files
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationVerificationUnavailableException
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse
@@ -33,6 +37,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 
@@ -304,6 +309,42 @@ class VerificationSessionRepositoryTest {
     }
 
     @Test
+    fun `erasure routes remove a callback waiting for retry across restart`() = testApplication {
+        val root = Files.createTempDirectory("verifier-erasure")
+        val repository = InMemoryVerificationSessionRepository()
+        val pending = Files.createDirectories(root.resolve("pending"))
+        for (id in listOf("purged", "deleted")) {
+            repository.create(session(id))
+            val delivery = WebhookDelivery(
+                deliveryId = id, url = "https://receiver.example", payload = """{"session":{"presentedRawData":"private"}}""",
+                contentDigest = "digest", target = id, event = "credential_policy_results_available", requestId = null,
+                basicAuthUser = null, basicAuthPass = null, bearerToken = null, retryPolicy = WebhookRetryPolicy(),
+                enqueueOrder = 1, attemptCount = 1, createdAtEpochMilliseconds = 0,
+                nextAttemptAtEpochMilliseconds = Long.MAX_VALUE, sessionOwner = id,
+            )
+            Files.writeString(pending.resolve("$id.json"), Json.encodeToString(delivery))
+        }
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+        WebhookNotifier.stop()
+        try {
+            WebhookNotifier.start(root)
+            assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/purged/pii").status)
+            assertEquals(false, Files.exists(pending.resolve("purged.json")))
+            assertEquals(true, Files.exists(pending.resolve("deleted.json")))
+            assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/deleted").status)
+            assertEquals(false, Files.exists(pending.resolve("deleted.json")))
+        } finally {
+            WebhookNotifier.stop()
+            root.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
     fun `pii route removes personal data but keeps the session and its outcome`() = testApplication {
         // The erasure counterpart to deleting: what is left has to still show that a verification happened and
         // how it ended, which is the whole reason for having both.
@@ -333,6 +374,73 @@ class VerificationSessionRepositoryTest {
             remaining.session.status,
             "the outcome is what is being kept",
         )
+    }
+
+    @Test
+    fun `purging an active attempt leaves the reusable session available and fenced from rollback`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+        for (admitted in listOf(false, true)) {
+            val id = "overlap-$admitted"
+            repository.create(session(id).copy(reattemptable = true))
+            val old = repository.claimForProcessingWithOriginal(id)
+            if (admitted) repository.update(id) {
+                attempted = true
+                status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
+            }
+
+            assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/$id/pii").status)
+            repository.restoreProcessingClaim(old)
+            val next = repository.claimForProcessingWithOriginal(id)
+            assertEquals(admitted, next.original.session.attempted)
+            assertEquals(
+                if (admitted) Verification2Session.VerificationSessionStatus.FAILED
+                else Verification2Session.VerificationSessionStatus.IN_USE,
+                next.original.session.status,
+            )
+            assertTrue(next.original.session.webhookGeneration > old.original.session.webhookGeneration)
+        }
+    }
+
+    @Test
+    fun `purge before admission preserves the previous outcome and presentation ID`() = testApplication {
+        val repository = InMemoryVerificationSessionRepository()
+        application {
+            install(ContentNegotiation) { json() }
+            install(SSE)
+            configureStatusPages()
+            routing { Verifier2Service.run { registerRoute(repository) } }
+        }
+        val outcomes = listOf(
+            Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+            Verification2Session.VerificationSessionStatus.FAILED,
+        )
+        for (outcome in outcomes) {
+            val id = "retry-purge-${outcome.name}"
+            val previous = session(id).copy(
+                status = outcome,
+                attempted = true,
+                presentationId = "previous-presentation",
+                statusReason = if (outcome.successful == false) "wallet declined" else null,
+                presentedRawData = Verification2Session.PresentedRawData(mapOf("stub" to listOf("previous-token")), null),
+            )
+            repository.create(previous)
+            val retry = repository.claimForProcessingWithOriginal(id)
+            assertEquals(HttpStatusCode.NoContent, client.delete("/verification-session/$id/pii").status)
+            repository.restoreProcessingClaim(retry)
+
+            val retained = repository.claimForProcessingWithOriginal(id).original.session
+            assertEquals(outcome, retained.status)
+            assertEquals(previous.presentationId, retained.presentationId)
+            assertEquals(previous.statusReason, retained.statusReason)
+            assertNull(retained.presentedRawData)
+            assertTrue(retained.webhookGeneration > retry.original.session.webhookGeneration)
+        }
     }
 
     @Test

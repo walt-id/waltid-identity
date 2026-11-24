@@ -473,7 +473,7 @@ Kotlin enum constants are `SCREAMING_SNAKE_CASE`; webhook and SSE payloads use t
 
 Offer events report management and retrieval facts. Protocol endpoint events report one final outcome. A successful request is emitted only after its protocol response has been constructed.
 
-An event contains the issuance session only after the request has been correlated using trusted protocol state. An unknown code, malformed request, or failure before grant resolution is published only on the issuer-level stream with its request ID and an empty session. The request ID is the Ktor call ID shared by the response `X-Request-ID` header and logging MDC; issuer2 accepts a valid incoming value or generates one when absent. The service does not decode an unverified token merely to obtain a session ID. Notification delivery is best effort and never changes the protocol response.
+An event contains the issuance session only after the request has been correlated using trusted protocol state. An unknown code, malformed request, or failure before grant resolution is published only on the issuer-level stream with its request ID and an empty session. The request ID is the Ktor call ID shared by the response `X-Request-ID` header and logging MDC; issuer2 accepts a valid incoming value or generates one when absent. The service does not decode an unverified token merely to obtain a session ID. Publishing an event preserves the protocol response. Issuer2 logs an error if it cannot enqueue the webhook. Once the write succeeds, the outbox retries delivery according to the configured policy.
 
 Nonce request events are always issuer-level. The OpenID4VCI Nonce Endpoint is not protected by an access token and its request contains no issuance-session identifier.
 
@@ -494,7 +494,7 @@ Failure events carry the protocol error directly on the event envelope:
 
 ### Ordering and delivery
 
-Events raised while handling a single request are delivered in order, on both transports. Concurrent requests on the same session may interleave. `credential_offer_created` is effectively webhook-only: it is published before the session id is returned to the caller, so no SSE subscriber can exist yet.
+Events raised while handling a single request are published to SSE and enqueued for webhook delivery in order. Concurrent requests on the same session may interleave. Webhook attempts can arrive out of order. Use the `Webhook-Sequence` header to recover enqueue order within a service process. `credential_offer_created` is effectively webhook-only: it is published before the session id is returned to the caller, so no SSE subscriber can exist yet.
 
 On successful credential issuance the session is persisted as `SUCCESSFUL` before the credential success event and `issuance_status_changed` are published. A terminal credential failure is persisted as `UNSUCCESSFUL` before the credential failure event and `issuance_status_changed` are published. The status event carries `status`, `statusReason`, and `isClosed`.
 
@@ -519,6 +519,26 @@ The original request remains supported on `POST /issuer2/credential-offers`:
   }
 }
 ```
+
+To authenticate issuance webhooks, add `signing_secret` to the offer's notification override:
+
+```json
+{
+  "profileId": "openBadgeCredential",
+  "authMethod": "PRE_AUTHORIZED",
+  "runtimeOverrides": {
+    "notifications": {
+      "webhook": {
+        "url": "https://receiver.example/issuer2",
+        "signing_secret": "replace-with-a-random-32-byte-secret"
+      }
+    }
+  }
+}
+```
+
+Issuer2 signs each outbound attempt using the [webhook receiver contract](../../waltid-libraries/web/waltid-ktor-notifications/README.md#signed-callbacks).
+The secret is retained internally for retries and omitted from public session and callback payloads.
 
 Its flat receipt includes `profileId`, `offerId`, `credentialOffer`, `authMethod`,
 `issuerStateMode`, `valueMode`, `expiresAt`, and `txCodeValue`, subject to the existing
