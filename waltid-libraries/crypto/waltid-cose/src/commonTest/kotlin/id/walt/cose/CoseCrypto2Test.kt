@@ -11,6 +11,20 @@ class CoseCrypto2Test {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     @Test
+    fun `duplicate protected labels are rejected without rewriting header bytes`() {
+        for (encoded in listOf("a201260126", "bf01260126ff", "a20126180126")) {
+            val protected = encoded.hexToByteArray()
+            val message = CoseSign1(protected, CoseHeaders(), byteArrayOf(), byteArrayOf())
+            assertFailsWith<IllegalArgumentException> { message.protectedAlgorithm() }
+            assertContentEquals(protected, message.protected)
+        }
+        val protected = "bf180126ff".hexToByteArray()
+        val message = CoseSign1(protected, CoseHeaders(), byteArrayOf(), byteArrayOf())
+        assertEquals(Cose.Algorithm.ES256, message.protectedAlgorithm())
+        assertContentEquals(protected, message.protected)
+    }
+
+    @Test
     fun `protected ES256 signs and verifies attached and detached payloads`() = runTest {
         val key = generate(KeySpec.Ec(EcCurve.P256))
         val headers = CoseHeaders(algorithm = Cose.Algorithm.ES256)

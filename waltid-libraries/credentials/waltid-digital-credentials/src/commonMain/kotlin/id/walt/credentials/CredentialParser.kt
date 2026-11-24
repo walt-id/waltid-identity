@@ -2,6 +2,7 @@
 
 package id.walt.credentials
 
+import id.walt.mdoc.encoding.requireSupportedMdocVersion
 import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
@@ -27,6 +28,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
+import id.walt.mdoc.encoding.validateMdocCbor
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
@@ -186,6 +188,26 @@ object CredentialParser {
         }.getOrThrow()
 
 
+        return handleMdocDocument(credential, document)
+    }
+
+    /** OpenID4VP mso_mdoc presentations contain one DeviceResponse, not a bare issuance credential. */
+    suspend fun handleMdocsPresentation(credential: String, base64: Boolean): Pair<CredentialDetectionResult, MdocsCredential> {
+        val bytes = if (base64) credential.decodeFromBase64Url() else credential.hexToByteArray()
+        validateMdocCbor(bytes)
+        val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(bytes)
+        require(response.status == 0u) { "Mdoc DeviceResponse status must indicate success" }
+        requireSupportedMdocVersion(response.version)
+        val document = requireNotNull(response.documents?.singleOrNull()) {
+            "An OpenID4VP mdoc presentation must contain exactly one document"
+        }
+        return handleMdocDocument(credential, document)
+    }
+
+    suspend fun handleMdocDocument(
+        credential: String,
+        document: Document,
+    ): Pair<CredentialDetectionResult, MdocsCredential> {
         // Build a JSON object that includes the docType for the DcqlMatcher
         val credentialData = buildJsonObject {
             put("docType", JsonPrimitive(document.docType))
