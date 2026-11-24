@@ -331,22 +331,8 @@ jobs:
           set -euo pipefail
           wget -q -O cloudflared "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
           chmod +x cloudflared
-          log="$RUNNER_TEMP/lt_role.txt"
-          ./cloudflared tunnel --url "http://localhost:${ROLE_PORT}" > "$log" 2>&1 &
-          pid=$!
-          echo "$pid" > "$RUNNER_TEMP/lt_role.pid"
-          url=""
-          for i in $(seq 1 60); do
-            url=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$log" | head -n 1 || true)
-            [ -n "$url" ] && break
-            kill -0 "$pid" 2>/dev/null || { echo "::error::${ROLE} cloudflared exited before printing a URL"; cat "$log"; exit 1; }
-            sleep 1
-          done
-          if [ -z "$url" ]; then
-            echo "::error::Failed to get ${ROLE} tunnel URL after ${i}s"
-            cat "$log"
-            exit 1
-          fi
+          url=$(bash waltid-identity/.github/scripts/ci/start-quick-tunnel.sh \
+            ./cloudflared "http://localhost:${ROLE_PORT}" "$RUNNER_TEMP/lt_role.txt" "$RUNNER_TEMP/lt_role.pid")
           echo "${ROLE} tunnel: $url"
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
@@ -740,6 +726,7 @@ jobs:
           fi
           CLOUDFLARED="$RUNNER_TEMP/cloudflared-issuer2"
           TUNNEL_LOG="$RUNNER_TEMP/cloudflared-issuer2.log"
+          TUNNEL_PID_FILE="$RUNNER_TEMP/cloudflared-issuer2.pid"
           ISSUER_LOG="$RUNNER_TEMP/issuer2.log"
           ISSUER_CONFIG="$RUNNER_TEMP/issuer-service-conformance.conf"
           FIXTURES="$GITHUB_WORKSPACE/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/issuer2"
@@ -759,17 +746,9 @@ jobs:
             http://127.0.0.1:7005 7006 "$OPENID4VCI_CONFORMANCE_DEFERRED_EVIDENCE_FILE" \
             > "$RUNNER_TEMP/issuer-deferred-proxy.log" 2>&1 &
           echo "$!" > "$RUNNER_TEMP/issuer-deferred-proxy.pid"
-          "$CLOUDFLARED" tunnel --url http://127.0.0.1:7006 > "$TUNNEL_LOG" 2>&1 &
-          CF_PID=$!
-          echo "$CF_PID" > "$RUNNER_TEMP/cloudflared-issuer2.pid"
-          TUNNEL_URL=""
-          for attempt in $(seq 1 60); do
-            TUNNEL_URL=$(grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" | head -n 1 || true)
-            [ -n "$TUNNEL_URL" ] && break
-            kill -0 "$CF_PID" 2>/dev/null || { echo "::error::Issuer tunnel exited during startup"; exit 1; }
-            sleep 1
-          done
-          [ -n "$TUNNEL_URL" ] || { echo "::error::No issuer tunnel URL after 60s"; exit 1; }
+          TUNNEL_URL=$(bash waltid-identity/.github/scripts/ci/start-quick-tunnel.sh \
+            "$CLOUDFLARED" http://127.0.0.1:7006 "$TUNNEL_LOG" "$TUNNEL_PID_FILE")
+          CF_PID=$(cat "$TUNNEL_PID_FILE")
           sed "s|__ISSUER_BASE_URL__|$TUNNEL_URL|g" "$FIXTURES/issuer-service-ci.conf.template" > "$ISSUER_CONFIG"
 
           pushd waltid-identity/waltid-services/waltid-issuer-api2 >/dev/null

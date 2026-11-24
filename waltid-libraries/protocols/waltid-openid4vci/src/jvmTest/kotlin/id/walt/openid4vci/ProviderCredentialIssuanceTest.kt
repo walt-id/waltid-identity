@@ -174,7 +174,7 @@ class ProviderCredentialIssuanceTest {
         DidService.minimalInit()
         val holderDid = DidService.registerByKey("key", holderKey).did
         val holderKid = "$holderDid#${holderDid.removePrefix("did:key:")}"
-        assertFailsWith<NoSuchElementException> {
+        assertFailsWith<IllegalArgumentException> {
             Crypto2JwtKeyResolver().resolveFromDid(holderDid, "$holderDid#unknown")
         }
         val proofPayload = buildJsonObject {
