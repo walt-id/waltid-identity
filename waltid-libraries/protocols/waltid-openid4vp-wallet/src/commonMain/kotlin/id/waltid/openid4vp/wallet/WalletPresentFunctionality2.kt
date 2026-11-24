@@ -83,6 +83,32 @@ object WalletPresentFunctionality2 {
 
     private val webPostToken = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_POST_TOKEN)
 
+    /** Evaluates PRESENT policies over the original credentials selected for presentation. */
+    suspend fun requireHolderPoliciesAllow(
+        policies: Flow<HolderPolicy>,
+        selectedCredentials: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+    ) = evaluateHolderPolicies(policies, selectedCredentials).requireAllow()
+
+    private suspend fun evaluateHolderPolicies(
+        policies: Flow<HolderPolicy>,
+        selectedCredentials: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+    ): HolderPolicy.HolderPolicyAction? {
+        val presentationPolicies = policies.filter {
+            it.direction == null || it.direction == HolderPolicy.HolderPolicyDirection.PRESENT
+        }
+        val credentials = selectedCredentials.values.flatMap { matches ->
+            matches.map { (it.credential as RawDcqlCredential).originalCredential as DigitalCredential }
+        }
+        return HolderPolicyEngine.evaluate(presentationPolicies, credentials.asFlow())
+    }
+
+    private fun HolderPolicy.HolderPolicyAction?.requireAllow(): Unit = when (this) {
+        HolderPolicy.HolderPolicyAction.ALLOW -> Unit
+        HolderPolicy.HolderPolicyAction.BLOCK ->
+            throw IllegalArgumentException("Presentation execution was blocked by Holder Policy.")
+        null -> throw IllegalArgumentException("Presentation execution was not allowed by any Holder Policy.")
+    }
+
     private fun mdocPresentationKeyResolver(
         resolver: (suspend (String, DigitalCredential) -> Crypto2Key)?,
     ): CredentialPresentationKeyResolver? = resolver?.let { legacy ->
@@ -1398,31 +1424,9 @@ object WalletPresentFunctionality2 {
             return walletRejectHandling(authorizationRequest, error.code)
         }
 
-        // Apply holder policies.
         if (holderPoliciesToRun != null) {
-            // transaction_data checks are intentionally not implemented as HolderPolicy checks:
-            // HolderPolicyEngine receives credentials only and has no authorization-request context.
-            // TODO: handle disclosures from DcqlMatchResult
-            val relevantHolderPolicies = holderPoliciesToRun
-                .filter { it.direction == null || it.direction == HolderPolicy.HolderPolicyDirection.PRESENT }
-            val credentialsToEvaluate = credentials.values.flatMap { matchResults ->
-                matchResults.map { matchResult ->
-                    // TODO: handle matchResult.selectedDisclosures
-                    (matchResult.credential as RawDcqlCredential).originalCredential as DigitalCredential
-                }
-            }
-            val evalResult = HolderPolicyEngine.evaluate(relevantHolderPolicies, credentialsToEvaluate.asFlow())
-            when {
-                runPolicies == null && evalResult == null -> { /* ok */
-                }
-
-                runPolicies == true -> {
-                    if (evalResult == HolderPolicy.HolderPolicyAction.BLOCK)
-                        throw IllegalArgumentException("Presentation execution was blocked by Holder Policy.")
-                    if (evalResult == null)
-                        throw IllegalArgumentException("Presentation execution was not allowed by any Holder Policy.")
-                }
-            }
+            val policyResult = evaluateHolderPolicies(holderPoliciesToRun, credentials)
+            if (runPolicies == true) policyResult.requireAllow()
         }
 
         requireCurrentPresentationReview()
