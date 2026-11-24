@@ -1,3 +1,4 @@
+import Dispatch
 import Foundation
 import UIKit
 import UserNotifications
@@ -5,11 +6,17 @@ import UserNotifications
 /// App-level delivery. The system gets no wallet or credential identifiers.
 @MainActor
 public final class WalletDemoCredentialStatusNotifications: NSObject, UNUserNotificationCenterDelegate {
-    public static let shared = WalletDemoCredentialStatusNotifications()
+    public static let shared = WalletDemoCredentialStatusNotifications { removeStatusNotifications() }
     public static let openHome = Notification.Name("wallet.credential-status.open-home")
     nonisolated private static let identifier = "wallet.credential-status"
+    private let removeNotifications: @Sendable () -> Void
     private var openRequested = false
     private var requestingPermission = false
+    private var clearing: Task<Void, Never>?
+
+    init(removeNotifications: @escaping @Sendable () -> Void) {
+        self.removeNotifications = removeNotifications
+    }
 
     public func register() {
         UNUserNotificationCenter.current().delegate = self
@@ -35,6 +42,8 @@ public final class WalletDemoCredentialStatusNotifications: NSObject, UNUserNoti
     func postIfAllowed(isCurrent: @MainActor () -> Bool) async {
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
+        // Finish clearing an older alert before posting its replacement.
+        while let clearing { await clearing.value }
         guard isCurrent(), UIApplication.shared.applicationState == .background,
               settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
         let content = UNMutableNotificationContent()
@@ -43,6 +52,20 @@ public final class WalletDemoCredentialStatusNotifications: NSObject, UNUserNoti
     }
 
     public func clear() {
+        guard clearing == nil else { return }
+        clearing = Task { [removeNotifications] in
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                // The system notification service can block removal calls.
+                DispatchQueue.global(qos: .utility).async {
+                    removeNotifications()
+                    continuation.resume()
+                }
+            }
+            clearing = nil
+        }
+    }
+
+    nonisolated private static func removeStatusNotifications() {
         let center = UNUserNotificationCenter.current()
         center.removePendingNotificationRequests(withIdentifiers: [Self.identifier])
         center.removeDeliveredNotifications(withIdentifiers: [Self.identifier])

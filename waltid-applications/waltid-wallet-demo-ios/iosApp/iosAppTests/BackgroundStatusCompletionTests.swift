@@ -38,6 +38,21 @@ final class BackgroundStatusCompletionTests: XCTestCase {
 }
 
 @MainActor
+final class BackgroundStatusNotificationTests: XCTestCase {
+    func testClearingNotificationsRunsOffTheMainThread() async {
+        let cleared = expectation(description: "Status notifications cleared")
+        let notifications = WalletDemoCredentialStatusNotifications {
+            XCTAssertFalse(Thread.isMainThread, "Notification removal must not block wallet UI")
+            cleared.fulfill()
+        }
+
+        notifications.clear()
+
+        await fulfillment(of: [cleared], timeout: 5)
+    }
+}
+
+@MainActor
 final class BackgroundStatusSchedulerTests: XCTestCase {
     func testReconciliationDoesNotCancelWithoutAPreviousBinding() throws {
         var cancelledRequests = 0
