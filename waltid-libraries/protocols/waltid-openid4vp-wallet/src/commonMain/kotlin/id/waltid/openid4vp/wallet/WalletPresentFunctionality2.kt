@@ -90,8 +90,8 @@ object WalletPresentFunctionality2 {
     /**
      * Requires an allow decision for the selected credentials and presentation context.
      * Credential checks see the original credentials, including withheld claims. Disclosed-claim
-     * checks see only the claims carried by the presentation. Transaction checks inspect values
-     * already validated by OpenID4VP, which also binds them to the holder proof.
+     * checks see only the claims carried by the presentation. Transaction checks inspect the contents
+     * of protocol-validated request items. OpenID4VP also binds those items to the holder proof.
      */
     suspend fun requireHolderPoliciesAllow(
         policies: Flow<HolderPolicy>,
