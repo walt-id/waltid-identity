@@ -60,13 +60,18 @@ object SelfIssuedIdTokenValidator {
         },
         allowedAlgorithms: Set<JwsAlgorithm> = JwsAlgorithm.entries.toSet(),
     ) {
-        val decoded = runCatching { CompactJws.decodeUnverified(idToken) }.getOrElse {
-            throw SelfIssuedIdTokenValidationException("id_token is not a valid JWS: ${it.message}")
+        val decoded = try {
+            CompactJws.decodeUnverified(idToken)
+        } catch (cause: Exception) {
+            throw SelfIssuedIdTokenValidationException("id_token is not a valid JWS", cause)
         }
-        val payload = runCatching {
-            Json.parseToJsonElement(decoded.payload.decodeToString(throwOnInvalidSequence = true)) as? JsonObject
-                ?: throw SelfIssuedIdTokenValidationException("id_token payload must be a JSON object")
-        }.getOrElse { throw SelfIssuedIdTokenValidationException("id_token has an invalid JSON payload: ${it.message}") }
+        val element = try {
+            Json.parseToJsonElement(decoded.payload.decodeToString(throwOnInvalidSequence = true))
+        } catch (cause: Exception) {
+            throw SelfIssuedIdTokenValidationException("id_token has an invalid JSON payload", cause)
+        }
+        val payload = element as? JsonObject
+            ?: throw SelfIssuedIdTokenValidationException("id_token payload must be a JSON object")
         ensure(decoded.algorithm in allowedAlgorithms) {
             "id_token algorithm is not allowed: ${decoded.algorithm.identifier}"
         }
@@ -84,12 +89,12 @@ object SelfIssuedIdTokenValidator {
 
         // 1. Self-issued check: iss MUST equal sub
         ensure(iss == sub) {
-            "id_token 'iss' ($iss) must equal 'sub' ($sub) for a Self-Issued ID Token (SIOPv2 §7)"
+            "id_token 'iss' must equal 'sub' for a Self-Issued ID Token (SIOPv2 §7)"
         }
 
         // 2. Audience check
         ensure(aud == expectedAudience) {
-            "id_token 'aud' ($aud) does not match expected audience ($expectedAudience)"
+            "id_token 'aud' does not match expected audience"
         }
 
         // 3. Nonce check
@@ -101,7 +106,7 @@ object SelfIssuedIdTokenValidator {
         val now = clock.now()
         val exp = Instant.fromEpochSeconds(expSeconds)
         ensure(now <= exp.plus(clockSkewSeconds.seconds)) {
-            "id_token is expired: exp=$expSeconds, now=${now.epochSeconds}"
+            "id_token is expired"
         }
 
         // 5. Signature verification - determine Subject Syntax Type from `sub`
@@ -120,7 +125,7 @@ object SelfIssuedIdTokenValidator {
                 val kid = decoded.protectedHeader["kid"]?.jsonPrimitive?.contentOrNull
                 val verificationKey = when {
                     kid != null -> keys.singleOrNull { it.id.value == kid }
-                        ?: throw SelfIssuedIdTokenValidationException("id_token kid does not identify a DID verification method: $kid")
+                        ?: throw SelfIssuedIdTokenValidationException("id_token kid does not identify a DID verification method")
 
                     keys.size == 1 -> keys.single()
                     else -> throw SelfIssuedIdTokenValidationException("id_token with multiple DID keys must include kid")
@@ -133,7 +138,7 @@ object SelfIssuedIdTokenValidator {
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (cause: Throwable) {
-                    throw SelfIssuedIdTokenValidationException("id_token DID signature verification failed: ${cause.message}", cause)
+                    throw SelfIssuedIdTokenValidationException("id_token DID signature verification failed", cause)
                 }
                 log.trace { "Self-Issued ID Token DID signature verified: sub=$sub, kid=$kid" }
             }
@@ -153,7 +158,7 @@ object SelfIssuedIdTokenValidator {
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (cause: Throwable) {
-                    throw SelfIssuedIdTokenValidationException("id_token 'sub_jwk' is not a valid JWK: ${cause.message}", cause)
+                    throw SelfIssuedIdTokenValidationException("id_token 'sub_jwk' is not a valid JWK", cause)
                 }
                 val encodedJwk = stored.material as EncodedKey.Jwk
                 ensure(!encodedJwk.privateMaterial) { "id_token 'sub_jwk' must not contain private key material" }
@@ -162,7 +167,7 @@ object SelfIssuedIdTokenValidator {
                 // Verify that sub equals the thumbprint of sub_jwk
                 val expectedSub = "$JWK_THUMBPRINT_PREFIX:sha-256:${Jwk.sha256Thumbprint(encodedJwk)}"
                 ensure(sub == expectedSub) {
-                    "id_token 'sub' ($sub) does not match JWK thumbprint of 'sub_jwk' ($expectedSub)"
+                    "id_token 'sub' does not match JWK thumbprint of 'sub_jwk'"
                 }
 
                 // Verify JWS signature using sub_jwk
@@ -171,7 +176,7 @@ object SelfIssuedIdTokenValidator {
                 } catch (cause: CancellationException) {
                     throw cause
                 } catch (cause: Throwable) {
-                    throw SelfIssuedIdTokenValidationException("id_token signature verification failed: ${cause.message}", cause)
+                    throw SelfIssuedIdTokenValidationException("id_token signature verification failed", cause)
                 }
 
                 log.trace { "Self-Issued ID Token JWK Thumbprint signature verified: sub=$sub" }
@@ -179,7 +184,7 @@ object SelfIssuedIdTokenValidator {
 
             else -> {
                 throw SelfIssuedIdTokenValidationException(
-                    "id_token 'sub' ($sub) uses an unrecognized Subject Syntax Type. " +
+                    "id_token 'sub' uses an unrecognized Subject Syntax Type. " +
                             "Expected 'did:...' or '$JWK_THUMBPRINT_PREFIX:...' (SIOPv2 §4.1)"
                 )
             }

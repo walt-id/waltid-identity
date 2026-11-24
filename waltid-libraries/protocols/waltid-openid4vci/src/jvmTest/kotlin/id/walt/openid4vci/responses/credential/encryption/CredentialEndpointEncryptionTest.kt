@@ -11,9 +11,12 @@ import id.walt.openid4vci.createTestConfig
 import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
+import id.walt.openid4vci.deferred.DeferredCredentialRequest
+import id.walt.openid4vci.requests.credential.encryption.CredentialRequestDecryptor
 import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncryptionParameters
 import id.walt.openid4vci.requests.credential.encryption.JweCredentialRequestDecryptor
 import id.walt.openid4vci.responses.credential.CredentialResponse
+import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseBody
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.responses.credential.toJsonObject
@@ -26,6 +29,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -97,6 +101,20 @@ class CredentialEndpointEncryptionTest {
         assertEquals(CredentialEncryptionProfile.ENC_A128GCM, parts.header["enc"]?.jsonPrimitive?.contentOrNull)
         assertEquals(walletKey.getKeyId(), parts.header["kid"]?.jsonPrimitive?.contentOrNull)
         assertEquals(response.toJsonObject(), parts.payload)
+
+        val unavailable = buildOAuth2Provider(createTestConfig().copy(
+            credentialResponseEncryptor = CredentialResponseEncryptor { _, _ -> error("test encryption diagnostic") },
+        ))
+        val immediate = unavailable.writeCredentialResponse(requestResult.request, response)
+        assertEquals(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, immediate.payload.getValue("error").jsonPrimitive.content)
+        val deferred = assertIs<CredentialResponseResult.Failure>(unavailable.createDeferredCredentialResponse(
+            DeferredCredentialRequest("pending", requestResult.request.credentialResponseEncryption),
+            CredentialResponse(transactionId = "pending", interval = 30),
+        ))
+        assertEquals(CredentialErrorCodes.INVALID_ENCRYPTION_PARAMETERS, deferred.error.error)
+        val expected = Regex("""Credential response encryption failed \(errorId=[0-9a-f-]{36}\)""")
+        assertTrue(expected.matches(immediate.payload.getValue("error_description").jsonPrimitive.content))
+        assertTrue(expected.matches(deferred.error.description.orEmpty()))
     }
 
     @Test
@@ -182,6 +200,20 @@ class CredentialEndpointEncryptionTest {
 
         assertNull(parts.header["kid"])
         assertEquals(payload, parts.payload)
+    }
+
+    @Test
+    fun `a decryptor dependency failure has a safe correlated description`() = runBlocking {
+        val provider = buildOAuth2Provider(createTestConfig(
+            credentialRequestDecryptor = CredentialRequestDecryptor {
+                throw IllegalArgumentException("test decryptor diagnostic")
+            },
+        ))
+        val result = provider.createCredentialRequest("test-encrypted-request", DefaultSession(subject = "subject"))
+        val failure = assertIs<CredentialRequestResult.Failure>(result)
+        assertEquals(CredentialErrorCodes.INVALID_CREDENTIAL_REQUEST, failure.error.error)
+        val description = failure.error.description.orEmpty()
+        assertTrue(description.matches(Regex("""Credential request could not be decrypted \(errorId=[0-9a-f-]{36}\)""")), description)
     }
 
     @Test

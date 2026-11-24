@@ -325,6 +325,18 @@ class Verifier2VPDirectPostHandlerParseTest {
         assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
     }
 
+    @Test
+    fun `invalid ID token JSON leaves a fixed reason on the public session`() = runTest {
+        val session = idTokenSession("nonce", "client")
+        val parts = unsignedIdToken("nonce", "client").split('.')
+        val invalidPayload = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+            .encode("""{"claim":"sample-claim",""".encodeToByteArray())
+        assertFailsWith<Verifier2VPDirectPostHandler.PresentationRejectionException> {
+            session.directPostWithIdToken("${parts.first()}.$invalidPayload.${parts.last()}")
+        }
+        assertEquals("Self-Issued ID Token validation failed: id_token has an invalid JSON payload", session.publicView().failure?.reason)
+    }
+
     private fun idTokenSession(nonce: String?, clientId: String): Verification2Session {
         val original = directPostSession("expected-state")
         return original.copy(authorizationRequest = original.authorizationRequest.copy(

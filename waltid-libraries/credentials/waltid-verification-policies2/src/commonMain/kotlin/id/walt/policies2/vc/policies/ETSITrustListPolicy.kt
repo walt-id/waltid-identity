@@ -26,6 +26,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -187,6 +188,8 @@ data class ETSITrustListPolicy(
                 }
             }
 
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: ETSITrustListPolicyException) {
             // Return as-is — preserve the original message rather than re-wrapping.
             return Result.failure(e)
@@ -324,6 +327,7 @@ data class ETSITrustListPolicy(
         val resolved = runCatching {
             JwsSignatureScheme().getIssuerCrypto2KeyInfo(signed, keyResolver).resolved
         }.getOrElse { cause ->
+            if (cause is CancellationException) throw cause
             throw ETSITrustListPolicyException(
                 "The JWT issuer's public key could not be resolved: ${cause.message}. ETSI Trust List " +
                 "verification requires an x5c header or a resolvable issuer key (DID or HTTPS well-known " +
@@ -334,6 +338,7 @@ data class ETSITrustListPolicy(
         runCatching {
             CompactJws.verify(signed.substringBefore('~'), resolved.key, JwsAlgorithm.entries.toSet())
         }.getOrElse { cause ->
+            if (cause is CancellationException) throw cause
             throw ETSITrustListPolicyException(
                 "The resolved JWT issuer key does not verify the credential signature: ${cause.message}",
                 cause
@@ -361,7 +366,10 @@ data class ETSITrustListPolicy(
     private suspend fun x5cLeafHoldsKey(x5c: JsonArray, key: Key): Boolean = runCatching {
         val leafKey = X5CKeyResolver.restoreKeyFromX5c(x5c, runtime)
         Jwk.sha256Thumbprint(exportIssuerJwk(leafKey)) == Jwk.sha256Thumbprint(exportIssuerJwk(key))
-    }.getOrDefault(false)
+    }.getOrElse { cause ->
+        if (cause is CancellationException) throw cause
+        false
+    }
 
     private suspend fun exportIssuerJwk(key: Key): EncodedKey.Jwk {
         val exporter = key.capabilities.publicKeyExporter

@@ -2299,8 +2299,8 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         requestId: String,
         cause: Exception,
     ): CredentialResponseHttp {
-        logger.error { "Credential issuance failed (requestId=$requestId, exception=${cause.javaClass.simpleName})" }
-        val error = OAuthError(OAuthErrorCodes.SERVER_ERROR, "Credential request processing failed")
+        val description = clientErrorDescription(cause, "Credential request processing failed", "Credential issuance failed (requestId=$requestId)")
+        val error = OAuthError(OAuthErrorCodes.SERVER_ERROR, description)
         notificationService.notify(
             requestId = requestId, session = session, event = credentialRequestEvent(format, succeeded = false),
             error = error.error, errorDescription = error.description,

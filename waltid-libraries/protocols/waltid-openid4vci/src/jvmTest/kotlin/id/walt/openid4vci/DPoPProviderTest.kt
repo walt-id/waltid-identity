@@ -6,6 +6,7 @@ import id.walt.crypto.utils.ShaUtils
 import id.walt.openid4vci.core.TOKEN_TYPE_DPOP
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.dpop.DPoPConstants
+import id.walt.openid4vci.dpop.DPoPProofVerifier
 import id.walt.openid4vci.dpop.DefaultDPoPProofVerifier
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
@@ -118,6 +119,24 @@ class DPoPProviderTest {
         ).response
 
         assertDPoPToken(tokenResponse.tokenType, tokenIssuer.lastClaims, walletKey)
+    }
+
+    @Test
+    fun `a DPoP verifier dependency failure returns a correlated protocol error`() = runTest {
+        val config = createTestConfig(dpopProofVerifier = DPoPProofVerifier {
+            throw IllegalStateException("test DPoP diagnostic")
+        })
+        val code = config.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+            scopes = setOf("credential"), audience = setOf(ISSUER), session = DefaultSession(subject = "subject"),
+        )).code
+        val result = buildOAuth2Provider(config).createAccessTokenRequest(
+            parameters = mapOf("grant_type" to listOf(GrantType.PreAuthorizedCode.value), "pre-authorized_code" to listOf(code)),
+            headers = mapOf(DPoPConstants.HEADER_NAME to listOf("proof")), tokenEndpointUri = TOKEN_ENDPOINT_URI,
+        )
+        val failure = assertIs<AccessTokenRequestResult.Failure>(result)
+        assertEquals("invalid_dpop_proof", failure.error.error)
+        val description = failure.error.description.orEmpty()
+        assertTrue(description.matches(Regex("""DPoP proof could not be verified \(errorId=[0-9a-f-]{36}\)""")), description)
     }
 
     @Test

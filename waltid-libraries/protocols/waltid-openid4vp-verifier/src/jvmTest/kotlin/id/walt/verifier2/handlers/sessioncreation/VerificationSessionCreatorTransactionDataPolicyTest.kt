@@ -219,7 +219,7 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
 
     @Test
     fun `signed authorization request creation fails when signing fails`() = runTest {
-        val exception = assertFailsWith<IllegalStateException> {
+        val exception = assertFailsWith<AuthorizationRequestSigningException> {
             VerificationSessionCreator.createVerificationSession(
                 setup = CrossDeviceFlowSetup(
                     core = GeneralFlowConfig(
@@ -243,7 +243,8 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
             )
         }
 
-        assertEquals("key not accessible", exception.message)
+        assertEquals("Failed to sign authorization request", exception.message)
+        assertEquals("key not accessible", exception.cause?.message)
     }
 
     @Test

@@ -1,6 +1,7 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.logging.LoggingManager
 import id.walt.commons.persistence.InMemoryPersistence
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.config.*
@@ -15,12 +16,20 @@ import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepo
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
+import io.klogging.Level
+import io.klogging.config.loggingConfiguration
+import io.klogging.events.LogEvent
+import io.klogging.sending.EventSender
+import java.util.UUID
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.*
 import kotlin.time.Duration
+import org.junit.jupiter.api.parallel.ResourceLock
 
 /**
  * A session store outage during a Credential Request is the issuer's failure, not the wallet's token. It used to
@@ -39,6 +48,7 @@ class SessionStoreFailureDisclosureTest {
     }
 
     @Test
+    @ResourceLock("KloggingConfiguration")
     fun `a session store failure is not reported as an invalid token`() = runTest {
         loadIssuer2ConfigFiles()
         val serviceConfig = ConfigManager.getConfig<Issuer2ServiceConfig>()
@@ -77,16 +87,34 @@ class SessionStoreFailureDisclosureTest {
         ), requestId = "token").payload.getValue("access_token").jsonPrimitive.content
 
         storeDown = true
-        val response = protocol.processCredentialRequest(
-            listOf("Bearer $token"), emptyList(),
-            buildJsonObject { put("credential_configuration_id", offer.credentialConfigurationIds.single()) },
-            "credential",
-        )
-        // invalid_token would tell the wallet to discard a valid token; the store's message names its host.
-        assertEquals(500, response.status)
-        val body = response.body.toString()
-        assertTrue("server_error" in body, body)
-        assertFalse("invalid_token" in body, body)
-        assertFalse("secret-host" in body, body)
+        val failures = LinkedBlockingQueue<LogEvent>()
+        loggingConfiguration(append = true) {
+            sink("credential-failure-test", EventSender { batch ->
+                failures.addAll(batch.filter { it.message.contains("Credential issuance failed (requestId=credential") })
+            })
+            logging {
+                fromMinLevel(Level.ERROR) { toSink("credential-failure-test") }
+            }
+        }
+        try {
+            val response = protocol.processCredentialRequest(
+                listOf("Bearer $token"), emptyList(),
+                buildJsonObject { put("credential_configuration_id", offer.credentialConfigurationIds.single()) },
+                "credential",
+            )
+            // invalid_token would tell the wallet to discard a valid token; the store's message names its host.
+            assertEquals(500, response.status)
+            assertEquals("server_error", response.payload.getValue("error").jsonPrimitive.content)
+            val description = response.payload.getValue("error_description").jsonPrimitive.content
+            val errorId = UUID.fromString(description.substringAfter("errorId=").removeSuffix(")"))
+            assertEquals("Credential request processing failed (errorId=$errorId)", description)
+            val logged = assertNotNull(failures.poll(5, TimeUnit.SECONDS))
+            assertContains(logged.message, "errorId=$errorId")
+            val trace = assertNotNull(logged.stackTrace)
+            assertContains(trace, storeFailure.message!!)
+            assertContains(trace, SessionStoreFailureDisclosureTest::class.simpleName!!)
+        } finally {
+            loggingConfiguration(append = false, LoggingManager.loggingSetup.config)
+        }
     }
 }

@@ -1,6 +1,10 @@
 package id.walt.verifier2.verification2
 
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.ETSITrustListPolicy
+import id.walt.policies2.vc.policies.ExpirationDatePolicy
 import id.walt.verifier2.data.SessionEvent
+import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationVerificationUnavailableException
@@ -17,6 +21,9 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.*
@@ -68,6 +75,10 @@ class VerificationErrorDisclosureTest {
         Verification2Session, SessionEvent,
         suspend (Verification2Session, SessionEvent, Verification2Session.() -> Unit) -> Unit,
     ) -> Unit = { s, event, update -> update(s, event) { status = Verification2Session.VerificationSessionStatus.FAILED } }
+
+    private fun failingExpirationPolicy(failure: Exception) = ExpirationDatePolicy(clock = object : Clock {
+        override fun now(): Instant = throw failure
+    })
 
     private fun assertNoInternalDetail(text: String?) {
         assertNotNull(text)
@@ -134,6 +145,38 @@ class VerificationErrorDisclosureTest {
     }
 
     @Test
+    fun `returned and thrown policy errors have safe reasons throughout the public session`() = runTest {
+        val original = fixture.session()
+        val session = original.copy(policies = original.policies.copy(
+            vc_policies = VCPolicyList(listOf(ETSITrustListPolicy())),
+            specific_vc_policies = mapOf("ids" to VCPolicyList(listOf(failingExpirationPolicy(IllegalStateException(secretDetail))))),
+        ))
+        val (status, _) = postDirect(presentation(), session, workingStore)
+
+        assertEquals(HttpStatusCode.BadRequest, status)
+        val public = session.publicView()
+        val results = assertNotNull(public.policyResults)
+        val general = results.vcPolicies.single()
+        val specific = results.specificVcPolicies.getValue("ids").single()
+        assertEquals("Credential did not pass the 'etsi-trust-list' policy", general.error)
+        assertEquals("Credential did not pass the 'expiration' policy", specific.error)
+        assertEquals(listOf(general, specific), assertIs<SessionFailure.VcPolicyViolations>(public.failure).violations)
+    }
+
+    @Test
+    fun `a cancelled verification leaves terminal state to the caller`() = runTest {
+        val cancellation = CancellationException("request ended")
+        val session = fixture.session()
+        session.policies = session.policies.copy(vc_policies = VCPolicyList(listOf(failingExpirationPolicy(cancellation))))
+        val thrown = assertFailsWith<CancellationException> {
+            verify(listOf(presentation()), session, workingStore)
+        }
+        assertEquals(cancellation.message, thrown.message)
+        assertNull(session.failure)
+        assertNotEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
+    }
+
+    @Test
     fun `a store that also fails to record the failure is still reported as unavailable`() = runTest {
         // A store outage fails every write, including the one that records the failure. That second
         // failure must not escape unclassified: the wallet should still get a retryable 503.
@@ -193,7 +236,9 @@ class VerificationErrorDisclosureTest {
         assertEquals(HttpStatusCode.BadRequest, status)
         assertEquals("invalid_request", body.field("error"))
         assertEquals("Invalid presentation response", body.field("error_description"))
-        assertEquals("1 credential policy violation(s)", session.failure!!.reason)
+        val failure = assertIs<SessionFailure.VcPolicyViolations>(session.failure)
+        assertEquals("1 credential policy violation(s)", failure.reason)
+        assertEquals("Credential has expired", failure.violations.single().error)
     }
 
     @Test

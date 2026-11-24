@@ -860,6 +860,8 @@ object PresentationVerificationEngine {
                 )
             }
 
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: PresentationRejectionException) {
             // Already handled: session state was updated before this was thrown.
             // Re-throw so the HTTP handler can return 400 to the wallet.

@@ -43,6 +43,7 @@ import id.walt.verifier2.data.*
 import id.walt.verifier2.handlers.authrequest.Verifier2RequestObjectKid
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
@@ -67,6 +68,9 @@ import id.walt.crypto2.keys.Key as Crypto2Key
  * duplicate literal has no justification left.
  */
 private val REDIRECT_URI_CLIENT_ID_PREFIX = ClientIdPrefix.REDIRECT_URI.value
+
+class AuthorizationRequestSigningException(cause: Exception) :
+    IllegalStateException("Failed to sign authorization request", cause)
 
 object VerificationSessionCreator {
 
@@ -512,7 +516,8 @@ object VerificationSessionCreator {
                 }
                 .let { JsonObject(it) }
 
-            requestSigningKey.signJws(Json.encodeToString(payloadWithAud).encodeToByteArray(), headers)
+            val payload = Json.encodeToString(payloadWithAud).encodeToByteArray()
+            signRequest { requestSigningKey.signJws(payload, headers) }
         } else null
 
         if (isSignedRequest) {
@@ -603,31 +608,37 @@ object VerificationSessionCreator {
 
                     // Generate readerAuth for EACH document requested (Per-Document Signature)
                     val signedDocRequests = initialDeviceRequest.docRequests.map { docReq ->
-                        val readerAuthSignature = CoseSign1.createAndSignDetached(
-                            protectedHeaders = protectedHeaders,
-                            unprotectedHeaders = unprotectedHeaders,
-                            detachedPayload = ReaderAuthenticationPayloads.forDocument(
-                                sessionTranscript,
-                                docReq.itemsRequest,
-                            ),
-                            signer = coseSigner
+                        val payload = ReaderAuthenticationPayloads.forDocument(
+                            sessionTranscript,
+                            docReq.itemsRequest,
                         )
+                        val readerAuthSignature = signRequest {
+                            CoseSign1.createAndSignDetached(
+                                protectedHeaders = protectedHeaders,
+                                unprotectedHeaders = unprotectedHeaders,
+                                detachedPayload = payload,
+                                signer = coseSigner
+                            )
+                        }
 
                         // Attach the signature to this specific document request
                         docReq.copy(readerAuth = readerAuthSignature)
                     }
 
                     // Generate readerAuthAll for the entire set (Global Signature)
-                    val readerAuthAllSignature = CoseSign1.createAndSignDetached(
-                        protectedHeaders = protectedHeaders,
-                        unprotectedHeaders = unprotectedHeaders,
-                        detachedPayload = ReaderAuthenticationPayloads.forAllDocuments(
-                            sessionTranscript = sessionTranscript,
-                            itemsRequests = initialDeviceRequest.docRequests.map { it.itemsRequest },
-                            deviceRequestInfo = deviceRequestInfo,
-                        ),
-                        signer = coseSigner
+                    val payload = ReaderAuthenticationPayloads.forAllDocuments(
+                        sessionTranscript = sessionTranscript,
+                        itemsRequests = initialDeviceRequest.docRequests.map { it.itemsRequest },
+                        deviceRequestInfo = deviceRequestInfo,
                     )
+                    val readerAuthAllSignature = signRequest {
+                        CoseSign1.createAndSignDetached(
+                            protectedHeaders = protectedHeaders,
+                            unprotectedHeaders = unprotectedHeaders,
+                            detachedPayload = payload,
+                            signer = coseSigner
+                        )
+                    }
 
                     // Assemble final request
                     DeviceRequest(
@@ -694,6 +705,14 @@ object VerificationSessionCreator {
         log.trace { "Created verification session ${newSession.id} in mode ${newSession.requestMode}" }
 
         return newSession
+    }
+
+    private inline fun <T> signRequest(sign: () -> T): T = try {
+        sign()
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (cause: Exception) {
+        throw AuthorizationRequestSigningException(cause)
     }
 
     private suspend fun VerifierSigningKey.signJws(
