@@ -92,7 +92,7 @@ report_startup_failure() {
 
 adb shell am start -a android.intent.action.VIEW -d about:blank -p com.android.chrome >/dev/null
 adb shell am instrument -w -r \
-  -e class id.walt.walletdemo.compose.android.ItbDemoWalletTest \
+  -e class 'id.walt.walletdemo.compose.android.ItbDemoWalletTest#runOwnedItbSessions' \
   -e wallet.itb.port "$device_port" -e wallet.itb.token "$ITB_ANDROID_TOKEN" -e wallet.itb.mode "$mode" \
   "$app.test/androidx.test.runner.AndroidJUnitRunner" >"$instrumentation_output" 2>&1 &
 instrumentation_pid=$!
