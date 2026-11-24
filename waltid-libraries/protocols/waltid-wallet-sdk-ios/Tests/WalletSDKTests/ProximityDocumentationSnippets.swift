@@ -27,8 +27,8 @@ private final class ProximityDocumentationSnippets {
                 showPreparationReview(plan, reason: reason)
             case .completed(let exchanges, _, _):
                 showCompletion(exchanges: exchanges)
-            case .noData(let exchange):
-                showNoData(exchange: exchange)
+            case .noData(let exchange, let request):
+                showNoData(exchange: exchange, request: request)
             case .failed(let error):
                 showFailure(error)
             default:
@@ -61,7 +61,7 @@ private final class ProximityDocumentationSnippets {
     private func showReview(_ value: Any) {}
     private func showPreparationReview(_ plan: Any, reason: Any) {}
     private func showCompletion(exchanges: Any) {}
-    private func showNoData(exchange: Any) {}
+    private func showNoData(exchange: Any, request: ProximityUnsatisfiedRequest) {}
     private func showFailure(_ value: Any) {}
     private func showProgress(_ value: Any) {}
 }

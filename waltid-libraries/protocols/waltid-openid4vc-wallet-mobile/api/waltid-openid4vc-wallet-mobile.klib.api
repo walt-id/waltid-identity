@@ -2178,13 +2178,16 @@ sealed interface id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobi
     }
 
     final class NoData : id.walt.wallet2.mobile/ProximityState { // id.walt.wallet2.mobile/ProximityState.NoData|null[0]
-        constructor <init>(kotlin/Int) // id.walt.wallet2.mobile/ProximityState.NoData.<init>|<init>(kotlin.Int){}[0]
+        constructor <init>(kotlin/Int, id.walt.wallet2.mobile/ProximityUnsatisfiedRequest) // id.walt.wallet2.mobile/ProximityState.NoData.<init>|<init>(kotlin.Int;id.walt.wallet2.mobile.ProximityUnsatisfiedRequest){}[0]
 
         final val exchange // id.walt.wallet2.mobile/ProximityState.NoData.exchange|{}exchange[0]
             final fun <get-exchange>(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.NoData.exchange.<get-exchange>|<get-exchange>(){}[0]
+        final val unsatisfiedRequest // id.walt.wallet2.mobile/ProximityState.NoData.unsatisfiedRequest|{}unsatisfiedRequest[0]
+            final fun <get-unsatisfiedRequest>(): id.walt.wallet2.mobile/ProximityUnsatisfiedRequest // id.walt.wallet2.mobile/ProximityState.NoData.unsatisfiedRequest.<get-unsatisfiedRequest>|<get-unsatisfiedRequest>(){}[0]
 
         final fun component1(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.NoData.component1|component1(){}[0]
-        final fun copy(kotlin/Int = ...): id.walt.wallet2.mobile/ProximityState.NoData // id.walt.wallet2.mobile/ProximityState.NoData.copy|copy(kotlin.Int){}[0]
+        final fun component2(): id.walt.wallet2.mobile/ProximityUnsatisfiedRequest // id.walt.wallet2.mobile/ProximityState.NoData.component2|component2(){}[0]
+        final fun copy(kotlin/Int = ..., id.walt.wallet2.mobile/ProximityUnsatisfiedRequest = ...): id.walt.wallet2.mobile/ProximityState.NoData // id.walt.wallet2.mobile/ProximityState.NoData.copy|copy(kotlin.Int;id.walt.wallet2.mobile.ProximityUnsatisfiedRequest){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityState.NoData.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityState.NoData.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityState.NoData.toString|toString(){}[0]
@@ -5110,6 +5113,24 @@ final class id.walt.wallet2.mobile/ProximityTransportCapability { // id.walt.wal
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/ProximityTransportCapability.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/ProximityTransportCapability.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/ProximityTransportCapability.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile/ProximityUnsatisfiedDocument { // id.walt.wallet2.mobile/ProximityUnsatisfiedDocument|null[0]
+    constructor <init>(kotlin/Int, kotlin/String, kotlin.collections/List<id.walt.wallet2.mobile/ProximityRequestedElement>) // id.walt.wallet2.mobile/ProximityUnsatisfiedDocument.<init>|<init>(kotlin.Int;kotlin.String;kotlin.collections.List<id.walt.wallet2.mobile.ProximityRequestedElement>){}[0]
+
+    final val docType // id.walt.wallet2.mobile/ProximityUnsatisfiedDocument.docType|{}docType[0]
+        final fun <get-docType>(): kotlin/String // id.walt.wallet2.mobile/ProximityUnsatisfiedDocument.docType.<get-docType>|<get-docType>(){}[0]
+    final val requestIndex // id.walt.wallet2.mobile/ProximityUnsatisfiedDocument.requestIndex|{}requestIndex[0]
+        final fun <get-requestIndex>(): kotlin/Int // id.walt.wallet2.mobile/ProximityUnsatisfiedDocument.requestIndex.<get-requestIndex>|<get-requestIndex>(){}[0]
+    final val requestedElements // id.walt.wallet2.mobile/ProximityUnsatisfiedDocument.requestedElements|{}requestedElements[0]
+        final fun <get-requestedElements>(): kotlin.collections/List<id.walt.wallet2.mobile/ProximityRequestedElement> // id.walt.wallet2.mobile/ProximityUnsatisfiedDocument.requestedElements.<get-requestedElements>|<get-requestedElements>(){}[0]
+}
+
+final class id.walt.wallet2.mobile/ProximityUnsatisfiedRequest { // id.walt.wallet2.mobile/ProximityUnsatisfiedRequest|null[0]
+    constructor <init>(kotlin.collections/List<id.walt.wallet2.mobile/ProximityUnsatisfiedDocument>) // id.walt.wallet2.mobile/ProximityUnsatisfiedRequest.<init>|<init>(kotlin.collections.List<id.walt.wallet2.mobile.ProximityUnsatisfiedDocument>){}[0]
+
+    final val documents // id.walt.wallet2.mobile/ProximityUnsatisfiedRequest.documents|{}documents[0]
+        final fun <get-documents>(): kotlin.collections/List<id.walt.wallet2.mobile/ProximityUnsatisfiedDocument> // id.walt.wallet2.mobile/ProximityUnsatisfiedRequest.documents.<get-documents>|<get-documents>(){}[0]
 }
 
 final class id.walt.wallet2.mobile/ProximityUseCase { // id.walt.wallet2.mobile/ProximityUseCase|null[0]
