@@ -143,10 +143,8 @@ class Issuer2AttestationTrustRegistryTest {
         val error = response.body<JsonObject>()
         assertEquals("server_error", error.getValue("error").jsonPrimitive.content)
         // Deferred acceptance stops before the session is claimed; the immediate path fails the claimed request.
-        assertEquals(
-            if (deferred) "Credential proof verification unavailable" else "Key attestation trust source is unavailable",
-            error.getValue("error_description").jsonPrimitive.content,
-        )
+        // Both report the same sanitized description.
+        assertEquals("Credential proof verification unavailable", error.getValue("error_description").jsonPrimitive.content)
         val session = assertNotNull(repository.get(offer.offerId))
         assertTrue(session.issuanceResults.isEmpty())
         if (deferred) assertTrue(assertNotNull(session.deferredState).transactions.isEmpty())
