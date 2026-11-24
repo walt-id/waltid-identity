@@ -5,6 +5,9 @@ import id.walt.commons.testing.E2ETest
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.statuslist.codec.TokenStatusListCodec
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
@@ -16,8 +19,6 @@ import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.policies2.vc.VCPolicyList
-import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier2.data.CrossDeviceFlowSetup
@@ -38,7 +39,21 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.Url
 import io.ktor.server.application.Application
+import io.ktor.server.routing.routing
+import io.ktor.server.routing.get
+import io.ktor.server.response.respondText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import kotlin.time.Clock
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,10 +67,6 @@ import kotlin.test.assertTrue
  * the query's claims, including a selectively disclosed one, is accepted.
  */
 class DcqlQueryBindingVerifier2IntegrationTest {
-
-    private val policies = Verification2Session.DefinedVerificationPolicies(
-        vc_policies = VCPolicyList(listOf(CredentialSignaturePolicy()))
-    )
 
     private val holderDid = "did:key:zDnaeYb7DakQWmYkrLkmsVERAazF5Ya1G5nxbSnQcLJZ8Cr17"
 
@@ -74,9 +85,36 @@ class DcqlQueryBindingVerifier2IntegrationTest {
         )
     )
 
+    @Test
+    fun `default status policy fetches the list and rejects revoked credentials`() {
+        for (value in listOf(0, 1)) {
+            var statusToken = ""
+            val fetches = AtomicInteger()
+            runPresentation(sdJwtQuery(), expectAccepted = value == 0, expectStatusRejected = value != 0,
+                statusToken = { fetches.incrementAndGet(); statusToken }) { bootstrapUrl ->
+                val uri = ConfigManager.getConfig<OSSVerifier2ServiceConfig>().urlPrefix!!.substringBefore("/verification-session") + "/test-status-list"
+                val credential = issueSdJwtVcForHolder(holderDid) { issuerKey, issuerDid ->
+                    val now = Clock.System.now().epochSeconds
+                    val payload = buildJsonObject {
+                        put("iss", issuerDid); put("sub", uri); put("iat", now); put("exp", now + 3600)
+                        putJsonObject("status_list") {
+                            put("bits", 1)
+                            put("lst", TokenStatusListCodec.encode(ByteArray(16_384).also { it[0] = value.toByte() }))
+                        }
+                    }
+                    statusToken = CompactJws.sign(payload.toString().encodeToByteArray(), issuerKey, JwsAlgorithm.EDDSA,
+                        buildJsonObject { put("typ", "statuslist+jwt"); put("kid", issuerDid) })
+                    buildJsonObject { putJsonObject("status_list") { put("idx", 0); put("uri", uri) } }
+                }
+                presentSdJwt(bootstrapUrl, sdJwtQuery(), credential)
+            }
+            assertTrue(fetches.get() > 0)
+        }
+    }
+
     /** The wallet selects against [walletQuery], which may differ from the query it was sent. */
-    private suspend fun presentSdJwt(bootstrapUrl: Url, walletQuery: DcqlQuery) =
-        issueSdJwtVcForHolder(holderDid).let { credential ->
+    private suspend fun presentSdJwt(bootstrapUrl: Url, walletQuery: DcqlQuery, supplied: DigitalCredential? = null) =
+        (supplied ?: issueSdJwtVcForHolder(holderDid)).let { credential ->
             WalletPresentFunctionality2.walletPresentHandling(
                 holderKey = KeyManager.resolveSerializedKey(HOLDER_SERIALIZED_KEY),
                 holderDid = holderDid,
@@ -181,6 +219,8 @@ class DcqlQueryBindingVerifier2IntegrationTest {
     private fun runPresentation(
         dcqlQuery: DcqlQuery,
         expectAccepted: Boolean = false,
+        expectStatusRejected: Boolean = false,
+        statusToken: (() -> String)? = null,
         present: suspend (bootstrapUrl: Url) -> Result<WalletPresentFunctionality2.WalletPresentResult>,
     ) {
         val host = "127.0.0.1"
@@ -202,15 +242,38 @@ class DcqlQueryBindingVerifier2IntegrationTest {
                     updateResolversForMethods()
                 }
             },
-            module = Application::verifierModule
+            module = {
+                verifierModule()
+                if (statusToken != null) routing {
+                    get("/test-status-list") { call.respondText(statusToken(), ContentType("application", "statuslist+jwt")) }
+                }
+            }
         ) {
             useBoundVerifierAddress()
             val http = testHttpClient()
-            val setup: VerificationSessionSetup = CrossDeviceFlowSetup(core = GeneralFlowConfig(dcqlQuery = dcqlQuery, policies = policies))
+            val setup: VerificationSessionSetup = CrossDeviceFlowSetup(core = GeneralFlowConfig(dcqlQuery = dcqlQuery))
             val created = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
                     setBody(setup)
                 }.body<VerificationSessionCreationResponse>()
+            }
+
+            test("Session creation installs signature and status defaults") {
+                val session = http.get("/verification-session/${created.sessionId}/info").body<Verification2Session>()
+                assertEquals(listOf("signature", "credential-status"), session.policies.vc_policies!!.policies.map { it.id })
+            }
+
+            if (expectAccepted) test("Malformed status policy arguments return HTTP 400") {
+                val encoded = Json.encodeToJsonElement<VerificationSessionSetup>(setup).jsonObject
+                for (argument in listOf("""{"value":-1}""", """{"discriminator":"unsupported"}""")) {
+                    val policies = Json.parseToJsonElement("""{"vc_policies":[{"policy":"credential-status","argument":$argument}]}""")
+                    val core = JsonObject(encoded.getValue("core_flow").jsonObject + ("policies" to policies))
+                    val invalid = JsonObject(encoded + ("core_flow" to core))
+                    assertEquals(HttpStatusCode.BadRequest, http.post("/verification-session/create") {
+                        contentType(ContentType.Application.Json)
+                        setBody(invalid.toString())
+                    }.status)
+                }
             }
 
             val presentation = testAndReturn("Present with wallet") { present(created.bootstrapAuthorizationRequestUrl!!) }
@@ -227,6 +290,13 @@ class DcqlQueryBindingVerifier2IntegrationTest {
             if (expectAccepted) {
                 test("Session succeeded") {
                     assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, session.status, session.failure.toString())
+                    assertTrue(session.policyResults!!.vcPolicies.any { it.policy.id == "credential-status" && it.success })
+                }
+            } else if (expectStatusRejected) {
+                test("Revoked credential fails the default status policy") {
+                    assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
+                    assertIs<SessionFailure.VcPolicyViolations>(session.failure)
+                    assertTrue(session.policyResults!!.vcPolicies.any { it.policy.id == "credential-status" && !it.success })
                 }
             } else {
                 test("Session failed on DCQL fulfillment, before credential policies") {
