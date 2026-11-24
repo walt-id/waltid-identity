@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.test.assertTextEquals
 
 import id.walt.credentials.status.presentation
@@ -29,6 +31,7 @@ import id.walt.walletdemo.compose.logic.WalletAccessOperation
 import id.walt.walletdemo.compose.logic.WalletAccessState
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatusNotice
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement
 import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
@@ -46,8 +49,13 @@ import id.walt.walletdemo.compose.logic.DemoBiometricAvailability
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
@@ -155,6 +163,16 @@ internal class WalletVisualScenarios(
             ready.credentials.associate { it.id to WalletVisualFixtures.credentialStatus("revoked_partial") }))
         captureIdentifier = "status.home.issue"
         walletHome()
+    }
+
+    fun credentialStatusHomeNotice() {
+        val ready = WalletVisualFixtures.partialResult.session as WalletSessionState.Ready
+        val credential = ready.credentials.single()
+        statusContext = CredentialStatusUiContext(WalletDemoCredentialStatuses(
+            mapOf(credential.id to WalletVisualFixtures.credentialStatus("revoked_current"))))
+        captureIdentifier = "status.home.notice"
+        walletHome(notice = WalletDemoCredentialStatusNotice(credential.id, "revoked-v1", "REVOKED",
+            "2026-11-20T12:00:00Z", false))
     }
 
     fun credentialStatusMixedArtwork(rtl: Boolean = false) = with(test) {
@@ -338,6 +356,13 @@ internal class WalletVisualScenarios(
                 assertEquals(emptyList(), preferenceChanges)
             }
         }
+    }
+
+    fun credentialStatusBackgroundSettings(paused: Boolean = false) {
+        statusContext = CredentialStatusUiContext(automatic = !paused, setAutomatic = {},
+            background = paused, setBackground = {}, checkAll = {})
+        captureIdentifier = if (paused) "status.settings.background_paused" else "status.settings.background_off"
+        settingsRoot("credential_status")
     }
 
     fun controls(rtl: Boolean = false) = with(test) {
@@ -612,6 +637,11 @@ internal class WalletVisualScenarios(
             "credential_status", "credential_status_help" -> {
                 onNodeWithTag("settings-credential-status").performClick()
                 if (destination == "credential_status_help") onNodeWithTag("settings-credential-status-how").performClick()
+                if (statusContext.setBackground != null) {
+                    val background = onNodeWithTag("settings-credential-status-background").assertIsOff()
+                    if (statusContext.automatic) background.assertIsEnabled() else background.assertIsNotEnabled()
+                    onNodeWithTag("settings-credential-status-check-all").assertIsEnabled()
+                }
             }
             "dc_api" -> {
                 onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).performClick()
@@ -641,18 +671,30 @@ internal class WalletVisualScenarios(
         } else capture("settings.$destination.$stateId")
     }
 
-    fun walletHome(empty: Boolean = false) = with(test) {
+    fun walletHome(empty: Boolean = false, notice: WalletDemoCredentialStatusNotice? = null) = with(test) {
         val ready = WalletVisualFixtures.partialResult.session as WalletSessionState.Ready
         val state = WalletVisualFixtures.partialResult.copy(
             selectedTab = WalletDemoTab.Credentials, operation = WalletOperationState.Idle,
             session = ready.copy(credentials = if (empty) emptyList() else ready.credentials),
         )
+        val snackbar = notice?.let { SnackbarHostState() }
         content {
-            Column(Modifier.fillMaxSize()) {
-                WalletHeader(state, onSettings = {}, onScan = {}, onShareNearby = {})
-                CredentialsTab(state.session, modifier = Modifier.weight(1f))
-                WalletFooter(feedback = { StatusCard(state, {}, {}) })
+            Box(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize()) {
+                    WalletHeader(state, onSettings = {}, onScan = {}, onShareNearby = {})
+                    CredentialsTab(state.session, modifier = Modifier.weight(1f),
+                        statusNotices = listOfNotNull(notice), statusSnackbar = snackbar)
+                    WalletFooter(feedback = { StatusCard(state, {}, {}) })
+                }
+                if (snackbar != null) {
+                    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)).padding(12.dp))
+                }
             }
+        }
+        if (notice != null) {
+            waitUntil { onAllNodesWithText("View credential").fetchSemanticsNodes().isNotEmpty() }
+            onNodeWithText("Revoked", substring = true).assertIsDisplayed()
         }
         if (empty) onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertIsDisplayed()
         else {

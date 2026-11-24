@@ -59,9 +59,11 @@ final class WalletE2EUI {
             let evaluatedAt = try XCTUnwrap(value["evaluatedAt"])
             var snapshot: [String: Any] = ["evaluatedAt": evaluatedAt, "credentials": records, "refreshing": []]
             if app.launchEnvironment["E2E_MOCK_STATUS_NOTIFICATION"] == "1" {
+                let presentation = try XCTUnwrap(value["presentation"] as? [String: Any])
+                let checkedAt = try XCTUnwrap(presentation["lastCheckedAt"] as? String)
                 snapshot["pendingNotices"] = [[
                     "reference": ["storeIndex": 0, "credentialId": "cred-1"],
-                    "version": "revoked-v1", "kind": "REVOKED", "checkedAt": evaluatedAt, "historical": false,
+                    "version": "revoked-v1", "kind": "REVOKED", "checkedAt": checkedAt, "historical": false,
                 ]]
             }
             let data = try JSONSerialization.data(withJSONObject: snapshot)

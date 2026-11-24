@@ -1388,6 +1388,33 @@
       "note": "Opens the actual Compose dialog through the production submit action and verifies Back does not submit. Native uses its actual system alert in app-host interaction/journey evidence, not a synthetic replica."
     },
     {
+      "id": "status.settings.background_off",
+      "title": "Background status checks default off",
+      "requirements": [
+        "Automatic checks are on, background checks are off and the manual check is available"
+      ],
+      "composeTest": "credentialStatusBackgroundOff",
+      "swiftTest": "testCredentialStatusBackgroundOff"
+    },
+    {
+      "id": "status.settings.background_paused",
+      "title": "Pausing automatic checks",
+      "requirements": [
+        "A saved background opt-in is paused, the background control is disabled and the manual check is available"
+      ],
+      "composeTest": "credentialStatusBackgroundPaused",
+      "swiftTest": "testCredentialStatusBackgroundPaused"
+    },
+    {
+      "id": "status.home.notice",
+      "title": "Dated revocation notice on unlocked Home",
+      "requirements": [
+        "The notice identifies the credential, shows the recorded status and time, and offers View credential and dismissal"
+      ],
+      "composeTest": "credentialStatusHomeNotice",
+      "swiftTest": "testCredentialStatusHomeNotice"
+    },
+    {
       "id": "status.settings.partial",
       "requirements": [
         "Foreground preference and structured completed, unchanged, deferred and error counts"
@@ -1456,6 +1483,11 @@
     }
   ],
   "galleryPreview": [
+    "status.settings.background_off",
+    "status.settings.background_paused",
+    "status.home.notice",
+    "settings.dc_api.enabled",
+    "settings.dc_api.disabled",
     "status.home.mixed_artwork",
     "status.details.clear",
     "status.details.adverse",

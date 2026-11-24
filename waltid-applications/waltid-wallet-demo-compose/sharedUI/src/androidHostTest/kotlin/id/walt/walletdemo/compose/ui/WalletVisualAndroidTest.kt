@@ -51,6 +51,9 @@ class WalletVisualAndroidTest {
     @Test fun credentialStatusSettingsPartial() = scenario { credentialStatusSettings() }
     @Test fun credentialStatusSettingsChecking() = scenario { credentialStatusSettings(checking = true) }
     @Test fun credentialStatusSettingsHelp() = scenario { credentialStatusSettings(helpExpanded = true) }
+    @Test fun credentialStatusBackgroundOff() = scenario { credentialStatusBackgroundSettings() }
+    @Test fun credentialStatusBackgroundPaused() = scenario { credentialStatusBackgroundSettings(paused = true) }
+    @Test fun credentialStatusHomeNotice() = scenario { credentialStatusHomeNotice() }
     @Test
     @Config(qualifiers = "en-rUS-w320dp-h568dp-night-mdpi")
     fun credentialStatusCompactRtl() = scenario(fontScale = 1.5f) { credentialStatusKinds(compactRtl = true) }

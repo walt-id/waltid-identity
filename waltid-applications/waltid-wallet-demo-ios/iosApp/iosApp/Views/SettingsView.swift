@@ -210,14 +210,16 @@ struct CredentialStatusSettingsView: View {
                     }
                 }
             } footer: {
-                Text("While this wallet is open and unlocked.\nChecks contact the issuer’s status service.")
-                if viewModel.backgroundStatusScheduler != nil {
-                    if !viewModel.backgroundStatusSchedulingAvailable {
-                        Text("Background refresh is unavailable in system settings.")
-                    } else if viewModel.backgroundStatusChecks == nil && !viewModel.savingBackgroundStatus {
-                        Text("Background checks are unavailable for this wallet.")
-                    } else {
-                        Text("Allow issuer status checks while the app is closed when the system allows.")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("While this wallet is open and unlocked.\nChecks contact the issuer’s status service.")
+                    if viewModel.backgroundStatusScheduler != nil {
+                        if !viewModel.backgroundStatusSchedulingAvailable {
+                            Text("Background refresh is unavailable in system settings.")
+                        } else if viewModel.backgroundStatusChecks == nil && !viewModel.savingBackgroundStatus {
+                            Text("Background checks are unavailable for this wallet.")
+                        } else {
+                            Text("Allow issuer status checks while the app is closed when the system allows.")
+                        }
                     }
                 }
             }
