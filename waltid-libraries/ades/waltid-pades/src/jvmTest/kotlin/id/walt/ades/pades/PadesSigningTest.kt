@@ -140,6 +140,35 @@ class PadesSigningTest {
     }
 
     @Test
+    fun signedFieldMdpChecksSeparateTerminalWidgets() = runTest {
+        val pdf = Loader.loadPDF(formPdf()).use { doc ->
+            val form = PDAcroForm(doc, doc.documentCatalog.cosObject.getDictionaryObject(COSName.ACRO_FORM) as COSDictionary)
+            val field = form.getField("Name") as PDTextField
+            val widget = COSDictionary().apply {
+                setItem(COSName.TYPE, COSName.ANNOT)
+                setItem(COSName.SUBTYPE, COSName.WIDGET)
+                setItem(COSName.PARENT, field)
+                setItem(COSName.RECT, PDRectangle(10f, 10f, 100f, 20f))
+            }
+            field.cosObject.setItem(COSName.KIDS, COSArray(listOf(widget)))
+            ByteArrayOutputStream().also { doc.save(it) }.toByteArray()
+        }
+        val locked = signer.sign(pdf, pki.credentials(), PadesSignatureParameters(existingFieldName = "Approval",
+            fieldLock = PadesFieldLock(PadesFieldLockAction.INCLUDE, listOf("Name"))))
+        assertEquals(Indication.TOTAL_PASSED, validator.validate(locked).indication)
+        val changed = Loader.loadPDF(locked).use { doc ->
+            val form = PDAcroForm(doc, doc.documentCatalog.cosObject.getDictionaryObject(COSName.ACRO_FORM) as COSDictionary)
+            val widget = (form.getField("Name") as PDTextField).widgets.single()
+            widget.rectangle = PDRectangle(200f, 200f, 100f, 20f)
+            widget.cosObject.isNeedToBeUpdated = true
+            ByteArrayOutputStream().also { doc.saveIncremental(it) }.toByteArray()
+        }
+        val result = PadesValidator(policy, allowOtherModifications = true).validate(changed)
+        assertEquals(Indication.TOTAL_FAILED, result.indication, result.toString())
+        assertTrue(result.signatures.flatMap { it.checks }.any { it.message.contains("locked field Name") })
+    }
+
+    @Test
     fun signedFieldMdpStillEnforcesLocksWhenUnsignedLockEntryIsRemoved() = runTest {
         val locked = signer.sign(formPdf(), pki.credentials(), PadesSignatureParameters(existingFieldName = "Approval",
             fieldLock = PadesFieldLock(PadesFieldLockAction.INCLUDE, listOf("Name"))))
