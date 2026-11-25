@@ -50,18 +50,8 @@ class Crypto2JwtKeyResolver(
     ),
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
     private val allowInlineJwk: Boolean = false,
-    private val didVerificationRelationship: VerificationRelationshipType? = null,
+    private val verificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2JwtVerificationKeyResolver {
-    constructor(
-        didResolver: Crypto2DidKeyResolver? = null,
-        runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
-        allowInlineJwk: Boolean = false,
-        verificationRelationship: VerificationRelationshipType?,
-    ) : this(
-        didResolver ?: DidDocumentCrypto2KeyResolver(resolveDocument = { did -> DidService.resolve(did) }),
-        runtime, allowInlineJwk, verificationRelationship,
-    )
-
     override suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey? {
         val kid = jwtHeader?.get("kid")?.jsonPrimitive?.contentOrNull
         return try {
@@ -69,7 +59,7 @@ class Crypto2JwtKeyResolver(
             when {
                 // 1. DID resolution is authoritative for DID issuer identifiers.
                 signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) -> {
-                    val key = resolveFromDid(signerIdentifier, kid, didVerificationRelationship)
+                    val key = resolveFromDid(signerIdentifier, kid, verificationRelationship)
                     ResolvedJwtVerificationKey(key, JwtKeyResolutionSource.DID, signerIdentifier, kid)
                 }
                 // 2. Inline X.509 certificate chain.
