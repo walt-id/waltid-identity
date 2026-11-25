@@ -19,6 +19,7 @@ kotlin {
             // walt.id
             implementation(project(":waltid-libraries:credentials:waltid-status-list"))
             api(project(":waltid-libraries:web:waltid-web-data-fetching"))
+            api(project(":waltid-libraries:credentials:waltid-trust-decision"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
             implementation(project(":waltid-libraries:crypto:waltid-jose"))

@@ -61,10 +61,9 @@ A **HolderPolicy** defines access control rules for credential operations:
 ### Policy Evaluation
 
 The **HolderPolicyEngine** evaluates policies:
-1. Filters policies by the `apply` check (if present) or includes all policies if `apply` is null
-2. Sorts policies by priority (ascending)
-3. Evaluates the first policy where the `check` condition matches
-4. Returns the action (`ALLOW` or `BLOCK`) from the matching policy, or `null` if no policy matches
+1. Sorts policies by ascending priority
+2. Evaluates each policy's `apply` and `check` conditions in order
+3. Returns the first matching action (`ALLOW` or `BLOCK`), or `null` if no policy matches
 
 ### Policy Checks
 
@@ -73,6 +72,22 @@ Policy checks determine if credentials match policy criteria:
 - **JsonSchemaHolderPolicyCheck**: Validates credentials against JSON Schema
 - **DcqlHolderPolicyCheck**: Matches credentials against DCQL queries
 - **ApplyAllHolderPolicyCheck**: Matches all credentials (used for default policies)
+
+#### Presentation evidence checks
+
+Presentation callers can provide a `HolderPolicyPresentationContext` to `HolderPolicyEngine.evaluate`.
+Use `direction: PRESENT` when configuring these checks for a presentation policy.
+
+- `disclosed_claims` evaluates `claims_present` and `claims_values` JSONPaths against the projected claims of each selected credential. At least one path is required.
+- `transaction_data` evaluates the optional `transaction_type`, `fields_present`, and `fields_values` against each validated transaction item. Field paths start at the item's type-specific details.
+
+Each check requires `match: any` or `match: all` and accepts an optional `credential_id` containing
+the presentation query ID. All path and value conditions apply to the same candidate. With
+`all`, every candidate in scope must match. An empty scope satisfies neither quantifier.
+
+The engine loads disclosure evidence only when needed. An empty evidence list represents confirmed absence.
+Unavailable evidence cannot establish an `ALLOW`. A potentially matching `BLOCK` applies at its configured
+priority when its evidence is unavailable, including when the two-argument `evaluate` overload is used.
 
 ### Priority-Based Evaluation
 

@@ -5,7 +5,6 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key as Crypto2Key
-import id.walt.did.dids.DidUtils
 import id.walt.sdjwt.SDMap
 import id.walt.w3c.JwtClaims
 import id.walt.w3c.VcClaims
@@ -21,8 +20,8 @@ import kotlin.time.Instant
 
 /**
  * The template context of an issuance, as every format builds it: `issuerId`, `issuerDid`, `subjectDid` and
- * `display`, with [extra] on top. Absent and empty values are left out, so a mapping that names one fails clearly
- * instead of receiving an empty value.
+ * `display`, with [extra] on top. Absent and empty values are left out. When a mapping requests a missing
+ * `subjectDid`, it can derive one from the selected [IssuanceHolderKey].
  *
  * `issuerDid` is the issuer id even when that is not a DID, e.g. an issuer URL: mappings such as the example
  * profiles' `"issuer": {"id": "<issuerDid>"}` depend on it, and only producing it for DIDs would make their
@@ -76,11 +75,10 @@ object MergingIssuer {
         completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
         context = context
     ).run {
-        val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signJws(
             issuerKey = issuerKey,
             issuerId = issuerId,
-            issuerKid = Issuer.getKidHeader(issuerKey, issuerDid),
+            issuerKid = Issuer.kidForIssuer(issuerKey, issuerId),
             subjectDid = subjectDid,
             additionalJwtHeader = additionalJwtHeader,
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
@@ -109,12 +107,11 @@ object MergingIssuer {
         completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
         context = context,
     ).run {
-        val issuerDid = issuerId.takeIf(DidUtils::isDidUrl)
         w3cVc.signJws(
             issuerKey = issuerKey,
             algorithm = algorithm,
             issuerId = issuerId,
-            issuerKid = Issuer.getKidHeader(issuerKey, issuerDid),
+            issuerKid = Issuer.kidForIssuer(issuerKey, issuerId),
             subjectDid = subjectDid,
             additionalJwtHeader = additionalJwtHeader,
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply { putAll(jwtOptions) },
@@ -148,11 +145,10 @@ object MergingIssuer {
         completeJwtWithDefaultCredentialData,
         context = context
     ).run {
-        val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signSdJwt(
             issuerKey = issuerKey,
             issuerId = issuerId,
-            issuerKid = Issuer.getKidHeader(issuerKey, issuerDid),
+            issuerKid = Issuer.kidForIssuer(issuerKey, issuerId),
             subjectDid = subjectDid,
             disclosureMap = disclosureMap,
             additionalJwtHeaders = additionalJwtHeaders.toMutableMap().apply {
@@ -187,12 +183,11 @@ object MergingIssuer {
         completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
         context = context,
     ).run {
-        val issuerDid = issuerId.takeIf(DidUtils::isDidUrl)
         w3cVc.signSdJwt(
             issuerKey = issuerKey,
             algorithm = algorithm,
             issuerId = issuerId,
-            issuerKid = Issuer.getKidHeader(issuerKey, issuerDid),
+            issuerKid = Issuer.kidForIssuer(issuerKey, issuerId),
             subjectDid = subjectDid,
             disclosureMap = disclosureMap,
             additionalJwtHeaders = additionalJwtHeaders + ("typ" to JsonPrimitive(type)),

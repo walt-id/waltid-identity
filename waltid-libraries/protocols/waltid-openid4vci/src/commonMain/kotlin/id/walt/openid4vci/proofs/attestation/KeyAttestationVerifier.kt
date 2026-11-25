@@ -61,14 +61,10 @@ class KeyAttestationVerifier(
         if (proofType != null && decoded.algorithm.identifier !in proofType.proofSigningAlgValuesSupported) {
             throw invalidCredentialProof("Key attestation signing algorithm is not advertised")
         }
-        val keys = try {
-            options.trustResolver.resolve(header, context, configuration)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: CredentialProofValidationException) {
-            throw e
-        } catch (e: Exception) {
-            throw KeyAttestationServiceException("Key attestation trust resolution failed", e)
+        val resolver = options.trustResolver
+        val keys = trustResolution {
+            if (resolver is SignatureFirstKeyAttestationTrustResolver) resolver.candidateKeys(header)
+            else resolver.resolve(header, context, configuration)
         }
         val signer = keys.firstNotNullOfOrNull { key ->
             // Preserve configured algorithm restrictions before restoring public material.
@@ -97,6 +93,7 @@ class KeyAttestationVerifier(
                 null
             }
         } ?: throw invalidCredentialProof("Key attestation signature is invalid or its signer is not trusted")
+        if (resolver is SignatureFirstKeyAttestationTrustResolver) trustResolution { resolver.authorizeSigner(header) }
         val payload = attestationInput {
             Json.parseToJsonElement(decoded.payload.decodeToString()) as? JsonObject
                 ?: throw invalidCredentialProof("Key attestation payload must be an object")
@@ -165,6 +162,19 @@ class KeyAttestationVerifier(
 
     /** Public material used for the successful signature check, never a second provider lookup. */
     private data class VerifiedSigner(val key: Key, val publicJwk: JsonObject)
+
+    /** Wallet evidence errors pass through; any other trust-resolution failure is the issuer's. */
+    private suspend fun <T> trustResolution(block: suspend () -> T): T = try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: CredentialProofValidationException) {
+        throw e
+    } catch (e: CredentialProofServiceException) {
+        throw e
+    } catch (e: Exception) {
+        throw KeyAttestationServiceException("Key attestation trust resolution failed", e)
+    }
 }
 
 private val publicKeyRuntime = CryptoRuntime(defaultSoftwareKeyProviders())

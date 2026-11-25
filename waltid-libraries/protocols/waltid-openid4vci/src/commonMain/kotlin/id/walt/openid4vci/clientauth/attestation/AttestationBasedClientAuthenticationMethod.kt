@@ -16,6 +16,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationServiceException
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationResult
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifier
 import id.walt.openid4vci.clientauth.attestation.verifier.KeyBasedClientAttestationVerifier
@@ -34,7 +35,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -136,11 +136,16 @@ class AttestationBasedClientAuthenticationMethod(
             return failure("client_id does not match client attestation subject")
         }
 
-        val verifiedSignerPublicJwk = when (val verification = attestationVerifier.verifyAttestationJwt(
-            jwt = attestationJwt,
-            header = attestation.header,
-            payload = attestation.payload,
-        )) {
+        val verification = try {
+            attestationVerifier.verifyAttestationJwt(
+                jwt = attestationJwt,
+                header = attestation.header,
+                payload = attestation.payload,
+            )
+        } catch (e: ClientAttestationServiceException) {
+            return ClientAuthenticationResult.Failure(OAuthError(OAuthErrorCodes.SERVER_ERROR, e.message))
+        }
+        val verifiedSignerPublicJwk = when (verification) {
             ClientAttestationVerificationResult.Verified -> null
             is ClientAttestationVerificationResult.VerifiedWithSigner -> verification.publicJwk
             is ClientAttestationVerificationResult.Rejected ->
@@ -166,8 +171,8 @@ class AttestationBasedClientAuthenticationMethod(
         // Keep v1 only for accepted optional algorithms not implemented by the portable crypto2 provider.
         val legacyClientInstanceKey = if (
             crypto2ClientInstanceKey == null &&
-            confirmationJwk["kty"]?.jsonPrimitive?.contentOrNull == "EC" &&
-            confirmationJwk["crv"]?.jsonPrimitive?.contentOrNull == "secp256k1"
+            confirmationJwk.stringClaim("kty") == "EC" &&
+            confirmationJwk.stringClaim("crv") == "secp256k1"
         ) {
             runCatching { JWKKey.importJWK(confirmationJwk.toString()).getOrThrow() }.getOrNull()
         } else null
@@ -191,9 +196,10 @@ class AttestationBasedClientAuthenticationMethod(
         }.getOrElse {
             return failure("Client attestation PoP algorithm is invalid")
         }
-        val confirmationAlgorithm = confirmationJwk["alg"]?.jsonPrimitive?.contentOrNull
-        if (confirmationAlgorithm != null && confirmationAlgorithm != popAlgorithm.identifier) {
-            return failure("Client attestation PoP algorithm does not match confirmation JWK alg")
+        confirmationJwk["alg"]?.let { confirmationAlgorithm ->
+            if ((confirmationAlgorithm as? JsonPrimitive)?.contentOrNull != popAlgorithm.identifier) {
+                return failure("Client attestation PoP algorithm does not match confirmation JWK alg")
+            }
         }
         val popSignatureValid = if (crypto2ClientInstanceKey != null) {
             try {
@@ -277,6 +283,13 @@ class AttestationBasedClientAuthenticationMethod(
             ?: return "Client attestation ${JwtHeaderParams.ALGORITHM} header is required"
         if (alg !in acceptedAttestationSigningAlgorithms) {
             return "Client attestation ${JwtHeaderParams.ALGORITHM} is not supported"
+        }
+        // RFC 7515 4.1.4: kid is a string. Rejecting other values here keeps a malformed header a client error
+        // and away from any verifier or trust source.
+        jwt.header[JwtHeaderParams.KEY_ID]?.let { kid ->
+            if (kid !is JsonPrimitive || !kid.isString) {
+                return "Client attestation ${JwtHeaderParams.KEY_ID} header must be a string"
+            }
         }
         if (jwt.payload.stringClaim(JwtPayloadClaims.SUBJECT).isNullOrBlank()) {
             return "Client attestation ${JwtPayloadClaims.SUBJECT} claim is required"

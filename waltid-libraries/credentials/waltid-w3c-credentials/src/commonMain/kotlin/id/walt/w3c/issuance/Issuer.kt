@@ -75,6 +75,20 @@ object Issuer {
         )
     }
 
+    /** For an issuer URL, uses the public key's ID, replacing an HTTP(S) key ID with its JWK thumbprint. */
+    @Deprecated("Use kidForIssuer with an id.walt.crypto2.keys.Key")
+    @JsExport.Ignore
+    suspend fun kidForIssuer(issuerKey: Key, issuerId: String): String =
+        getKidHeader(issuerKey, issuerDidOrNull(issuerId))
+
+    /**
+     * For an issuer URL, `issuerKey.id.value` is copied into the credential's `kid` header.
+     * Choose a key ID suitable for publication. For an issuer DID, returns the verification method ID.
+     */
+    @JsExport.Ignore
+    suspend fun kidForIssuer(issuerKey: Crypto2Key, issuerId: String): String =
+        getKidHeader(issuerKey, issuerDidOrNull(issuerId))
+
     @Deprecated("Use getKidHeader with a crypto2 Key")
     @JvmBlocking
     @JvmAsync
@@ -100,6 +114,8 @@ object Issuer {
         }
         return qualifyDidKeyId(keyId, issuerDid)
     }
+
+    private fun issuerDidOrNull(issuerId: String): String? = issuerId.takeIf(DidUtils::isDidUrl)
 
     private suspend fun publicJwkThumbprint(issuerKey: Crypto2Key): String {
         val exported = requireNotNull(issuerKey.capabilities.publicKeyExporter) {
