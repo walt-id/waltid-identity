@@ -42,6 +42,7 @@ import org.bouncycastle.asn1.x509.ExtendedKeyUsage
 import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.GeneralName
 import org.bouncycastle.asn1.x509.GeneralNames
+import org.bouncycastle.asn1.x509.ReasonFlags
 import org.bouncycastle.asn1.x509.KeyPurposeId
 import org.bouncycastle.asn1.x509.KeyUsage as BcKeyUsage
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
@@ -164,6 +165,8 @@ class TestPki(
         eku: KeyPurposeId? = null,
         ocspNoCheck: Boolean = false,
         withRevocationInfo: Boolean = false,
+        keyUsageBits: Int? = null,
+        crlReasons: ReasonFlags? = null,
         notBefore: Instant = now - 365.days,
         notAfter: Instant = now + 365.days,
     ): TestEntity {
@@ -180,7 +183,7 @@ class TestPki(
         builder.addExtension(Extension.basicConstraints, true, BasicConstraints(ca))
         builder.addExtension(
             Extension.keyUsage, true,
-            BcKeyUsage(if (ca) BcKeyUsage.keyCertSign or BcKeyUsage.cRLSign else BcKeyUsage.digitalSignature or BcKeyUsage.nonRepudiation),
+            BcKeyUsage(keyUsageBits ?: if (ca) BcKeyUsage.keyCertSign or BcKeyUsage.cRLSign else BcKeyUsage.digitalSignature or BcKeyUsage.nonRepudiation),
         )
         eku?.let { builder.addExtension(Extension.extendedKeyUsage, it == KeyPurposeId.id_kp_timeStamping, ExtendedKeyUsage(it)) }
         if (ocspNoCheck) builder.addExtension(ASN1ObjectIdentifier("1.3.6.1.5.5.7.48.1.5"), false, DERNull.INSTANCE)
@@ -189,7 +192,7 @@ class TestPki(
             val caName = if (issuer.name.contains("Root")) "root" else "issuing"
             builder.addExtension(
                 Extension.cRLDistributionPoints, false,
-                CRLDistPoint(arrayOf(DistributionPoint(DistributionPointName(GeneralNames(GeneralName(GeneralName.uniformResourceIdentifier, "$baseUrl/crl/$crlName.crl"))), null, null))),
+                CRLDistPoint(arrayOf(DistributionPoint(DistributionPointName(GeneralNames(GeneralName(GeneralName.uniformResourceIdentifier, "$baseUrl/crl/$crlName.crl"))), crlReasons, null))),
             )
             val aia = mutableListOf(AccessDescription(AccessDescription.id_ad_caIssuers, GeneralName(GeneralName.uniformResourceIdentifier, "$baseUrl/ca/$caName.crt")))
             if (!ca) aia += AccessDescription(AccessDescription.id_ad_ocsp, GeneralName(GeneralName.uniformResourceIdentifier, "$baseUrl/ocsp"))
