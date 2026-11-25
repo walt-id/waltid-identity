@@ -2,6 +2,8 @@
 
 Shared test fixture code for mobile wallet end-to-end tests.
 
+- `kotlin/DemoPayment.kt` supplies the same exact-number, future-dated TS12 acceptance vectors to Android and the JVM service suite without introducing a mobile dependency into the service.
+- `ios/WalletPaymentUI.swift` shares live payment review interactions between Compose iOS and native iOS; the paired Swift backend vectors use decimal numbers.
 - `ios/TestHelpers/` contains Swift backend helpers used by iOS XCTest targets.
 - `ios/IdentityDocumentTests/` contains assertions over the app side of the app/document-provider
   contract: that a demo's namespace resolves to its own App Group and Keychain group, and that a
