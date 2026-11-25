@@ -1,5 +1,9 @@
 package id.walt.verifier2.handlers.sessioncreation
 
+import id.walt.policies2.vc.CredentialPolicyResult
+import id.walt.policies2.vc.policies.WebhookPolicy
+import id.walt.verifier2.verification2.Verifier2PolicyResults
+import kotlinx.serialization.json.JsonPrimitive
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
@@ -103,6 +107,30 @@ class SameDeviceFlowTest {
         assertNull(completed.responseCode)
         assertEquals("private outcome detail", completed.statusReason)
         assertEquals("wallet-browser-secret", restored.responseCode)
+    }
+
+    @Test
+    fun `successful completion redacts nested policy credentials without changing stored results`() = runTest {
+        val webhook = WebhookPolicy("https://example.com/policy", "secret-user", "secret-password", "secret-token")
+        val result = CredentialPolicyResult(webhook, success = true, result = JsonPrimitive("accepted"))
+        val session = VerificationSessionCreator.createVerificationSession(
+            SameDeviceFlowSetup(GeneralFlowConfig(), redirects = redirects), clientId = null,
+            urlPrefix = "https://verifier.example/verification-session", urlHost = "openid4vp://authorize",
+        ).apply {
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
+            responseCode = "completion-code"
+            policyResults = Verifier2PolicyResults(emptyMap(), listOf(result), mapOf("requested" to listOf(result)))
+        }
+        val restored = Json.decodeFromString<Verification2Session>(Json.encodeToString(session))
+        val completed = restored.completionView("completion-code")
+        val serialized = Json.encodeToString(completed)
+        for (secret in listOf("secret-user", "secret-password", "secret-token")) {
+            assertTrue(secret !in serialized, "Completion contains policy credentials")
+        }
+        assertTrue(completed.policyResults!!.overallSuccess)
+        assertEquals(JsonPrimitive("accepted"), completed.policyResults!!.vcPolicies.single().result)
+        assertEquals(JsonPrimitive("accepted"), completed.policyResults!!.specificVcPolicies.getValue("requested").single().result)
+        assertEquals(webhook, restored.policyResults!!.vcPolicies.single().policy)
     }
 
     @Test
