@@ -211,10 +211,12 @@ class Issuer2MsoDataWalletFlowTest {
             val payload = walletFlow.requestCredential(resolved, token.access_token, includeDidInProof = false)
             assertIsoMdlCredentialPayload(payload)
             assertEquals(validFrom, mdocValidityInfo(payload).validFrom)
-            val namespace = mdocNamespaceJson(payload, ISO_MDL_NAMESPACE)
+            val issuerSigned = decodeIssuerSigned(payload)
+            val namespace = issuerSigned.namespacesToJson().getValue(ISO_MDL_NAMESPACE).jsonObject
             assertEquals(JsonPrimitive(age), namespace["age_in_years"])
             assertEquals(JsonPrimitive("AT"), namespace["nationality"])
-            assertTrue(namespace.keys.none { it.startsWith("biometric_template_") })
+            val signedElements = assertNotNull(issuerSigned.namespaces?.get(ISO_MDL_NAMESPACE)).entries
+            assertTrue(signedElements.none { it.value.elementIdentifier.startsWith("biometric_template_") })
         }
 
         val crossingBirthday = offer()
@@ -312,7 +314,7 @@ class Issuer2MsoDataWalletFlowTest {
             val credentialData = JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to JsonObject(namespace - "birth_date")))
             config.copy(profiles = config.profiles + (id to profile.copy(
                 credentialData = credentialData,
-                idTokenClaimsMapping = mapOf("$.birthdate" to "$.['$ISO_MDL_NAMESPACE'].birth_date"),
+                idTokenClaimsMapping = mapOf("$.birthdate" to """$["$ISO_MDL_NAMESPACE"]["birth_date"]"""),
             )))
         })
         val client = apiClient()
@@ -447,8 +449,11 @@ class Issuer2MsoDataWalletFlowTest {
         return credentialPayload
     }
 
+    private fun mdocNamespaceJson(credentialPayload: JsonObject, namespace: String): JsonObject =
+        decodeIssuerSigned(credentialPayload).namespacesToJson().getValue(namespace).jsonObject
+
     @OptIn(ExperimentalSerializationApi::class)
-    private fun mdocNamespaceJson(credentialPayload: JsonObject, namespace: String): JsonObject {
+    private fun decodeIssuerSigned(credentialPayload: JsonObject): IssuerSigned {
         val issuedCredentialBytes = credentialPayload.getValue("credentials")
             .let { it as JsonArray }
             .single()
@@ -457,8 +462,7 @@ class Issuer2MsoDataWalletFlowTest {
             .jsonPrimitive
             .content
             .decodeFromBase64Url()
-        val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(issuedCredentialBytes)
-        return issuerSigned.namespacesToJson().getValue(namespace).jsonObject
+        return coseCompliantCbor.decodeFromByteArray<IssuerSigned>(issuedCredentialBytes)
     }
 
     private fun withIsoMdlMsoData(): (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { config ->

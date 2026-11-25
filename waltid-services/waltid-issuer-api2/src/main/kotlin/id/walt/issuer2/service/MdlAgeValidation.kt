@@ -76,7 +76,7 @@ internal object MdlAgeValidation {
     private fun claimTargets(mapping: Map<String, String>?): Set<String> =
         mapping.orEmpty().values.mapNotNullTo(mutableSetOf()) { path ->
             try {
-                JsonPath.compile(path).path
+                JsonPath.compile(path).path.replace('"', '\'')
             } catch (_: InvalidPathException) {
                 null
             }

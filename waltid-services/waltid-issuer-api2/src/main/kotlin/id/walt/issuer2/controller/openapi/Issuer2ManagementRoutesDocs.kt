@@ -112,7 +112,8 @@ object Issuer2ManagementRoutesDocs {
               Put MSO validity functions in `msoData`. Offer creation returns HTTP 400 for top-level validity fields in `mapping`.
             - For an mDL, set `mapping["org.iso.18013.5.1"]["age_in_years"]` to `<age-in-years>` to derive the age
               at issuance from the final `birth_date` and the UTC date of MSO `validFrom`. A literal age must
-              be a nonnegative integer and match the birth date when `msoData.validFrom` is fixed.
+              be a nonnegative integer. The issuer checks it against the configured birth date when both the birth
+              date and `msoData.validFrom` are known.
             - Non-empty `runtimeOverrides.msoData` is accepted only for `mso_mdoc`. Blank validity values are rejected.
               Null `expectedUpdate` clears the profile value; null `validFrom` or `validUntil` inherits it.
             - Validity must satisfy `signed <= validFrom < validUntil`. `expectedUpdate` is optional;
