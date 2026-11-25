@@ -10,6 +10,9 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.ClientIdX509TrustRegistry
 import id.walt.trust.decision.HttpTrustDecisionEvaluator
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.wallet2.auth.ExposedWallet2AccountStore
+import id.walt.wallet2.auth.InMemoryWallet2AccountStore
+import id.walt.wallet2.auth.Wallet2AccountStore
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
@@ -59,6 +62,8 @@ object OSSWallet2Service {
      * so descriptors and named stores use the same backend.
      */
     var walletStore: WalletStore = InMemoryWalletStore()
+    internal var accountStore: Wallet2AccountStore = InMemoryWallet2AccountStore()
+        private set
     private var persistentStoreRegistry: ExposedStoreRegistry? = null
 
     // Store factories - swapped at startup when persistence is enabled.
@@ -188,7 +193,7 @@ object OSSWallet2Service {
                 ?: namedDidStores.entries.firstOrNull { it.value === store }?.key
 
         // Account-wallet ownership always lives in walletStore (InMemoryWalletStore or
-        // ExposedWalletStore). When auth is enabled, OSSWallet2AccountStore handles user
+        // ExposedWalletStore). When auth is enabled, the account store handles user
         // credentials; wallet ownership is a separate concern that belongs to the wallet store.
         override suspend fun linkWalletToAccount(accountId: String, walletId: String) =
             walletStore.linkWalletToAccount(accountId, walletId)
@@ -200,6 +205,7 @@ object OSSWallet2Service {
     fun configurePersistence(db: Database) {
         issuanceSessionStates.clear()
         walletStore = ExposedWalletStore(db)
+        accountStore = ExposedWallet2AccountStore(db)
         persistentStoreRegistry = ExposedStoreRegistry(db)
         keyStoreFactory = { id -> ExposedKeyStore(id, db) }
         credentialStoreFactory = { id -> ExposedCredentialStore(id, db) }
@@ -212,6 +218,7 @@ object OSSWallet2Service {
     fun configureInMemory(store: WalletStore = InMemoryWalletStore()) {
         issuanceSessionStates.clear()
         walletStore = store
+        accountStore = InMemoryWallet2AccountStore()
         persistentStoreRegistry = null
         keyStoreFactory = { InMemoryKeyStore() }
         credentialStoreFactory = { InMemoryCredentialStore() }
