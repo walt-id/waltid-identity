@@ -77,7 +77,7 @@ class X509Crl(encoded: ByteArray) {
 
     suspend fun verifySignature(issuerCertificate: X509Certificate): Boolean {
         // Shared waltid-x509 key-usage interpretation also governs historical evidence.
-        if (issuerCertificate.keyUsage?.contains(KeyUsageBit.CRL_SIGN) == false) return false
+        if (!issuerCertificate.isCa || issuerCertificate.keyUsage?.contains(KeyUsageBit.CRL_SIGN) == false) return false
         val alg = runCatching { AdesSignatureAlgorithm.fromAlgorithmIdentifier(root.child(1)) }.getOrNull() ?: return false
         return AdesCrypto.verify(issuerCertificate.publicKey, alg, tbs.encoded, root.child(2).asBitStringBytes(), derEcdsa = true)
     }
