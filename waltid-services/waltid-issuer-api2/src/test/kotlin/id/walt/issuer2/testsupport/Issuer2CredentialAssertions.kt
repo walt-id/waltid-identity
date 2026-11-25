@@ -210,3 +210,8 @@ private fun assertJwtVcJsonMappingFunctionsApplied(issuedCredential: String) {
 
 private fun assertStringClaim(value: JsonElement?, claimName: String): String =
     assertNotNull(value?.jsonPrimitive?.contentOrNull, "Expected $claimName")
+/** A generic server error keeps its fixed text and adds only the errorId that the server's log records the cause under. */
+fun assertGenericServerErrorDescription(expected: String, actual: String?) {
+    val pattern = Regex(Regex.escape(expected) + """ \(errorId=[0-9a-f-]{36}\)""")
+    kotlin.test.assertTrue(actual != null && pattern.matches(actual), "Expected '$expected (errorId=…)' but was '$actual'")
+}

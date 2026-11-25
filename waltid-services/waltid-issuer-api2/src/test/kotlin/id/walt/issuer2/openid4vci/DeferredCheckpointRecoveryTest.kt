@@ -181,7 +181,7 @@ class DeferredCheckpointRecoveryTest {
         assertEquals(500, failed.status)
         if (failure == "checkpoint" || (failure == "consume" && deferred)) {
             assertEquals("server_error", failed.payload.getValue("error").jsonPrimitive.content)
-            assertEquals("Credential request processing failed", failed.payload.getValue("error_description").jsonPrimitive.content)
+            assertGenericServerErrorDescription("Credential request processing failed", failed.payload.getValue("error_description").jsonPrimitive.content)
         }
         assertEquals(1, proofVerifications, "The first request verifies its batch once")
         val transaction = if (deferred) assertNotNull(sessions.getSession(receipt.offerId).deferredState).transactions.values.single() else null
