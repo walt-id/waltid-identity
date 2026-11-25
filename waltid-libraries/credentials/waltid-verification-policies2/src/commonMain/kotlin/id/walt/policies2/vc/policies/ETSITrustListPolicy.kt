@@ -658,7 +658,7 @@ data class ETSITrustListPolicy(
         private val keyResolver: Crypto2JwtKeyResolver by lazy {
             Crypto2JwtKeyResolver(
                 allowInlineJwk = false,
-                verificationRelationship = VerificationRelationshipType.AssertionMethod,
+                didVerificationRelationship = VerificationRelationshipType.AssertionMethod,
             )
         }
 
