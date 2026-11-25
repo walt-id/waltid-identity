@@ -9,6 +9,7 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
+import id.walt.wallet2.persistence.stores.SqlDelightStatusMaintenanceStore
 import id.walt.wallet2.status.CredentialStatusCommit
 import id.walt.wallet2.status.CredentialStatusInput
 import id.walt.wallet2.status.CredentialStatusInventory
@@ -32,7 +33,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
@@ -403,6 +406,44 @@ class StatusMaintenanceIntegrationTest {
         assertEquals(replacement.signed, store.getCredential("a")?.credential?.signed)
         assertNull(store.readCredentialStatus("a"))
         assertNull(assertIs<CredentialStatusInput.Signed>(store.readStatusInput("a")).notice)
+    }
+
+    @Test
+    fun cancellationWhileReadingALaterRowPreservesThePreviousCommitAndCursor() = withWallet {
+        val first = add("a", value = 2u)
+        val second = add("b")
+        val grant = requireNotNull(SqlDelightStatusMaintenanceStore(queries, "review").read()?.grantId)
+        val readingSecond = CompletableDeferred<Unit>()
+
+        suspend fun scan(interruptSecond: Boolean) {
+            open().use { driver ->
+                val session = requireNotNull(SqlDelightStatusMaintenanceStore.admit(driver, "review", grant))
+                if (!interruptSecond) assertEquals("a", session.cursor)
+                val inventory = object : CredentialStatusInventory by session.inventory {
+                    override suspend fun statusPage(afterId: String?, limit: Int): List<CredentialStatusInput> {
+                        val rows = session.inventory.statusPage(afterId, limit)
+                        if (interruptSecond && rows.any { it.id == "b" }) {
+                            readingSecond.complete(Unit)
+                            awaitCancellation()
+                        }
+                        return rows
+                    }
+                }
+                WalletCredentialStatusService.refreshMaintenancePage(inventory, session.cursor, 2, client,
+                    ::managedCredentialStatusTrustPolicy, session::advance, onItem = {}, onNoticeCommitted = {})
+            }
+        }
+
+        withTimeout(10.seconds) {
+            val worker = launch { scan(interruptSecond = true) }
+            readingSecond.await()
+            worker.cancelAndJoin()
+        }
+        assertNotNull(store.readCredentialStatus("a"))
+        assertNull(store.readCredentialStatus("b"))
+        scan(interruptSecond = false)
+        assertNotNull(store.readCredentialStatus("b"))
+        assertEquals(listOf(first.uri, second.uri), requests)
     }
 
     @Test

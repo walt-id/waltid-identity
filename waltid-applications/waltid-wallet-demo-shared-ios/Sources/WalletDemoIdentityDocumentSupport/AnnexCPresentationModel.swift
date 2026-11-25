@@ -52,6 +52,8 @@ public final class AnnexCPresentationModel: ObservableObject {
     @Published public private(set) var preview: AnnexCPresentationPreview?
     /// User-facing failure text, if the flow cannot continue.
     @Published public private(set) var failure: String?
+    /// A failed one-tap response keeps this request in explicit wallet review.
+    @Published public private(set) var directSubmissionFailure: String?
     /// Locks interaction once a response is being sealed or the platform request has ended.
     public var isSubmitting: Bool { phase == .submitting || phase == .finished }
     /// What the user is being asked to share, in the wallet's shared review vocabulary.
@@ -191,6 +193,7 @@ public final class AnnexCPresentationModel: ObservableObject {
     /// Runs stage 2: requests the raw request and returns the sealed response to the platform.
     public func submit(reviewedStatus: [String: String]? = nil) async {
         guard phase == .reviewing, let wallet, let preview else { return }
+        guard reviewedStatus != nil || directSubmissionFailure == nil else { return }
         guard hasCompleteSelection else {
             failure = IdentityDocumentSupportFailure.missingCredentialSelection.localizedDescription
             return
@@ -239,12 +242,16 @@ public final class AnnexCPresentationModel: ObservableObject {
             cancel()
         } catch {
             log.error("Annex C response failed: \(error.localizedDescription, privacy: .public)")
-            failure = error.localizedDescription
             phase = .reviewing
-            if reviewedStatus == nil && statusObservation == nil {
+            if reviewedStatus == nil {
+                directSubmissionFailure = error.localizedDescription
                 // A failed direct attempt opens interactive review. Load the evidence that review needs.
-                do { try await startStatusReview(wallet) }
-                catch { cancel() }
+                if statusObservation == nil {
+                    do { try await startStatusReview(wallet) }
+                    catch { cancel() }
+                }
+            } else {
+                failure = error.localizedDescription
             }
         }
     }

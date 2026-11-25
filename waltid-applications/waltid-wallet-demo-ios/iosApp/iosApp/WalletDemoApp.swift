@@ -13,7 +13,17 @@ import WalletDemoIdentityDocumentSupport
 @main
 struct WalletDemoApp: App {
     var body: some Scene {
-        WindowGroup { WalletForegroundScene() }
+        WindowGroup {
+            #if DEBUG
+            if #available(iOS 26.0, *), ProcessInfo.processInfo.environment["E2E_ANNEX_C_RETRY"] == "1" {
+                MockAnnexCRetryScene()
+            } else {
+                WalletForegroundScene()
+            }
+            #else
+            WalletForegroundScene()
+            #endif
+        }
     }
 
     @UIApplicationDelegateAdaptor(NativeBackgroundStatusDelegate.self) private var backgroundStatusDelegate

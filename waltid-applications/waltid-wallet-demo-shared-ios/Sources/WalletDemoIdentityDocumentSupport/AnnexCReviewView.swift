@@ -45,8 +45,9 @@ public struct AnnexCReviewView: View {
     public var body: some View {
         let renderedSelection = model.selection
         let renderedReview = model.review
+        let notices = [model.directSubmissionFailure, model.statusReviewNotice].compactMap { $0 }
         Group {
-            if showDcApiPresentationPreview || model.failure != nil {
+            if showDcApiPresentationPreview || model.directSubmissionFailure != nil || model.failure != nil {
                 SharingReviewScreen(
                     title: "Share documents",
                     requestIdentity: ObjectIdentifier(model),
@@ -68,7 +69,7 @@ public struct AnnexCReviewView: View {
                     // requester learns something it never learns.
                     onReject: nil,
                     onCancel: model.cancel,
-                    statusNotice: model.statusReviewNotice
+                    statusNotice: notices.isEmpty ? nil : notices.joined(separator: "\n")
                 )
             } else {
                 ProgressView("Preparing presentation")

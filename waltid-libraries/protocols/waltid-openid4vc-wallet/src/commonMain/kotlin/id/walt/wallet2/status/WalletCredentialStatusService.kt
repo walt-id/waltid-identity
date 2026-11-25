@@ -437,21 +437,29 @@ class WalletCredentialStatusService private constructor(
         onItem: (CredentialStatusRefreshOutcome) -> Unit,
     ) {
         val inventory = owner.inventory
-        val limit = 64
-        val tail = inventory.statusPage(cursor, limit)
-        val page = if (tail.isEmpty() && cursor != null) inventory.statusPage(null, limit) else tail
         val source = Source(inventory, inventory, inventory::readStatusInput)
         val session = resolver.newRefreshSession()
         try {
             var remaining = maxItems
-            for (input in page) {
+            var afterId = cursor
+            var scanned = 0
+            while (remaining > 0 && scanned < 64) {
                 currentCoroutineContext().ensureActive()
-                if (remaining == 0) break
+                // Decode only the next signed row so a later row cannot consume this one's budget.
+                val input = inventory.statusPage(afterId, 1).firstOrNull()
+                if (input == null) {
+                    if (scanned > 0 || afterId == null) break
+                    afterId = null
+                    continue
+                }
                 val reference = WalletCredentialReference(0, input.id)
                 val candidate = Candidate(reference, source, input)
                 val record = candidate.record()
                 val cached = record?.let { candidate.readLocalState(it).metadata } ?: unreadable
+                currentCoroutineContext().ensureActive()
                 if (!advance(input.id)) break
+                afterId = input.id
+                scanned++
                 val outcome = when {
                     record == null -> {
                         remaining--

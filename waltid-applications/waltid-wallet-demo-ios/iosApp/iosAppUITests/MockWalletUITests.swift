@@ -3,6 +3,29 @@ import XCTest
 
 @MainActor
 final class MockWalletUITests: XCTestCase {
+    func testOneTapAnnexCFailureRequiresAnExplicitReviewedShare() throws {
+        guard #available(iOS 26.0, *) else { throw XCTSkip("Identity document presentation requires iOS 26") }
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        WalletE2EUI(app: app).launch(environment: [
+            "E2E_ANNEX_C_RETRY": "1", "E2E_MOCK_WALLET": "1", "E2E_MOCK_STATUS": "revoked_current",
+        ], unlock: false)
+
+        let share = app.buttons["wallet.presentationSubmitButton"]
+        XCTAssertTrue(share.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Direct response failed"].exists)
+        XCTAssertTrue(app.staticTexts["Revoked"].exists)
+        XCTAssertTrue(app.staticTexts["Mobile Driving Licence"].exists)
+        XCTAssertTrue(app.staticTexts["Delivered responses: 0"].exists)
+        share.tap()
+        let confirm = app.alerts["Share with status issues?"].buttons["credential-status-confirm"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Delivered responses: 0"].exists)
+        confirm.tap()
+        XCTAssertTrue(app.staticTexts["Delivered responses: 1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(share.isEnabled)
+    }
+
     func testStatusNotificationOpensCredentialAfterUnlockAndAcknowledgesIt() {
         let app = XCUIApplication()
         defer { app.terminate() }

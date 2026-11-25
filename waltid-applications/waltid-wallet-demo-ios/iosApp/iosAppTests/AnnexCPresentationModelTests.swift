@@ -137,7 +137,7 @@ final class AnnexCPresentationModelTests: XCTestCase {
 
         await model.submit()
 
-        XCTAssertEqual(model.failure, StubWalletFailure().localizedDescription)
+        XCTAssertEqual(model.directSubmissionFailure, StubWalletFailure().localizedDescription)
         XCTAssertNil(context.sentResponse, "A wallet that could not seal a response must not hand the platform any bytes")
         XCTAssertFalse(
             model.isSubmitting,
@@ -208,7 +208,8 @@ final class AnnexCPresentationModelTests: XCTestCase {
         await model.submit()
 
         XCTAssertFalse(model.isSubmitting)
-        XCTAssertEqual(model.failure, StubWalletFailure().localizedDescription)
+        XCTAssertNil(model.failure)
+        XCTAssertEqual(model.directSubmissionFailure, StubWalletFailure().localizedDescription)
         XCTAssertNil(context.sentResponse)
         XCTAssertEqual(context.sendResponseCount, 1)
         XCTAssertEqual(wallet.statusReadCount, 1)
