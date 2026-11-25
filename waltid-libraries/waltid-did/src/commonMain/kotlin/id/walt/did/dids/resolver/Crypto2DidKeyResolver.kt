@@ -49,15 +49,26 @@ fun interface Crypto2DidKeyResolver {
 class DidVerificationMethodNotFoundException(keyId: String) :
     IllegalArgumentException("DID document has no verification method matching key ID: $keyId")
 
-class DidDocumentCrypto2KeyResolver(
+class DidDocumentCrypto2KeyResolver private constructor(
     private val resolveDocument: suspend (String) -> Result<JsonObject>,
-    private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
-    private val verificationRelationship: VerificationRelationshipType? = null,
+    private val runtime: CryptoRuntime,
+    private val verificationRelationship: VerificationRelationshipType?,
 ) : Crypto2DidKeyResolver {
+    constructor(
+        resolveDocument: suspend (String) -> Result<JsonObject>,
+        runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+    ) : this(resolveDocument, runtime, null)
+
+    // Preserve the released JVM constructor and its default-argument bridge for compiled consumers.
     constructor(
         resolver: DidResolver,
         runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
-        verificationRelationship: VerificationRelationshipType? = null,
+    ) : this(resolver::resolve, runtime, null)
+
+    constructor(
+        resolver: DidResolver,
+        runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+        verificationRelationship: VerificationRelationshipType?,
     ) : this(resolver::resolve, runtime, verificationRelationship)
 
     override suspend fun resolveToKeys(did: String): Set<Key> =
