@@ -11,6 +11,7 @@ import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.interactive.digitalsignature.PDSignature
 import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm
 import org.apache.pdfbox.pdmodel.interactive.form.PDSignatureField
+import org.apache.pdfbox.pdmodel.interactive.form.PDTerminalField
 
 /** Signed FieldMDP transforms and signature-field locks (ISO 32000-1 12.8.2.4 and 12.7.4.5). */
 internal object PdfPermissions {
@@ -121,7 +122,12 @@ internal object PdfPermissions {
                 (signature?.cosObject?.getCOSName(COSName.TYPE) == COSName.DOC_TIME_STAMP || signature?.subFilter == PdfNames.ETSI_RFC3161.name) &&
                     field.widgets.all { widget -> widget.rectangle?.let { it.width == 0f || it.height == 0f } ?: (widget.appearance == null) }
             } == true
-            !addedTimestamp && rules.any { it.locks(name) } && !deepSame(before[name]?.cosObject, after[name]?.cosObject, HashSet())
+            !addedTimestamp && rules.any { it.locks(name) } && (!deepSame(before[name]?.cosObject, after[name]?.cosObject, HashSet()) ||
+                !deepSame(
+                    (before[name] as? PDTerminalField)?.widgets?.let { COSArray(it.map { widget -> widget.cosObject }) },
+                    (after[name] as? PDTerminalField)?.widgets?.let { COSArray(it.map { widget -> widget.cosObject }) },
+                    HashSet(),
+                ))
         }.map { "locked field $it changed" }
     }
 
