@@ -6,6 +6,7 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.CredentialVerificationPolicy2
 import id.walt.policies2.vc.policies.WebhookPolicy
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyList
@@ -269,6 +270,14 @@ data class Verification2Session(
         setup = setup.publicView(),
         notifications = notifications?.withoutCredentials(),
         policies = policies.publicView(),
+        policyResults = policyResults?.let { results ->
+            results.copy(
+                vcPolicies = results.vcPolicies.map { it.copy(policy = it.policy.publicView()) },
+                specificVcPolicies = results.specificVcPolicies.mapValues { (_, policies) ->
+                    policies.map { it.copy(policy = it.policy.publicView()) }
+                },
+            )
+        },
         ephemeralDecryptionKey = null,
         crypto2EphemeralDecryptionKey = null,
         responseCode = null,
@@ -424,14 +433,11 @@ internal fun Verification2Session.DefinedVerificationPolicies.publicView() = cop
     specific_vc_policies = specific_vc_policies?.mapValues { (_, policies) -> policies.publicView() },
 )
 
-private fun VCPolicyList.publicView() = copy(
-    policies = policies.map { policy ->
-        if (policy is WebhookPolicy) {
-            policy.copy(
-                basicAuthUsername = null,
-                basicAuthPassword = null,
-                bearerAuthToken = null,
-            )
-        } else policy
-    }
-)
+private fun VCPolicyList.publicView() = copy(policies = policies.map { it.publicView() })
+
+internal fun CredentialVerificationPolicy2.publicView(): CredentialVerificationPolicy2 =
+    if (this is WebhookPolicy) copy(
+        basicAuthUsername = null,
+        basicAuthPassword = null,
+        bearerAuthToken = null,
+    ) else this
