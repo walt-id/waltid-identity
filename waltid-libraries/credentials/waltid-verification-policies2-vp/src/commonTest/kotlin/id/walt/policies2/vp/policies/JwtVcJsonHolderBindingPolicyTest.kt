@@ -87,8 +87,14 @@ class JwtVcJsonHolderBindingPolicyTest {
 
     @Test
     fun confirmationSupportsDifferentPublicKeyTypesAndIgnoresJwkMetadata() = runTest {
-        for (type in listOf(KeyType.Ed25519, KeyType.secp256r1, KeyType.RSA)) {
-            val key = JWKKey.generate(type).getPublicKey()
+        // Public fixtures keep this key-comparison test independent of the iOS signing keychain.
+        val publicKeys = listOf(
+            """{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiYSkbL9b5BAsbk"}""",
+            """{"kty":"EC","crv":"P-256","x":"uAMG3ffORZJAxox6jd9WqKVCyf-nzebhG64f4uGkw80","y":"PBd-jzVV8ZM01_6Pra2o2uG05-6yhRCw-6hGCJcOtKc"}""",
+            """{"kty":"RSA","n":"uCXibTXC_yQ3LQiakyjGRoft03otjLmHFWSK7GMZvdpaL5uqt5OPUvfo7wlW8hywjcBxnJMLN4WoL1pjdS74bWYF2Fte4xHAoZsCQRffvv9aviK5QnW3qQGg95hk03ECowA0B1gb2GEQ5aoT1MpHZdBIBVmxcbHiYOtsoM85e7P7jJy6Z4QM6tQy26BImSlCuA6Zn4c4aK_-nzH3h0SNsChMJkx0TNvQkvKogwgOVw8NIGKkQstDPHudbIiLI0tPmD6co01rdhXo1kH-bD5cwbR9T66bLLsWtyq4VWj2CtkAyMtjb3AGhFNLK5kth20OUVIOe-AXtUm-6irMVFoIBQ","e":"AQAB"}""",
+        )
+        for (publicKey in publicKeys) {
+            val key = JWKKey.importJWK(publicKey).getOrThrow()
             val jwk = JsonObject(key.exportJWKObject() + ("kid" to JsonPrimitive("local-test-key")))
             val data = JsonObject(mapOf("cnf" to JsonObject(mapOf("jwk" to jwk))))
             CredentialHolderBinding.requireBoundToPresenter(credential(null, data), "did:example:holder", key.getThumbprint())
