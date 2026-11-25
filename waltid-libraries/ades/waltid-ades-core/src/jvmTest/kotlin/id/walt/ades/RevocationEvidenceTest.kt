@@ -13,6 +13,7 @@ import id.walt.ades.validation.RevocationStatus
 import id.walt.ades.validation.SignatureEvidence
 import id.walt.ades.validation.TimestampEvidence
 import id.walt.ades.validation.TimestampType
+import id.walt.ades.validation.TimestampValidator
 import id.walt.ades.validation.ValidationData
 import id.walt.ades.validation.ValidationDataCollector
 import id.walt.ades.validation.ValidationDataResolver
@@ -158,6 +159,22 @@ class RevocationEvidenceTest {
             .validate(pki.signer.certificate, pki.now).passed)
         val incomplete = ValidationData(certificates = listOf(pki.signer.certificate, pki.issuingCa.certificate), crls = data.crls)
         assertTrue(ValidationDataCollector(null).collect(listOf(pki.signer.certificate), incomplete).missing.isNotEmpty())
+    }
+
+    @Test
+    fun timestampValidationRejectsTsaEvidenceStaleBeforeItsControlTime() = runTest {
+        val bytes = "timestamp freshness".encodeToByteArray()
+        pki.tsaClock = { pki.now }
+        val token = Rfc3161TimestampClient(pki.tsaUrl, pki.transport)
+            .timestamp(AdesDigestAlgorithm.SHA256, AdesDigestAlgorithm.SHA256.digest(bytes))
+        for (stale in listOf(false, true)) {
+            val pool = ValidationData(certificates = listOf(pki.issuingCa.certificate), crls = listOf(
+                X509Crl(pki.crl(pki.issuingCa)), X509Crl(pki.crl(pki.root, if (stale) pki.now - 8.days else pki.now)),
+            ))
+            val chain = CertificateChainValidator(ValidationDataResolver(pool, null, anchors), AdesValidationPolicy(anchors))
+            val result = TimestampValidator(chain).validate(TimestampEvidence(TimestampType.SIGNATURE, token, bytes))
+            assertEquals(!stale, result.passed, result.toString())
+        }
     }
 
     @Test
