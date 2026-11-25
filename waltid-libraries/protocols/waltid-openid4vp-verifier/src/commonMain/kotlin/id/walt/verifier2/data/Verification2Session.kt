@@ -6,7 +6,6 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.VCPolicyList
-import id.walt.policies2.vc.policies.CredentialVerificationPolicy2
 import id.walt.policies2.vc.policies.WebhookPolicy
 import id.walt.policies2.vc.policies.CredentialVerificationPolicy2
 import id.walt.policies2.vp.policies.VPPolicy2
