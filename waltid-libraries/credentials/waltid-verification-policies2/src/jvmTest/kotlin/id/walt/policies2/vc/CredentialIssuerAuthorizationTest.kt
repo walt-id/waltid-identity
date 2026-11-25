@@ -77,7 +77,7 @@ class CredentialIssuerAuthorizationTest {
                     assertTrue(CredentialSignaturePolicy().verify(credential(assertion, kid = "$did#missing", sdJwt = sdJwt)).isFailure)
                 }
                 // Generic DID resolution still exposes authentication keys to other consumers.
-                assertEquals(if (embedded) 1 else 2, DidService.resolveToCrypto2Keys(did).getOrThrow().size)
+                assertEquals(2, DidService.resolveToCrypto2Keys(did).getOrThrow().size)
             }
         }
         withDocument(JsonObject(document(assertion, authentication).filterKeys { it != "assertionMethod" })) {
