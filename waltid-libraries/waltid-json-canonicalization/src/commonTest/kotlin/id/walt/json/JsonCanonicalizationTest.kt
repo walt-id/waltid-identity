@@ -27,6 +27,7 @@ class JsonCanonicalizationTest {
         for ((bits, expected) in vectors) {
             assertEquals(expected, JsonCanonicalization.canonicalize(JsonPrimitive(Double.fromBits(bits.toULong(16).toLong()))), bits)
         }
+        assertEquals("295147905179352830000", JsonCanonicalization.getCanonicalString("295147905179352830000"))
         assertEquals("100000000000000000000", JsonCanonicalization.getCanonicalString("1e20"))
         assertEquals("0.000001", JsonCanonicalization.getCanonicalString("1e-6"))
     }
