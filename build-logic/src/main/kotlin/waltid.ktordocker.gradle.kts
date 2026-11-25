@@ -19,16 +19,13 @@ fun getDockerCredentials(rootDir: File): Pair<String, String> {
     )
 }
 
-// Match the v2 API Dockerfiles and omit the affected Pebble helper (GO-2026-6859).
-val apiV2BaseImage = when (project.name) {
-    "waltid-issuer-api2", "waltid-verifier-api2", "waltid-wallet-api2" -> "amazoncorretto:25-al2023"
-    else -> null
-}
+// Match the service Dockerfiles and omit the affected Pebble helper (GO-2026-6859).
+val runtimeBaseImage = "amazoncorretto:25-al2023"
 
 ktor {
     docker {
-        jreVersion.set(JavaVersion.VERSION_21)
-        apiV2BaseImage?.let { customBaseImage.set(it) }
+        jreVersion.set(JavaVersion.VERSION_25)
+        customBaseImage.set(runtimeBaseImage)
 
         localImageName.set(project.name.replaceFirst("waltid-", "waltid/")) // waltid-verifier-api2 -> waltid/verifier-api2
         imageTag.set("${project.version}")
@@ -52,7 +49,7 @@ configure<JibExtension> {
         workingDirectory = "/${project.name}"
     }
     from {
-        apiV2BaseImage?.let { image = it }
+        image = runtimeBaseImage
         platforms {
             platform {
                 architecture = "amd64"
