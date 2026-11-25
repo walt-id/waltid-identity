@@ -16,10 +16,21 @@ import org.bouncycastle.asn1.cms.SignedData
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.test.assertContentEquals
 
 class TimestampRequestTest {
     private val pki = TestPki()
     private val digest = ByteArray(32) { it.toByte() }
+
+    @Test
+    fun nonceRequestPreservesAll128BitsAsAPositiveDerInteger() {
+        val nonce = ByteArray(16) { 0xff.toByte() }
+        val client = Rfc3161TimestampClient(pki.tsaUrl, pki.transport)
+        val encoded = Der.parse(client.buildRequest(AdesDigestAlgorithm.SHA256, digest, nonce)).children
+            .last { it.isUniversal(Der.INTEGER) }.content
+        assertTrue(encoded.size == 17 && encoded[0] == 0.toByte())
+        assertContentEquals(nonce, encoded.copyOfRange(1, encoded.size))
+    }
 
     @Test
     fun acceptsMatchingRequestsAndExplicitlyNonceFreeRequests() = runTest {
