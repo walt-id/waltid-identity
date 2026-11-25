@@ -244,7 +244,7 @@ class CbAdesSigner(private val context: CbAdesSigningContext = CbAdesSigningCont
             if (value != null) e += CborItem.int(label) to value
         }
 
-        val chain = credentials.certificateChain.filter { p.includeRootInChain || !it.isSelfIssued || it == credentials.signingCertificate }
+        val chain = credentials.certificateChain.filter { p.includeRootInChain || !it.isIssuedBy(it) || it == credentials.signingCertificate }
         val crit = (p.criticalLabels + listOfNotNull(CbAdesLabels.SIG_D.takeIf { p.detachedReferences != null })).distinct()
 
         put(CbAdesLabels.ALG, credentials.algorithm.coseId!!.cbor())
