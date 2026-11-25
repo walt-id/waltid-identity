@@ -13,7 +13,7 @@ import id.walt.crypto2.keys.KeyEncodingFormat
 object CredentialHolderBinding {
     suspend fun requireBoundToPresenter(
         credential: DigitalCredential,
-        presenterDid: String,
+        presenterDid: String?,
         presenterKeyThumbprint: String,
     ) {
         // Wrapped JWT credentials retain outer confirmation claims in the signed payload rather
@@ -35,7 +35,7 @@ object CredentialHolderBinding {
             val subjects = listOfNotNull(credential.subject,
                 CredentialParser.getCredentialDataSubject(credential.credentialData),
                 signedPayload?.let(CredentialParser::getJwtHeaderOrDataSubject)).distinct()
-            credential is AbstractW3C && presenterDid.startsWith("did:") && subjects == listOf(presenterDid)
+            credential is AbstractW3C && presenterDid?.startsWith("did:") == true && subjects == listOf(presenterDid)
         }
         require(bound) { "Credential is not cryptographically or semantically bound to presenter $presenterDid" }
     }
