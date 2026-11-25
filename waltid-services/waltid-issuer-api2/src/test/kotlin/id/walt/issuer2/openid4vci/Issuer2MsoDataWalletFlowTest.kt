@@ -202,6 +202,7 @@ class Issuer2MsoDataWalletFlowTest {
         suspend fun offer(overrides: CredentialOfferRuntimeOverrides? = null) = client.createWalletFlowCredentialOffer(
             scenario = Issuer2CredentialScenarios.isoMdl,
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
             runtimeOverrides = overrides,
         )
 
