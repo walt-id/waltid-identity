@@ -17,6 +17,9 @@ Ensure you have the following tools installed:
 
 If you prefer to run the services using latest release pre-built Docker images, follow these steps:
 
+If you have an existing Wallet2 container with the old default SQLite database,
+[copy the database](#upgrading-an-existing-wallet2-database) before running `docker compose up` or `docker compose down`.
+
 ### Pull the Latest Release Images
 
 Start by pulling the latest release Docker images for the services:
@@ -35,7 +38,7 @@ Once the images are pulled, start the services by running:
 $ docker compose up
 ```
 
-*Note:* If you are facing issues with the containers, remove the existing ones with `docker compose down` (add `-v` to
+*Note:* If you are facing issues with a new installation, remove the existing containers with `docker compose down` (add `-v` to
 also drop the volumes) and run the command above again.
 
 ### Upgrading an existing Wallet2 database
@@ -43,16 +46,56 @@ also drop the volumes) and run the command above again.
 Older releases stored the default Wallet2 SQLite database at `/waltid-wallet-api2/wallet2.db`
 inside the container. The current Compose file mounts `wallet-api2/data` from the host and uses
 `wallet2.db` in that directory. To keep the old database, run these commands from the Compose
-directory before removing or recreating the existing container:
+directory in Bash before removing or recreating the existing container:
 
 ```bash
-docker compose stop wallet-api2
-mkdir -p wallet-api2/data
-test ! -e wallet-api2/data/wallet2.db && docker compose cp wallet-api2:/waltid-wallet-api2/wallet2.db ./wallet-api2/data/wallet2.db
+(
+  set -euo pipefail
+  copy_failed() {
+    printf '%s\n' 'Wallet2 upgrade stopped. Keep the old container and resolve the copy failure before retrying.' >&2
+    exit 1
+  }
+  trap copy_failed ERR
+  data=wallet-api2/data
+  files=(wallet2.db-wal wallet2.db-shm wallet2.db-journal wallet2.db)
+
+  for file in "${files[@]}"; do
+    if [[ -e "$data/$file" || -L "$data/$file" ]]; then
+      printf 'Wallet2 upgrade stopped. %s already exists. Keep the old container and resolve the destination before retrying.\n' "$data/$file" >&2
+      exit 1
+    fi
+  done
+
+  docker compose stop wallet-api2
+  mkdir -p "$data"
+  staging=$(mktemp -d "$data/.wallet2-upgrade.XXXXXX")
+  trap 'rm -rf -- "$staging"' EXIT
+
+  docker compose cp wallet-api2:/waltid-wallet-api2/. - |
+    tar -tf - | sed 's|^\./||' > "$staging/container-files"
+  copied=()
+  for file in "${files[@]}"; do
+    if grep -Fxq "$file" "$staging/container-files"; then
+      docker compose cp "wallet-api2:/waltid-wallet-api2/$file" "$staging/$file"
+      [[ -f "$staging/$file" ]] || copy_failed
+      copied+=("$file")
+    fi
+  done
+  [[ -s "$staging/wallet2.db" ]] || copy_failed
+
+  for file in "${copied[@]}"; do
+    ln "$staging/$file" "$data/$file"
+    [[ "$staging/$file" -ef "$data/$file" ]] || copy_failed
+  done
+  printf 'Copied Wallet2 files to %s:\n' "$data"
+  printf '  %s\n' "${copied[@]}"
+)
 ```
 
-If the stopped container also contains `wallet2.db-wal`, `wallet2.db-shm`, or `wallet2.db-journal`,
-copy those files into the same directory. Start Wallet2 using the updated Compose and configuration files:
+Continue only after the copy succeeds and lists `wallet2.db` and every companion file present in the
+stopped container (`wallet2.db-wal`, `wallet2.db-shm`, or `wallet2.db-journal`) together in
+`wallet-api2/data`. If the copy stops, keep the old container until you have a complete copy.
+Start Wallet2 using the updated Compose and configuration files:
 
 ```bash
 docker compose up -d wallet-api2
