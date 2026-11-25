@@ -136,13 +136,19 @@ data class W3CVC(
             data = this.toJsonObject(),
             key = issuerKey,
             jwtHeaders = baseHeaders + additionalJwtHeader,
-            jwtOptions = mapOf(
-                JwsOption.ISSUER to JsonPrimitive(issuerId),
-                JwsOption.SUBJECT to JsonPrimitive(subjectDid),
-                *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray())
-            ),
+            jwtOptions = signingJwtOptions(issuerId, subjectDid, additionalJwtOptions),
             wrapInVc = !isV2()
         )
+    }
+
+    private fun signingJwtOptions(
+        issuerId: String?,
+        subjectDid: String,
+        additionalJwtOptions: Map<String, JsonElement>,
+    ): Map<String, JsonElement> = buildMap {
+        put(JwsOption.ISSUER, JsonPrimitive(issuerId))
+        if (subjectDid.isNotBlank()) put(JwsOption.SUBJECT, JsonPrimitive(subjectDid))
+        putAll(additionalJwtOptions)
     }
 
     private fun sdJwtSigningInput(
@@ -154,11 +160,7 @@ data class W3CVC(
         val wrapInVc = !isV2()
         val payload = JwsSignatureScheme().toPayload(
             data = toJsonObject(),
-            jwtOptions = mapOf(
-                JwsOption.ISSUER to JsonPrimitive(issuerId),
-                JwsOption.SUBJECT to JsonPrimitive(subjectDid),
-                *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray()),
-            ),
+            jwtOptions = signingJwtOptions(issuerId, subjectDid, additionalJwtOptions),
             wrapInVc = wrapInVc,
         )
         val sdPayload = SDPayload.createSDPayload(
@@ -205,11 +207,7 @@ data class W3CVC(
                 JwsHeader.KEY_ID to JsonPrimitive(kid),
                 "typ" to JsonPrimitive(typHeader),
             ) + additionalJwtHeader,
-            jwtOptions = mapOf(
-                JwsOption.ISSUER to JsonPrimitive(issuerId),
-                JwsOption.SUBJECT to JsonPrimitive(subjectDid),
-                *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray()),
-            ),
+            jwtOptions = signingJwtOptions(issuerId, subjectDid, additionalJwtOptions),
             wrapInVc = !isV2(),
         )
     }

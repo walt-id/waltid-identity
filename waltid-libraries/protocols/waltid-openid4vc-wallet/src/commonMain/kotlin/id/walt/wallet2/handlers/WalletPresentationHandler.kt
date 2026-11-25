@@ -33,9 +33,11 @@ import id.walt.dcql.RequiredCredentialUnavailableException
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
+import id.walt.holderpolicies.HolderPolicy
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier.openid.transactiondata.DecodedTransactionData
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.wallet2.data.StoredCredential
@@ -66,6 +68,7 @@ import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.http.*
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -365,6 +368,9 @@ data class SubmitDcApiPresentationRequest(
 class MissingPresentationPreviewException :
     IllegalStateException("Presentation request preview expired or was not found; preview the request again before responding.")
 
+class InvalidPresentationTransactionDataException(val reason: String) :
+    IllegalStateException("Presentation request is invalid (invalid_transaction_data): $reason")
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
@@ -478,6 +484,23 @@ object WalletPresentationHandler {
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+    ): WalletPresentResult = presentCredentialWithTrust(
+        wallet, request, holderPoliciesToRun = null, onEvent, transactionDataTypeRegistry,
+        clientIdTrustConfiguration, beforeCredentialsUsed, expectedRequestObjectAudience, unsignedRequestObjectPolicy,
+    )
+
+    /** When requested and supplied, [holderPoliciesToRun] must allow the selected stored credentials. */
+    suspend fun presentCredentialWithTrust(
+        wallet: Wallet,
+        request: PresentCredentialRequest,
+        holderPoliciesToRun: Flow<HolderPolicy>?,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
     ): WalletPresentResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -506,6 +529,7 @@ object WalletPresentationHandler {
                     }
             },
             runPolicies = request.runPolicies,
+            holderPoliciesToRun = holderPoliciesToRun,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
@@ -576,6 +600,23 @@ object WalletPresentationHandler {
         expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+    ): WalletPresentResult = presentCredentialIsolatedWithTrust(
+        wallet, request, holderPoliciesToRun = null, onEvent, transactionDataTypeRegistry,
+        clientIdTrustConfiguration, beforeCredentialsUsed, expectedRequestObjectAudience, unsignedRequestObjectPolicy,
+    )
+
+    /** When supplied, [holderPoliciesToRun] must allow the selected inline credentials. */
+    suspend fun presentCredentialIsolatedWithTrust(
+        wallet: Wallet,
+        request: PresentCredentialIsolatedRequest,
+        holderPoliciesToRun: Flow<HolderPolicy>?,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+        transactionDataTypeRegistry: TransactionDataTypeRegistry,
+        clientIdTrustConfiguration: ClientIdTrustConfiguration,
+        beforeCredentialsUsed: suspend (Int) -> Unit = {},
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
     ): WalletPresentResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
@@ -596,7 +637,8 @@ object WalletPresentationHandler {
                 DcqlMatcher.match(query, candidates.map { it.credential }, candidates.matchingContext()).getOrThrow()
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
-            runPolicies = null,
+            runPolicies = holderPoliciesToRun != null,
+            holderPoliciesToRun = holderPoliciesToRun,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             clientIdTrustConfiguration = clientIdTrustConfiguration,
             beforeCredentialsUsed = beforeCredentialsUsed,
@@ -1316,6 +1358,7 @@ object WalletPresentationHandler {
         presentationRequestUrl: Url,
         selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
         runPolicies: Boolean?,
+        holderPoliciesToRun: Flow<HolderPolicy>? = null,
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         resolvedAuthorizationRequest: ResolvedAuthorizationRequest? = null,
         clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
@@ -1332,7 +1375,7 @@ object WalletPresentationHandler {
                 holderDid = holderDid,
                 presentationRequestUrl = presentationRequestUrl,
                 selectCredentialsForQuery = selectOnce,
-                holderPoliciesToRun = null,
+                holderPoliciesToRun = holderPoliciesToRun,
                 runPolicies = runPolicies,
                 transactionDataTypeRegistry = transactionDataTypeRegistry,
                 resolvedAuthorizationRequest = resolvedAuthorizationRequest,
@@ -1352,7 +1395,7 @@ object WalletPresentationHandler {
             holderDid = holderDid,
             presentationRequestUrl = presentationRequestUrl,
             selectCredentialsForQuery = selectOnce,
-            holderPoliciesToRun = null,
+            holderPoliciesToRun = holderPoliciesToRun,
             runPolicies = runPolicies,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolvedAuthorizationRequest = resolvedAuthorizationRequest,
@@ -1631,11 +1674,37 @@ object WalletPresentationHandler {
                 unsignedRequestObjectPolicy,
             )
         },
+    ): BuildVpTokenResult = buildVpToken(
+        wallet, request, scaAuthorizer, holderPoliciesToRun = null, transactionDataTypeRegistry,
+        clientIdTrustConfiguration, expectedRequestObjectAudience, unsignedRequestObjectPolicy,
+        resolveAuthorizationRequest,
+    )
+
+    /** When supplied, [holderPoliciesToRun] must allow the selected credentials before signing. */
+    suspend fun buildVpToken(
+        wallet: Wallet,
+        request: BuildVpTokenRequest,
+        scaAuthorizer: WalletScaPresentationAuthorizer?,
+        holderPoliciesToRun: Flow<HolderPolicy>?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
+        clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
+        expectedRequestObjectAudience: String = AuthorizationRequestResolver.DEFAULT_REQUEST_OBJECT_AUDIENCE,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest = { requestUrl ->
+            this@WalletPresentationHandler.resolveAuthorizationRequest(
+                { WalletPresentationFormatRegistry.defaultCapabilities() },
+                requestUrl,
+                clientIdTrustConfiguration,
+                expectedRequestObjectAudience,
+                unsignedRequestObjectPolicy,
+            )
+        },
     ): BuildVpTokenResult {
         val keyMaterial = request.key?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(request.keyId, setOf(KeyUsage.SIGN))
             ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
-        val resolvedAuthorizationRequest = resolveAndValidatePresentationRequest(
+        val (resolvedAuthorizationRequest, validatedTransactionData) = resolveAndValidatePresentationRequest(
             requestUrl = request.requestUrl,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             formatCapabilities = { keyMaterial.presentationCapabilities() },
@@ -1685,6 +1754,10 @@ object WalletPresentationHandler {
             "Selected credential option(s) do not match required presentation credential query constraints"
         }
 
+        if (holderPoliciesToRun != null) {
+            WalletPresentFunctionality2.requireHolderPoliciesAllow(holderPoliciesToRun, selected, validatedTransactionData)
+        }
+
         val crypto2Key = keyMaterial.crypto2Key
         val vpToken = if (crypto2Key != null) {
             WalletPresentFunctionality2.buildVpToken(
@@ -1692,6 +1765,7 @@ object WalletPresentationHandler {
                 matchedCredentials = selected,
                 holderKey = crypto2Key,
                 holderDid = did,
+                transactionDataTypeRegistry = transactionDataTypeRegistry,
                 clientMetadata = resolvedAuthorizationRequest.effectiveClientMetadata,
                 credentialHolderKeyResolver = wallet.credentialHolderKeyResolver(scaAuthorizer = scaAuthorizer),
                 scaAuthorizer = scaAuthorizer?.forKey(crypto2Key),
@@ -1752,7 +1826,7 @@ object WalletPresentationHandler {
             requestUrl = request.requestUrl,
             transactionDataTypeRegistry = transactionDataTypeRegistry,
             resolveAuthorizationRequest = resolveAuthorizationRequest,
-        )
+        ).resolved
         return WalletPresentFunctionality2.sendAuthorizationResponse(
             authorizationRequest = resolvedAuthorizationRequest.authorizationRequest,
             vpToken = request.vpToken,
@@ -2166,7 +2240,7 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         formatCapabilities: (() -> WalletPresentationFormatRegistry.RuntimeCapabilities)? = null,
         resolveAuthorizationRequest: suspend (Url) -> ResolvedAuthorizationRequest,
-    ): ResolvedAuthorizationRequest {
+    ): ValidatedPresentationRequest {
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(requestUrl)
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedAuthorizationRequest,
@@ -2174,12 +2248,23 @@ object WalletPresentationHandler {
             formatCapabilities = formatCapabilities,
         )
         if (validation is PresentationRequestValidationResult.Invalid) {
+            if (validation.error.code == WalletPresentFunctionality2.OID4VPErrorCode.INVALID_TRANSACTION_DATA) {
+                throw InvalidPresentationTransactionDataException(validation.error.message)
+            }
             error(
                 "Presentation request is invalid (${validation.error.code.code}): ${validation.error.message}"
             )
         }
-        return resolvedAuthorizationRequest
+        return ValidatedPresentationRequest(
+            resolvedAuthorizationRequest,
+            (validation as PresentationRequestValidationResult.Valid).transactionData,
+        )
     }
+
+    private data class ValidatedPresentationRequest(
+        val resolved: ResolvedAuthorizationRequest,
+        val transactionData: List<DecodedTransactionData>,
+    )
 
     internal suspend fun rememberPreviewedAuthorizationRequest(
         wallet: Wallet,
