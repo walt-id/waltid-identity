@@ -56,6 +56,7 @@ class X509Crl(encoded: ByteArray) {
 
     /** RFC 5280 6.3.3: a scoped CRL cannot establish good standing outside its covered certificate class/reasons. */
     fun covers(certificate: X509Certificate): Boolean {
+        if (certificate.crlDistributionPointReasons?.containsAll((1..8).toList()) == false) return false
         val known = setOf(Oids.EXT_CRL_NUMBER, Oids.EXT_AUTHORITY_KEY_ID, "2.5.29.28")
         if (extensions.any { it.children.size == 3 && it.child(1).asBoolean() && it.child(0).asOid() !in known }) return false
         val scope = extensions.firstOrNull { it.child(0).asOid() == "2.5.29.28" }
@@ -75,6 +76,8 @@ class X509Crl(encoded: ByteArray) {
         revoked.firstOrNull { it.serialNumber.contentEquals(certificate.serialNumber) }
 
     suspend fun verifySignature(issuerCertificate: X509Certificate): Boolean {
+        // Shared waltid-x509 key-usage interpretation also governs historical evidence.
+        if (issuerCertificate.keyUsage?.contains(KeyUsageBit.CRL_SIGN) == false) return false
         val alg = runCatching { AdesSignatureAlgorithm.fromAlgorithmIdentifier(root.child(1)) }.getOrNull() ?: return false
         return AdesCrypto.verify(issuerCertificate.publicKey, alg, tbs.encoded, root.child(2).asBitStringBytes(), derEcdsa = true)
     }
