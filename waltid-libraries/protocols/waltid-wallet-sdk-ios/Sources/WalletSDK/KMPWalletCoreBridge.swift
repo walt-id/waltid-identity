@@ -2731,7 +2731,7 @@ extension WalletCore.ProximityState {
         case let .terminating(value):
             return .terminating(exchange: Int(value.exchange))
         case let .noData(value):
-            return .noData(exchange: Int(value.exchange))
+            return .noData(exchange: Int(value.exchange), unsatisfiedRequest: try value.unsatisfiedRequest.toSwiftUnsatisfiedRequest())
         case let .completed(value):
             return .completed(exchanges: Int(value.exchanges), declined: value.declined, receipt: try value.receipt?.toSwiftReceipt())
         case .cancelled:
@@ -2854,6 +2854,19 @@ private extension WalletCore.ProximityApplicationDocumentRequest {
                 of: WalletCore.ProximityRequestedElement.self
             ).map { try $0.toSwiftElement() }
         )
+    }
+}
+
+internal extension WalletCore.ProximityUnsatisfiedRequest {
+    func toSwiftUnsatisfiedRequest() throws -> ProximityUnsatisfiedRequest {
+        try ProximityUnsatisfiedRequest(documents: swiftArray(documents, of: WalletCore.ProximityUnsatisfiedDocument.self).map { document in
+            try ProximityUnsatisfiedDocument(
+                requestIndex: Int(document.requestIndex),
+                documentType: document.docType,
+                requestedElements: swiftArray(document.requestedElements, of: WalletCore.ProximityRequestedElement.self)
+                    .map { try $0.toSwiftElement() }
+            )
+        })
     }
 }
 

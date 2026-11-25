@@ -6,7 +6,9 @@ import id.walt.crypto2.jose.*
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.openid4vci.proofs.attestation.*
+import id.walt.trust.model.TrustedEntityType
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Test
@@ -23,6 +25,9 @@ class Issuer2KeyAttestationConfigTest {
             KeyAttestationConfig(KeyAttestationVerificationMethod.StaticJwk(key.exportPublicJwkObject())),
             KeyAttestationConfig(KeyAttestationVerificationMethod.X509Chain(listOf("root-pem-parsing-is-validated-at-startup"))),
             KeyAttestationConfig(KeyAttestationVerificationMethod.KeyReference("attester-key")),
+            KeyAttestationConfig(
+                KeyAttestationVerificationMethod.X509TrustRegistry(setOf(TrustedEntityType.WALLET_PROVIDER), true),
+            ),
         )
         for (config in configs) {
             assertEquals(config, load(Json.encodeToJsonElement(KeyAttestationConfig.serializer(), config)).getOrThrow().keyAttestationConfig)
@@ -37,9 +42,21 @@ class Issuer2KeyAttestationConfigTest {
             """{"verificationMethod":{"type":"static-jwk"}}""",
             """{"verificationMethod":{"type":"x509-chain","trustedRootCertificatesPem":[]}}""",
             """{"verificationMethod":{"type":"key-reference","reference":""}}""",
+            """{"verificationMethod":{"type":"x509-trust-registry","expectedEntityTypes":[]}}""",
         )) {
             assertTrue(load(Json.parseToJsonElement(config)).isFailure, config)
         }
+    }
+
+    @Test
+    fun `startup fails when x509 trust registry key attestation has no resolver`() {
+        val method = KeyAttestationConfig(KeyAttestationVerificationMethod.X509TrustRegistry(setOf(TrustedEntityType.WALLET_PROVIDER)))
+        val config = load(Json.encodeToJsonElement(KeyAttestationConfig.serializer(), method)).getOrThrow()
+
+        val error = assertFails { OpenId4VciModule.createAttestationTrustEvaluator(config) }
+        assertTrue("attestationTrustResolver" in error.message.orEmpty(), error.message)
+        val resolver = TrustDecisionResolverConfig("https://registry.example/trust-registry/resolve/certificate-chain")
+        assertNotNull(OpenId4VciModule.createAttestationTrustEvaluator(config.copy(attestationTrustResolver = resolver)))
     }
 
     private fun load(config: JsonElement?): Result<Issuer2ServiceConfig> {

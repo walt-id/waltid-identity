@@ -1,52 +1,83 @@
 package id.walt.ktornotifications
 
 import com.sun.net.httpserver.HttpServer
+import id.walt.ktornotifications.core.KtorSessionNotifications.WebhookRetryPolicy
 import id.walt.ktornotifications.core.KtorSessionNotifications.VerificationSessionWebhookNotification
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import io.ktor.http.Url
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import java.net.InetSocketAddress
+import java.nio.file.Files
+import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class WebhookNotifierTest {
 
     private val update = KtorSessionUpdate(target = "session", event = "test", session = buildJsonObject {})
+    private lateinit var outboxDirectory: Path
 
     companion object {
         private const val BLOCKED = "Webhook destination is not allowed (network-fetch-guard.conf)"
     }
 
     @BeforeTest
-    fun denyLoopback() {
+    fun denyLoopback() = runBlocking {
+        WebhookNotifier.stop()
+        outboxDirectory = Files.createTempDirectory("webhook-notifier-test-")
+        WebhookNotifier.start(outboxDirectory)
         System.clearProperty("walt.ssrf.allowLoopback")
         guard(allowLoopback = false)
     }
 
     @AfterTest
-    fun releaseLoopbackChoice() {
-        System.clearProperty("walt.ssrf.allowLoopback")
-        PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
-        PrivateNetworkGuardSettings.allowPrivateNetworks = false
-        PrivateNetworkGuardSettings.trustedHostSuffixes = emptySet()
+    fun releaseLoopbackChoice() = runBlocking {
+        try {
+            WebhookNotifier.stop()
+        } finally {
+            outboxDirectory.toFile().deleteRecursively()
+            System.clearProperty("walt.ssrf.allowLoopback")
+            PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+            PrivateNetworkGuardSettings.allowPrivateNetworks = false
+            PrivateNetworkGuardSettings.trustedHostSuffixes = emptySet()
+        }
     }
 
     @Test
-    fun `a loopback webhook is refused before the server is contacted`() = runTest {
+    fun `injected store works when the default location cannot hold an outbox`() = runBlocking {
+        WebhookNotifier.stop()
+        WebhookNotifier.start(FileWebhookDeliveryStore(outboxDirectory))
+        val previous = System.getProperty(STORAGE_DIRECTORY_PROPERTY)
+        val file = Files.createFile(outboxDirectory.resolve("ordinary-file"))
+        try {
+            System.setProperty(STORAGE_DIRECTORY_PROPERTY, file.toString())
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1/hook"))
+            assertEquals(id, awaitDeadLetter(id).deliveryId)
+            assertTrue(WebhookNotifier.redrive(id))
+        } finally {
+            if (previous == null) System.clearProperty(STORAGE_DIRECTORY_PROPERTY)
+            else System.setProperty(STORAGE_DIRECTORY_PROPERTY, previous)
+        }
+    }
+
+    @Test
+    fun `a loopback webhook is refused before the server is contacted`() = runBlocking {
         val hits = AtomicInteger()
         val server = localServer(hits)
         try {
-            val failure = assertFailsWith<WebhookDestinationNotAllowedException> {
-                WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
-            }
-            assertEquals(BLOCKED, failure.message)
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            assertTrue(awaitDeadLetter(id).lastError.contains(BLOCKED))
             assertEquals(0, hits.get())
         } finally {
             server.stop(0)
@@ -54,24 +85,20 @@ class WebhookNotifierTest {
     }
 
     @Test
-    fun `a private address is refused`() = runTest {
-        val failure = assertFailsWith<WebhookDestinationNotAllowedException> {
-            WebhookNotifier.notify(update, webhook("http://10.0.0.5/hook"))
-        }
-        assertEquals(BLOCKED, failure.message)
+    fun `a private address is refused`() = runBlocking {
+        val id = WebhookNotifier.enqueue(update, webhook("http://10.0.0.5/hook"))
+        assertTrue(awaitDeadLetter(id).lastError.contains(BLOCKED))
     }
 
     @Test
-    fun `cloud metadata stays refused when loopback and private networks are allowed`() = runTest {
+    fun `cloud metadata stays refused when loopback and private networks are allowed`() = runBlocking {
         guard(allowLoopback = true, allowPrivateNetworks = true)
-        val failure = assertFailsWith<WebhookDestinationNotAllowedException> {
-            WebhookNotifier.notify(update, webhook("http://169.254.169.254/latest/meta-data/"))
-        }
-        assertEquals(BLOCKED, failure.message)
+        val id = WebhookNotifier.enqueue(update, webhook("http://169.254.169.254/latest/meta-data/"))
+        assertTrue(awaitDeadLetter(id).lastError.contains(BLOCKED))
     }
 
     @Test
-    fun `a redirect is returned and not followed`() = runTest {
+    fun `a redirect is returned and not followed`() = runBlocking {
         guard(allowLoopback = true)
         val hits = AtomicInteger()
         val server = localServer(hits) { exchange ->
@@ -80,10 +107,8 @@ class WebhookNotifierTest {
             exchange.close()
         }
         try {
-            val failure = assertFailsWith<IllegalArgumentException> {
-                WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
-            }
-            assertTrue(failure.message!!.contains("HTTP 302"), failure.message)
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            assertTrue(awaitDeadLetter(id).lastError.contains("HTTP 302"))
             assertEquals(1, hits.get())
         } finally {
             server.stop(0)
@@ -91,12 +116,13 @@ class WebhookNotifierTest {
     }
 
     @Test
-    fun `loopback is delivered when the deployment allows it`() = runTest {
+    fun `loopback is delivered when the deployment allows it`() = runBlocking {
         guard(allowLoopback = true)
         val hits = AtomicInteger()
         val server = localServer(hits)
         try {
-            WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            awaitDelivered(id)
             assertEquals(1, hits.get())
         } finally {
             server.stop(0)
@@ -104,16 +130,14 @@ class WebhookNotifierTest {
     }
 
     @Test
-    fun `a configured loopback deny wins over the test system property`() = runTest {
+    fun `a configured loopback deny wins over the test system property`() = runBlocking {
         System.setProperty("walt.ssrf.allowLoopback", "true")
         guard(allowLoopback = false)
         val hits = AtomicInteger()
         val server = localServer(hits)
         try {
-            val failure = assertFailsWith<WebhookDestinationNotAllowedException> {
-                WebhookNotifier.notify(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
-            }
-            assertEquals(BLOCKED, failure.message)
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook"))
+            assertTrue(awaitDeadLetter(id).lastError.contains(BLOCKED))
             assertEquals(0, hits.get())
         } finally {
             server.stop(0)
@@ -121,15 +145,16 @@ class WebhookNotifierTest {
     }
 
     @Test
-    fun `an unresolvable host is a connection failure`() = runTest {
-        val failure = assertFailsWith<IllegalArgumentException> {
-            WebhookNotifier.notify(update, webhook("http://no-such-host.invalid/hook"))
-        }
-        assertTrue(failure.message!!.startsWith("Could not connect"), failure.message)
+    fun `an unresolvable host is a connection failure`() = runBlocking {
+        val id = WebhookNotifier.enqueue(
+            update,
+            webhook("http://no-such-host.invalid/hook", WebhookRetryPolicy(maxAttempts = 1)),
+        )
+        assertTrue(awaitDeadLetter(id).lastError.contains("UnknownHostException"))
     }
 
     @Test
-    fun `a trusted hostname may resolve to loopback`() = runTest {
+    fun `a trusted hostname may resolve to loopback`() = runBlocking {
         guard(allowLoopback = false, trustedHostSuffixes = setOf("localhost"))
         val hits = AtomicInteger()
         val server = HttpServer.create(InetSocketAddress(0), 0)
@@ -141,14 +166,51 @@ class WebhookNotifierTest {
         }
         server.start()
         try {
-            WebhookNotifier.notify(update, webhook("http://localhost:${server.address.port}/hook"))
+            val id = WebhookNotifier.enqueue(update, webhook("http://localhost:${server.address.port}/hook"))
+            awaitDelivered(id)
             assertEquals(1, hits.get())
         } finally {
             server.stop(0)
         }
     }
 
-    private fun webhook(url: String) = VerificationSessionWebhookNotification(url = Url(url))
+    @Test
+    fun `one attempt sends exactly one POST with the published nullable fields`() = runBlocking {
+        guard(allowLoopback = true)
+        val hits = AtomicInteger()
+        val body = kotlinx.coroutines.CompletableDeferred<String>()
+        val server = localServer(hits) { exchange ->
+            body.complete(exchange.requestBody.use { it.readBytes().decodeToString() })
+            exchange.responseHeaders.add("Retry-After", "0")
+            exchange.sendResponseHeaders(503, -1)
+            exchange.close()
+        }
+        try {
+            val id = WebhookNotifier.enqueue(update, webhook("http://127.0.0.1:${server.address.port}/hook", WebhookRetryPolicy(maxAttempts = 1)))
+            assertEquals(1, awaitDeadLetter(id).attemptCount)
+            assertEquals(1, hits.get())
+            val received = Json.parseToJsonElement(body.await()).jsonObject
+            for (field in listOf("requestId", "error", "error_description")) assertEquals(JsonNull, received.getValue(field))
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    private fun webhook(url: String, retryPolicy: WebhookRetryPolicy = WebhookRetryPolicy()) =
+        VerificationSessionWebhookNotification(url = Url(url), retryPolicy = retryPolicy)
+
+    private suspend fun awaitDeadLetter(deliveryId: String): WebhookDeadLetter = withTimeout(10_000) {
+        while (true) {
+            WebhookNotifier.deadLetters().firstOrNull { it.deliveryId == deliveryId }?.let { return@withTimeout it }
+            delay(25)
+        }
+        error("unreachable")
+    }
+
+    private suspend fun awaitDelivered(deliveryId: String) = withTimeout(10_000) {
+        val pending = outboxDirectory.resolve("pending/$deliveryId.json")
+        while (Files.exists(pending)) delay(25)
+    }
 
     private fun guard(
         allowLoopback: Boolean,

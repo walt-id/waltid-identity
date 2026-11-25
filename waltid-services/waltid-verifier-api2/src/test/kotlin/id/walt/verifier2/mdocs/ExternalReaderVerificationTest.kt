@@ -344,7 +344,13 @@ class ExternalReaderVerificationTest {
         routes(repository)
         val http = createClient { install(ClientContentNegotiation) { json() }; install(ClientSSE) }
         val request = fixture()
-        val invalid = listOf(
+        val encoded = Base64.decode(request.deviceResponse)
+        val end = if (encoded[0] == 0xbf.toByte()) encoded.lastIndex else encoded.size
+        val duplicateVersions = listOf("6776657273696f6e63312e30", "d9d9f76776657273696f6e63312e30").map { key ->
+            request.copy(deviceResponse = Base64.encode(byteArrayOf(0xbf.toByte()) + encoded.copyOfRange(1, end) +
+                key.hexToByteArray() + byteArrayOf(0xff.toByte())))
+        }
+        val invalid = duplicateVersions + listOf(
             request.copy(deviceResponse = "not base64"),
             request.copy(deviceResponse = Base64.encode(coseCompliantCbor.encodeToByteArray(mapOf("data" to "encrypted", "status" to "0")))),
             request.copy(deviceResponse = Base64.encode(byteArrayOf(0xff.toByte()))),

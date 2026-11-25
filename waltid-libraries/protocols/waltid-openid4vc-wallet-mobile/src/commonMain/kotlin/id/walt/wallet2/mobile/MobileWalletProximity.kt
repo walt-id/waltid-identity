@@ -354,7 +354,11 @@ private class ProximitySessionImpl(
                 withContext(NonCancellable) { stateCollector.cancelAndJoin() }
             }
             when (result) {
-                is MdocHolderSessionResult.NoData -> owner.publish(ProximityState.NoData(result.exchange))
+                is MdocHolderSessionResult.NoData -> owner.publish(ProximityState.NoData(
+                    result.exchange, checkNotNull(processor.takeUnsatisfiedRequest(result.exchange)) {
+                        "An unmatched request must retain its requested-document context"
+                    },
+                ))
                 is MdocHolderSessionResult.Completed -> owner.publish(
                     ProximityState.Completed(result.exchanges, declined = false))
                 is MdocHolderSessionResult.Declined -> owner.publish(

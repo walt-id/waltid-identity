@@ -22,7 +22,7 @@ internal class MobileWalletProximitySnippets {
                     is ProximityState.PreparationRequired -> showPreparationReview(state.plan, state.reason)
                     is ProximityState.AuthorizingHolderKey -> showHolderAuthorization(state.authorization)
                     is ProximityState.Completed -> showCompletion(state.exchanges, state.declined)
-                    is ProximityState.NoData -> showNoData(state.exchange)
+                    is ProximityState.NoData -> showNoData(state.exchange, state.unsatisfiedRequest)
                     is ProximityState.Failed -> showProximityError(state.error)
                     ProximityState.Cancelled -> showCancelled()
                     is ProximityState.Preparing,
@@ -64,7 +64,7 @@ internal class MobileWalletProximitySnippets {
     private fun showPreparationReview(plan: Any, reason: Any) = Unit
     private fun showHolderAuthorization(value: Any) = Unit
     private fun showCompletion(exchanges: Any, declined: Any) = Unit
-    private fun showNoData(exchange: Any) = Unit
+    private fun showNoData(exchange: Any, request: ProximityUnsatisfiedRequest) = Unit
     private fun showProximityError(value: Any) = Unit
     private fun showCancelled() = Unit
     private fun showProximityProgress(value: Any) = Unit

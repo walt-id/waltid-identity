@@ -318,7 +318,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
                 assertTrue("Invalid issuer signature must be rejected") { resp.transmissionSuccess == false }
                 assertTrue {
                     val description = resp.verifierResponse!!.jsonObject["error_description"]!!.jsonPrimitive.content
-                    description.startsWith("Credential policy verification failed.") && description.contains("signature")
+                    description == "Invalid presentation response"
                 }
             }
 

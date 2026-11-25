@@ -179,18 +179,16 @@ class Issuer2ProfileEndpointTest {
         val profilesRaw = client.get("/issuer2/profiles")
         assertEquals(HttpStatusCode.OK, profilesRaw.status)
         val profilesResponseBody = profilesRaw.bodyAsText()
-        assertIssuerKeyIsExposed(profilesResponseBody)
         val profiles = json.decodeFromString<List<CredentialProfile>>(profilesResponseBody)
         assertTrue(profiles.isNotEmpty(), "Expected at least one configured issuer2 profile")
         assertProfilesCoverCredentialMetadata(profiles)
-        val profilesConfig = ConfigManager.getConfig<Issuer2ProfilesConfig>()
-        profiles.forEach { profile -> assertProfileHasConfiguredIssuerKey(profile, profilesConfig) }
+        profiles.forEach(::assertIssuerKeyIsRedacted)
 
         profiles.forEach { listedProfile ->
             val configuredProfileRaw = client.get("/issuer2/profiles/${listedProfile.profileId}")
             assertEquals(HttpStatusCode.OK, configuredProfileRaw.status)
             val configuredProfileBody = configuredProfileRaw.bodyAsText()
-            assertIssuerKeyIsExposed(configuredProfileBody)
+            assertIssuerKeyIsRedacted(json.decodeFromString<CredentialProfile>(configuredProfileBody))
             assertProfileJsonEquals(
                 expected = listedProfile,
                 actualBody = configuredProfileBody,
@@ -203,12 +201,6 @@ class Issuer2ProfileEndpointTest {
             "Expected configured profile $OPEN_BADGE_PROFILE_ID",
         )
         assertW3CProfile(openBadgeProfile)
-
-        val profileRaw = client.get("/issuer2/profiles/$OPEN_BADGE_PROFILE_ID")
-        assertEquals(HttpStatusCode.OK, profileRaw.status)
-        val profileResponseBody = profileRaw.bodyAsText()
-        assertIssuerKeyIsExposed(profileResponseBody)
-        assertProfileJsonEquals(openBadgeProfile, profileResponseBody)
 
         assertMdocCatalogProfiles(profiles)
         assertSdJwtCatalogProfiles(profiles)
@@ -246,10 +238,11 @@ class Issuer2ProfileEndpointTest {
             "Expected profile OpenAPI examples to cover W3C, SD-JWT VC, and mDOC defaults",
         )
         examples.forEach { example ->
+            assertIssuerKeyIsRedacted(example)
             assertEquals(
-                configuredProfilesById[example.profileId],
+                configuredProfilesById.getValue(example.profileId).copy(issuerKey = redactedIssuerKey),
                 example,
-                "Expected OpenAPI example ${example.profileId} to be the exact loaded profile config",
+                "Expected OpenAPI example ${example.profileId} to match the masked profile",
             )
         }
     }
@@ -434,15 +427,10 @@ class Issuer2ProfileEndpointTest {
         assertNull(profile.idTokenClaimsMapping)
     }
 
-    private fun assertProfileHasConfiguredIssuerKey(
-        profile: CredentialProfile,
-        profilesConfig: Issuer2ProfilesConfig,
-    ) {
-        assertEquals(
-            expectedIssuerMaterial(profile.profileId, profilesConfig).key,
-            profile.issuerKey,
-            "Expected ${profile.profileId}.issuerKey to match its configured issuer key",
-        )
+    private val redactedIssuerKey = JsonObject(mapOf("type" to JsonPrimitive("redacted")))
+
+    private fun assertIssuerKeyIsRedacted(profile: CredentialProfile) {
+        assertTrue(profile.issuerKey == redactedIssuerKey, "Expected ${profile.profileId}.issuerKey to be redacted")
     }
 
     private fun assertDefaultIssuerKey(issuerKey: JsonObject, context: String) {
@@ -491,10 +479,6 @@ class Issuer2ProfileEndpointTest {
                 },
             )
         }
-
-    private fun assertIssuerKeyIsExposed(responseBody: String) {
-        assertTrue(responseBody.contains("issuerKey"), "Profile API should expose issuerKey in the first version")
-    }
 
     // Walk all profile fields that can contain strings or nested JSON. A plain "$"
     // is valid in JsonPath mappings; only "${" indicates an unresolved HOCON substitution.

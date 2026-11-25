@@ -32,6 +32,7 @@ import id.walt.crypto2.keys.Encryptor
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyDeleter
 import id.walt.crypto2.keys.KeyDeletionResult
+import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.ManagedKey
@@ -61,17 +62,12 @@ class AwsKmsSdkKeyProvider(
 
     override suspend fun generate(request: GenerateManagedKeyRequest): ManagedKey {
         val options = AwsKmsSdkOptions.decode(request.providerOptions)
-        val signing = request.usages.all { it == KeyUsage.SIGN || it == KeyUsage.VERIFY }
-        val encryption = request.usages.all { it == KeyUsage.ENCRYPT || it == KeyUsage.DECRYPT }
-        require(request.usages.isNotEmpty() && (signing || encryption)) {
-            "AWS KMS keys cannot mix signing and encryption usages"
-        }
-        if (encryption) require(request.spec is KeySpec.Rsa) { "AWS asymmetric encryption requires an RSA key" }
+        val usage = awsKeyUsage(request.spec, request.usages)
         val created = withClient(options.primaryRegion) { client ->
             client.createKey(
                 CreateKeyRequest {
                     keySpec = AwsKeySpec.fromValue(request.spec.toAwsKeySpec())
-                    keyUsage = if (signing) KeyUsageType.SignVerify else KeyUsageType.EncryptDecrypt
+                    keyUsage = usage
                     description = options.description
                     multiRegion = options.multiRegion
                     tags = options.tags.map { (key, value) -> Tag { tagKey = key; tagValue = value } }
@@ -118,20 +114,16 @@ class AwsKmsSdkKeyProvider(
                 "AWS KMS did not return a public key"
             }
         }
-        val storedData = AwsSdkStoredKeyData(options.copy(tags = emptyMap()), remoteKeyId)
-        return key(
-            StoredKey.Managed(
-                version = StoredKey.CURRENT_VERSION,
+        return restore(
+            storedKeyForExisting(
                 id = request.id,
                 spec = request.spec,
                 usages = request.usages,
-                provider = id,
-                providerSchemaVersion = PROVIDER_SCHEMA_VERSION,
-                providerData = storedData.encode(),
+                options = options,
+                remoteKeyId = remoteKeyId,
                 publicKey = EncodedKey.SpkiDer(BinaryData(publicKey)),
                 metadata = request.metadata,
             ),
-            storedData,
         )
     }
 
@@ -144,6 +136,7 @@ class AwsKmsSdkKeyProvider(
         val data = AwsSdkStoredKeyData.decode(stored.providerData)
         require(data.remoteKeyId.isNotBlank()) { "Stored AWS key ID cannot be blank" }
         stored.spec.toAwsKeySpec()
+        awsKeyUsage(stored.spec, stored.usages)
         return key(stored, data)
     }
 
@@ -153,8 +146,10 @@ class AwsKmsSdkKeyProvider(
         override val storedKey: StoredKey.Managed,
         private val data: AwsSdkStoredKeyData,
     ) : ManagedKey {
-        private val signatureAlgorithms = storedKey.spec.awsSignatureAlgorithms()
-        private val encryptionAlgorithms = storedKey.spec.awsEncryptionAlgorithms()
+        private val signatureAlgorithms =
+            if (storedKey.usages.any(signingUsages::contains)) storedKey.spec.awsSignatureAlgorithms() else emptySet()
+        private val encryptionAlgorithms =
+            if (storedKey.usages.any(encryptionUsages::contains)) storedKey.spec.awsEncryptionAlgorithms() else emptySet()
 
         override val capabilities = KeyCapabilities(
             signer = KeyUsage.SIGN.takeIf(storedKey.usages::contains)?.let {
@@ -306,6 +301,32 @@ class AwsKmsSdkKeyProvider(
     companion object {
         val ID = ProviderId("aws-kms-sdk")
         private const val PROVIDER_SCHEMA_VERSION = 1
+
+        /** Builds a descriptor from a trusted key ID and public key already obtained from AWS KMS. */
+        fun storedKeyForExisting(
+            id: KeyId,
+            spec: KeySpec,
+            usages: Set<KeyUsage>,
+            options: AwsKmsSdkOptions,
+            remoteKeyId: String,
+            publicKey: EncodedKey.SpkiDer,
+            metadata: Map<String, String> = emptyMap(),
+        ): StoredKey.Managed {
+            require(remoteKeyId.isNotBlank()) { "AWS KMS key ID cannot be blank" }
+            spec.toAwsKeySpec()
+            awsKeyUsage(spec, usages)
+            return StoredKey.Managed(
+                version = StoredKey.CURRENT_VERSION,
+                id = id,
+                spec = spec,
+                usages = usages,
+                provider = ID,
+                providerSchemaVersion = PROVIDER_SCHEMA_VERSION,
+                providerData = AwsSdkStoredKeyData(options.copy(tags = emptyMap()), remoteKeyId).encode(),
+                publicKey = publicKey,
+                metadata = metadata,
+            )
+        }
     }
 }
 
@@ -336,6 +357,21 @@ private data class AwsSdkStoredKeyData(val options: AwsKmsSdkOptions, val remote
     companion object {
         private val json = Json { encodeDefaults = true; explicitNulls = false; ignoreUnknownKeys = false }
         fun decode(data: BinaryData): AwsSdkStoredKeyData = json.decodeFromString(data.toByteArray().decodeToString())
+    }
+}
+
+private val signingUsages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY)
+private val encryptionUsages = setOf(KeyUsage.ENCRYPT, KeyUsage.DECRYPT)
+
+private fun awsKeyUsage(spec: KeySpec, usages: Set<KeyUsage>): KeyUsageType {
+    require(usages.isNotEmpty()) { "AWS KMS key usages cannot be empty" }
+    return when {
+        signingUsages.containsAll(usages) -> KeyUsageType.SignVerify
+        encryptionUsages.containsAll(usages) -> {
+            require(spec is KeySpec.Rsa) { "AWS asymmetric encryption requires an RSA key" }
+            KeyUsageType.EncryptDecrypt
+        }
+        else -> throw IllegalArgumentException("AWS KMS keys cannot mix signing and encryption usages or use other usages")
     }
 }
 

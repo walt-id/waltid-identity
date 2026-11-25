@@ -11,8 +11,11 @@ import id.walt.openid4vci.metadata.issuer.BatchCredentialIssuance
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.ProofTypeMetadata
 import id.walt.openid4vci.proofs.CredentialProofValidationContext
+import id.walt.openid4vci.proofs.CredentialProofValidationException
+import id.walt.openid4vci.proofs.CredentialProofVerifier
 import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.openid4vci.proofs.ProofType
+import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -34,6 +37,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
@@ -87,6 +91,34 @@ class ProviderCredentialProofVerificationTest {
     }
 
     @Test
+    fun `verified bindings can recover a response before allocation and signing`() = runTest {
+        val config = createTestConfig(credentialProofVerifier = DefaultCredentialProofVerifier(now = { NOW }))
+        config.credentialEndpointHandlers.register(CredentialFormat.SD_JWT_VC,
+            CredentialEndpointHandler { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> error("Signed a saved response") })
+        val provider = buildOAuth2Provider(config)
+        val holders = List(2) { JWKKey.generate(KeyType.secp256r1) }
+        val request = createCredentialRequest(provider, holders.map { createProof(it) })
+        val saved = CredentialResponseResult.Success(CredentialResponse(listOf(
+            IssuedCredential(JsonPrimitive("saved-1")), IssuedCredential(JsonPrimitive("saved-2")),
+        )))
+        suspend fun recover(checkpoint: CredentialResponseResult.Success) = provider.createCredentialResponse(
+            request = request, configuration = credentialConfiguration(),
+            issuerId = "did:example:issuer", issuerKey = JWKKey.generate(KeyType.secp256r1),
+            proofValidationContext = proofContext(batchSize = 2),
+            issuanceInputData = object : CredentialIssuanceInputProvider {
+                override suspend fun prepare(bindings: List<VerifiedCredentialBinding>): CredentialResponseResult {
+                    assertEquals(listOf(setOf(0), setOf(1)), bindings.map { it.proofIndexes })
+                    return checkpoint
+                }
+                override suspend fun provide(credentialCount: Int): List<CredentialIssuanceInput> = error("Allocated new inputs")
+            },
+        )
+        assertEquals(saved, recover(saved))
+        val partial = CredentialResponseResult.Success(CredentialResponse(listOf(IssuedCredential(JsonPrimitive("only-one")))))
+        assertFailsWith<IllegalStateException> { recover(partial) }
+    }
+
+    @Test
     fun `issues a configured batch larger than two`() = runTest {
         val provider = buildOAuth2Provider(
             createTestConfig(credentialProofVerifier = DefaultCredentialProofVerifier(now = { NOW })),
@@ -115,12 +147,12 @@ class ProviderCredentialProofVerificationTest {
     }
 
     @Test
-    fun `binds credentials to the corresponding proof keys in request order`() = runTest {
+    fun `binds credentials in request order even when distinct keys have the same kid`() = runTest {
         val provider = buildOAuth2Provider(
             createTestConfig(credentialProofVerifier = DefaultCredentialProofVerifier(now = { NOW })),
         )
         val holderKeys = List(3) { JWKKey.generate(KeyType.secp256r1) }
-        val request = createCredentialRequest(provider, holderKeys.map { createProof(it) })
+        val request = createCredentialRequest(provider, holderKeys.map { createProof(it, jwkKid = "wallet-key") })
 
         val responseResult = provider.createCredentialResponse(
             request = request,
@@ -206,38 +238,58 @@ class ProviderCredentialProofVerificationTest {
     }
 
     @Test
-    fun `accepts duplicate holder keys in a credential batch`() = runTest {
+    fun `rejects two proofs signed by the same key even with different kids`() = runTest {
         val provider = buildOAuth2Provider(
             createTestConfig(credentialProofVerifier = DefaultCredentialProofVerifier(now = { NOW })),
         )
         val holderKey = JWKKey.generate(KeyType.secp256r1)
-        val request = createCredentialRequest(provider, listOf(createProof(holderKey), createProof(holderKey)))
-        var suppliedCredentialCount = 0
+        val request = createCredentialRequest(provider, listOf(createProof(holderKey, "first"), createProof(holderKey, "second")))
 
         val responseResult = provider.createCredentialResponse(
             request = request,
             configuration = credentialConfiguration(),
             issuerKey = JWKKey.generate(KeyType.secp256r1),
             issuerId = "did:example:issuer",
-            issuanceInputData = CredentialIssuanceInputProvider { credentialCount ->
-                suppliedCredentialCount = credentialCount
-                List(credentialCount) {
-                    CredentialIssuanceInput(buildJsonObject { put("given_name", "Alice") })
-                }
-            },
+            issuanceInputData = { error("Allocated inputs for repeated holder keys") },
             proofValidationContext = proofContext(batchSize = 2),
         )
 
-        assertTrue(responseResult is CredentialResponseResult.Success)
-        assertEquals(2, suppliedCredentialCount)
-        assertEquals(2, responseResult.response.credentials?.size)
-        val expectedHolderThumbprint = holderKey.getPublicKey().getThumbprint()
-        val actualHolderThumbprints = requireNotNull(responseResult.response.credentials).map { issued ->
-            val credential = issued.credential as JsonPrimitive
-            val holderJwk = requireNotNull(SDJwtVC.parse(credential.content).holderKeyJWK)
-            JWKKey.importJWK(holderJwk.toString()).getOrThrow().getThumbprint()
+        assertTrue(responseResult is CredentialResponseResult.Failure)
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, responseResult.error.error)
+    }
+
+    @Test
+    fun `rejects duplicate bindings from a custom verifier before acceptance or preparation`() = runTest {
+        val verifier = DefaultCredentialProofVerifier(now = { NOW })
+        val repeatedBindingVerifier = CredentialProofVerifier { request, configuration, context ->
+            val verified = verifier.verify(request, configuration, context)
+            val firstKey = verified.bindings.first().holderKey
+            verified.copy(bindings = verified.bindings.map { it.copy(holderKey = firstKey) })
         }
-        assertEquals(listOf(expectedHolderThumbprint, expectedHolderThumbprint), actualHolderThumbprints)
+        val provider = buildOAuth2Provider(createTestConfig(credentialProofVerifier = repeatedBindingVerifier))
+        val request = createCredentialRequest(provider, List(2) { createProof(JWKKey.generate(KeyType.secp256r1)) })
+        val configuration = credentialConfiguration()
+        val context = proofContext(batchSize = 2)
+        val denied = assertFailsWith<CredentialProofValidationException> {
+            provider.acceptCredentialRequest(request, configuration, "item", CREDENTIAL_CONFIGURATION_ID, context)
+        }
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, denied.errorCode)
+
+        val result = provider.createCredentialResponse(
+            request = request,
+            configuration = configuration,
+            issuerKey = JWKKey.generate(KeyType.secp256r1),
+            issuerId = CREDENTIAL_ISSUER,
+            proofValidationContext = context,
+            issuanceInputData = object : CredentialIssuanceInputProvider {
+                override suspend fun prepare(bindings: List<VerifiedCredentialBinding>): CredentialResponseResult =
+                    error("Prepared a rejected batch")
+                override suspend fun provide(credentialCount: Int): List<CredentialIssuanceInput> =
+                    error("Allocated inputs for a rejected batch")
+            },
+        )
+        assertTrue(result is CredentialResponseResult.Failure)
+        assertEquals(CredentialErrorCodes.INVALID_PROOF, result.error.error)
     }
 
     @Test
@@ -354,7 +406,7 @@ class ProviderCredentialProofVerificationTest {
         assertEquals(2, metadataCalls)
     }
 
-    private suspend fun createProof(key: JWKKey): String = key.signJws(
+    private suspend fun createProof(key: JWKKey, jwkKid: String? = null): String = key.signJws(
         plaintext = buildJsonObject {
             put(JwtPayloadClaims.ISSUER, "client")
             put(JwtPayloadClaims.AUDIENCE, CREDENTIAL_ISSUER)
@@ -362,7 +414,9 @@ class ProviderCredentialProofVerificationTest {
         }.toString().encodeToByteArray(),
         headers = mapOf(
             JwtHeaderParams.TYPE to JsonPrimitive("openid4vci-proof+jwt"),
-            JwtHeaderParams.JSON_WEB_KEY to key.getPublicKey().exportJWKObject(),
+            JwtHeaderParams.JSON_WEB_KEY to key.getPublicKey().exportJWKObject().let { jwk ->
+                if (jwkKid == null) jwk else JsonObject(jwk + ("kid" to JsonPrimitive(jwkKid)))
+            },
         ),
     )
 
