@@ -4,7 +4,7 @@ import id.walt.ades.asn1.Der
 import id.walt.ades.asn1.DerWriter
 import id.walt.ades.crypto.AdesDigestAlgorithm
 import id.walt.ades.transport.AdesTransport
-import kotlin.random.Random
+import dev.whyoleg.cryptography.random.CryptographyRandom
 
 /** Source of RFC 3161 time-stamp tokens over a message imprint. */
 fun interface TimestampSource {
@@ -24,7 +24,7 @@ class Rfc3161TimestampClient(
 ) : TimestampSource {
 
     override suspend fun timestamp(algorithm: AdesDigestAlgorithm, digest: ByteArray): ByteArray {
-        val nonce = if (useNonce) Random.nextBytes(8).also { it[0] = (it[0].toInt() and 0x7f).toByte() } else null
+        val nonce = if (useNonce) CryptographyRandom.nextBytes(16) else null
         val request = buildRequest(algorithm, digest, nonce)
         val response = transport.post(url, "application/timestamp-query", request, headers)
         val token = parseResponse(response)
