@@ -22,6 +22,7 @@ import id.walt.ades.x509.X509Crl
 import kotlinx.coroutines.test.runTest
 import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.IssuingDistributionPoint
+import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.asn1.x509.KeyPurposeId
 import org.bouncycastle.asn1.x509.ReasonFlags
 import org.bouncycastle.cert.X509CRLHolder
@@ -86,6 +87,7 @@ class RevocationEvidenceTest {
         assertFalse(fresh(RevocationStatus.Good("response", pki.now - 1.hours, pki.now - 1.hours)))
         assertFalse(fresh(RevocationStatus.Good("response", pki.now + 1.hours, pki.now + 1.days)))
         assertFalse(fresh(RevocationStatus.Good("response", pki.now - 2.days, null)))
+        assertFalse(fresh(RevocationStatus.Good("response", pki.now - 7.days, pki.now + 1.days)))
     }
 
     @Test
@@ -97,28 +99,65 @@ class RevocationEvidenceTest {
         val resolver = ValidationDataResolver(data, null, anchors)
         assertEquals(listOf(leaf.certificate, rollover.certificate, pki.root.certificate), resolver.buildChains(leaf.certificate).single())
         assertTrue(CertificateChainValidator(resolver, AdesValidationPolicy(anchors)).validate(leaf.certificate, pki.now).passed)
-        val collected = ValidationDataCollector(null, anchors).collect(listOf(leaf.certificate), data)
+        val collected = ValidationDataCollector(null, anchors, includeRoot = false).collect(listOf(leaf.certificate), data)
         assertTrue(collected.missing.isEmpty(), collected.missing.toString())
+        assertTrue(rollover.certificate in collected.required.certificates)
+        assertFalse(pki.root.certificate in collected.required.certificates)
     }
 
     @Test
-    fun revokedLeafDoesNotHideMissingOrRevokedIntermediateEvidence() = runTest {
+    fun historicalRecoveryRequiresFreshIntermediateEvidenceWithAnIndependentValidTsa() = runTest {
         val time = pki.revocationTime - 1.days
-        pki.tsaClock = { time }
+        val tsaPki = TestPki(tsaClock = { time })
         val bytes = "proof".encodeToByteArray()
-        val token = Rfc3161TimestampClient(pki.tsaUrl, pki.transport).timestamp(AdesDigestAlgorithm.SHA256, AdesDigestAlgorithm.SHA256.digest(bytes))
-        // Timestamp chain has complete evidence supplied separately; omit the root CRL only from the signature pool.
-        val evidence = SignatureEvidence("signature", emptyList(), pki.revokedSigner.certificate, AdesSignatureAlgorithm.ES256, true,
-            certificates = listOf(pki.issuingCa.certificate), crls = listOf(X509Crl(pki.crl(pki.issuingCa))),
-            signatureTimestamps = listOf(TimestampEvidence(TimestampType.SIGNATURE, token, bytes)))
-        val unavailable = AdesSignatureValidator(AdesValidationPolicy(anchors)).validate(evidence)
-        assertFalse(unavailable.isValid)
-        assertTrue(unavailable.timestamps.none { it.passed })
-        val valid = AdesSignatureValidator(AdesValidationPolicy(anchors, transport = pki.transport)).validate(evidence)
-        assertEquals(Indication.TOTAL_PASSED, valid.indication)
-        pki.revoke(pki.issuingCa, time - 1.hours)
-        val revoked = AdesSignatureValidator(AdesValidationPolicy(anchors, transport = pki.transport)).validate(evidence)
-        assertFalse(revoked.isValid)
+        val token = Rfc3161TimestampClient(tsaPki.tsaUrl, tsaPki.transport)
+            .timestamp(AdesDigestAlgorithm.SHA256, AdesDigestAlgorithm.SHA256.digest(bytes))
+        val tsaCrls = listOf(X509Crl(tsaPki.crl(tsaPki.issuingCa, time)), X509Crl(tsaPki.crl(tsaPki.root, time)))
+        for (rootCrl in listOf(null, X509Crl(pki.crl(pki.root, time - 8.days)), X509Crl(pki.crl(pki.root, time)))) {
+            val evidence = SignatureEvidence("signature", emptyList(), pki.revokedSigner.certificate,
+                AdesSignatureAlgorithm.ES256, true,
+                certificates = listOf(pki.issuingCa.certificate, tsaPki.issuingCa.certificate),
+                crls = tsaCrls + listOfNotNull(X509Crl(pki.crl(pki.issuingCa, time)), rootCrl),
+                signatureTimestamps = listOf(TimestampEvidence(TimestampType.SIGNATURE, token, bytes)))
+            val result = AdesSignatureValidator(AdesValidationPolicy(anchors + tsaPki.root.certificate)).validate(evidence)
+            assertTrue(result.timestamps.single().passed, result.toString())
+            assertEquals(rootCrl?.thisUpdate?.let { it >= time - 1.days } == true, result.isValid, result.toString())
+        }
+    }
+
+    @Test
+    fun unauthorizedCrlSignerProvidesNoCurrentOrHistoricalStatus() = runTest {
+        val issuer = pki.issue("CN=No CRL signing", pki.root, ca = true, keyUsageBits = KeyUsage.keyCertSign)
+        val leaf = pki.issue("CN=Leaf", issuer)
+        val crl = X509Crl(pki.crl(issuer))
+        val resolver = ValidationDataResolver(ValidationData(), null)
+        assertNull(resolver.crlStatus(crl, leaf.certificate, issuer.certificate))
+        for (time in listOf(pki.now, pki.now - 1.days)) {
+            assertIs<RevocationStatus.Unknown>(ValidationDataResolver(
+                ValidationData(crls = listOf(crl)), null,
+            ).revocationStatus(leaf.certificate, issuer.certificate, time) { true })
+        }
+    }
+
+    @Test
+    fun certificateReasonRestrictionsPreventAnUnscopedCrlFromClaimingCompleteCoverage() = runTest {
+        val restricted = pki.issue("CN=Partial CRL reasons", pki.issuingCa, withRevocationInfo = true,
+            crlReasons = ReasonFlags(ReasonFlags.keyCompromise))
+        val crl = X509Crl(pki.crl(pki.issuingCa))
+        assertEquals(setOf(1), restricted.certificate.crlDistributionPointReasons)
+        assertNull(ValidationDataResolver(ValidationData(), null).crlStatus(crl, restricted.certificate, pki.issuingCa.certificate))
+    }
+
+    @Test
+    fun collectionRecognizesASelfSignedTerminusWithoutEstablishingTrust() = runTest {
+        val data = ValidationData(certificates = listOf(pki.signer.certificate, pki.issuingCa.certificate, pki.root.certificate),
+            crls = listOf(X509Crl(pki.crl(pki.issuingCa)), X509Crl(pki.crl(pki.root))))
+        val collected = ValidationDataCollector(null).collect(listOf(pki.signer.certificate), data)
+        assertTrue(collected.missing.isEmpty(), collected.missing.toString())
+        assertFalse(CertificateChainValidator(ValidationDataResolver(data, null), AdesValidationPolicy())
+            .validate(pki.signer.certificate, pki.now).passed)
+        val incomplete = ValidationData(certificates = listOf(pki.signer.certificate, pki.issuingCa.certificate), crls = data.crls)
+        assertTrue(ValidationDataCollector(null).collect(listOf(pki.signer.certificate), incomplete).missing.isNotEmpty())
     }
 
     @Test
