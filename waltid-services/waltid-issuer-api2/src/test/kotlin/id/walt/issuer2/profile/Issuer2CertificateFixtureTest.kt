@@ -144,21 +144,13 @@ class Issuer2CertificateFixtureTest {
         val runnerResources = repoRoot.resolve("waltid-services/waltid-openid4vp-conformance-runners/src/test/resources")
         val profilesConfig = loadProfiles(repoRoot.resolve("waltid-services/waltid-issuer-api2/config/issuer2-profiles.conf"))
         val mdocChain = profilesConfig.defaultMdocIssuerX5chain
-        val signerPem = mdocChain.single()
-        val documentSigner = X509CertificateUtil.parseCertificatePem(signerPem)
-        val validation = X509SingleCertificateValidator(listOf(IsoDocumentSignerX509CertificateProfile))
-            .validate(documentSigner)
-        assertTrue(validation.valid, "defaultMdocIssuerX5chain: ${validation.errorLog.map { it.message }}")
-        assertEquals(
-            false,
-            documentSigner.data.extensionBasicConstraints?.critical,
-            "defaultMdocIssuerX5chain must explicitly include noncritical Basic Constraints",
-        )
+        val haipMdocChain = profilesConfig.defaultHaipMdocIssuerX5chain
 
         val root = readCertificate(Files.readString(runnerResources.resolve("certs/issuer2-haip-root-ca.pem")))
         val demoMdlRoot = readCertificate(Files.readString(runnerResources.resolve("certs/issuer2-demo-mdl-root-ca.pem")))
+        val haipMdlRoot = readCertificate(Files.readString(runnerResources.resolve("certs/issuer2-haip-mdl-root-ca.pem")))
 
-        for (iaca in listOf(root, demoMdlRoot)) {
+        for (iaca in listOf(root, demoMdlRoot, haipMdlRoot)) {
             assertTrue(iaca.subjectX500Principal.name.contains("C=AT"))
             assertEquals(0, iaca.basicConstraints)
             assertTrue(assertNotNull(iaca.keyUsage)[5], "IACA must allow certificate signing")
@@ -172,7 +164,7 @@ class Issuer2CertificateFixtureTest {
         )
 
         assertLeaf(
-            signerPem,
+            mdocChain.single(),
             "defaultMdocIssuerX5chain",
             demoMdlRoot,
             expectedX = DEFAULT_KEY_X,
@@ -188,9 +180,9 @@ class Issuer2CertificateFixtureTest {
             mdoc = false,
         )
         assertLeaf(
-            profilesConfig.defaultHaipMdocIssuerX5chain.single(),
+            haipMdocChain.single(),
             "defaultHaipMdocIssuerX5chain",
-            root,
+            haipMdlRoot,
             expectedX = HAIP_KEY_X,
             expectedY = HAIP_KEY_Y,
             mdoc = true,
@@ -205,14 +197,18 @@ class Issuer2CertificateFixtureTest {
         )
 
         val mdlProfileId = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
-        for (file in listOf(
-            repoRoot.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf"),
-            runnerResources.resolve("issuer2/issuer2-profiles-ci.conf"),
+        val composeProfilesFile = repoRoot.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf")
+        val runnerProfilesFile = runnerResources.resolve("issuer2/issuer2-profiles-ci.conf")
+        val runnerProfiles = loadProfiles(runnerProfilesFile)
+        for ((file, config) in listOf(
+            composeProfilesFile to loadProfiles(composeProfilesFile),
+            runnerProfilesFile to runnerProfiles,
         )) {
-            val config = loadProfiles(file)
             assertEquals(mdocChain, config.defaultMdocIssuerX5chain, "$file default mdoc chain")
             assertEquals(mdocChain, config.profiles.getValue(mdlProfileId).x5Chain, "$file mDL profile")
         }
+        assertEquals(haipMdocChain, runnerProfiles.defaultHaipMdocIssuerX5chain, "Conformance HAIP mDL default chain")
+        assertEquals(haipMdocChain, runnerProfiles.profiles.getValue("isoMdlHaip").x5Chain, "Conformance HAIP mDL profile")
     }
 
     private fun loadProfiles(file: Path): Issuer2ProfilesConfig {
@@ -221,7 +217,7 @@ class Issuer2CertificateFixtureTest {
         return ConfigManager.loadConfig(config, emptyArray()).getOrThrow() as Issuer2ProfilesConfig
     }
 
-    private fun assertLeaf(
+    private suspend fun assertLeaf(
         pem: String,
         label: String,
         root: X509Certificate,
@@ -251,6 +247,15 @@ class Issuer2CertificateFixtureTest {
 
         val extendedKeyUsage = leaf.extendedKeyUsage.orEmpty()
         if (mdoc) {
+            val documentSigner = X509CertificateUtil.parseCertificatePem(pem)
+            val validation = X509SingleCertificateValidator(listOf(IsoDocumentSignerX509CertificateProfile))
+                .validate(documentSigner)
+            assertTrue(validation.valid, "$label: ${validation.errorLog.map { it.message }}")
+            assertEquals(
+                false,
+                documentSigner.data.extensionBasicConstraints?.critical,
+                "$label must explicitly include noncritical Basic Constraints",
+            )
             assertTrue(MDOC_DOCUMENT_SIGNER_EKU in extendedKeyUsage, "$label must contain the mdoc DS EKU")
             assertTrue(leaf.criticalExtensionOIDs.contains(EXTENDED_KEY_USAGE_OID), "$label EKU must be critical")
         } else {

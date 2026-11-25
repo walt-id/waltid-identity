@@ -402,8 +402,11 @@ certificate chain that issuer2 puts into the credential:
 
 ```bash
 export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE=/path/to/credential-root-ca.pem
+export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_TRUST_ANCHOR_PEM_FILE=/path/to/haip-mdoc-root-ca.pem
 export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE=/path/to/status-list-root-ca.pem
 ```
+
+The HAIP mdoc override is optional. Without it, the runner uses the shared credential trust anchor.
 
 ### 4. Start Services
 
@@ -738,6 +741,7 @@ An unfiltered direct Gradle invocation selects the complete 296-variant matrix.
 | `OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID` | HAIP SD-JWT credential config; defaults to the base SD-JWT ID | `identity_credential_haip` |
 | `OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID` | HAIP mdoc credential config; defaults to the base mdoc ID | `org.iso.18013.5.1.mDL.haip` |
 | `OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE` | Root/intermediate trust anchor PEM for HAIP credential x5c validation | `/path/to/credential-root-ca.pem` |
+| `OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_TRUST_ANCHOR_PEM_FILE` | Optional credential trust anchor PEM for HAIP mdoc plans | `/path/to/haip-mdoc-root-ca.pem` |
 | `OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE` | Root/intermediate trust anchor PEM for HAIP status-list validation | `/path/to/status-list-root-ca.pem` |
 | `OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE` | Private client-attester JWK/JWKS used by the conformance suite to sign client attestation JWTs | `src/test/resources/keys/attester-key.json` |
 | `OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE` | Private ES256/P-256 key-attester JWK/JWKS; must match issuer key-attestation trust | `src/test/resources/keys/attester-key.json` |
@@ -771,8 +775,9 @@ credential trust anchor is separate from the client-attestation trust root.
 
 The committed AT test certificates are:
 
-- [HAIP credential root](../src/test/resources/certs/issuer2-haip-root-ca.pem), supplied to the conformance suite as a trust anchor
-- [HAIP credential leaf](../src/test/resources/certs/issuer2-haip-leaf.pem), placed in issuer2's `defaultHaipIssuerX5chain`
+- HAIP SD-JWT trust anchor. [HAIP credential root](../src/test/resources/certs/issuer2-haip-root-ca.pem)
+- HAIP SD-JWT certificate in issuer2's `defaultHaipIssuerX5chain`. [HAIP credential leaf](../src/test/resources/certs/issuer2-haip-leaf.pem)
+- HAIP mDL IACA for the `isoMdlHaip` document signer. [HAIP mDL root](../src/test/resources/certs/issuer2-haip-mdl-root-ca.pem)
 
 Do not put the root certificate into issuer2's `x5Chain`. It must contain the
 leaf and any intermediates only. The SD-JWT leaf key matches
@@ -814,6 +819,7 @@ export OPENID4VCI_CONFORMANCE_PROOF_MODES="jwt,attestation" && \
 export OPENID4VCI_CONFORMANCE_HAIP_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential_haip" && \
 export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL.haip" && \
 export OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
+export OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-mdl-root-ca.pem" && \
 export OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" && \
 export OPENID4VCI_CONFORMANCE_BROWSER_AUTOMATION="true" && \
 export OPENID4VCI_CONFORMANCE_AUTH_USERNAME="jane@walt.id" && \
@@ -1092,6 +1098,7 @@ OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE="$PWD/src/test/resources/keys/a
 OPENID4VCI_CONFORMANCE_KEY_ATTESTER_JWKS_FILE="$PWD/src/test/resources/keys/attester-key.json" \
 OPENID4VCI_CONFORMANCE_PROOF_MODES=jwt,attestation \
 OPENID4VCI_CONFORMANCE_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" \
+OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-mdl-root-ca.pem" \
 OPENID4VCI_CONFORMANCE_STATUS_LIST_TRUST_ANCHOR_PEM_FILE="$PWD/src/test/resources/certs/issuer2-haip-root-ca.pem" \
 OPENID4VCI_CONFORMANCE_REQUIRE_KEY_ATTESTATION_PASS=true \
 OPENID4VCI_CONFORMANCE_ADDITIONAL_MODULES='' \

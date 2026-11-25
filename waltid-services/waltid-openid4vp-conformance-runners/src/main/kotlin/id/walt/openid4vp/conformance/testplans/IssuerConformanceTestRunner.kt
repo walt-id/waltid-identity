@@ -58,6 +58,11 @@ class IssuerConformanceTestRunner(
     private val proofModes: List<String> = parseIssuerProofModes(System.getenv("OPENID4VCI_CONFORMANCE_PROOF_MODES")),
     private val issuanceMode: IssuerIssuanceMode = IssuerIssuanceMode.fromEnvironment(),
 ) {
+    private val haipMdocTrustAnchorPem = resolvePemFromEnvironment(
+        inlinePemEnvironmentVariable = "OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_TRUST_ANCHOR_PEM",
+        pemFileEnvironmentVariable = "OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_TRUST_ANCHOR_PEM_FILE",
+    )
+
     private val effectiveStrictResults: Boolean
         get() = issuanceMode == IssuerIssuanceMode.DEFERRED || variantSelection.strictResults
 
@@ -152,6 +157,7 @@ class IssuerConformanceTestRunner(
                         credentialProofTypeHint = variant.credentialProofType ?: credentialProofTypeHint,
                         staticTxCode = staticTxCode,
                         credentialTrustAnchorPem = credentialTrustAnchorPem,
+                        haipMdocTrustAnchorPem = haipMdocTrustAnchorPem,
                         statusListTrustAnchorPem = statusListTrustAnchorPem,
                     )
                     IssuerTestPlanRunner(plan.config, conformance, issuerInterface, issuanceMode).attempt(variant)

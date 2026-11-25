@@ -81,6 +81,7 @@ class IssuerCiConfigurationTest {
             .openStream().use { factory.generateCertificate(it) as X509Certificate }
         val haipRoot = readRoot("issuer2-haip-root-ca.pem")
         val demoMdlRoot = readRoot("issuer2-demo-mdl-root-ca.pem")
+        val haipMdlRoot = readRoot("issuer2-haip-mdl-root-ca.pem")
         profiles.root().keys.forEach { name ->
             val profile = profiles.getConfig(name)
             val configurationId = profile.getString("credentialConfigurationId").removeSuffix(".attestation")
@@ -92,7 +93,11 @@ class IssuerCiConfigurationTest {
             val key = ECKey.parse(profile.getConfig("issuerKey.jwk").root().render(ConfigRenderOptions.concise()))
             val leaf = factory.generateCertificate(profile.getStringList("x5Chain").single().byteInputStream()) as X509Certificate
             assertContentEquals(key.toECPublicKey().encoded, leaf.publicKey.encoded, name)
-            val root = if (configurationId == "org.iso.18013.5.1.mDL") demoMdlRoot else haipRoot
+            val root = when (configurationId) {
+                "org.iso.18013.5.1.mDL" -> demoMdlRoot
+                "org.iso.18013.5.1.mDL.haip" -> haipMdlRoot
+                else -> haipRoot
+            }
             leaf.verify(root.publicKey)
             leaf.checkValidity()
         }

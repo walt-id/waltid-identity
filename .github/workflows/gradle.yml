@@ -648,6 +648,7 @@ jobs:
       KLOGGING_CONFIG_PATH: ${{ github.workspace }}/waltid-identity/.github/ci/klogging.conf
       ISSUER_REPORT_DIR: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/issuer-ci
       ISSUER_DIAGNOSTICS_DIR: ${{ github.workspace }}/issuer-conformance-diagnostics
+      OPENID4VCI_CONFORMANCE_HAIP_MDOC_CREDENTIAL_TRUST_ANCHOR_PEM_FILE: ${{ github.workspace }}/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-haip-mdl-root-ca.pem
     steps:
       - name: Set up swap space
         run: |

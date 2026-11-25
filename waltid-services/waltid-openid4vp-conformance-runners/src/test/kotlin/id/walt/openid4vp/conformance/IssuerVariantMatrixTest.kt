@@ -13,6 +13,8 @@ import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantSel
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.Oid4vciIssuerVariantPlan
 import id.walt.openid4vp.conformance.testplans.runner.req.CredentialOfferAuthMethod
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -169,6 +171,35 @@ class IssuerVariantMatrixTest {
                 assertEquals(if (preAuthorized) "493536" else null, config.staticTxCode)
             }
         }
+    }
+
+    @Test
+    fun haipMdocPlansCanUseTheirOwnCredentialTrustAnchor() {
+        val variants = IssuerVariantMatrix.all()
+        val haipMdoc = variants.first { it.isHaip && it.credentialFormat == "mdoc" }
+        val haipSdJwt = variants.first { it.isHaip && it.credentialFormat == "sd_jwt_vc" }
+        val baseMdoc = variants.first { !it.isHaip && it.credentialFormat == "mdoc" }
+
+        fun trustAnchor(variant: IssuerVariant, configurationId: String, mdocAnchor: String? = "haip-mdoc-root"): String {
+            val plan = Oid4vciIssuerVariantPlan(
+                issuerUrl = "https://issuer.example/openid4vci",
+                credentialConfigurationId = configurationId,
+                variant = variant,
+                clientAttestationIssuer = "https://attester.example",
+                clientAttesterJwks = JsonObject(emptyMap()),
+                credentialTrustAnchorPem = "credential-root",
+                statusListTrustAnchorPem = "status-list-root",
+                haipMdocTrustAnchorPem = mdocAnchor,
+            )
+            val credential = plan.config.testPlanCreationConfiguration.getValue("credential").jsonObject
+            assertEquals("status-list-root", credential.getValue("status_list_trust_anchor_pem").jsonPrimitive.content)
+            return credential.getValue("trust_anchor_pem").jsonPrimitive.content
+        }
+
+        assertEquals("haip-mdoc-root", trustAnchor(haipMdoc, "org.iso.18013.5.1.mDL.haip"))
+        assertEquals("credential-root", trustAnchor(haipMdoc, "org.iso.18013.5.1.mDL.haip", mdocAnchor = null))
+        assertEquals("credential-root", trustAnchor(haipSdJwt, "identity_credential_haip"))
+        assertEquals("credential-root", trustAnchor(baseMdoc, "org.iso.18013.5.1.mDL"))
     }
 
     @Test

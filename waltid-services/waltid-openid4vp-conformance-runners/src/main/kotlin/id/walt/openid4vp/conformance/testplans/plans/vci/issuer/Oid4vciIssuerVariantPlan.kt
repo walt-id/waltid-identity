@@ -24,6 +24,7 @@ class Oid4vciIssuerVariantPlan(
     private val credentialTrustAnchorPem: String? = null,
     private val statusListTrustAnchorPem: String? = null,
     private val keyAttesterJwks: JsonObject? = null,
+    private val haipMdocTrustAnchorPem: String? = null,
 ) {
 
     // Client keys for DPoP and private_key_jwt tests.
@@ -93,9 +94,11 @@ class Oid4vciIssuerVariantPlan(
                 put("client_id", "conformance-test-client-2")
                 put("jwks", client2JwksJson)
             }
-            if (credentialTrustAnchorPem != null || statusListTrustAnchorPem != null) {
+            val trustAnchorPem = haipMdocTrustAnchorPem
+                ?.takeIf { variant.isHaip && variant.credentialFormat == "mdoc" } ?: credentialTrustAnchorPem
+            if (trustAnchorPem != null || statusListTrustAnchorPem != null) {
                 putJsonObject("credential") {
-                    credentialTrustAnchorPem?.let { put("trust_anchor_pem", it) }
+                    trustAnchorPem?.let { put("trust_anchor_pem", it) }
                     statusListTrustAnchorPem?.let { put("status_list_trust_anchor_pem", it) }
                 }
             }
