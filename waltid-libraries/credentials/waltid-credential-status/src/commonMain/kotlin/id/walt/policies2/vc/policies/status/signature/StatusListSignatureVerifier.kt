@@ -62,7 +62,7 @@ class StatusListSignatureVerifier(
     private val keyResolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(
         allowInlineJwk = allowUntrustedInlineJwk,
         // A status list asserts issuer claims; authentication alone does not authorize its signature.
-        verificationRelationship = VerificationRelationshipType.AssertionMethod,
+        didVerificationRelationship = VerificationRelationshipType.AssertionMethod,
     ),
     private val allowedJwtAlgorithms: Set<JwsAlgorithm> = JwsAlgorithm.entries.toSet(),
     private val allowedCoseAlgorithms: Set<Int> = DEFAULT_COSE_ALGORITHMS,
