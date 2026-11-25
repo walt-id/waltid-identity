@@ -4,13 +4,13 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.did.dids.document.MultibasePublicKeys
-import id.walt.did.utils.KeyMaterial
+import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
 import id.walt.webdatafetching.removeDotSegments
-import io.ktor.http.encodedPath
 import io.ktor.http.URLBuilder
+import io.ktor.http.encodedPath
 import io.ktor.http.takeFrom
+import id.walt.did.utils.KeyMaterial
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -22,95 +22,187 @@ import kotlinx.serialization.json.jsonPrimitive
 /** Resolves DID verification methods to crypto2 keys. */
 fun interface Crypto2DidKeyResolver {
     suspend fun resolveToKeys(did: String): Set<Key>
+
+    /**
+     * Resolves a specific verification method before importing key material.
+     *
+     * Implementations that cannot inspect the DID document fail closed when a verification
+     * relationship is requested. This keeps lambda-based resolvers source-compatible without
+     * silently bypassing DID relationship authorization.
+     */
+    suspend fun resolveToKeys(
+        did: String,
+        keyId: String?,
+        relationship: VerificationRelationshipType?,
+    ): Set<Key> {
+        require(relationship == null) {
+            "DID resolver does not support verification relationship filtering: $relationship"
+        }
+        val keys = resolveToKeys(did)
+        if (keyId == null) return keys
+        val candidates = idCandidates(keyId)
+        return keys.filterTo(mutableSetOf()) { key -> idCandidates(key.id.value).any(candidates::contains) }
+    }
 }
 
-class DidDocumentCrypto2KeyResolver(
-    private val resolver: DidResolver,
-    private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
-) : Crypto2DidKeyResolver {
-    private var verificationRelationship: VerificationRelationshipType? = null
+/** The requested ID does not identify a method in the resolved DID document. */
+class DidVerificationMethodNotFoundException(keyId: String) :
+    IllegalArgumentException("DID document has no verification method matching key ID: $keyId")
 
+class DidDocumentCrypto2KeyResolver(
+    private val resolveDocument: suspend (String) -> Result<JsonObject>,
+    private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+    private val verificationRelationship: VerificationRelationshipType? = null,
+) : Crypto2DidKeyResolver {
     constructor(
         resolver: DidResolver,
         runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
-        verificationRelationship: VerificationRelationshipType?,
-    ) : this(resolver, runtime) {
-        this.verificationRelationship = verificationRelationship
-    }
+        verificationRelationship: VerificationRelationshipType? = null,
+    ) : this(resolver::resolve, runtime, verificationRelationship)
 
-    private fun normalizeId(id: String, did: String): String {
-        if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(id)) return id
-        // DID Core 3.2.2 treats method-name:method-specific-id as the authority for RFC 3986 resolution.
-        val baseDid = did.substringBefore('/').substringBefore('?').substringBefore('#')
-        if (id.startsWith('#') || id.startsWith('?') || id.isEmpty()) return baseDid + id
-        val resolved = URLBuilder("https://did.invalid/").apply {
-            takeFrom(id)
-            encodedPath = removeDotSegments(encodedPath)
-        }.buildString()
-        return if (resolved.startsWith("https://did.invalid")) baseDid + resolved.removePrefix("https://did.invalid")
-        else "did:" + resolved.substringAfter("://")
-    }
+    override suspend fun resolveToKeys(did: String): Set<Key> =
+        resolveToKeys(did, keyId = null, relationship = verificationRelationship)
 
-    override suspend fun resolveToKeys(did: String): Set<Key> {
-        val document = resolver.resolve(did).getOrElse { cause ->
+    override suspend fun resolveToKeys(
+        did: String,
+        keyId: String?,
+        relationship: VerificationRelationshipType?,
+    ): Set<Key> {
+        require(relationship != VerificationRelationshipType.KeyAgreement) {
+            "DID keyAgreement methods cannot be resolved as signature verification keys"
+        }
+        val document = resolveDocument(did).getOrElse { cause ->
             throw IllegalArgumentException("Unable to resolve DID document: $did", cause)
         }
-        val methods = if (verificationRelationship == null) {
-            document["verificationMethod"] as? JsonArray
-                ?: throw IllegalArgumentException("DID document has no verification methods: $did")
-        } else {
-            // DID Core permits both embedded methods and references in verification relationships.
-            val references = (document["verificationMethod"] as? JsonArray).orEmpty()
-                .filterIsInstance<JsonObject>()
-                .associateBy { normalizeId(it["id"]?.jsonPrimitive?.content.orEmpty(), did) }
-            val relationship = document[verificationRelationship.toString()] as? JsonArray
-                ?: throw IllegalArgumentException("DID document has no $verificationRelationship methods: $did")
-            JsonArray(relationship.mapNotNull { entry ->
-                when (entry) {
-                    is JsonObject -> entry
-                    is JsonPrimitive -> references[normalizeId(entry.content, did)]
-                    else -> null
-                }
-            })
+        val methods = resolveMethods(document, did, relationship)
+        val selectedMethods = keyId?.let { selectMethods(methods, did, it) } ?: methods
+        val keys = selectedMethods.mapNotNull { method ->
+            restore(method, did)
+        }.toSet()
+        val relationshipDescription = relationship?.let { " for relationship $it" }.orEmpty()
+        val keyDescription = keyId?.let { " matching key ID $it" }.orEmpty()
+        require(keys.isNotEmpty()) {
+            "DID document has no supported verification methods$keyDescription$relationshipDescription: $did"
         }
-        val keys = methods.mapNotNull { element ->
-            val method = element as? JsonObject ?: return@mapNotNull null
+        return keys
+    }
+
+    private fun resolveMethods(
+        document: JsonObject,
+        did: String,
+        relationship: VerificationRelationshipType?,
+    ): List<JsonObject> {
+        val declaredMethods = (document["verificationMethod"] as? JsonArray)
+            ?.mapNotNull { it as? JsonObject }
+            .orEmpty()
+        // Collect embedded methods from all relationships to support verification methods
+        // that are directly embedded in relationship arrays (not just referenced).
+        // Encryption-only keys (e.g., with "use": "enc") will fail to restore for
+        // KeyUsage.VERIFY and be naturally filtered out.
+        val embeddedMethods = VerificationRelationshipType.entries.flatMap { type ->
+            (document[type.toString()] as? JsonArray)
+                ?.mapNotNull { it as? JsonObject }
+                .orEmpty()
+        }
+        val documentMethods = (declaredMethods + embeddedMethods).distinct()
+        if (relationship == null) {
+            if (documentMethods.isEmpty()) {
+                throw IllegalArgumentException("DID document has no verification methods: $did")
+            }
+            return documentMethods
+        }
+
+        val relationshipMethods = document[relationship.toString()] as? JsonArray
+            ?: throw IllegalArgumentException("DID document has no $relationship methods: $did")
+        return relationshipMethods.mapNotNull { entry ->
+            when (entry) {
+                is JsonObject -> entry
+                is JsonPrimitive -> entry.takeIf(JsonPrimitive::isString)
+                    ?.let { findReferencedMethod(documentMethods, did, it.content) }
+                else -> null
+            }
+        }
+    }
+
+    private fun findReferencedMethod(
+        methods: List<JsonObject>,
+        did: String,
+        reference: String,
+    ): JsonObject? {
+        val normalizedReference = normalizeDidUrl(did, reference)
+        val matches = methods.filter { method ->
+            methodId(method)?.let { normalizeDidUrl(did, it) == normalizedReference } == true
+        }
+        require(matches.size <= 1) { "Multiple DID verification methods match relationship reference: $reference" }
+        return matches.singleOrNull()
+    }
+
+    private fun selectMethods(methods: List<JsonObject>, did: String, keyId: String): List<JsonObject> {
+        val normalizedKeyId = normalizeDidUrl(did, keyId)
+        val exactMatches = methods.filter { method ->
+            methodId(method)?.let { normalizeDidUrl(did, it) == normalizedKeyId } == true
+        }
+        require(exactMatches.size <= 1) { "Multiple DID verification methods match key ID: $keyId" }
+        if (exactMatches.isNotEmpty()) return exactMatches
+
+        if ('#' in keyId || keyId.startsWith("did:")) {
+            throw DidVerificationMethodNotFoundException(keyId)
+        }
+        val fragmentMatches = methods.filter { method ->
+            methodId(method)?.substringAfter('#', missingDelimiterValue = "") == keyId
+        }
+        require(fragmentMatches.size <= 1) { "Multiple DID verification methods match key ID fragment: $keyId" }
+        return fragmentMatches.ifEmpty { throw DidVerificationMethodNotFoundException(keyId) }
+    }
+
+    private suspend fun restore(method: JsonObject, did: String): Key? {
+        val verificationMethodId = methodId(method) ?: return null
+        return try {
             val jwk = (method["publicKeyJwk"] as? JsonObject)
                 ?: (method["publicKeyMultibase"] as? JsonPrimitive)?.content?.let { multibase ->
                     // crypto2-native: no v1 key import, which is what fails on JS.
-                    try {
-                        Json.parseToJsonElement(
-                            MultibasePublicKeys.decode(multibase).jwk.data.toByteArray().decodeToString()
-                        ).jsonObject
-                    } catch (cause: CancellationException) {
-                        throw cause
-                    } catch (_: Throwable) {
-                        null
-                    }
+                    Json.parseToJsonElement(
+                        MultibasePublicKeys.decode(multibase).jwk.data.toByteArray().decodeToString()
+                    ).jsonObject
                 }
-                ?: try {
+                ?: run {
                     // Legacy material only (publicKeyBase58/Hex), which carries no multicodec prefix.
                     KeyMaterial.get(method).getOrThrow().getPublicKey().exportJWKObject()
-                } catch (cause: CancellationException) {
-                    throw cause
-                } catch (_: Exception) {
-                    return@mapNotNull null
                 }
-            val verificationMethodId = method["id"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank)
-                ?: throw IllegalArgumentException("DID verification method has no ID")
             val stored = EncodedKey.Jwk(
                 BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
                 privateMaterial = false,
-            ).toStoredSoftwareKey(KeyId(normalizeId(verificationMethodId, did)), setOf(KeyUsage.VERIFY))
-            try {
-                runtime.restore(stored)
-            } catch (cause: CancellationException) {
-                throw cause
-            } catch (_: Throwable) {
-                null
-            }
-        }.toSet()
-        require(keys.isNotEmpty()) { "DID document has no supported verification methods: $did" }
-        return keys
+            ).toStoredSoftwareKey(KeyId(normalizeDidUrl(did, verificationMethodId)), setOf(KeyUsage.VERIFY))
+            runtime.restore(stored)
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Throwable) {
+            null
+        }
     }
+
+    private fun methodId(method: JsonObject): String? =
+        (method["id"] as? JsonPrimitive)?.content?.takeIf(String::isNotBlank)
 }
+
+/**
+ * Resolves relative verification-method IDs using DID Core 3.2.2 and RFC 3986.
+ * Absolute URI IDs retain their scheme; relative path, query and fragment IDs remain distinct.
+ */
+fun normalizeDidUrl(did: String, id: String): String {
+    if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(id)) return id
+    // DID Core treats method-name:method-specific-id as the authority for relative resolution.
+    val baseDid = did.substringBefore('/').substringBefore('?').substringBefore('#')
+    if (id.startsWith('#') || id.startsWith('?') || id.isEmpty()) return baseDid + id
+    val resolved = URLBuilder("https://did.invalid/").apply {
+        takeFrom(id)
+        encodedPath = removeDotSegments(encodedPath)
+    }.buildString()
+    return if (resolved.startsWith("https://did.invalid")) baseDid + resolved.removePrefix("https://did.invalid")
+    else "did:" + resolved.substringAfter("://")
+}
+
+private fun idCandidates(id: String): Set<String> =
+    setOf(id, id.substringAfter('#', missingDelimiterValue = ""))
+        .filter(String::isNotBlank)
+        .toSet()

@@ -6,6 +6,8 @@ import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.auth.ktorAuthnz
+import id.walt.ktorauthnz.security.PasswordHashingAlgorithm
+import id.walt.ktorauthnz.security.PasswordHashingConfiguration
 import id.walt.ktorauthnz.sessions.InMemorySessionStore
 import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import id.walt.ktorauthnz.sessions.ValkeySessionStore
@@ -107,12 +109,21 @@ fun Application.configureSecurity() {
     }
 }
 
+internal fun configureWalletPasswordAuthentication(config: KtorAuthnzConfig) {
+    val bridge = config.legacyPasswordWritesDuringRollout
+    KtorAuthnzManager.passwordHashingConfig = PasswordHashingConfiguration(
+        pepper = config.pepper,
+        selectedPwHashAlgorithm = if (bridge) PasswordHashingAlgorithm.ARGON2 else config.hashAlgorithm,
+        selectedHashConversions = if (bridge) emptyMap() else config.hashMigrations,
+    )
+    KtorAuthnzManager.accountStore = AuthenticationService(legacyPasswordWrites = bridge).editableAccountStore
+}
+
 val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
 
     if (FeatureManager.isFeatureEnabled(FeatureCatalog.ktorAuthnzAuthenticationFeature)) {
-        KtorAuthnzManager.accountStore = AuthenticationService().editableAccountStore
-
         val config = ConfigManager.getConfig<KtorAuthnzConfig>()
+        configureWalletPasswordAuthentication(config)
 
         val configuredExpiration = Duration.parse(config.valkeyRetention ?: config.flowConfigs.firstOrNull()?.expiration ?: "1d")
 

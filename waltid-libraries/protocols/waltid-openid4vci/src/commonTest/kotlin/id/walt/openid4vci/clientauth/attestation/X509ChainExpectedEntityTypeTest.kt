@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package id.walt.openid4vci.clientauth.attestation
 
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod

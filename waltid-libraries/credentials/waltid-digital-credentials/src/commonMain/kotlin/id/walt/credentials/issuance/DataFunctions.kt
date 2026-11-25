@@ -1,8 +1,12 @@
 package id.walt.credentials.issuance
 
 import id.walt.crypto.utils.UuidUtils.randomUUID
+import id.walt.crypto2.keys.Key
+import id.walt.did.dids.Crypto2DidService
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.*
@@ -13,7 +17,6 @@ import kotlin.js.JsExport
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
-import kotlinx.coroutines.currentCoroutineContext
 
 private val webDataFetcher = WebDataFetcher(WebDataFetcherId.DATA_FUNCTIONS)
 
@@ -27,24 +30,45 @@ class IssuanceClock(val clock: Clock) : AbstractCoroutineContextElement(Issuance
     companion object Key : CoroutineContext.Key<IssuanceClock>
 }
 
+/** The verified holder key selected for one credential. Mappings may request a DID for this key. */
+class IssuanceHolderKey(private val holderKey: Key) : AbstractCoroutineContextElement(IssuanceHolderKey) {
+    companion object : CoroutineContext.Key<IssuanceHolderKey>
+
+    internal suspend fun deriveSubjectDid(): JsonPrimitive = try {
+        JsonPrimitive(Crypto2DidService.registerByKey(method = "jwk", key = holderKey).did)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        throw IllegalArgumentException("Cannot find in context: subjectDid", e)
+    }
+}
+
 suspend fun currentIssuanceClock(): Clock =
     currentCoroutineContext()[IssuanceClock]?.clock ?: Clock.System
 
 /**
  * The data functions for the issuance under way: every timestamp function reads the issuance clock set with
  * [IssuanceClock], falling back to the system clock. Use this rather than [dataFunctions], whose clock is always the
- * system clock - with it, two timestamps of one issuance could disagree.
+ * system clock. A scoped [IssuanceHolderKey] also supplies a fallback for a requested `subjectDid`.
  */
 suspend fun issuanceDataFunctions(): Map<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement> =
-    dataFunctionsFor(currentIssuanceClock())
+    dataFunctionsFor(currentIssuanceClock(), currentCoroutineContext()[IssuanceHolderKey])
+
+fun dataFunctionsFor(clock: Clock) = dataFunctionsFor(clock, holderKey = null)
 
 @OptIn(ExperimentalJsExport::class)
-fun dataFunctionsFor(clock: Clock): Map<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement> =
+private fun dataFunctionsFor(
+    clock: Clock,
+    holderKey: IssuanceHolderKey?,
+): Map<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement> =
     mapOf(
-        "subjectDid" to { it.fromContext() },
+        "subjectDid" to { if (holderKey != null) it.subjectDid(holderKey) else it.fromContext() },
         "issuerDid" to { it.fromContext() },
         "issuerId" to { it.fromContext() },
-        "context" to { it.context[it.args!!]!! },
+        "context" to {
+            if (it.args == "subjectDid" && holderKey != null) it.subjectDid(holderKey)
+            else it.context[it.args!!]!!
+        },
         "display" to {
             val context = it.context
             val displayList =

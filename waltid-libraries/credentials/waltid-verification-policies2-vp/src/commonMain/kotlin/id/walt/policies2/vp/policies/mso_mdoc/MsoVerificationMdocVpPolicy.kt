@@ -43,7 +43,7 @@ class MsoVerificationMdocVpPolicy(
         addResult("signed", timestamps.signed.toString())
         addResult("valid_from", timestamps.validFrom.toString())
         addResult("valid_until", timestamps.validUntil.toString())
-        timestamps.precheck()
+        mso.precheck()
         timestamps.validate(verificationContext?.verificationTime ?: Clock.System.now())
 
         // EAA-6.2.7.1-04/05 (ETSI TS 119 472-1 v1.2.1): validFrom and validUntil SHALL

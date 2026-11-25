@@ -2,6 +2,30 @@ import XCTest
 @testable import WalletSDK
 
 final class ProximityInputValidationTests: XCTestCase {
+    func testUnsatisfiedRequestRejectsInvalidDisplayContext() throws {
+        let field = ProximityRequestedElement(namespace: "namespace", elementIdentifier: "name", intentToRetain: false, satisfiesRequestedElements: [])
+        assertInvalid { try ProximityUnsatisfiedRequest(documents: []) }
+        assertInvalid { try ProximityUnsatisfiedDocument(requestIndex: -1, documentType: "document", requestedElements: [field]) }
+        assertInvalid { try ProximityUnsatisfiedDocument(requestIndex: 0, documentType: " ", requestedElements: [field]) }
+        assertInvalid { try ProximityUnsatisfiedDocument(requestIndex: 0, documentType: "document", requestedElements: []) }
+        let summary = try ProximityUnsatisfiedRequest(documents: [.init(requestIndex: 0, documentType: "document", requestedElements: [field])])
+        XCTAssertEqual(summary.documents.first?.requestedElements, [field])
+        XCTAssertEqual(ProximityState.noData(exchange: 1, unsatisfiedRequest: summary).legalActions, [])
+    }
+
+    func testUnsatisfiedDocumentTypeUsesKotlinBlankValidation() throws {
+        let field = ProximityRequestedElement(namespace: "namespace", elementIdentifier: "name", intentToRetain: false, satisfiesRequestedElements: [])
+        // Kotlin treats format characters and NEXT LINE as nonblank; preserve the original value.
+        for documentType in ["\u{200B}", "\u{0085}", " \u{200B}\t", "org.example.\u{200B}"] {
+            let document = try ProximityUnsatisfiedDocument(requestIndex: 0, documentType: documentType, requestedElements: [field])
+            XCTAssertEqual(document.documentType, documentType)
+        }
+        // Kotlin whitespace includes separator categories and these control characters.
+        for documentType in ["", " \t\n", "\u{001C}", "\u{001F}", "\u{00A0}", "\u{2007}", "\u{2028}", "\u{2029}", "\u{202F}", "\u{3000}"] {
+            assertInvalid { try ProximityUnsatisfiedDocument(requestIndex: 0, documentType: documentType, requestedElements: [field]) }
+        }
+    }
+
     func testConfigurationRejectsInvalidLimitsAndProfilePolicyRecoverably() throws {
         for limit in [Int.min, 0, 16_777_217, Int.max] {
             assertInvalid { try ProximityConfiguration(maximumMessageBytes: limit) }

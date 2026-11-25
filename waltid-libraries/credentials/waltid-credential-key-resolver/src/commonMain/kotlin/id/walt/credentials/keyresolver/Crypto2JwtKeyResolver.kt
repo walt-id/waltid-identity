@@ -10,7 +10,9 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
+import id.walt.did.dids.resolver.normalizeDidUrl
 import id.walt.did.dids.resolver.Crypto2DidKeyResolver
+import id.walt.did.dids.resolver.DidDocumentCrypto2KeyResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.*
@@ -43,11 +45,12 @@ fun interface Crypto2JwtVerificationKeyResolver {
  * [id.walt.credentials.keyresolver.resolvers.X5cTrustAnchors], before it is relied on.
  */
 class Crypto2JwtKeyResolver(
-    private val didResolver: Crypto2DidKeyResolver = Crypto2DidKeyResolver { did ->
-        DidService.resolveToCrypto2Keys(did).getOrThrow()
-    },
+    private val didResolver: Crypto2DidKeyResolver = DidDocumentCrypto2KeyResolver(
+        resolveDocument = { did -> DidService.resolve(did) },
+    ),
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
     private val allowInlineJwk: Boolean = false,
+    private val didVerificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2JwtVerificationKeyResolver {
     constructor(
         didResolver: Crypto2DidKeyResolver? = null,
@@ -55,9 +58,8 @@ class Crypto2JwtKeyResolver(
         allowInlineJwk: Boolean = false,
         verificationRelationship: VerificationRelationshipType?,
     ) : this(
-        didResolver ?: Crypto2DidKeyResolver { did ->
-            DidService.resolveToCrypto2Keys(did, verificationRelationship).getOrThrow()
-        }, runtime, allowInlineJwk,
+        didResolver ?: DidDocumentCrypto2KeyResolver(resolveDocument = { did -> DidService.resolve(did) }),
+        runtime, allowInlineJwk, verificationRelationship,
     )
 
     override suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey? {
@@ -67,7 +69,7 @@ class Crypto2JwtKeyResolver(
             when {
                 // 1. DID resolution is authoritative for DID issuer identifiers.
                 signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) -> {
-                    val key = resolveFromDid(signerIdentifier, kid)
+                    val key = resolveFromDid(signerIdentifier, kid, didVerificationRelationship)
                     ResolvedJwtVerificationKey(key, JwtKeyResolutionSource.DID, signerIdentifier, kid)
                 }
                 // 2. Inline X.509 certificate chain.
@@ -108,8 +110,32 @@ class Crypto2JwtKeyResolver(
         }
     }
 
-    suspend fun resolveFromDid(did: String, keyId: String? = null): Key =
-        selectDidKey(didResolver.resolveToKeys(did), did, keyId)
+    suspend fun resolveFromDid(
+        did: String,
+        keyId: String? = null,
+        relationship: VerificationRelationshipType? = null,
+    ): Key = resolveFromDid(did, keyId, relationship, requireExactKeyId = false)
+
+    /** Resolves the exact DID verification method identified by [keyId]. */
+    suspend fun resolveFromDidStrict(
+        did: String,
+        keyId: String,
+        relationship: VerificationRelationshipType? = null,
+    ): Key = resolveFromDid(did, keyId, relationship, requireExactKeyId = true)
+
+    private suspend fun resolveFromDid(
+        did: String,
+        keyId: String?,
+        relationship: VerificationRelationshipType?,
+        requireExactKeyId: Boolean,
+    ): Key {
+        val resolutionKeyId = keyId.takeUnless {
+            !requireExactKeyId && (did.startsWith("did:jwk:") || (did.startsWith("did:key:") && keyId == did))
+        }
+        val keys = didResolver.resolveToKeys(did, resolutionKeyId, relationship)
+        return if (requireExactKeyId) selectExactDidKey(keys, did, requireNotNull(keyId))
+        else selectDidKey(keys, did, keyId)
+    }
 
     private suspend fun resolveX5c(
         x5c: JsonArray,
@@ -145,11 +171,26 @@ class Crypto2JwtKeyResolver(
         if (keys.size == 1 && kid == did && did.startsWith("did:key:")) {
             return keys.single()
         }
+        val exactMatches = keys.filter { normalizeDidUrl(did, it.id.value) == normalizeDidUrl(did, kid) }
+        require(exactMatches.size <= 1) { "Multiple DID verification keys match kid: $kid" }
+        exactMatches.singleOrNull()?.let { return it }
+        require(!kid.startsWith("did:") && !kid.startsWith('/') && !kid.startsWith('?')) {
+            "No DID verification key matches kid: $kid"
+        }
         val kidCandidates = idCandidates(kid)
         val matches = keys.filter { key -> idCandidates(key.id.value).any(kidCandidates::contains) }
         require(matches.size <= 1) { "Multiple DID verification keys match kid: $kid" }
         return matches.singleOrNull()
             ?: throw NoSuchElementException("No DID verification key matches kid: $kid")
+    }
+
+    private fun selectExactDidKey(keys: Set<Key>, did: String, kid: String): Key {
+        require(keys.isNotEmpty()) { "No verification keys resolved for DID: $did" }
+        val normalizedKid = normalizeDidUrl(did, kid)
+        val matches = keys.filter { key -> normalizeDidUrl(did, key.id.value) == normalizedKid }
+        require(matches.size <= 1) { "Multiple DID verification keys match kid: $kid" }
+        return matches.singleOrNull()
+            ?: throw NoSuchElementException("No DID verification key exactly matches kid: $kid")
     }
 
     /**
@@ -176,6 +217,7 @@ class Crypto2JwtKeyResolver(
         setOf(id, id.substringAfter('#', missingDelimiterValue = ""))
             .filter(String::isNotBlank)
             .toSet()
+
 
 
     companion object {

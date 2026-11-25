@@ -20,7 +20,7 @@ import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.Account
-import id.walt.ktorauthnz.accounts.EditableAccountStore
+import id.walt.ktorauthnz.accounts.PasswordHashUpgradeStore
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.accounts.identifiers.methods.EmailIdentifier
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
@@ -30,6 +30,8 @@ import id.walt.ktorauthnz.methods.AuthenticationMethod
 import id.walt.ktorauthnz.methods.EmailPass
 import id.walt.ktorauthnz.methods.registerAuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.PasswordStoredData
+import id.walt.ktorauthnz.security.PasswordHash
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
 import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
 import id.walt.wallet2.OSSWallet2AuthConfig
@@ -57,12 +59,12 @@ private val authLog = KotlinLogging.logger {}
 // ---------------------------------------------------------------------------
 
 /**
- * In-memory [EditableAccountStore] for the OSS wallet service.
+ * In-memory account store for the OSS wallet service.
  * Manages user accounts and authentication credentials only.
  * Wallet ownership (account-to-wallet mapping) is managed by the [id.walt.wallet2.stores.WalletStore].
  * All data is lost on restart. Replace with an Exposed/SQLite-backed implementation for production.
  */
-object OSSWallet2AccountStore : EditableAccountStore {
+object OSSWallet2AccountStore : PasswordHashUpgradeStore {
 
     private val accounts = ConcurrentHashMap<String, Account>()
     private val identifierToAccountId = ConcurrentHashMap<AccountIdentifier, String>()
@@ -99,6 +101,10 @@ object OSSWallet2AccountStore : EditableAccountStore {
 
     override suspend fun updateAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData) {
         accountStoredData.getOrPut(accountId) { ConcurrentHashMap() }[method] = data.transformSavable()
+    }
+
+    override suspend fun upgradePasswordHash(identifier: AccountIdentifier, verified: PasswordStoredData, replacement: PasswordHash) {
+        identifierStoredData[identifier]?.replace(verified.authMethod().id, verified, verified.withPasswordHash(replacement))
     }
 
     override suspend fun deleteAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String) {

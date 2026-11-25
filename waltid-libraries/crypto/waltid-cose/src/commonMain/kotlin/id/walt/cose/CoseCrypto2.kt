@@ -178,6 +178,7 @@ fun CoseSign1.protectedAlgorithm(): Int = validatedProtectedAlgorithm()
 
 private fun CoseSign1.validatedProtectedAlgorithm(): Int {
     require(protected.isNotEmpty()) { "COSE algorithm must be protected" }
+    validateCborStructure(protected)
     val protectedHeaders = coseCompliantCbor.decodeFromByteArray<CoseHeaders>(protected)
     validateCoseHeaderSeparation(protectedHeaders, unprotected)
     return requireNotNull(protectedHeaders.algorithm) {

@@ -54,14 +54,12 @@ class JwsSignatureScheme : SignatureScheme {
         if (wrapInVc) {
             mapOf(
                 JwsOption.ISSUER to jwtOptions[JwsOption.ISSUER],
-                JwsOption.SUBJECT to jwtOptions[JwsOption.SUBJECT],
                 JwsOption.VC to data,
                 *(jwtOptions.entries.map { it.toPair() }.toTypedArray())
             ).toJsonObject()
         } else {
             mapOf(
                 JwsOption.ISSUER to jwtOptions[JwsOption.ISSUER],
-                JwsOption.SUBJECT to jwtOptions[JwsOption.SUBJECT],
                 *(data.entries.map { it.toPair() }.toTypedArray()),
                 *(jwtOptions.entries.map { it.toPair() }.toTypedArray())
             ).toJsonObject()

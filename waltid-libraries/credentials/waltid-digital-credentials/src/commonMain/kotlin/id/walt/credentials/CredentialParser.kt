@@ -3,6 +3,8 @@
 package id.walt.credentials
 
 import id.walt.credentials.keyresolver.resolveJwtIssuer
+import id.walt.credentials.keyresolver.w3cJwtPayload
+import id.walt.mdoc.encoding.requireSupportedMdocVersion
 import id.walt.cose.coseCompliantCbor
 import id.walt.credentials.CredentialDetectorTypes.CredentialDetectionResult
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
@@ -28,6 +30,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
+import id.walt.mdoc.encoding.validateMdocCbor
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
@@ -187,6 +190,26 @@ object CredentialParser {
         }.getOrThrow()
 
 
+        return handleMdocDocument(credential, document)
+    }
+
+    /** OpenID4VP mso_mdoc presentations contain one DeviceResponse, not a bare issuance credential. */
+    suspend fun handleMdocsPresentation(credential: String, base64: Boolean): Pair<CredentialDetectionResult, MdocsCredential> {
+        val bytes = if (base64) credential.decodeFromBase64Url() else credential.hexToByteArray()
+        validateMdocCbor(bytes)
+        val response = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(bytes)
+        require(response.status == 0u) { "Mdoc DeviceResponse status must indicate success" }
+        requireSupportedMdocVersion(response.version)
+        val document = requireNotNull(response.documents?.singleOrNull()) {
+            "An OpenID4VP mdoc presentation must contain exactly one document"
+        }
+        return handleMdocDocument(credential, document)
+    }
+
+    suspend fun handleMdocDocument(
+        credential: String,
+        document: Document,
+    ): Pair<CredentialDetectionResult, MdocsCredential> {
         // Build a JSON object that includes the docType for the DcqlMatcher
         val credentialData = buildJsonObject {
             put("docType", JsonPrimitive(document.docType))
@@ -302,6 +325,18 @@ object CredentialParser {
         val locatedDisclosures = SdJwtDisclosureLocator.locate(payload, parsedDisclosures.orEmpty())
         val availableDisclosures = parsedDisclosures?.let { locatedDisclosures }
 
+        if (header["typ"]?.jsonPrimitive?.content == "dc+sd-jwt" || "vct" in payload) {
+            // SD-JWT VC §2.2.2.3: these claims, including their descendants, must not be disclosed.
+            // Use the resolved root path so an ordinary nested claim named exp remains allowed.
+            val nonDisclosableClaims = setOf("iss", "nbf", "exp", "cnf", "vct", "vct#integrity", "aka_vcts", "status")
+            val forbiddenDisclosure = availableDisclosures.orEmpty().firstOrNull {
+                it.location?.firstOrNull()?.jsonPrimitive?.content in nonDisclosableClaims
+            }
+            require(forbiddenDisclosure == null) {
+                "SD-JWT VC claim '${forbiddenDisclosure?.location?.firstOrNull()?.jsonPrimitive?.content}' must not be selectively disclosed"
+            }
+        }
+
         val fullCredentialData =
             if (availableDisclosures?.isNotEmpty() == true ||
                 header.getValue("typ").jsonPrimitive.content.let { it == "vc+sd-jwt" || it == "dc+sd-jwt" }
@@ -329,11 +364,16 @@ object CredentialParser {
                         )
             }
 
-            !payload.contains("vct") && (payload.contains("@context") || payload.contains("type") || (payload.containsKey("vc") && (payload["vc"]?.jsonObject?.contains("@context") == true || payload["vc"]?.jsonObject?.contains(
-                "type"
-            ) == true))) -> {
-                val w3cPayload = if (payload.containsKey("vc")) payload["vc"]!!.jsonObject else payload
-                val w3cModelVersion = detectW3CDataModelVersion(w3cPayload)
+            w3cJwtPayload(payload) != null -> {
+                val w3cPayload = requireNotNull(w3cJwtPayload(payload))
+                // W3C credential wrapped in vc claim with SD-JWT envelope but no selective disclosures.
+                // @context may be absent from vc top-level (e.g. nested inside credentialSubject),
+                // so fall back to validFrom (DM2) / issuanceDate (DM1.1) for version detection.
+                val w3cModelVersion = when {
+                    "@context" in w3cPayload || "type" in w3cPayload -> detectW3CDataModelVersion(w3cPayload)
+                    "validFrom" in w3cPayload -> W3CSubType.W3C_2
+                    else -> W3CSubType.W3C_1_1
+                }
                 val credential = when (w3cModelVersion) {
                     W3CSubType.W3C_1_1 -> W3C11(
                         disclosables = containedDisclosablesSaveable,
@@ -380,53 +420,6 @@ object CredentialParser {
                             issuer = getJwtHeaderOrDataIssuer(payload),
                             subject = getCredentialDataSubject(payload)
                         )
-            }
-
-            payload.contains("vc") -> {
-                val subPayload = payload["vc"]!!.jsonObject
-                if (subPayload.contains("_sd")) {
-                    parseSdJwt(credential, header, subPayload, signature)
-                } else {
-                    // W3C credential wrapped in vc claim with SD-JWT envelope but no selective disclosures.
-                    // @context may be absent from vc top-level (e.g. nested inside credentialSubject),
-                    // so fall back to validFrom (DM2) / issuanceDate (DM1.1) for version detection.
-                    val w3cModelVersion = when {
-                        subPayload.contains("@context") -> detectW3CDataModelVersion(subPayload)
-                        subPayload.contains("validFrom") -> W3CSubType.W3C_2
-                        subPayload.contains("issuanceDate") -> W3CSubType.W3C_1_1
-                        else -> null
-                    }
-                    if (w3cModelVersion != null) {
-                        val w3cCredential = when (w3cModelVersion) {
-                            W3CSubType.W3C_1_1 -> W3C11(
-                                disclosables = containedDisclosablesSaveable,
-                                disclosures = availableDisclosures,
-                                signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
-                                signed = signedCredentialWithoutDisclosures,
-                                signedWithDisclosures = credential,
-                                credentialData = fullCredentialData,
-                                originalCredentialData = payload,
-                                issuer = getJwtHeaderOrDataIssuer(payload),
-                                subject = getCredentialDataSubject(payload)
-                            )
-
-                            W3CSubType.W3C_2 -> W3C2(
-                                disclosables = containedDisclosablesSaveable,
-                                disclosures = availableDisclosures,
-                                signature = SdJwtCredentialSignature(plainSignature, header, availableDisclosures),
-                                signed = signedCredentialWithoutDisclosures,
-                                signedWithDisclosures = credential,
-                                credentialData = fullCredentialData,
-                                originalCredentialData = payload,
-                                issuer = getJwtHeaderOrDataIssuer(payload),
-                                subject = getCredentialDataSubject(payload)
-                            )
-                        }
-                        detectedSdjwtSigned(CredentialPrimaryDataType.W3C, w3cModelVersion) to w3cCredential
-                    } else {
-                        throw NotImplementedError(unknownSdJwtReason(header, payload) + " Credential: $credential")
-                    }
-                }
             }
 
             else -> {

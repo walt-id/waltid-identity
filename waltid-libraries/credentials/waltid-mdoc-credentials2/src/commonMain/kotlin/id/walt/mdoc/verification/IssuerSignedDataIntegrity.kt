@@ -24,15 +24,17 @@ fun verifyIssuerSignedItemDigests(
     document: Document,
     mso: MobileSecurityObject,
 ): List<IssuerSignedItemDigestVerification> = buildList {
+    require(document.docType == mso.docType) { "Document docType does not match its MSO" }
+    mso.precheck()
     document.issuerSigned.namespaces?.forEach { (namespace, issuerSignedItems) ->
+        val items = issuerSignedItems.entries.map { it.value }
+        require(items.map { it.digestId }.distinct().size == items.size) { "Duplicate disclosed DigestID in namespace $namespace" }
+        require(items.map { it.elementIdentifier }.distinct().size == items.size) { "Duplicate disclosed element identifier in namespace $namespace" }
         val msoDigests = mso.valueDigests[namespace]
             ?: throw IllegalArgumentException(
                 "MSO is missing value digests for namespace: $namespace " +
                     "(only has digests for: ${mso.valueDigests.keys})"
             )
-        val duplicateDigestIds = msoDigests.entries.groupBy(ValueDigest::key).filterValues { it.size > 1 }.keys
-        require(duplicateDigestIds.isEmpty()) { "MSO contains duplicate DigestIDs for namespace $namespace: $duplicateDigestIds" }
-
         issuerSignedItems.entries.forEach { wrappedItem ->
             val item = wrappedItem.value
             val serialized = wrappedItem.serialized

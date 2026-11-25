@@ -2,6 +2,8 @@ package id.walt.ktorauthnz.accounts
 
 import id.walt.ktorauthnz.accounts.identifiers.methods.AccountIdentifier
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
+import id.walt.ktorauthnz.methods.storeddata.PasswordStoredData
+import id.walt.ktorauthnz.security.PasswordHash
 
 interface EditableAccountStore : AccountStore {
 
@@ -21,4 +23,16 @@ interface EditableAccountStore : AccountStore {
     suspend fun updateAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData)
     suspend fun deleteAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String)
     suspend fun deleteAccountStoredData(accountId: String, method: String)
+}
+
+/** Stores supporting login-time migration atomically replace only the credential that was verified. */
+interface PasswordHashUpgradeStore : EditableAccountStore {
+    suspend fun upgradePasswordHash(identifier: AccountIdentifier, verified: PasswordStoredData, replacement: PasswordHash)
+}
+
+/** Existing unmarked records in this store were written with [unmarkedPasswordPepper]. */
+interface VersionedPasswordPepperStore : PasswordHashUpgradeStore {
+    val unmarkedPasswordPepper: String
+    /** Keep new records readable by older replicas while the new readers are being deployed. */
+    val writeUnmarkedPasswords: Boolean
 }

@@ -30,6 +30,8 @@ data class Issuer2ServiceConfig(
     val deferredIssuance: id.walt.openid4vci.deferred.DeferredIssuanceConfig = id.walt.openid4vci.deferred.DeferredIssuanceConfig(),
     /** Requires PKCE for authorization-code requests; supplied PKCE is always verified. */
     val requirePkce: Boolean = false,
+    /** Required when client or key attestation uses the `x509-trust-registry` verification method. */
+    val attestationTrustResolver: TrustDecisionResolverConfig? = null,
 ) : WaltConfig() {
     /** Preserves the full JVM constructor from before metadata signing configuration. */
     constructor(

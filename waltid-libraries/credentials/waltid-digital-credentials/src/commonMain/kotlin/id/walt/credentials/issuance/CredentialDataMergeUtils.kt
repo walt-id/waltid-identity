@@ -61,7 +61,7 @@ object CredentialDataMergeUtils {
             functionHistory[cmd] = result
         }
 
-        log.debug { "Called function: $functionCall, got: $result" }
+        log.debug { "Evaluated mapping function $cmd" }
         return result
     }
 
@@ -89,16 +89,26 @@ object CredentialDataMergeUtils {
         }
     }
 
+    /** Read-only template inputs and the DID derived during this merge. */
+    private class MergeContext(private val supplied: Map<String, JsonElement>) : AbstractMap<String, JsonElement>() {
+        override val entries get() = supplied.entries
+        override fun get(key: String) = supplied[key]
+        var derivedSubjectDid: JsonPrimitive? = null
+    }
+
     /** One merge: the policy, the template inputs, and the call history `<last:...>` reads, shared across it. */
     private class Merge(
-        val policy: MergePolicy,
-        val context: Map<String, JsonElement>,
-        val functions: Map<String, suspend (FunctionCall) -> JsonElement>,
+        private val policy: MergePolicy,
+        context: Map<String, JsonElement>,
+        private val functions: Map<String, suspend (FunctionCall) -> JsonElement>,
     ) {
-        val history = HashMap<String, JsonElement>()
+        private val context = MergeContext(context)
+        private val history = HashMap<String, JsonElement>()
 
-        suspend fun template(value: JsonPrimitive): JsonElement =
-            if (value.isString && value.isTemplate()) getTemplateData(value.content, functions, context, history) else value
+        suspend fun evaluate(functionCall: String): JsonElement = getTemplateData(functionCall, functions, context, history)
+
+        private suspend fun template(value: JsonPrimitive): JsonElement =
+            if (value.isString && value.isTemplate()) evaluate(value.content) else value
 
         /** Writes the [mapping] of [key] into [data]. */
         suspend fun into(data: MutableMap<String, JsonElement>, key: String, mapping: JsonElement) {
@@ -155,8 +165,13 @@ object CredentialDataMergeUtils {
         val args: String?
     ) {
         fun fromContext(): JsonElement {
-            log.debug { "CONTEXT: $context" }
             return context[func] ?: throw IllegalArgumentException("Cannot find in context: $func")
+        }
+
+        internal suspend fun subjectDid(holderKey: IssuanceHolderKey): JsonElement {
+            val merge = context as? MergeContext
+            return context["subjectDid"] ?: merge?.derivedSubjectDid
+                ?: holderKey.deriveSubjectDid().also { merge?.derivedSubjectDid = it }
         }
     }
 
@@ -176,7 +191,7 @@ object CredentialDataMergeUtils {
             if (!k.startsWith("jwt:")) {
                 merge.into(vcm, k, v)
             } else {
-                results[k] = getTemplateData(v.jsonPrimitive.content, data, context, merge.history)
+                results[k] = merge.evaluate(v.jsonPrimitive.content)
             }
         }
         return MergeResult(W3CVC(vcm), results)
@@ -197,40 +212,34 @@ object CredentialDataMergeUtils {
             if (!k.startsWith("jwt:")) {
                 merge.into(vcm, k, v)
             } else {
-                vcm[k.removePrefix("jwt:")] = getTemplateData(v.jsonPrimitive.content, data, context, merge.history)
+                vcm[k.removePrefix("jwt:")] = merge.evaluate(v.jsonPrimitive.content)
             }
         }
         return vcm.toJsonObject()
     }
 
-    /**
-     * Keep only mapping keys that already exist as JSON objects in [credentialData].
-     * Unknown keys, primitive mappings, and top-level W3C-style validity keys are rejected
-     * with a field-specific error. Use `msoData` for MSO `validFrom` / `validUntil`.
-     */
+    /** Validate namespace mapping configuration before the credential data is populated. */
+    fun validateMdocNamespaceMappingShape(mapping: JsonObject) {
+        mapping.forEach { (key, value) ->
+            require(key != "validFrom" && key != "validUntil" && key != "expectedUpdate") {
+                "mapping.$key is not an mdoc namespace object; set msoData.$key for MSO validity"
+            }
+            require(value is JsonObject) {
+                "mapping.$key must be a JSON object of element mappings"
+            }
+        }
+    }
+
+    /** Resolve the mapping against the final [credentialData], including claims supplied during authorization. */
     fun JsonObject.mdocNamespaceMapping(credentialData: JsonObject): JsonObject? {
         if (isEmpty()) return null
-        forEach { (key, value) ->
-            if (key == "validFrom" || key == "validUntil" || key == "expectedUpdate") {
-                throw IllegalArgumentException(
-                    "mapping.$key is not an mdoc namespace object; set msoData.$key for MSO validity"
-                )
+        validateMdocNamespaceMappingShape(this)
+        keys.forEach { key ->
+            val credentialValue = requireNotNull(credentialData[key]) {
+                "mapping.$key does not match a credentialData namespace object"
             }
-            val credentialValue = credentialData[key]
-            if (credentialValue == null) {
-                throw IllegalArgumentException(
-                    "mapping.$key does not match a credentialData namespace object"
-                )
-            }
-            if (credentialValue !is JsonObject) {
-                throw IllegalArgumentException(
-                    "mapping.$key requires credentialData.$key to be a JSON object of namespace claims"
-                )
-            }
-            if (value !is JsonObject) {
-                throw IllegalArgumentException(
-                    "mapping.$key must be a JSON object of element mappings"
-                )
+            require(credentialValue is JsonObject) {
+                "mapping.$key requires credentialData.$key to be a JSON object of namespace claims"
             }
         }
         return this

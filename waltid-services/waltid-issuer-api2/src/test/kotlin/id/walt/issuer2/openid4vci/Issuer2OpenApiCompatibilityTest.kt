@@ -1,6 +1,12 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.commons.web.modules.OpenApiModule
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.persistence.InMemoryPersistence
+import id.walt.issuer2.application.Issuer2Module
+import id.walt.issuer2.configurePlugins
+import id.walt.issuer2.repository.ConfiguredCredentialStatusConsumptionRepository
+import id.walt.issuer2.repository.CredentialStatusConsumption
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferRequestBody
@@ -18,11 +24,15 @@ import io.ktor.http.contentType
 import io.ktor.server.application.install
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.*
+import kotlin.time.Duration
 
 /**
  * Matches the content-negotiation JSON installed by the shipped service
@@ -55,6 +65,22 @@ class Issuer2OpenApiCompatibilityTest {
         fun body(operation: JsonObject) = operation.getValue("content").jsonObject
             .getValue("application/json").jsonObject.getValue("schema")
         val paths = specification.getValue("paths").jsonObject
+        for (path in listOf("/issuer2/profiles", "/issuer2/profiles/{profileId}")) {
+            val profileExamples = paths.getValue(path).jsonObject.getValue("get").jsonObject
+                .getValue("responses").jsonObject.getValue("200").jsonObject
+                .getValue("content").jsonObject.getValue("application/json").jsonObject
+                .getValue("examples").jsonObject
+            assertTrue(profileExamples.isNotEmpty())
+            val redactedKey = buildJsonObject { put("type", "redacted") }
+            for (example in profileExamples.values) {
+                val value = example.jsonObject.getValue("value")
+                val profiles = if (value is JsonArray) value else listOf(value)
+                assertTrue(profiles.isNotEmpty())
+                profiles.forEach {
+                    assertTrue(it.jsonObject["issuerKey"] == redactedKey, "Expected a redacted signing key in $path example")
+                }
+            }
+        }
         val challenge = paths.getValue("/openid4vci/challenge").jsonObject.getValue("post").jsonObject
         assertFalse(challenge.containsKey("requestBody"), "Challenge endpoint accepts an empty body")
         val challengeResponses = challenge.getValue("responses").jsonObject
@@ -79,7 +105,8 @@ class Issuer2OpenApiCompatibilityTest {
         val examples = offer.getValue("requestBody").jsonObject.getValue("content").jsonObject
             .getValue("application/json").jsonObject.getValue("examples").jsonObject
         val statusExamples = examples.filterKeys { "status" in it }
-        assertEquals(5, statusExamples.size)
+        assertEquals(8, statusExamples.size)
+        assertEquals(3, statusExamples.keys.count { "preallocated status groups" in it })
         statusExamples.values.forEach { example ->
             val value = example.jsonObject.getValue("value").jsonObject
             val statuses = if ("profileId" in value) {
@@ -91,6 +118,16 @@ class Issuer2OpenApiCompatibilityTest {
             }
             assertEquals(statuses.size, statuses.distinct().size)
         }
+        val webhookExample = examples.getValue(
+            "[pre-authorized][single][by-reference][webhook runtime override]"
+        ).jsonObject.getValue("value")
+        val webhookRequest = Json.decodeFromJsonElement<CredentialOfferCreateRequest>(webhookExample)
+        val webhook = assertNotNull(webhookRequest.runtimeOverrides?.notifications?.webhook)
+        assertEquals("https://example.com/webhook/issuance-status", webhook.url)
+        assertEquals(8, webhook.retryPolicy.maxAttempts)
+        assertEquals(2, webhook.retryPolicy.initialBackoffSeconds)
+        assertEquals(120, webhook.retryPolicy.maxBackoffSeconds)
+        assertEquals(2.0, webhook.retryPolicy.backoffMultiplier)
         val responses = resolve(body(offer.getValue("responses").jsonObject.getValue("201").jsonObject))
             .getValue("anyOf").jsonArray.map(::resolve)
         assertEquals(1, responses.count { "profileId" in it.getValue("properties").jsonObject })
@@ -109,6 +146,8 @@ class Issuer2OpenApiCompatibilityTest {
         val notificationFields = setOf("walletNotificationId", "walletNotificationEvent", "walletNotificationEventDescription")
         for (shape in sessionShapes) {
             val properties = shape.getValue("properties").jsonObject
+            assertFalse("credentialStatusIssuance" in properties)
+            assertFalse("issuanceClaimId" in properties)
             val report = if ("issuanceResults" in properties) {
                 val results = resolve(properties.getValue("issuanceResults"))
                 resolve(results.getValue("additionalProperties")).getValue("properties").jsonObject
@@ -158,7 +197,7 @@ class Issuer2OpenApiCompatibilityTest {
             }
             routing { route("api.json") { openApi() } }
         }
-        installIssuer2WithConfigFiles(json = shippedIssuer2Json)
+        installStatusExampleIssuer()
         val client = apiClient()
         val specification = Json.parseToJsonElement(client.get("/api.json").bodyAsText()).jsonObject
         val examples = specification.getValue("paths").jsonObject
@@ -179,6 +218,27 @@ class Issuer2OpenApiCompatibilityTest {
                 setBody(published.toString())
             }
             assertEquals(HttpStatusCode.Created, response.status, "$name\n${response.bodyAsText()}")
+        }
+    }
+}
+
+/** Exercise every published body with an injected durable-store stand-in, including Redis-only examples. */
+private fun ApplicationTestBuilder.installStatusExampleIssuer() {
+    loadIssuer2ConfigFiles()
+    val module = Issuer2Module(
+        ConfigManager.getConfig(), ConfigManager.getConfig(), ConfigManager.getConfig(),
+        credentialStatusConsumptionRepository = ConfiguredCredentialStatusConsumptionRepository(
+            InMemoryPersistence<CredentialStatusConsumption>("openapi-status-examples", Duration.INFINITE),
+            durable = true,
+        ),
+    )
+    application {
+        install(ContentNegotiation) { json(shippedIssuer2Json) }
+        installIssuer2AuthenticationForTests()
+        configurePlugins()
+        routing {
+            module.managementController.register(this)
+            module.openId4VciController.register(this)
         }
     }
 }
