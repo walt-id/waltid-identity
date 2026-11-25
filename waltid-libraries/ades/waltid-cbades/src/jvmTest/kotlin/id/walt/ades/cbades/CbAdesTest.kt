@@ -5,6 +5,7 @@ import id.walt.ades.cbades.cbor.CborItem
 import id.walt.ades.cbades.cbor.asMap
 import id.walt.ades.cbades.cbor.cbor
 import id.walt.ades.crypto.AdesDigestAlgorithm
+import id.walt.ades.crypto.AdesSigningCredentials
 import id.walt.ades.model.Commitment
 import id.walt.ades.model.CommitmentType
 import id.walt.ades.model.SignaturePolicyIdentifier
@@ -51,6 +52,17 @@ class CbAdesTest {
     private fun DocumentValidationResult.assertPassed(level: AdesLevel? = null) {
         assertEquals(Indication.TOTAL_PASSED, indication, describe())
         if (level != null) assertTrue(signatures.all { it.level == level }, describe())
+    }
+
+    @Test
+    fun omittingTheRootRetainsASameNameRolloverIntermediate() = runTest {
+        val rollover = pki.issue(pki.root.name, pki.root, ca = true)
+        val leaf = pki.issue("CN=Rollover signing leaf", rollover)
+        val credentials = AdesSigningCredentials(pki.credentials(leaf).key,
+            listOf(leaf.certificate, rollover.certificate, pki.root.certificate))
+        val signed = signer.signSign1(payload, credentials, CbAdesSignatureParameters(includeRootInChain = false))
+        val chain = CbAdesComponents.parseX5chain(signed.headers.protected(CbAdesLabels.X5CHAIN))!!
+        assertEquals(listOf(leaf.certificate, rollover.certificate), chain)
     }
 
     @Test
