@@ -3,6 +3,9 @@ package id.walt.issuer2.service
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionFailure
 import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.domain.CredentialStatusIssuanceState
+import id.walt.issuer2.domain.CredentialStatusIssuanceOperation
+import id.walt.issuer2.repository.CredentialStatusOperationException
 import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.openid4vci.deferred.DeferredIssuanceStore
 import id.walt.openid4vci.deferred.DeferredSessionSnapshot
@@ -10,12 +13,17 @@ import id.walt.openid4vci.deferred.DeferredIssuanceState
 import id.walt.openid4vci.deferred.DeferredStatus
 import id.walt.openid4vci.requests.notification.IssuedCredentialNotificationChange
 import io.ktor.server.plugins.NotFoundException
+import id.walt.openid4vci.responses.credential.CredentialResponse
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.util.UUID
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 class IssuanceSessionService(
     private val repository: IssuanceSessionRepository,
+    private val now: () -> Instant = { Clock.System.now() },
 ) {
     val deferredStore: DeferredIssuanceStore = object : DeferredIssuanceStore {
         override suspend fun get(id: String): DeferredSessionSnapshot? =
@@ -38,7 +46,7 @@ class IssuanceSessionService(
         }
     }
 
-    /** Preserve concurrent transaction checkpoints when recording issuance results. */
+    /** Persist newly issued results while preserving concurrent transaction checkpoints and wallet reports. */
     suspend fun saveDeferredProgress(session: IssuanceSession): IssuanceSession {
         while (true) {
             val current = getSession(session.sessionId)
@@ -84,7 +92,8 @@ class IssuanceSessionService(
             val denied = state?.status == DeferredStatus.DENIED
             val replacement = session.copy(
                 deferredState = state, deferredStatus = state?.status ?: session.deferredStatus,
-                expiresAt = if (state == null) session.expiresAt else current.expiresAt,
+                expiresAt = if (state == null && !current.requiresCredentialStatusLease) session.expiresAt else current.expiresAt,
+                credentialStatusIssuance = current.credentialStatusIssuance,
                 issuanceResults = session.issuanceResults + current.issuanceResults,
                 authorizedCredentialIdentifiers = current.authorizedCredentialIdentifiers ?: session.authorizedCredentialIdentifiers,
                 status = if (denied) IssuanceSessionStatus.UNSUCCESSFUL else session.status,
@@ -139,6 +148,102 @@ class IssuanceSessionService(
                 issuanceResults = current.issuanceResults + session.issuanceResults,
                 issuanceClaimId = null,
             )
+            if (repository.compareAndSet(current, replacement)) return replacement
+        }
+    }
+
+    /** A persistent claim retains the session and key sidecar if the issuing process dies. */
+    suspend fun claimCredentialStatusSession(sessionId: String): IssuanceSession? {
+        while (true) {
+            val current = repository.get(sessionId) ?: return null
+            if (current.isClosed || current.expiresAt <= now()) return null
+            val state = current.credentialStatusIssuance ?: CredentialStatusIssuanceState()
+            if (state.leaseId != null && state.leaseExpiresAt?.let { it > now() } == true) return null
+            val replacement = current.copy(credentialStatusIssuance = state.copy(
+                leaseId = UUID.randomUUID().toString(), leaseExpiresAt = now() + 5.minutes,
+            ))
+            if (repository.compareAndSet(current, replacement)) return replacement
+        }
+    }
+
+    suspend fun prepareCredentialStatusOperation(
+        claim: IssuanceSession,
+        credentialIdentifier: String,
+        holderKeys: List<String>,
+    ): CredentialStatusIssuanceOperation {
+        val saved = updateCredentialStatusClaim(claim) { current ->
+            val state = requireNotNull(current.credentialStatusIssuance)
+            val operation = state.operations[credentialIdentifier]
+                ?: CredentialStatusIssuanceOperation(UUID.randomUUID().toString(), holderKeys)
+            if (operation.holderKeys != holderKeys) {
+                throw CredentialStatusOperationException("Credential request conflicts with its pending status operation")
+            }
+            current.copy(credentialStatusIssuance = state.copy(
+                operations = state.operations + (credentialIdentifier to operation),
+            ))
+        }
+        return saved.credentialStatusIssuance!!.operations.getValue(credentialIdentifier)
+    }
+
+    suspend fun checkpointCredentialStatusResponse(
+        claim: IssuanceSession,
+        credentialIdentifier: String,
+        operationId: String,
+        response: CredentialResponse,
+    ) {
+        updateCredentialStatusClaim(claim) { current ->
+            val state = requireNotNull(current.credentialStatusIssuance)
+            val operation = state.operations.getValue(credentialIdentifier)
+            check(operation.id == operationId) { "Credential status operation changed" }
+            current.copy(credentialStatusIssuance = state.copy(
+                operations = state.operations + (credentialIdentifier to operation.copy(response = response)),
+            ))
+        }
+    }
+
+    suspend fun discardUnreservedCredentialStatusOperation(claim: IssuanceSession, credentialIdentifier: String) {
+        updateCredentialStatusClaim(claim) { current ->
+            val state = requireNotNull(current.credentialStatusIssuance)
+            current.copy(credentialStatusIssuance = state.copy(operations = state.operations - credentialIdentifier))
+        }
+    }
+
+    suspend fun releaseCredentialStatusSession(
+        claim: IssuanceSession,
+        update: (IssuanceSession) -> IssuanceSession = { it },
+    ): IssuanceSession = updateCredentialStatusClaim(claim, release = true, transform = update)
+
+    suspend fun finishCredentialStatusSession(
+        claim: IssuanceSession,
+        credentialIdentifier: String,
+        recordIssuance: (IssuanceSession) -> IssuanceSession,
+    ): IssuanceSession = updateCredentialStatusClaim(claim, release = true) { current ->
+        val state = requireNotNull(current.credentialStatusIssuance)
+        recordIssuance(current).copy(
+            credentialStatusIssuance = state.copy(operations = state.operations - credentialIdentifier),
+        )
+    }
+
+    private suspend fun updateCredentialStatusClaim(
+        claim: IssuanceSession,
+        release: Boolean = false,
+        transform: (IssuanceSession) -> IssuanceSession,
+    ): IssuanceSession {
+        val claimId = requireNotNull(claim.credentialStatusIssuance?.leaseId)
+        while (true) {
+            val current = repository.get(claim.sessionId)
+                ?: throw CredentialStatusOperationException("Credential status processing session expired")
+            val state = current.credentialStatusIssuance
+            if (state?.leaseId != claimId || state.leaseExpiresAt?.let { it <= now() } != false ||
+                current.expiresAt <= now() || current.isClosed) {
+                throw CredentialStatusOperationException("Credential status processing lease was lost")
+            }
+            val replacement = transform(current).let { transformed ->
+                transformed.copy(credentialStatusIssuance = requireNotNull(transformed.credentialStatusIssuance).copy(
+                    leaseId = if (release) null else claimId,
+                    leaseExpiresAt = if (release) null else now() + 5.minutes,
+                ))
+            }
             if (repository.compareAndSet(current, replacement)) return replacement
         }
     }

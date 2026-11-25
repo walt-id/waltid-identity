@@ -41,8 +41,6 @@ services:
       - all
     pull_policy: missing
     depends_on:
-      postgres:
-        condition: service_healthy
       caddy:
         condition: service_started
     env_file:
@@ -51,6 +49,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - ./wallet-api2/config:/waltid-wallet-api2/config
+      - ./wallet-api2/data:/waltid-wallet-api2/data
 
   web-portal2:
     image: ${IMAGE_PREFIX}waltid/portal2:${VERSION_TAG:-latest}

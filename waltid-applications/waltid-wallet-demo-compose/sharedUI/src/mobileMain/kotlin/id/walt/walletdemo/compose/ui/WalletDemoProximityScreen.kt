@@ -195,8 +195,9 @@ internal fun WalletDemoProximityScreen(
                         )
                     }
                     is ProximityState.NoData -> ProximityTerminalContent(
-                        title = stringResource(Res.string.proximity_no_data_title),
+                        title = stringResource(Res.string.proximity_unsatisfied_title),
                         message = stringResource(Res.string.proximity_declined_message),
+                        details = { ProximityUnsatisfiedRequestContent(sessionState.unsatisfiedRequest) },
                     )
                     ProximityState.Cancelled -> ProximityTerminalContent(
                         title = stringResource(Res.string.proximity_cancelled_title),

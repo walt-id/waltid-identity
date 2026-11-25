@@ -22,7 +22,7 @@
 
 Production‑ready utilities to deliver session updates via:
 - **Server‑Sent Events (SSE)** — in‑app streaming of `KtorSessionUpdate` per session/target
-- **Webhooks** — push JSON payloads to external systems with optional Basic/Bearer authentication
+- **Webhooks** — push JSON payloads to external systems with optional Basic/Bearer or HMAC authentication
 
 Built on top of the core models from `waltid-ktor-notifications-core`.
 
@@ -62,7 +62,7 @@ val update = KtorSessionUpdate(
 
 val notifications = KtorSessionNotifications(
     webhook = KtorSessionNotifications.VerificationSessionWebhookNotification(
-        url = "https://example.com/webhook",
+        url = io.ktor.http.Url("https://example.com/webhook"),
         bearerToken = "secret-token"
     )
 )
@@ -100,7 +100,111 @@ routing {
 
 Notes:
 - SSE uses a per‑target `SharedFlow` with small replay to catch recent events
-- Webhook delivery supports Basic and Bearer auth
+- Webhook delivery supports Basic, Bearer, and signed HMAC requests
+
+## Reliable webhook delivery
+
+Webhook events use at-least-once delivery. Calling `notifySessionUpdate` first writes the exact serialized JSON
+payload to a local durable outbox and then returns; a background worker performs the HTTP request. Pending records
+are resumed when the service starts again. Exhausted and permanently rejected deliveries are retained under the
+outbox's `dead-letter` directory. Verifier2 removes queued and dead-letter records on explicit session erasure. Enterprise Verifier2 with `persistSessionResult = false` discards failed callbacks once delivery attempts end. Embedded callers can use `WebhookNotifier.enqueue(update, config)` to obtain the stable delivery ID.
+The library exposes `WebhookNotifier.deadLetters()` and
+`WebhookNotifier.redrive(deliveryId)` as programmatic hooks for integration into authenticated operator tooling;
+it does not expose an HTTP management endpoint.
+
+The default retry policy is five attempts with exponential backoff from 1 to 60 seconds and jitter. Network
+failures, HTTP 408, 429, and 5xx responses are retried. The worker honors `Retry-After`. Other non-2xx responses
+are dead-lettered immediately. The policy can be overridden per webhook:
+
+```json
+{
+  "url": "https://example.com/webhook",
+  "retry_policy": {
+    "max_attempts": 8,
+    "initial_backoff_seconds": 2,
+    "max_backoff_seconds": 120,
+    "backoff_multiplier": 2.0
+  }
+}
+```
+
+The default file-backed outbox root defaults to the operating system's temporary directory and logs a warning when that fallback is
+used. Production deployments must set the JVM property `waltid.webhook.delivery.directory` or environment variable
+`WALTID_WEBHOOK_DELIVERY_DIRECTORY` to put it on a durable volume. Issuer2 and Verifier2 use separate
+subdirectories. An embedded notifier uses the `embedded` subdirectory of a configured root. Without a configured
+root, its temporary directory is process-specific. The file store is intended for a single service process per directory; replicas must not share an
+outbox directory. Unreadable records are moved to the outbox's `corrupt` directory so they cannot block healthy
+deliveries. Delivery requests run with bounded concurrency, preventing one slow receiver from serially blocking
+the entire outbox. When a poll claims a full batch, the worker polls again immediately, so a backlog drains at
+that concurrency limit instead of one batch per poll interval.
+
+Services that run multiple replicas can provide a distributed implementation of `WebhookDeliveryStore` through
+`WebhookNotifier.start(store)`. Claims, completion, rescheduling, and dead-letter transitions are lease-fenced so a
+stale worker cannot overwrite a delivery reclaimed by another replica.
+
+Outbox records contain the callback URL, payload, and configured Basic/Bearer/HMAC credentials so they can be delivered
+after a restart. Directory and files are owner-only on POSIX file systems. Restrict access to the configured volume,
+encrypt it at rest, and do not expose or back it up as public application data. Define retention and cleanup policies
+for both `dead-letter` and `corrupt` records because neither is deleted automatically.
+
+### Receiver contract
+
+Every attempt sends the following headers:
+
+| Header | Meaning |
+| --- | --- |
+| `Webhook-Id` | Stable unique ID for the logical delivery |
+| `Idempotency-Key` | Same value as `Webhook-Id`, for deduplication |
+| `Webhook-Sequence` | Enqueue order within one producer process. Compare events from the same request. The signature does not cover this header |
+| `Webhook-Timestamp` | Attempt time as Unix epoch seconds |
+| `Webhook-Attempt` | One-based attempt number |
+| `Content-Digest` | RFC 9530-style SHA-256 digest of the exact JSON body |
+| `X-Webhook-Signature` | `v1=` followed by Base64 HMAC-SHA256 when `signing_secret` is configured |
+
+Check the configured authentication and the digest of the raw body on every attempt, including duplicates.
+For signed callbacks, verify the timestamp and HMAC before trusting `Webhook-Id`. Record the verified ID atomically
+with the business update. If the ID was already committed, return success without applying the update again.
+Use HTTPS for delivery.
+
+### Signed callbacks
+
+Set `signing_secret` on the webhook notification for Issuer2 or Verifier2. It must contain at least 32 UTF-8 bytes.
+Use a unique, randomly generated secret per receiver, store it as a secret, and share it with that receiver through a secure channel.
+Basic or Bearer authentication may remain configured during migration. Existing callbacks without `signing_secret`
+continue to be delivered without `X-Webhook-Signature`.
+
+```json
+{
+  "url": "https://example.com/webhook",
+  "signing_secret": "replace-with-a-random-32-byte-secret"
+}
+```
+
+For every attempt, the sender signs this UTF-8 string, with no trailing newline:
+
+```text
+POST
+<configured callback URL>
+<Webhook-Id>
+<Webhook-Timestamp>
+<Webhook-Attempt>
+<Content-Digest>
+```
+
+The signature is `v1=` plus standard Base64 of `HMAC-SHA256(signing_secret, canonical string)`.
+The callback URL is the normalized Ktor URL string stored in the delivery, including its query string. For example,
+`https://example.com:443/hook?source=issuer2` is signed as `https://example.com/hook?source=issuer2`.
+A receiver behind a proxy should use that external URL, not an internal rewritten URL. To verify, calculate SHA-256 over the raw request body and
+compare its RFC 9530-style value with `Content-Digest`; then compute the HMAC and compare decoded bytes in constant
+time. Reject missing or invalid signatures and timestamps outside a short window (for example, five minutes).
+Return success for a valid duplicate without applying the update again. Retries keep the same ID and body. Each
+attempt gets a fresh signature that covers its timestamp and attempt number.
+The `WebhookSignature.verify` JVM helper performs only the constant-time signature comparison; callers must also
+check body digest, timestamp freshness, and delivery ID replay protection.
+
+Events raised by one request are enqueued in order. A failed delivery is retried independently, and concurrent
+delivery means HTTP arrival order can differ from enqueue order. Receivers that need that order sort by
+`Webhook-Sequence`. They must not assume global ordering between different sessions.
 
 ## Related Libraries
 

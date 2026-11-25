@@ -11,6 +11,23 @@ import kotlin.uuid.Uuid
 
 class ProximityModelsTest {
     @Test
+    fun `unsatisfied request owns its collections and exposes no disclosure alternatives`() {
+        val elements = mutableListOf(ProximityRequestedElement("namespace", "name", true))
+        val document = ProximityUnsatisfiedDocument(0, "document", elements)
+        val documents = mutableListOf(document)
+        val summary = ProximityUnsatisfiedRequest(documents)
+        elements.clear()
+        documents.clear()
+        runCatching { (summary.documents as MutableList).clear() }
+        runCatching { (summary.documents.single().requestedElements as MutableList).clear() }
+        assertEquals(listOf(ProximityRequestedElement("namespace", "name", true)), summary.documents.single().requestedElements)
+        assertFailsWith<IllegalArgumentException> {
+            ProximityUnsatisfiedDocument(0, "document", listOf(ProximityRequestedElement("namespace", "alternative", false,
+                listOf(ProximityElementReference("namespace", "original")))))
+        }
+    }
+
+    @Test
     fun `NFC platform failures retain actionable fresh-session recovery`() {
         val denied = EngineProximityError.Capability("nfc_access_not_accepted", "NFC access was not accepted").toWalletError()
         assertEquals(ProximityRecovery.StartNewSession, denied.recovery)
@@ -427,9 +444,14 @@ class ProximityModelsTest {
 
     @Test
     fun `no-data is terminal and retains the final request index`() {
-        assertTrue(ProximityState.NoData(2).legalActions.isEmpty())
-        assertEquals(2, ProximityState.NoData(2).exchange)
-        assertFailsWith<IllegalArgumentException> { ProximityState.NoData(0) }
+        val summary = ProximityUnsatisfiedRequest(listOf(ProximityUnsatisfiedDocument(0, "org.example.photoid",
+            listOf(ProximityRequestedElement("org.example.identity", "portrait", true)))))
+        val state = ProximityState.NoData(2, summary)
+        assertTrue(state.legalActions.isEmpty())
+        assertEquals(2, state.exchange)
+        assertEquals(summary, state.unsatisfiedRequest)
+        assertEquals(summary, state.copy(exchange = 3).unsatisfiedRequest)
+        assertFailsWith<IllegalArgumentException> { ProximityState.NoData(0, summary) }
     }
 
     private fun review() = ProximityReview(

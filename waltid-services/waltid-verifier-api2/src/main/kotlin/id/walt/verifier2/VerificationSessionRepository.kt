@@ -44,6 +44,7 @@ interface VerificationSessionRepository {
         }
         current.session.requireAvailable()
         val claimed = current.session.copyForStorage().apply {
+            outcomeBeforeProcessingClaim = status.takeIf { it.successful != null }
             this.status = Verification2Session.VerificationSessionStatus.VALIDATING_RECEIVED_REQUEST
         }
         return VerificationSessionProcessingClaim(
@@ -302,10 +303,11 @@ class VerificationSessionCorruptedException(message: String, cause: Throwable? =
  * what exhausted the heap of a verifier doing 15 requests a minute, and it happened up to four times per
  * update because [update] retries.
  *
- * `copy()` is sufficient: everything reachable is either immutable - [JsonElement],
- * [Verification2Session.PresentedRawData], `Verifier2PolicyResults`, and the read-only collections - or a
- * top-level `var`, which `copy()` gives each snapshot its own of. Nothing mutates nested session state in place.
+ * Storage copies share their nested presentation data and retain the webhook generation that the
+ * attempt loaded. Each snapshot owns its top-level mutable fields.
  */
-fun Verification2Session.copyForStorage(): Verification2Session = copy()
+fun Verification2Session.copyForStorage(): Verification2Session = copyWithWebhookGeneration().also {
+    it.outcomeBeforeProcessingClaim = outcomeBeforeProcessingClaim
+}
 
 private fun VerificationSessionSnapshot.copyForCaller() = copy(session = session.copyForStorage())
