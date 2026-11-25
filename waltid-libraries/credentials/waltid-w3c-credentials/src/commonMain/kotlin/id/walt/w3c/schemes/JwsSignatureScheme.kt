@@ -143,7 +143,7 @@ class JwsSignatureScheme : SignatureScheme {
     suspend fun getIssuerCrypto2KeyInfo(
         jws: String,
         resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(
-            verificationRelationship = VerificationRelationshipType.AssertionMethod,
+            didVerificationRelationship = VerificationRelationshipType.AssertionMethod,
         ),
     ): Crypto2KeyInfo {
         val compact = jws.substringBefore('~')
@@ -163,7 +163,7 @@ class JwsSignatureScheme : SignatureScheme {
         data: String,
         allowedAlgorithms: Set<JwsAlgorithm> = JwsAlgorithm.entries.toSet(),
         resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(
-            verificationRelationship = VerificationRelationshipType.AssertionMethod,
+            didVerificationRelationship = VerificationRelationshipType.AssertionMethod,
         ),
     ): Result<JsonElement> = resultOfSuspend {
         val compact = data.substringBefore('~')
