@@ -1,5 +1,6 @@
 package id.walt.issuer2.service
 
+import id.walt.credentials.issuance.CredentialDataMergeUtils.validateMdocNamespaceMappingShape
 import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.sdjwt.metadata.type.validateIssuanceInput
 
@@ -14,6 +15,7 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
+import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
@@ -27,6 +29,7 @@ import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.util.UUID
+import io.ktor.server.plugins.BadRequestException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -68,6 +71,11 @@ class CredentialOfferService(
             require(issuerKey["type"] != null) { "issuerKey must contain a key type" }
             val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
             val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
+            val credentialStatus = try {
+                profileService.statusForIssuance(profile, overrides?.credentialStatus, overrides?.mapping)
+            } catch (e: IllegalArgumentException) {
+                throw BadRequestException(e.message ?: "Invalid credentialStatus configuration", e)
+            }
             idTokenClaimsMapping?.let { mapping ->
                 JsonObjectPathMapper.validateJsonObjectContainsPaths(
                     jsonObject = credentialData,
@@ -92,12 +100,20 @@ class CredentialOfferService(
                     .takeUnless { it.isEmpty() },
                 x5Chain = overrides?.x5Chain ?: profile.x5Chain,
                 issuerDid = overrides?.issuerDid ?: profile.issuerDid,
-                credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,
+                credentialStatus = credentialStatus,
             )
             Triple(profile, issuanceRequest, overrides?.notifications ?: profile.notifications)
         }
         for ((_, issuance, _) in resolvedCredentials) {
             val configuration = typeMetadata.credentialConfigurations[issuance.credentialConfigurationId] ?: continue
+            val mapping = issuance.mapping
+            if (configuration.format == CredentialFormat.MSO_MDOC && mapping != null) {
+                try {
+                    validateMdocNamespaceMappingShape(mapping)
+                } catch (e: IllegalArgumentException) {
+                    throw BadRequestException(e.message ?: "Invalid mdoc mapping", e)
+                }
+            }
             typeMetadata.resolve(configuration)?.use { context ->
                 context.resolved.validateIssuanceInput(
                     issuance.credentialData, issuance.selectiveDisclosure,

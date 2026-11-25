@@ -50,10 +50,16 @@ dependencies {
     api(identityLibs.sksamuel.cohort)
 
     // OpenAPI
+    api(platform(identityLibs.jackson.bom.tools))
     api(identityLibs.smiley4.service.openapi)
     implementation(identityLibs.smiley4.service.swagger.ui)
     implementation(identityLibs.smiley4.service.redoc)
     implementation(libs.bundles.smiley4.schema.kenerator)
+    constraints {
+        api(identityLibs.guava) {
+            because("Swagger Parser's transitive Guava dependency is affected by GHSA-xxph-c9ww-hj94")
+        }
+    }
 
     // Persistence
     api(identityLibs.cache4k)

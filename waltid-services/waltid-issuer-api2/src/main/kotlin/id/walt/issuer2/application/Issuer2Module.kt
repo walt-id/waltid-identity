@@ -1,7 +1,6 @@
 package id.walt.issuer2.application
 
 import id.walt.openid4vci.proofs.attestation.KeyAttestationKeyReferenceResolver
-import id.walt.openid4vci.proofs.DefaultCredentialProofVerifier
 import id.walt.commons.config.ConfigManager
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.config.Issuer2MetadataConfig
@@ -12,6 +11,9 @@ import id.walt.issuer2.controller.OpenId4VciController
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.repository.ConfiguredIssuanceSessionRepository
 import id.walt.issuer2.repository.IssuanceSessionRepository
+import id.walt.issuer2.repository.CredentialStatusConsumptionRepository
+import id.walt.issuer2.repository.configuredCredentialStatusStorage
+import id.walt.issuer2.repository.ConfiguredCredentialStatusConsumptionRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPARRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
@@ -39,86 +41,107 @@ class Issuer2Module @JvmOverloads constructor(
     keyAttestationKeyResolver: KeyAttestationKeyReferenceResolver? = null,
     metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
     metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
+    credentialStatusConsumptionRepository: CredentialStatusConsumptionRepository? = null,
 ) : AutoCloseable {
     private val typeMetadata = IssuerTypeMetadataCatalogue(serviceConfig, metadataConfig)
+    private val ownedStatusStorage = lazy(::configuredCredentialStatusStorage)
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
-    private val parRepository = ConfiguredPARRepository()
     private val refreshTokenRepository = ConfiguredRefreshTokenRepository()
-    private val notificationService = IssuanceNotificationService()
-    private val credentialProofVerifier = DefaultCredentialProofVerifier()
+    internal val statusConsumption: CredentialStatusConsumptionRepository
+    val credentialOfferService: CredentialOfferService
+    val managementController: Issuer2ManagementController
+    val openId4VciController: OpenId4VciController
 
-    private val openId4VciModule = OpenId4VciModule.create(
-        config = serviceConfig,
-        authorizationCodeRepository = authorizationCodeRepository,
-        preAuthorizedCodeRepository = preAuthorizedCodeRepository,
-        parRepository = parRepository,
-        refreshTokenRepository = refreshTokenRepository,
-        keyAttestationKeyResolver = keyAttestationKeyResolver,
-        credentialProofVerifier = credentialProofVerifier,
-        metadataResolver = typeMetadata,
-    )
+    init {
+        try {
+            statusConsumption = credentialStatusConsumptionRepository
+                ?: ConfiguredCredentialStatusConsumptionRepository(ownedStatusStorage.value)
+            val parRepository = ConfiguredPARRepository()
+            val notificationService = IssuanceNotificationService()
 
-    private val credentialProfileService = CredentialProfileService(
-        profilesConfig = profilesConfig,
-        metadataConfig = metadataConfig,
-    )
+            val openId4VciModule = OpenId4VciModule.create(
+                config = serviceConfig,
+                authorizationCodeRepository = authorizationCodeRepository,
+                preAuthorizedCodeRepository = preAuthorizedCodeRepository,
+                parRepository = parRepository,
+                refreshTokenRepository = refreshTokenRepository,
+                keyAttestationKeyResolver = keyAttestationKeyResolver,
+                metadataResolver = typeMetadata,
+            )
 
-    private val issuanceSessionService = IssuanceSessionService(
-        repository = issuanceSessionRepository,
-    )
+            val credentialProfileService = CredentialProfileService(
+                profilesConfig = profilesConfig,
+                metadataConfig = metadataConfig,
+                preallocatedStatusEnabled = statusConsumption.durable,
+            )
 
-    private val metadataService = MetadataService(
-        pkceServiceConfig = openId4VciModule.pkceServiceConfig,
-        serviceConfig = serviceConfig,
-        metadataConfig = metadataConfig,
-        profileService = credentialProfileService,
-        sessionService = issuanceSessionService,
-        preAuthorizedGrantAnonymousAccessSupported =
-            openId4VciModule.preAuthorizedCodeIssuer.anonymousAccessSupported,
-        crypto2TokenSigningKey = openId4VciModule.crypto2TokenSigningKey,
-        metadataSigningKeyResolver = metadataSigningKeyResolver,
-        metadataSigningCertificateResolver = metadataSigningCertificateResolver,
-        typeMetadata = typeMetadata,
-    )
+            val issuanceSessionService = IssuanceSessionService(
+                repository = issuanceSessionRepository,
+            )
 
-    val credentialOfferService = CredentialOfferService(
-        profileService = credentialProfileService,
-        sessionService = issuanceSessionService,
-        preAuthorizedCodeIssuer = openId4VciModule.preAuthorizedCodeIssuer,
-        config = serviceConfig,
-        notificationService = notificationService,
-        typeMetadata = typeMetadata,
-    )
+            val metadataService = MetadataService(
+                pkceServiceConfig = openId4VciModule.pkceServiceConfig,
+                serviceConfig = serviceConfig,
+                metadataConfig = metadataConfig,
+                profileService = credentialProfileService,
+                sessionService = issuanceSessionService,
+                preAuthorizedGrantAnonymousAccessSupported =
+                    openId4VciModule.preAuthorizedCodeIssuer.anonymousAccessSupported,
+                crypto2TokenSigningKey = openId4VciModule.crypto2TokenSigningKey,
+                metadataSigningKeyResolver = metadataSigningKeyResolver,
+                metadataSigningCertificateResolver = metadataSigningCertificateResolver,
+                typeMetadata = typeMetadata,
+            )
 
-    private val protocolService = OpenId4VciProtocolService(
-        oauth2Provider = openId4VciModule.oauth2Provider,
-        sessionService = issuanceSessionService,
-        profileService = credentialProfileService,
-        metadataService = metadataService,
-        notificationService = notificationService,
-        credentialProofKeyAcceptance = credentialProofKeyAcceptance,
-        credentialProofKeyCommitment = credentialProofKeyCommitment,
-        credentialNonceService = openId4VciModule.credentialNonceService,
-        credentialProofVerifier = credentialProofVerifier,
-        keyAttestation = openId4VciModule.keyAttestation,
-        attestationChallengeService = openId4VciModule.attestationChallengeService,
-        deferredConfig = serviceConfig.deferredIssuance,
-    )
+            credentialOfferService = CredentialOfferService(
+                profileService = credentialProfileService,
+                sessionService = issuanceSessionService,
+                preAuthorizedCodeIssuer = openId4VciModule.preAuthorizedCodeIssuer,
+                config = serviceConfig,
+                notificationService = notificationService,
+                typeMetadata = typeMetadata,
+            )
 
-    val managementController = Issuer2ManagementController(
-        profileService = credentialProfileService,
-        sessionService = issuanceSessionService,
-        offerService = credentialOfferService,
-    )
+            val protocolService = OpenId4VciProtocolService(
+                oauth2Provider = openId4VciModule.oauth2Provider,
+                sessionService = issuanceSessionService,
+                profileService = credentialProfileService,
+                metadataService = metadataService,
+                notificationService = notificationService,
+                credentialProofKeyAcceptance = credentialProofKeyAcceptance,
+                credentialProofKeyCommitment = credentialProofKeyCommitment,
+                credentialNonceService = openId4VciModule.credentialNonceService,
+                keyAttestation = openId4VciModule.keyAttestation,
+                attestationChallengeService = openId4VciModule.attestationChallengeService,
+                deferredConfig = serviceConfig.deferredIssuance,
+                credentialStatusConsumption = statusConsumption,
+            )
 
-    val openId4VciController = OpenId4VciController(
-        metadataService = metadataService,
-        protocolService = protocolService,
-        offerService = credentialOfferService,
-        notificationService = notificationService,
-    )
+            managementController = Issuer2ManagementController(
+                profileService = credentialProfileService,
+                sessionService = issuanceSessionService,
+                offerService = credentialOfferService,
+            )
 
-    override fun close() = typeMetadata.close()
+            openId4VciController = OpenId4VciController(
+                metadataService = metadataService,
+                protocolService = protocolService,
+                offerService = credentialOfferService,
+                notificationService = notificationService,
+            )
+        } catch (failure: Throwable) {
+            runCatching { close() }.onFailure(failure::addSuppressed)
+            throw failure
+        }
+    }
+
+    override fun close() {
+        try {
+            typeMetadata.close()
+        } finally {
+            if (ownedStatusStorage.isInitialized()) ownedStatusStorage.value.close()
+        }
+    }
 
     companion object {
         @JvmOverloads

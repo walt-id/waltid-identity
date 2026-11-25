@@ -1,8 +1,10 @@
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.crypto2.jose.exportPublicJwkObject
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
@@ -118,6 +120,24 @@ class Crypto2W3cCredentialTest {
         )
         assertTrue(CompactJws.verify(baseIssued, key, JwsAlgorithm.ES256).payload.isNotEmpty())
         assertEquals(key.id.value, Issuer.getKidHeader(key))
+    }
+
+    @Test
+    fun `kid for an issuer uses the key ID for URLs and the verification method for DIDs`() = runTest {
+        val keyId = "signing-1"
+        val issuerKey = key(keyId)
+        val publicJwk = JsonObject(issuerKey.exportPublicJwkObject() + ("kid" to JsonPrimitive(keyId)))
+        val legacyKey = JWKKey.importJWK(publicJwk.toString()).getOrThrow()
+        val issuerUrl = "https://issuer.example"
+        val didJwk = Crypto2DidJwkRegistrar().createByKey(issuerKey, DidJwkCreateOptions()).did
+        val didWeb = "did:web:issuer.example"
+
+        assertEquals(keyId, Issuer.kidForIssuer(issuerKey, issuerUrl))
+        assertEquals(keyId, Issuer.kidForIssuer(legacyKey, issuerUrl))
+        assertEquals("$didJwk#0", Issuer.kidForIssuer(issuerKey, didJwk))
+        assertEquals("$didJwk#0", Issuer.kidForIssuer(legacyKey, didJwk))
+        assertEquals("$didWeb#${publicJwkThumbprint(issuerKey)}", Issuer.kidForIssuer(issuerKey, didWeb))
+        assertEquals("$didWeb#$keyId", Issuer.kidForIssuer(legacyKey, didWeb))
     }
 
     @Test

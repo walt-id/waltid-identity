@@ -1,6 +1,8 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.credentials.issuance.CredentialDataMergeUtils.mdocNamespaceMapping
 import id.walt.issuer2.config.Issuer2ProfilesConfig
+import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.testsupport.Issuer2AuthorizationRequestMode
 import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
@@ -19,11 +21,18 @@ import id.walt.issuer2.testsupport.listSessions
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.issuer2.testsupport.mdocValidityInfo
+import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.IssuerStateMode
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -123,22 +132,60 @@ class Issuer2MsoDataWalletFlowTest {
     }
 
     @Test
-    fun mappingValidFromIsRejectedInFavorOfMsoData() = testApplication {
-        val error = runCatching {
-            issueIsoMdl(
-                CredentialOfferRuntimeOverrides(
-                    mapping = buildJsonObject {
-                        put("validFrom", JsonPrimitive("<timestamp-before:30d>"))
-                        put("validUntil", JsonPrimitive("<timestamp-in:10d>"))
-                    }
-                )
+    fun offerRejectsMsoValidityFieldsInMapping() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val response = client.post("/issuer2/credential-offers") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                CredentialOfferCreateRequest(
+                    profileId = Issuer2CredentialScenarios.isoMdl.profileId,
+                    authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                    runtimeOverrides = CredentialOfferRuntimeOverrides(
+                        mapping = buildJsonObject {
+                            put("validFrom", JsonPrimitive("<timestamp-before:30d>"))
+                            put("validUntil", JsonPrimitive("<timestamp-in:10d>"))
+                        },
+                    ),
+                ),
             )
-        }.exceptionOrNull()
-        assertNotNull(error)
-        assertTrue(
-            error.message!!.contains("msoData") || error.message!!.contains("validFrom"),
-            error.message,
+        }
+        val body = response.bodyAsText()
+        assertEquals(HttpStatusCode.BadRequest, response.status, body)
+        assertTrue(body.contains("msoData.validFrom"), body)
+        assertTrue(client.listSessions().isEmpty())
+    }
+
+    @Test
+    fun authorizedMdocOfferAllowsANamespaceSuppliedByExternalIdentityClaims() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val scenario = Issuer2CredentialScenarios.isoMdl
+        val mapping = buildJsonObject {
+            putJsonObject(ISO_MDL_NAMESPACE) { put("issuing_authority", "<issuerId>") }
+        }
+        val offer = client.createWalletFlowCredentialOffer(
+            scenario = scenario,
+            authenticationMethod = AuthenticationMethod.AUTHORIZED,
+            issuerStateMode = IssuerStateMode.INCLUDE,
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                credentialData = buildJsonObject { put(ISO_MDL_NAMESPACE, "pending") },
+                mapping = mapping,
+                idTokenClaimsMapping = mapOf("$.mdl" to "$.['$ISO_MDL_NAMESPACE']"),
+            ),
         )
+
+        val issuance = client.getSession(offer.offerId).issuanceRequests.single()
+        val claims = buildJsonObject {
+            putJsonObject("mdl") { put("given_name", "Jane") }
+        }
+        val populatedData = JsonObjectPathMapper.fromSourceToDestinationJsonPathsMap(
+            source = claims,
+            destination = issuance.credentialData,
+            jsonPathMapConfig = assertNotNull(issuance.idTokenClaimsMapping),
+        )
+        assertEquals(claims.getValue("mdl"), populatedData.getValue(ISO_MDL_NAMESPACE))
+        assertEquals(mapping, assertNotNull(issuance.mapping).mdocNamespaceMapping(populatedData))
     }
 
     @Test

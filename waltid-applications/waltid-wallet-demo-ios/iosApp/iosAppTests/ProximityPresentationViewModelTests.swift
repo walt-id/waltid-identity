@@ -1270,11 +1270,79 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
         viewModel.start()
         try await chooseConnectionAndWaitForStart(viewModel, client: client, count: 1)
-        await session.emit(.noData(exchange: 2))
+        let summary = try WalletSDK.ProximityUnsatisfiedRequest(documents: [
+            .init(requestIndex: 0, documentType: "org.example.photoid", requestedElements: [
+                .init(namespace: "org.example.identity", elementIdentifier: "portrait", intentToRetain: true, satisfiesRequestedElements: []),
+            ]),
+        ])
+        await session.emit(.noData(exchange: 2, unsatisfiedRequest: summary))
         try await waitUntil { viewModel.isTerminal }
-        XCTAssertEqual(viewModel.sessionState, .noData(exchange: 2))
+        XCTAssertEqual(viewModel.sessionState, .noData(exchange: 2, unsatisfiedRequest: summary))
+        XCTAssertFalse(viewModel.canApprove)
+        XCTAssertNil(viewModel.review)
+        try await captureNoDataScreen(viewModel, name: "nearby-unmatched-request-native-ios")
         viewModel.dismiss()
         XCTAssertNil(viewModel.sessionState)
+    }
+
+    @MainActor
+    private func captureNoDataScreen(_ viewModel: ProximityPresentationViewModel, name: String) async throws {
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previousWindow = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let host = UIHostingController(rootView: NavigationView {
+            ProximityPresentationView(viewModel: viewModel, approvalMode: .constant(.askEachTime), credentialDetailsByID: [:])
+                .navigationTitle("Share nearby").navigationBarTitleDisplayMode(.inline)
+        }.navigationViewStyle(.stack))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; previousWindow?.makeKeyAndVisible() }
+        host.view.layoutIfNeeded()
+        await Task.yield()
+        let image = UIGraphicsImageRenderer(bounds: window.bounds).image { _ in
+            XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
+        }
+        let attachment = XCTAttachment(image: image)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
+    func testUnsatisfiedRequestEvidenceMatrix() async throws {
+        func document(_ index: Int, _ type: String, _ namespace: String, _ fields: [String], retain: Bool = false) throws -> WalletSDK.ProximityUnsatisfiedDocument {
+            try .init(requestIndex: index, documentType: type, requestedElements: fields.map {
+                .init(namespace: namespace, elementIdentifier: $0, intentToRetain: retain, satisfiesRequestedElements: [])
+            })
+        }
+        let cases: [(String, [WalletSDK.ProximityUnsatisfiedDocument])] = [
+            ("N1", [try document(0, "unknown.document", "org.iso.18013.5.1", ["given_name"])]),
+            ("N2", [try document(0, "org.iso.18013.5.1.mDL", "unknown.namespace", ["given_name"])]),
+            ("N3", [try document(0, "org.iso.18013.5.1.mDL", "org.iso.18013.5.1", ["given_name", "family_name"]),
+                    try document(1, "missing.document", "namespace", ["name"])]),
+            ("N4", [try document(0, "missing.document", "first.namespace", ["名", "age"], retain: true),
+                    try .init(requestIndex: 1, documentType: "missing.document", requestedElements: [
+                        .init(namespace: "second.namespace", elementIdentifier: "portrait", intentToRetain: false, satisfiesRequestedElements: []),
+                        .init(namespace: "third.namespace", elementIdentifier: "address", intentToRetain: false, satisfiesRequestedElements: [])])]),
+            ("nearby-unmatched-large-initial", try (0..<6).map { try document($0, "document-\($0)", "namespace", (0..<21).map { "field_\($0)" }) }),
+        ]
+        for (name, documents) in cases {
+            let session = FakeProximitySession()
+            let client = FakeProximityWalletClient(session: session)
+            let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+            viewModel.start()
+            try await chooseConnectionAndWaitForStart(viewModel, client: client, count: 1)
+            let summary = try WalletSDK.ProximityUnsatisfiedRequest(documents: documents)
+            await session.emit(.noData(exchange: 2, unsatisfiedRequest: summary))
+            try await waitUntil { viewModel.isTerminal }
+            XCTAssertEqual(viewModel.sessionState, .noData(exchange: 2, unsatisfiedRequest: summary))
+            XCTAssertFalse(viewModel.canApprove)
+            XCTAssertNil(viewModel.review)
+            try await captureNoDataScreen(viewModel, name: name)
+            viewModel.dismiss()
+            XCTAssertNil(viewModel.sessionState)
+        }
     }
 
     @MainActor

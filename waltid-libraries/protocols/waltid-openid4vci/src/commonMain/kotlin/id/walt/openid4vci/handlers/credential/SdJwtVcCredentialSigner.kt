@@ -10,7 +10,6 @@ import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.jose.exportPublicJwkObject
-import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.proofs.invalidCredentialProof
@@ -21,8 +20,10 @@ import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
-import id.walt.w3c.issuance.Issuer.getKidHeader
+import id.walt.w3c.issuance.Issuer.kidForIssuer
 import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeSDJwtVCPayloadWithMapping
+import id.walt.credentials.issuance.IssuanceHolderKey
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 import id.walt.crypto2.keys.Key as Crypto2Key
 
@@ -122,15 +123,17 @@ object SdJwtVcCredentialSigner {
         val holderKeyJson = exportHolderJwk(binding.holderKey)
         val holderDid = binding.holderDid
 
-        val mappedCredentialData = credentialData.mergeSDJwtVCPayloadWithMapping(
-            mapping = dataMapping ?: JsonObject(emptyMap()),
-            context = issuanceTemplateContext(
-                issuerId = issuerId,
-                subjectDid = holderDid,
-                display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray
-            ),
-            data = issuanceDataFunctions()
-        )
+        val mappedCredentialData = withContext(IssuanceHolderKey(binding.holderKey)) {
+            credentialData.mergeSDJwtVCPayloadWithMapping(
+                mapping = dataMapping ?: JsonObject(emptyMap()),
+                context = issuanceTemplateContext(
+                    issuerId = issuerId,
+                    subjectDid = holderDid,
+                    display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray
+                ),
+                data = issuanceDataFunctions()
+            )
+        }
 
         val defaultPayloadProperties = defaultPayloadProperties(
             issuerId = issuerId,
@@ -154,11 +157,9 @@ object SdJwtVcCredentialSigner {
             disclosureMap = SDJwtVC.effectiveDisclosureMap(selectiveDisclosure, alwaysDisclosedOverrides.keys)
         )
 
-        val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
-
         val issuerKid = when (issuerSigningKey) {
-            is IssuerSigningKey.Legacy -> getKidHeader(issuerSigningKey.key, issuerDid)
-            is IssuerSigningKey.Crypto2 -> getKidHeader(issuerSigningKey.key, issuerDid)
+            is IssuerSigningKey.Legacy -> kidForIssuer(issuerSigningKey.key, issuerId)
+            is IssuerSigningKey.Crypto2 -> kidForIssuer(issuerSigningKey.key, issuerId)
         }
         val headers = mapOf(
             JWT_HEADER_KID to JsonPrimitive(issuerKid),

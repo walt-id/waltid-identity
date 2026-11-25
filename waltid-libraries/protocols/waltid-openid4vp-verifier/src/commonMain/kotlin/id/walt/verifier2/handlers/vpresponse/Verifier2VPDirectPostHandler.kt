@@ -2,6 +2,8 @@
 
 package id.walt.verifier2.handlers.vpresponse
 
+import id.walt.mdoc.encoding.validateMdocCbor
+import id.walt.mdoc.encoding.requireSupportedMdocVersion
 import kotlin.time.TimeSource
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.DirectSerializedKey
@@ -30,6 +32,7 @@ import id.walt.verifier2.verification2.PresentationVerificationEngine
 import id.walt.verifier2.verification2.SelfIssuedIdTokenValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -93,8 +96,9 @@ object Verifier2VPDirectPostHandler {
                     crypto2StoredKey = crypto2EphemeralDecryptionKey,
                 )
 
+                validateMdocCbor(plaintext)
                 val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(plaintext)
-                require(deviceResponse.version == "1.0") { "Unsupported DeviceResponse version: ${deviceResponse.version}" }
+                requireSupportedMdocVersion(deviceResponse.version)
                 require(deviceResponse.status == 0u) { "DeviceResponse reported failure status: ${deviceResponse.status}" }
                 requireNotNull(deviceResponse.documents) { "Missing 'documents' in DeviceResponse!" }
 
@@ -298,6 +302,24 @@ object Verifier2VPDirectPostHandler {
         ephemeralDecryptionKey: DirectSerializedKey? = verificationSession?.ephemeralDecryptionKey,
         crypto2EphemeralDecryptionKey: String? = verificationSession?.crypto2EphemeralDecryptionKey,
         presentationId: String = Uuid.random().toString(),
+    ) = respondHandleDirectPostResponseWithOutcome(
+        verificationSession, updateSessionCallback, failSessionCallback, policyContext,
+        beforeRespond = { failure -> beforeRespond(failure != null) },
+        ephemeralDecryptionKey = ephemeralDecryptionKey,
+        crypto2EphemeralDecryptionKey = crypto2EphemeralDecryptionKey,
+        presentationId = presentationId,
+    )
+
+    /** The same response handler, carrying the processing failure to operation and audit recording. */
+    suspend fun RoutingCall.respondHandleDirectPostResponseWithOutcome(
+        verificationSession: Verification2Session?,
+        updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
+        failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
+        policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty,
+        beforeRespond: suspend (failure: Throwable?) -> Unit = {},
+        ephemeralDecryptionKey: DirectSerializedKey? = verificationSession?.ephemeralDecryptionKey,
+        crypto2EphemeralDecryptionKey: String? = verificationSession?.crypto2EphemeralDecryptionKey,
+        presentationId: String = Uuid.random().toString(),
     ) {
         val call = this
 
@@ -311,6 +333,7 @@ object Verifier2VPDirectPostHandler {
             }
         }
 
+        var processingResponse = true
         try {
             // Phase timings: this call is 74% of the enterprise verification response handler (46.6ms of
             // 63ms), so attributing it is what makes optimisation here a measured decision. Logged as one
@@ -330,7 +353,8 @@ object Verifier2VPDirectPostHandler {
             )
             val afterHandle = started.elapsedNow()
 
-            beforeRespond(false)
+            processingResponse = false
+            beforeRespond(null)
             call.respond(result)
             log.debug {
                 "Direct post phases: parse=$afterParse, handle=${afterHandle - afterParse}, " +
@@ -344,10 +368,10 @@ object Verifier2VPDirectPostHandler {
             log.debug { "Presentation rejected, responding 400: ${e.message}" }
             val errorBody = buildMap {
                 put("error", "invalid_request")
-                put("error_description", e.message ?: "Presentation rejected")
+                put("error_description", "Invalid presentation response")
                 verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
             }
-            beforeRespond(true)
+            beforeRespond(e)
             call.respond(HttpStatusCode.BadRequest, errorBody)
         } catch (e: PresentationVerificationUnavailableException) {
             // The presentation was not rejected - the verifier could not reach something it needs.
@@ -358,11 +382,22 @@ object Verifier2VPDirectPostHandler {
             log.error(e) { "Verification unavailable, responding 503: ${e.message}" }
             val errorBody = buildMap {
                 put("error", "temporarily_unavailable")
-                put("error_description", e.message ?: "Verification temporarily unavailable")
+                put("error_description", "Verification temporarily unavailable")
                 verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
             }
-            beforeRespond(true)
+            beforeRespond(e)
             call.respond(HttpStatusCode.ServiceUnavailable, errorBody)
+        } catch (e: Exception) {
+            // Parsing failures are client errors. Keep parser classes and submitted values out of
+            // the public response while preserving claim cleanup through the normal callback.
+            if (!processingResponse || (e !is IllegalArgumentException && e !is BadRequestException)) throw e
+            log.debug(e) { "Invalid presentation response" }
+            beforeRespond(e)
+            call.respond(HttpStatusCode.BadRequest, buildMap {
+                put("error", "invalid_request")
+                put("error_description", "Invalid presentation response")
+                verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
+            })
         }
     }
 
@@ -463,7 +498,6 @@ object Verifier2VPDirectPostHandler {
         session.updateSession(SessionEvent.attempted_presentation) {
             resetPresentationAttempt(presentationId)
             status = Verification2Session.VerificationSessionStatus.PROCESSING_FLOW
-            presentedRawData = Verification2Session.PresentedRawData(vpTokenContents, receivedState)
         }
         val afterSessionUpdate = phaseStart.elapsedNow()
 
@@ -514,7 +548,7 @@ object Verifier2VPDirectPostHandler {
             failSessionCallback,
             policyContext,
             verificationTime,
-            trustedAuthoritiesChecker
+            trustedAuthoritiesChecker,
         )
         // Phase timings for the dominant part of the verifier: this function is ~43ms of a 63ms request,
         // and the split between parsing, the session write and the verification engine is what tells an

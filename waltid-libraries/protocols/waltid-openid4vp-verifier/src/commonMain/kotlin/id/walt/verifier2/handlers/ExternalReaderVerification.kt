@@ -153,7 +153,9 @@ object ExternalReaderVerification {
             specificVcPolicies = credentialResults.specificVcPolicies.mapValues { (_, values) -> values.map { it.boundedForStorage() } },
         )
         val queryFailure = query?.let {
-            PresentationVerificationEngine.matchCredentialsToQueries(it, credentialsByQuery, matchClaims = setup.core.dcqlQuery != null)
+            PresentationVerificationEngine.matchCredentialsToQueries(
+                it, credentialsByQuery, matchClaims = setup.core.dcqlQuery != null, enforceMdocDisclosure = false,
+            )
                 .mapCatching { matched -> DcqlFulfillmentChecker.checkOverallDcqlFulfillment(it, matched).getOrThrow() }
                 .exceptionOrNull()
         }
