@@ -75,6 +75,16 @@ class X509Certificate(encoded: ByteArray) {
             dp.contextChild(0)?.contextChild(0)?.let(::uris) ?: emptyList()
         } ?: emptyList()
 
+    /** RFC 5280 reason flags retained from the certificate's distribution points; null means unrestricted. */
+    val crlDistributionPointReasons: Set<Int>?
+        get() {
+            val points = extension(Oids.EXT_CRL_DISTRIBUTION_POINTS)?.parsed?.children ?: return null
+            if (points.any { it.contextChild(1) == null }) return null
+            return points.flatMap { point ->
+                point.contextChild(1)!!.asBitList().mapIndexedNotNull { index, included -> index.takeIf { included } }
+            }.toSet()
+        }
+
     val ocspResponderUrls: List<String> get() = accessLocations(Oids.AD_OCSP)
     val caIssuersUrls: List<String> get() = accessLocations(Oids.AD_CA_ISSUERS)
 
