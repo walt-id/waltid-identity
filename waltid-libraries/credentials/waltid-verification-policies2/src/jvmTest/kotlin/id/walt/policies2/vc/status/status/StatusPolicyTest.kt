@@ -12,6 +12,8 @@ import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
@@ -83,7 +85,7 @@ class StatusPolicyTest {
                 if (attributes.any { it.getAllowedValues() != listOf(0u) }) continue
                 val credential = CredentialParser.parseOnly(jsonModule.encodeToString(context.holderCredential))
                 val result = StatusPolicy().verify(credential)
-                assertEquals(context.valid, result.isSuccess, "$group/${resource.id}: ${result.exceptionOrNull()?.message}")
+                assertEquals(context.valid && group != "revocationlist2020", result.isSuccess, "$group/${resource.id}: ${result.exceptionOrNull()?.message}")
             }
         }
     }
@@ -99,6 +101,21 @@ class StatusPolicyTest {
         val values = context.attribute.getAllowedValues().joinToString(",")
         val policies = Json.decodeFromString<VCPolicyList>("""[{"policy":"credential-status","argument":{"values":[$values]}}]""")
         assertTrue(policies.policies.single().verify(credential).isSuccess)
+    }
+
+    @Test
+    fun `automatic detection rejects unsupported siblings beside a clear token status list`() = runTest {
+        val context = server.credentials.values.flatten().map { it.data }
+            .filterIsInstance<SingleStatusResourceData>()
+            .first { it.valid && "status" in it.holderCredential }
+        val original = context.holderCredential
+        assertTrue(StatusPolicy().verify(CredentialParser.parseOnly(jsonModule.encodeToString(original))).isSuccess)
+        val withSibling = JsonObject(original + ("status" to JsonObject(
+            original.getValue("status").jsonObject + ("unsupported_method" to JsonObject(emptyMap()))
+        )))
+        val result = StatusPolicy().verify(CredentialParser.parseOnly(jsonModule.encodeToString(withSibling)))
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("unsupported_method"))
     }
 
     companion object {
