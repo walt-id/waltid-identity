@@ -13,6 +13,7 @@ import kotlinx.serialization.json.put
 import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.net.Socket
 import java.net.URI
 import kotlin.test.*
 
@@ -115,27 +116,40 @@ class ItbCaseRunnerTest {
         }
     }
 
+    private enum class PeerOutcome { DISCONNECT_DURING_CALL, DISCONNECT_AFTER_REPLY, WALLET_REJECTION }
+
     @Test
     fun deviceDisconnectStopsFurtherSessionsWhileAWalletRejectionAllowsTheNextCase() = runBlocking {
         val token = "a".repeat(64)
-        for (disconnect in listOf(true, false)) {
+        for (outcome in PeerOutcome.entries) {
             withTimeout(10_000) {
                 ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { listener ->
+                    val connection = CompletableDeferred<Socket>()
                     val peer = launch(Dispatchers.IO) {
                         listener.accept().use { socket ->
                             ItbDeviceWire.authenticate(ItbDeviceWire.read(socket), token)
                             ItbDeviceWire.write(socket, buildJsonObject {
                                 put("ready", true); put("provider", "android-native-biometric")
                             })
-                            if (disconnect) ItbDeviceWire.read(socket)
-                            else ItbDeviceWire.serve(socket) { throw ItbWalletRejection("demo_wallet_rejected") }
+                            connection.complete(socket)
+                            if (outcome == PeerOutcome.DISCONNECT_DURING_CALL) {
+                                assertEquals(ItbDeviceWire.ping, ItbDeviceWire.read(socket))
+                                ItbDeviceWire.write(socket, ItbDeviceWire.pong)
+                                ItbDeviceWire.read(socket)
+                            } else ItbDeviceWire.serve(socket) {
+                                if (outcome == PeerOutcome.WALLET_REJECTION) throw ItbWalletRejection("demo_wallet_rejected")
+                                ItbWalletResult()
+                            }
                         }
                     }
                     val bridge = Bridge()
                     var stops = 0
                     HttpClient(MockEngine { request ->
                         respond(when (request.url.encodedPath.substringAfterLast('/')) {
-                            "status" -> status(false)
+                            "status" -> {
+                                if (outcome == PeerOutcome.DISCONNECT_AFTER_REPLY && bridge.completed) connection.await().close()
+                                status(bridge.completed)
+                            }
                             "stop" -> { stops++; "" }
                             session -> report
                             else -> error("Unexpected request")
@@ -143,17 +157,20 @@ class ItbCaseRunnerTest {
                     }).use { client ->
                         ItbAndroidWalletDriver.connect(listener.localPort, token, Url("https://itb.example"), null, Dispatchers.IO).use { device ->
                             val runner = ItbCaseRunner(ItbRestClient(client, Url("https://itb.example/api/rest"), "fixture"), bridge, device::execute,
-                                walletConnected = { !device.isClosed })
+                                walletConnected = device::isConnected)
                             val first = runner.run(suite, case)
                             assertEquals(session, first.session)
                             val next = suite.cases.first { it != case && it.prerequisite == null }
                             val second = runner.run(suite, next)
-                            if (disconnect) {
+                            if (outcome != PeerOutcome.WALLET_REJECTION) {
                                 assertEquals(ItbCaseResult.Outcome.NOT_RUN, second.outcome)
                                 assertEquals("device_connection_closed", second.errorCode)
                                 assertNull(second.session)
                                 assertEquals(1, bridge.prepared)
-                                assertEquals(1, stops)
+                                if (outcome == PeerOutcome.DISCONNECT_AFTER_REPLY) {
+                                    assertEquals(ItbCaseResult.Outcome.PASSED, first.outcome)
+                                    assertEquals(0, stops)
+                                } else assertEquals(1, stops)
                             } else {
                                 assertEquals("demo_wallet_rejected", second.errorCode)
                                 assertEquals(2, bridge.prepared)

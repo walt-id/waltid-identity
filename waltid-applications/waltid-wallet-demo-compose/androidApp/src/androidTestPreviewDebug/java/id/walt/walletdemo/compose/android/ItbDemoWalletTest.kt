@@ -5,9 +5,8 @@ import android.content.Intent
 import android.hardware.biometrics.BiometricManager
 import android.net.Uri
 import android.os.Bundle
-import android.view.View
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.TextView
+import androidx.activity.compose.setContent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -23,13 +22,17 @@ import id.walt.itb.ItbWalletInteraction
 import id.walt.itb.ItbWalletRejection
 import id.walt.itb.ItbWalletResult
 import id.walt.itb.checkStatusListReferences
-import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.identity.SigningIdentityState
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResourceAfterScrolling
+import id.walt.walletdemo.compose.logic.ClaimGroup
+import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
+import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
+import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewScreen
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewTestTags
 import io.github.oshai.kotlinlogging.DirectLoggerFactory
 import io.github.oshai.kotlinlogging.KotlinLoggingConfiguration
@@ -50,12 +53,14 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.regex.Pattern
 
 /** Opt-in instrumentation around the installed Preview app's real entry points, UI and store. */
@@ -65,28 +70,36 @@ class ItbDemoWalletTest {
     fun blockedPaymentWithoutSelectableCredentialsReportsTheWalletReason() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
+        val submitted = AtomicBoolean()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                activity.setContentView(TextView(activity).apply {
-                    text = "Payment instructions could not be retrieved."
-                    accessibilityDelegate = object : View.AccessibilityDelegate() {
-                        override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
-                            super.onInitializeAccessibilityNodeInfo(host, info)
-                            info.viewIdResourceName = "payment-consent-blocked"
-                        }
-                    }
-                })
-            }
-            val wallet = runBlocking { createAndroidDemoMobileWallet(context, demoWalletConfig()).wallet }
-            try {
-                val driver = DemoInteractions(context, UiDevice.getInstance(instrumentation), wallet, true, "itb.example")
-                val failure = assertThrows(ItbWalletRejection::class.java) {
-                    runBlocking { driver.present("fixture", ItbWalletInteraction.PaymentReview("Coffee", "EUR", "12.34"), false) }
+                // A single required credential is already selected. There is no alternative to choose.
+                val review = WalletDemoSharingReview(
+                    request = WalletDemoSharingRequest(requester = null, transactionData = listOf(
+                        ClaimGroup("payment", "Payment", emptyList(), transactionType = "urn:eudi:sca:payment:1"),
+                    )),
+                    credentialOptions = listOf(WalletDemoPresentationCredentialOption(
+                        queryId = "payment", credentialId = "fixture", label = "SCA-IBAN", issuer = null,
+                        format = "dc+sd-jwt", credentialDataJson = "{}", disclosures = emptyList(),
+                    )),
+                )
+                activity.setContent {
+                    WalletDemoSharingReviewScreen(
+                        review = review, title = "Confirm payment",
+                        preparePaymentConsent = { error("Payment instructions could not be retrieved.") },
+                        onSubmit = { submitted.set(true) }, onCancel = {},
+                    )
                 }
-                assertEquals("demo_payment_review_metadata_unavailable", failure.code)
-            } finally {
-                runBlocking { wallet.close() }
             }
+            val driver = DemoInteractions(
+                context, UiDevice.getInstance(instrumentation), { error("Payment review must not read the credential store") },
+                attended = true, itbHost = "itb.example",
+            )
+            val failure = assertThrows(ItbWalletRejection::class.java) {
+                runBlocking { driver.present("fixture", ItbWalletInteraction.PaymentReview("Coffee", "EUR", "12.34"), false) }
+            }
+            assertEquals("demo_payment_review_metadata_unavailable", failure.code)
+            assertFalse(submitted.get())
         }
     }
 
@@ -148,7 +161,7 @@ class ItbDemoWalletTest {
                         put("provider", if (attended) "android-demo-attended" else "android-demo-unattended")
                     })
                     instrumentation.sendStatus(2, Bundle().apply { putString("itb_state", "ready") })
-                    val driver = DemoInteractions(context, device, wallet, attended, origin.host)
+                    val driver = DemoInteractions(context, device, wallet::credentials, attended, origin.host)
                     try {
                         ItbDeviceWire.serve(socket, driver::execute)
                     } catch (ended: CancellationException) {
@@ -165,7 +178,7 @@ class ItbDemoWalletTest {
 private class DemoInteractions(
     private val context: Context,
     private val device: UiDevice,
-    private val wallet: MobileWallet,
+    private val readCredentials: suspend () -> List<MobileWalletCredential>,
     private val attended: Boolean,
     private val itbHost: String,
 ) {
@@ -314,7 +327,7 @@ private class DemoInteractions(
     }
 
     private suspend fun status(input: ItbWalletInteraction.CheckStatus): ItbWalletResult {
-        val credentials = wallet.credentials().associateBy { it.id }
+        val credentials = readCredentials().associateBy { it.id }
         checkStatusListReferences(input.credentialIds.map { id ->
             val credential = credentials[id] ?: throw ItbWalletRejection("demo_status_credential_missing")
             Json.parseToJsonElement(credential.credentialDataJson).jsonObject["status"]
@@ -533,13 +546,13 @@ private class DemoInteractions(
         WalletComposeE2EHelper.unlock(device)
     }
 
-    private suspend fun storedIds(): Set<String> = wallet.credentials().mapTo(mutableSetOf()) { it.id }
+    private suspend fun storedIds(): Set<String> = readCredentials().mapTo(mutableSetOf()) { it.id }
 
     private suspend fun newCredential(before: Set<String>): MobileWalletCredential = withTimeout(15_000) {
-        var added = wallet.credentials().filter { it.id !in before }
+        var added = readCredentials().filter { it.id !in before }
         while (added.isEmpty()) {
             delay(250)
-            added = wallet.credentials().filter { it.id !in before }
+            added = readCredentials().filter { it.id !in before }
         }
         added.singleOrNull() ?: throw ItbWalletRejection("demo_expected_one_new_credential")
     }

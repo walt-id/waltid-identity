@@ -2204,27 +2204,40 @@ object WalletPresentationHandler {
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
     ): ResolvedAuthorizationRequest {
+        val haipRedirect = requestUrl.protocol.name.equals("haip-vp", ignoreCase = true)
+        val requestPolicy = if (haipRedirect) {
+            require(!requestUrl.parameters["request_uri"].isNullOrBlank()) {
+                "haip-vp requires a signed Request Object by reference (request_uri)"
+            }
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED
+        } else unsignedRequestObjectPolicy
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
-        return AuthorizationRequestResolver.resolve(
+        val resolved = AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
-            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+            unsignedRequestObjectPolicy = requestPolicy,
             trustConfiguration = clientIdTrustConfiguration,
             expectedRequestObjectAudience = expectedRequestObjectAudience,
             fetchRequestUri = { requestUri, requestUriMethod ->
                 AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                     webResolveAuthReq = fetcher,
                     requestUri = requestUri,
-                    unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                    unsignedRequestObjectPolicy = requestPolicy,
                     requestUriMethod = requestUriMethod,
                     expectedRequestObjectAudience = expectedRequestObjectAudience,
                     requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
                         WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
                         clientIdTrustConfiguration,
-                        unsignedRequestObjectPolicy,
+                        requestPolicy,
                     ),
                 )
             },
         )
+        if (haipRedirect) {
+            require(resolved.authorizationRequest.responseMode == OpenID4VPResponseMode.DIRECT_POST_JWT) {
+                "haip-vp requires encrypted direct_post.jwt responses"
+            }
+        }
+        return resolved
     }
 
     /**

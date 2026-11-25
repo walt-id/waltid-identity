@@ -96,9 +96,10 @@ The runner starts one session at a time, never retries an uncertain start, and
 records each prepared session ID before starting its test steps. After the wallet
 and portal steps, it retries a transient status or report read up to twice
 within the case timeout. Cleanup stops
-only that owned session. If the Android wallet connection closes, the remaining
-cases are recorded as `NOT_RUN` with `device_connection_closed` before any more
-sessions are created. A stopped ITB session can
+only that owned session. Before preparing a case, the runner gives the Android
+bridge five seconds to acknowledge a ping. When the channel closes or the probe
+fails, the runner records the remaining cases as `NOT_RUN` with
+`device_connection_closed`. A stopped ITB session can
 have `UNDEFINED` rather than `FAILURE`; the separate wallet outcome is preserved.
 Reports contain identities, timestamps and error types/codes. A stalled test
 definition read appears as `test_definition`. A failed HTTP response for that
@@ -153,7 +154,8 @@ The **WeBuild ITB live wallet cases** workflow is explicitly dispatched by an
 operator because it uses a shared external tenant. Runs share one concurrency
 group so their tenant sessions do not overlap. The six payment cases require
 local operator-assisted execution. The offline profile checks run separately on
-relevant PRs.
+relevant PRs. The Compose Android device job also runs the Preview driver’s
+blocked-payment regression without ITB credentials.
 
 The portal bridge gives a started, owned session up to 45 seconds to display its
 wallet interaction and reports the portal's generic execution error separately.

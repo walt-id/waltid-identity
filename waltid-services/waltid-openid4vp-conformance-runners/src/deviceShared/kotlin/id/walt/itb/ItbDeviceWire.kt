@@ -16,7 +16,9 @@ import kotlin.coroutines.coroutineContext
 
 /** Test-only, bounded messages over loopback + adb forwarding. No private-key signing RPC. */
 internal object ItbDeviceWire {
-    const val VERSION = 2
+    const val VERSION = 3
+    val ping = buildJsonObject { put("ping", true) }
+    val pong = buildJsonObject { put("pong", true) }
     private const val MAX_BYTES = 1024 * 1024
 
     fun approvedOrigin(value: String): Url = Url(value).also {
@@ -152,6 +154,10 @@ internal object ItbDeviceWire {
         try {
             var expected = 1
             for (request in requests) {
+                if (request == ping) {
+                    write(socket, pong)
+                    continue
+                }
                 require(request["sequence"]?.jsonPrimitive?.intOrNull == expected++) { "Out-of-order wallet operation" }
                 require(expected <= 101) { "Device run exceeds its bounded operation count" }
                 val result = try {

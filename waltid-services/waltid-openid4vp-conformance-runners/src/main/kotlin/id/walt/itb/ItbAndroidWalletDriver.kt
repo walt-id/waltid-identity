@@ -15,8 +15,23 @@ internal class ItbAndroidWalletDriver private constructor(
     private val ioDispatcher: CoroutineDispatcher,
     private val operationTimeoutMillis: Long,
 ) : AutoCloseable by socket {
-    val isClosed: Boolean get() = socket.isClosed
     private var sequence = 0
+
+    /** Probe the peer while the channel is idle, before creating the next portal session. */
+    suspend fun isConnected(): Boolean {
+        if (socket.isClosed) return false
+        return try {
+            withSocketDeadline(socket, 5_000, ioDispatcher) {
+                ItbDeviceWire.write(socket, ItbDeviceWire.ping)
+                check(ItbDeviceWire.read(socket) == ItbDeviceWire.pong) { "Invalid device liveness response" }
+            }
+            true
+        } catch (error: Exception) {
+            close()
+            currentCoroutineContext().ensureActive()
+            false
+        }
+    }
 
     suspend fun execute(interaction: ItbWalletInteraction): ItbWalletResult {
         val result = try {

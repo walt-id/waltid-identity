@@ -134,7 +134,7 @@ private suspend fun runItb(): Int {
                                 val bridge = ItbPortalBridge(page, "${catalogue.testBed}/app#/organisation/conformance/$organisationId", catalogue.systemName)
                                 val runner = ItbCaseRunner(
                                     api, bridge, executeWallet, caseTimeoutMillis = caseTimeoutMillis,
-                                    walletConnected = { native?.isClosed != true },
+                                    walletConnected = { native?.isConnected() != false },
                                 )
                                 val completed = mutableMapOf<String, ItbCaseResult>()
                                 selected.forEachIndexed { index, (suite, case) ->

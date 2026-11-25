@@ -21,7 +21,9 @@ an unrelated offer or scheme fails the case and triggers owned-session cleanup.
 Passing requires both wallet success and that exact session's terminal ITB success.
 App runs use Android's registered intent filter and real wallet consent. The runner
 opens the original URI from the portal's `VP request` field. Camera scanning and browser
-invocation are independent of these URL-based cases.
+invocation are independent of these URL-based cases. For `haip-vp`, the demo
+wallet requires a signed Request Object fetched by reference and an encrypted
+`direct_post.jwt` response before offering consent.
 
 The deployed VP-011/012/013 descriptions explicitly limit their scope to the
 available protocol slice. They identify missing `verifier_info.registrar_dataset`
