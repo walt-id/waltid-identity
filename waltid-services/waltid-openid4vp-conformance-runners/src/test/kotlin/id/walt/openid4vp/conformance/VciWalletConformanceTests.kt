@@ -2,6 +2,9 @@
 
 package id.walt.openid4vp.conformance
 
+import id.walt.verifier2.data.Verification2Session
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.VCPolicyList
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyType
@@ -324,6 +327,11 @@ class VciWalletConformanceTests {
             contentType(ContentType.Application.Json)
             setBody<VerificationSessionSetup>(CrossDeviceFlowSetup(core = GeneralFlowConfig(
                 dcqlQuery = DcqlQuery(credentials = listOf(query)),
+                // The issuer module is FINISHED and its status endpoint is no longer live here.
+                // This post-issuance check tests persisted holder keys; local HTTP tests cover default status checks.
+                policies = Verification2Session.DefinedVerificationPolicies(
+                    vc_policies = VCPolicyList(listOf(CredentialSignaturePolicy())),
+                ),
             )))
         }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
             .body<VerificationSessionCreationResponse>()
