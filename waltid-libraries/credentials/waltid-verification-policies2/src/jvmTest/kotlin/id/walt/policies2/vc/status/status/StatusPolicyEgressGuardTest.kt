@@ -2,6 +2,11 @@ package id.walt.policies2.vc.status.status
 
 import id.walt.credentials.CredentialParser
 import id.walt.policies2.vc.policies.StatusPolicy
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetcherManager
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.AllowList
+import id.walt.webdatafetching.config.url.UrlConfiguration
 import id.walt.webdatafetching.ssrf.BlockedAddressException
 import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import kotlinx.coroutines.runBlocking
@@ -30,7 +35,10 @@ class StatusPolicyEgressGuardTest {
     fun stopServer() = server.stop()
 
     @AfterEach
-    fun resetGuard() = PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+    fun resetGuard() {
+        PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+        WebDataFetcherManager.appendConfiguration(WebDataFetcherId.STATUS_POLICY2.name, WebDataFetchingConfiguration())
+    }
 
     private fun validCase(): SingleStatusResourceData =
         server.credentials.getValue("statuslist2021").map { it.data }
@@ -69,5 +77,21 @@ class StatusPolicyEgressGuardTest {
     fun `refuses the cloud metadata address even when loopback is allowed`() = runTest {
         PrivateNetworkGuardSettings.allowLoopback = true
         assertBlocked(verify(validCase(), rewriteBaseUrlTo = "http://169.254.169.254"))
+    }
+
+    @Test
+    fun `honours the URL allow-list configured for the status fetcher`() = runTest {
+        PrivateNetworkGuardSettings.allowLoopback = true
+        WebDataFetcherManager.appendConfiguration(
+            WebDataFetcherId.STATUS_POLICY2.name,
+            WebDataFetchingConfiguration(url = UrlConfiguration(hosts = AllowList(blacklist = listOf("localhost")))),
+        )
+        val result = verify(validCase())
+        val error = result.exceptionOrNull()
+        assertTrue(result.isFailure, "status policy must fail when the allow-list refuses the status list host")
+        assertTrue(
+            generateSequence(error) { it.cause }.any { it.message.orEmpty().contains("Host is not allowed: localhost") },
+            "expected the allow-list to refuse the host, got: $error",
+        )
     }
 }

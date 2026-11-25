@@ -2,6 +2,11 @@ import com.sun.net.httpserver.HttpServer
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.jwk.JwkKeyProvider
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetcherManager
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.AllowList
+import id.walt.webdatafetching.config.url.UrlConfiguration
 import id.walt.webdatafetching.ssrf.BlockedAddressException
 import id.walt.webdatafetching.ssrf.PrivateNetworkGuardSettings
 import kotlinx.coroutines.test.runTest
@@ -42,6 +47,7 @@ class JwkKeyProviderEgressGuardTest {
     fun stop() {
         server.stop(0)
         PrivateNetworkGuardSettings.clearAllowLoopbackChoice()
+        WebDataFetcherManager.appendConfiguration(WebDataFetcherId.JWKS_KEY_PROVIDER.name, WebDataFetchingConfiguration())
     }
 
     private suspend fun assertBlocked(uri: String) {
@@ -71,5 +77,20 @@ class JwkKeyProviderEgressGuardTest {
     fun `refuses the cloud metadata address even when loopback is allowed`() = runTest {
         PrivateNetworkGuardSettings.allowLoopback = true
         assertBlocked("http://169.254.169.254/latest/meta-data/jwks")
+    }
+
+    @Test
+    fun `honours the URL allow-list configured for the JWKS fetcher`() = runTest {
+        PrivateNetworkGuardSettings.allowLoopback = true
+        WebDataFetcherManager.appendConfiguration(
+            WebDataFetcherId.JWKS_KEY_PROVIDER.name,
+            WebDataFetchingConfiguration(url = UrlConfiguration(hosts = AllowList(blacklist = listOf("127.0.0.1")))),
+        )
+        val error = runCatching { JwkKeyProvider(jwksUri).getKey(kid) }.exceptionOrNull()
+        assertTrue(
+            generateSequence(error) { it.cause }.any { it is IllegalArgumentException && it.message == "Host is not allowed: 127.0.0.1" },
+            "expected the allow-list to refuse the host, got: $error",
+        )
+        assertEquals(0, hits.get(), "a refused host must not be requested")
     }
 }

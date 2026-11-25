@@ -1,6 +1,7 @@
 package id.walt.webdatafetching
 
 import id.walt.webdatafetching.config.RequestConfiguration
+import id.walt.webdatafetching.config.url.installUrlAllowList
 import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
 import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -40,6 +41,10 @@ class WebDataFetcher private constructor(
         // request_uri, token/credential endpoints, ...). Guard unconditionally, not just when a `url`
         // allowlist happens to be configured for this fetcher id.
         installPrivateNetworkGuard()
+
+        // Apply the configured URL allow-list to every request, including ones made through httpClient directly.
+        // Installed after the guard, so this also checks each redirect hop the guard follows.
+        installUrlAllowList { WebDataFetcherManager.getConfigurationForId(id, defaultConfiguration).url }
 
         install(ContentNegotiation) {
             json()
