@@ -71,10 +71,12 @@ class CertificateChainValidator(
         return result.errorLog.takeIf { !result.valid }?.joinToString { it.message }
     }
 
-    fun freshAt(time: Instant): (RevocationStatus) -> Boolean = { status ->
+    /** Later evidence can establish historical status, but evidence stale before the control time cannot. */
+    fun freshAt(time: Instant, evidenceAvailableAt: Instant = time): (RevocationStatus) -> Boolean = { status ->
         when (status) {
-            is RevocationStatus.Good -> status.issuedAt <= time &&
-                (status.nextUpdate?.let { it >= time } ?: (status.issuedAt >= time - policy.revocationFreshness))
+            is RevocationStatus.Good -> status.issuedAt <= evidenceAvailableAt &&
+                status.issuedAt >= time - policy.revocationFreshness &&
+                (status.nextUpdate?.let { it >= time } ?: true)
             is RevocationStatus.Revoked -> true
             is RevocationStatus.Unknown -> false
         }
