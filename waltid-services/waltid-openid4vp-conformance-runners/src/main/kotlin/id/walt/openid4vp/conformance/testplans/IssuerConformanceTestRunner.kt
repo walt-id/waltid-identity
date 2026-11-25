@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
@@ -62,6 +63,9 @@ class IssuerConformanceTestRunner(
         get() = issuanceMode == IssuerIssuanceMode.DEFERRED || variantSelection.strictResults
 
     suspend fun run(): List<TestPlanResult> {
+        require(ConformanceExecutionMode.current != ConformanceExecutionMode.FULL_PLAN || !variantSelection.discoveryOnly) {
+            "Full-plan issuer runs require live execution"
+        }
         // Even failures before metadata is available must not leave an earlier run's passing reports.
         IssuerVariantReportWriter.prepareForRun(variantSelection.reportDir)
         val conformance = ConformanceInterface(conformanceHost, conformancePort)
@@ -100,7 +104,11 @@ class IssuerConformanceTestRunner(
         }
         val resolvedIds = resolveCredentialConfigurationIds(metadata)
         val allVariants = if (issuanceMode == IssuerIssuanceMode.DEFERRED) IssuerVariantMatrix.deferred() else IssuerVariantMatrix.all()
-        val selectedVariants = variantSelection.select(expandIssuerProofModes(allVariants, proofModes))
+        val selected = variantSelection.select(expandIssuerProofModes(allVariants, proofModes))
+        val selectedVariants = if (ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN) {
+            selected.filter { it.isHaip }.map { it.copy(fullPlan = true) }
+                .distinctBy { it.testPlanCreationVariant() to it.credentialProofType }
+        } else selected
         val protocolVariants = selectedVariants.map { it.copy(credentialProofType = null) }.distinct()
 
         require(selectedVariants.isNotEmpty()) {

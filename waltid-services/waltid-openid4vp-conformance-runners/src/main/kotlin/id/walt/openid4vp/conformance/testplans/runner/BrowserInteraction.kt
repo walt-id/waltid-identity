@@ -28,10 +28,8 @@ internal fun TestRunResult.pendingBrowserInteractions(): List<BrowserInteraction
         .ifEmpty { browser.urls.mapNotNull { it?.browserUrl() } }
 
 internal fun TestRunResult.browserInteractionSummary(): String =
-    "urlsWithMethod=${browser.urlsWithMethod.map { it.shortJson() }}, " +
-        "urls=${browser.urls.map { it.shortJson() }}, " +
-        "visitedUrlsWithMethod=${browser.visitedUrlsWithMethod.map { it.shortJson() }}, " +
-        "visited=${browser.visited.map { it.shortJson() }}"
+    "urlsWithMethod=${browser.urlsWithMethod.size}, urls=${browser.urls.size}, " +
+        "visitedUrlsWithMethod=${browser.visitedUrlsWithMethod.size}, visited=${browser.visited.size}"
 
 internal fun openBrowserInteraction(
     page: Page,
@@ -91,9 +89,6 @@ private fun JsonElement.browserUrl(): BrowserInteraction? = runCatching {
 
 private fun JsonObject.stringValue(name: String): String? =
     get(name)?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }?.takeIf { it.isNotBlank() }
-
-private fun JsonElement?.shortJson(): String =
-    this?.toString()?.let { if (it.length > 500) it.take(500) + "..." else it } ?: "null"
 
 private fun String.htmlEscape(): String = buildString {
     this@htmlEscape.forEach { char ->

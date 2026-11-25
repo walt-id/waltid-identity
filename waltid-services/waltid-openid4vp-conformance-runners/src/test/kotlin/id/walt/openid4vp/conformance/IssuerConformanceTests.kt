@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.testplans.IssuerConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.IssuerIssuanceMode
 import id.walt.openid4vp.conformance.testplans.parseKeyAttesterJwks
@@ -162,7 +163,9 @@ class IssuerConformanceTests {
 
     @Test
     fun runIssuerConformanceTests() {
-        if (IssuerIssuanceMode.fromEnvironment() == IssuerIssuanceMode.DEFERRED) {
+        if (ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN) {
+            require(!credentialIssuerUrl.isNullOrBlank()) { "Full-plan issuer conformance requires a credential issuer URL" }
+        } else if (IssuerIssuanceMode.fromEnvironment() == IssuerIssuanceMode.DEFERRED) {
             requireNotNull(credentialIssuerUrl) { "Deferred conformance requires an OSS credential issuer URL" }
         } else {
             assumeTrue(credentialIssuerUrl != null, "No credential issuer URL / enterprise issuer target configured")

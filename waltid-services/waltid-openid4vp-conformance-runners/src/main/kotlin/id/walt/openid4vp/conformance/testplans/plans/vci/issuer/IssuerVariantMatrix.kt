@@ -28,7 +28,15 @@ data class IssuerVariant(
     // Runner coverage dimension, not a conformance-suite variant parameter.
     val credentialProofType: String? = null,
     val issuanceMode: IssuerIssuanceMode = IssuerIssuanceMode.IMMEDIATE,
+    /** HAIP plan owns its module encryption variants; the legacy per-module slice is disabled. */
+    val fullPlan: Boolean = false,
 ) {
+    init {
+        require(!fullPlan || (fapiProfile == "vci_haip" && issuanceMode == IssuerIssuanceMode.IMMEDIATE)) {
+            "Full-plan issuer variants must use the immediate HAIP plan"
+        }
+    }
+
     val isHaip: Boolean
         get() = fapiProfile == "vci_haip"
 
@@ -49,7 +57,7 @@ data class IssuerVariant(
             senderConstrain.toIdPart(),
             authorizationRequestType.toIdPart(),
             requestMethod.toIdPart(),
-            credentialEncryption.toIdPart(),
+            if (fullPlan) "fullplan" else credentialEncryption.toIdPart(),
         ).joinToString("-") + (if (issuanceMode == IssuerIssuanceMode.DEFERRED) "-deferred" else "") + (credentialProofType?.let { "-proof-$it" } ?: "")
 
     val credentialOfferAuthMethod: CredentialOfferAuthMethod?
@@ -70,7 +78,7 @@ data class IssuerVariant(
             "authorization_request_type=$authorizationRequestType",
             "fapi_request_method=$requestMethod",
             "vci_grant_type=$grantType",
-            "vci_credential_encryption=$credentialEncryption",
+            if (fullPlan) "complete suite module variants" else "vci_credential_encryption=$credentialEncryption",
         ).joinToString(prefix = "OID4VCI 1.0 Issuer - ")
 
     val isDefinedByBaseIssuerPlan: Boolean
@@ -90,7 +98,7 @@ data class IssuerVariant(
         put("authorization_request_type", authorizationRequestType)
         put("fapi_request_method", requestMethod)
         put("vci_grant_type", grantType)
-        put("vci_credential_encryption", credentialEncryption)
+        if (fullPlan) put("execution_mode", "full-plan") else put("vci_credential_encryption", credentialEncryption)
         credentialProofType?.let { put("credential_proof_type", it) }
         if (issuanceMode == IssuerIssuanceMode.DEFERRED) put("issuance_mode", "deferred")
     }
@@ -315,6 +323,7 @@ data class IssuerVariantModuleRunResult(
     /** Safe for CI artifacts; excludes raw exception messages and request/response data. */
     val failureSummary: String? = null,
     val deferredEvidence: IssuerDeferredEvidence? = null,
+    val blockerReason: String? = null,
 )
 
 @Serializable
@@ -431,7 +440,11 @@ object IssuerVariantReportWriter {
         appendLine("- Failed: ${results.count { it.status != IssuerVariantRunStatus.PASSED }}")
         appendLine("- ${batchCoverageSummary(results)}")
         appendLine()
+        if (results.any { it.variant["execution_mode"]?.jsonPrimitive?.content == "full-plan" }) {
+            appendLine("Full-plan run: suite-inapplicable modules remain separate from executed passes. `not_offered_by_pinned_suite` is not batch coverage.")
+        } else {
         appendLine("`not_offered_by_pinned_suite` means encrypted HAIP batch is absent from db1080a's dedicated HAIP plan; it is not batch coverage. Deferred uses the generic VCI plan.")
+        }
         appendLine()
         appendLine("<details>")
         appendLine("<summary>${ConformanceReportWriter.Role.VCI_ISSUER.title} results</summary>")

@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.verifier
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
+
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
@@ -114,7 +116,8 @@ class Oid4vpVerifierVariantPlan(
         verificationSessionSetup = CrossDeviceFlowSetup(
             core = GeneralFlowConfig(
                 dcqlQuery = Json.decodeFromString(dcqlQuery),
-                policies = ConformanceVerifierPolicies.withoutMdocIssuerAuth(),
+                policies = if (ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN) ConformanceVerifierPolicies.fullPlan()
+                else ConformanceVerifierPolicies.withoutMdocIssuerAuth(),
 
                 signedRequest = variant.signedRequest,
                 encryptedResponse = variant.encryptedResponse,
@@ -196,9 +199,12 @@ class Oid4vpVerifierVariantPlan(
             put("oid4vp-1final-verifier-request-uri-method-post", ExpectedVerifierOutcome.ACCEPT_OR_SKIP)
 
             // Negative modules: the verifier must reject the presentation.
+            put("oid4vp-1final-verifier-present-revoked-credential", ExpectedVerifierOutcome.REJECT)
             if (variant.isMdoc) {
+                put("oid4vp-1final-verifier-present-credential-on-identifier-list", ExpectedVerifierOutcome.REJECT)
                 put("oid4vp-1final-verifier-invalid-session-transcript", ExpectedVerifierOutcome.REJECT)
             } else {
+                put("oid4vp-1final-verifier-wrong-vct", ExpectedVerifierOutcome.REJECT)
                 put("oid4vp-1final-verifier-invalid-kb-jwt-signature", ExpectedVerifierOutcome.REJECT)
                 put("oid4vp-1final-verifier-invalid-credential-signature", ExpectedVerifierOutcome.REJECT)
                 put("oid4vp-1final-verifier-invalid-sd-hash", ExpectedVerifierOutcome.REJECT)

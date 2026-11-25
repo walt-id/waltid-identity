@@ -1,5 +1,10 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import kotlinx.coroutines.delay
+
+import id.walt.openid4vp.conformance.report.FullPlanEvidence
+import id.walt.openid4vp.conformance.testplans.http.ConformanceEvidenceRequired
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.testplans.IssuerIssuanceMode
 import id.walt.openid4vp.conformance.testplans.IssuerDeferredEvidence
 import id.walt.openid4vp.conformance.testplans.readIssuerDeferredEvidence
@@ -38,6 +43,7 @@ class IssuerTestPlanRunner(
 ) {
     private val conformanceHost = conformance.conformanceHost
     private val conformancePort = conformance.conformancePort
+    private val executionMode = ConformanceExecutionMode.current
     private val moduleSelection = IssuerModuleSelection.fromEnvironment()
     private val browserAutomationConfig = IssuerBrowserAutomationConfig.fromEnvironment()
     private val browserAutomation = IssuerConformanceBrowserAutomation(
@@ -61,6 +67,9 @@ class IssuerTestPlanRunner(
     }
 
     suspend fun attempt(variant: IssuerVariant): IssuerVariantRunResult {
+        require(executionMode != ConformanceExecutionMode.FULL_PLAN || variant.fullPlan) {
+            "Full-plan execution requires an unsliced HAIP plan variant"
+        }
         println("-- Conformance OID4VCI Issuer Matrix Variant ${variant.id} -- -> Setup")
 
         val variantJson = variant.toJsonObject()
@@ -106,7 +115,7 @@ class IssuerTestPlanRunner(
         val selectedModules = variantModules.filter { moduleSelection.matches(it.testModule) }
         val excludedModules = selectedModules.mapNotNull { module ->
             (moduleSelection.exclusionReason(module.testModule)
-                ?: knownSuiteBugExclusionReason(variant, module.testModule))?.let { reason ->
+                ?: if (executionMode == ConformanceExecutionMode.CI) knownSuiteBugExclusionReason(variant, module.testModule) else null)?.let { reason ->
                 module.testModule to reason
             }
         }
@@ -141,7 +150,15 @@ class IssuerTestPlanRunner(
         modulesToRun.forEach { println("   - ${it.testModule}") }
 
         val moduleResults = modulesToRun.map { module ->
-            runModuleRetryingGateway(testPlanId, module.testModule, module.variant, variant.credentialProofType)
+            runModuleRetryingGateway(testPlanId, module.testModule, module.variant, variant.credentialProofType).also { result ->
+                FullPlanEvidence.record(testPlanId, createTestPlanResponse.modules.indexOf(module), module,
+                    when {
+                        result.testId == null || result.status == "BLOCKED" || result.blockerReason != null -> "blocked"
+                        result.status == "FINISHED" && result.result == "SKIPPED" -> "suite-inapplicable"
+                        else -> "executed"
+                    },
+                    result.testId, result.status, result.result, result.error)
+            }
         }
 
         return IssuerVariantRunResult(
@@ -204,6 +221,15 @@ class IssuerTestPlanRunner(
         moduleVariant: JsonObject,
         proofType: String?,
     ): IssuerVariantModuleRunResult {
+        if (executionMode == ConformanceExecutionMode.FULL_PLAN &&
+            testModule == "fapi2-security-profile-final-user-rejects-authentication") {
+            return IssuerVariantModuleRunResult(
+                testModule = testModule,
+                status = "BLOCKED",
+                error = "Manual user rejection is required; this harness automates login/acceptance only",
+                variant = moduleVariant,
+            )
+        }
         var testId: String? = null
         var stage = "Create test"
         val offerIds = mutableListOf<String>()
@@ -267,6 +293,7 @@ class IssuerTestPlanRunner(
                 accepted = false,
                 error = throwable.compactMessage(),
                 failureSummary = "$stage: ${throwable.safeConformanceFailure()}",
+                blockerReason = throwable.message.takeIf { throwable is ConformanceEvidenceRequired },
                 deferredEvidence = deferredEvidence,
                 variant = moduleVariant,
             )
@@ -277,6 +304,7 @@ class IssuerTestPlanRunner(
         if (status == "FINISHED" && result == "PASSED") {
             return true
         }
+        if (executionMode == ConformanceExecutionMode.FULL_PLAN) return status == "FINISHED" && result == "SKIPPED"
         if (issuanceMode == IssuerIssuanceMode.DEFERRED) return false
         if (status == "FINISHED" && result == "SKIPPED") {
             return true
@@ -288,7 +316,7 @@ class IssuerTestPlanRunner(
     }
 
     private fun moduleAppliesToVariant(variant: IssuerVariant, moduleVariant: JsonObject): Boolean {
-        if (!variant.isHaip) {
+        if (!variant.isHaip || variant.fullPlan) {
             return true
         }
 
@@ -311,10 +339,17 @@ class IssuerTestPlanRunner(
 
     private fun overallStatus(moduleResults: List<IssuerVariantModuleRunResult>): IssuerVariantRunStatus {
         if (moduleResults.all { it.accepted }) {
-            return IssuerVariantRunStatus.PASSED
+            return if (executionMode == ConformanceExecutionMode.FULL_PLAN &&
+                moduleResults.none { it.status == "FINISHED" && it.result == "PASSED" }) {
+                IssuerVariantRunStatus.BLOCKED
+            } else IssuerVariantRunStatus.PASSED
+        }
+        if (executionMode == ConformanceExecutionMode.FULL_PLAN &&
+            moduleResults.any { it.status == "FINISHED" && it.result == "FAILED" }) {
+            return IssuerVariantRunStatus.FAILED
         }
 
-        return if (moduleResults.any { it.error?.isBlockedError() == true || it.status == "WAITING" }) {
+        return if (moduleResults.any { it.error?.isBlockedError() == true || it.status in setOf("WAITING", "BLOCKED") }) {
             IssuerVariantRunStatus.BLOCKED
         } else {
             IssuerVariantRunStatus.FAILED
@@ -335,6 +370,10 @@ class IssuerTestPlanRunner(
     }
 
     private fun classifyPlanCreationFailure(throwable: Throwable): IssuerVariantRunStatus {
+        if (executionMode == ConformanceExecutionMode.FULL_PLAN &&
+            generateSequence(throwable) { it.cause }.any { it is java.io.IOException }) {
+            return IssuerVariantRunStatus.BLOCKED
+        }
         val message = throwable.compactMessage().lowercase()
         return when {
             "no test modules" in message || "not applicable" in message -> IssuerVariantRunStatus.NOT_APPLICABLE
@@ -412,6 +451,7 @@ class IssuerTestPlanRunner(
         credentialOfferProvider: (suspend () -> String)? = null,
     ) {
         var counter = 0
+        var completionDeadline = System.currentTimeMillis() + 60_000L
         val attemptedBrowserUrls = mutableSetOf<String>()
         val credentialOfferDelivery = IssuerCredentialOfferDelivery()
         while (true) {
@@ -429,6 +469,7 @@ class IssuerTestPlanRunner(
                 attemptBrowserAutomation(testId, attemptedBrowserUrls, shouldLog = counter == 1 || counter % 10 == 0)
             ) {
                 counter = 0
+                completionDeadline = System.currentTimeMillis() + 60_000L
             }
 
             if (
@@ -442,9 +483,15 @@ class IssuerTestPlanRunner(
                 )
             ) {
                 counter = 0
+                completionDeadline = System.currentTimeMillis() + 60_000L
             }
 
-            if (counter > 60) {
+            if (counter == 1 || counter % 10 == 0 || System.currentTimeMillis() > completionDeadline) {
+                IssuerSuiteWait.completionDeadline(conformance.getTestLog(testId))?.let {
+                    completionDeadline = maxOf(completionDeadline, it)
+                }
+            }
+            if (System.currentTimeMillis() > completionDeadline) {
                 if (testRunInfo.status == "WAITING") {
                     throw IllegalStateException(
                         "Test $testId is stuck in WAITING status after ${counter - 1} seconds. " +
@@ -518,6 +565,7 @@ class IssuerTestPlanRunner(
     ): Boolean {
         val testRun = runCatching { conformance.getTestRun(testId) }
             .getOrElse {
+                if (it is CancellationException) throw it
                 if (shouldLog) {
                     println("Browser automation is enabled, but test run details are not available yet: ${it.compactMessage()}")
                 }
@@ -537,6 +585,9 @@ class IssuerTestPlanRunner(
 
         val interaction = interactions
             .firstOrNull { it.url !in attemptedBrowserUrls }
+            ?: interactions.lastOrNull().takeIf {
+                conformance.getTestLog(testId).any { entry -> entry.isPendingUpload && entry.src == "ExpectInvalidRequestUriErrorPage" }
+            }
             ?: run {
                 if (shouldLog) {
                     println(
@@ -550,15 +601,45 @@ class IssuerTestPlanRunner(
         attemptedBrowserUrls += interaction.url
         println("Browser automation enabled; completing conformance browser interaction for test $testId")
 
+        if (testRun.name == "fapi2-security-profile-final-par-ensure-reused-request-uri-prior-to-auth-completion-succeeds") {
+            browserAutomation.visitLoginWithoutAuthenticating(interaction)
+            conformance.markBrowserUrlVisited(testId, interaction.url)
+            // This module exposes the same URL twice. Do not treat the second visit as a
+            // duplicate or authenticate before the suite has entered its second-visit phase.
+            val deadline = System.currentTimeMillis() + browserAutomationConfig.timeoutSeconds * 1_000
+            while (conformance.getTestLog(testId).none { it.msg == "Make second request to authorization endpoint" }) {
+                check(System.currentTimeMillis() < deadline) { "Suite did not request the second PAR visit" }
+                delay(250)
+            }
+            conformance.markBrowserUrlVisited(testId, interaction.url)
+            completeBrowserInteraction(testId, interaction)
+            return true
+        }
+
         runCatching {
             conformance.markBrowserUrlVisited(testId, interaction.url)
         }.onFailure {
+            if (it is CancellationException) throw it
             println("Warning: could not mark conformance browser URL as visited: ${it.compactMessage()}")
         }
 
-        browserAutomation.complete(interaction)
+        completeBrowserInteraction(testId, interaction)
 
         return true
+    }
+
+    private suspend fun completeBrowserInteraction(testId: String, interaction: BrowserInteraction) {
+        try {
+            browserAutomation.complete(interaction)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            if (executionMode == ConformanceExecutionMode.FULL_PLAN &&
+                conformance.getTestLog(testId).any { it.isPendingUpload }) {
+                val observed = conformance.getTestRunInfo(testId)
+                throw ConformanceEvidenceRequired(testId, observed.status, observed.result, error.compactMessage())
+            }
+            throw error
+        }
     }
 
     private data class CredentialOfferDelivery(

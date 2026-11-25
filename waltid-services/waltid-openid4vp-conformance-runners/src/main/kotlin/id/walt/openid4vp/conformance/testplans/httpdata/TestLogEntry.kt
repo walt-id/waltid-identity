@@ -39,6 +39,8 @@ data class TestLogEntry(
      */
     @SerialName("response_status_code")
     val responseStatusCode: JsonElement? = null,
+    /** Suite event timestamp in milliseconds; retained as JSON for forward-compatible decoding. */
+    val time: JsonElement? = null,
 ) {
     /** An image placeholder that is still waiting to be filled. */
     val isPendingUpload: Boolean get() = upload != null && img == null

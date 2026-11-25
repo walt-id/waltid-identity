@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.report
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -12,7 +13,12 @@ import java.nio.file.Path
  * `build/reports/openid-conformance/<role>/`.
  */
 object ConformanceReportWriter {
-    const val DEFAULT_REPORT_ROOT = "build/reports/openid-conformance"
+    val DEFAULT_REPORT_ROOT: String
+        get() = if (ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN) {
+            "build/reports/openid-conformance-full-plan"
+        } else {
+            "build/reports/openid-conformance"
+        }
 
     private val json = Json { prettyPrint = true }
 
@@ -35,6 +41,10 @@ object ConformanceReportWriter {
         val accepted: Boolean = false,
         /** Which runner produced this entry; see [write]. */
         val producer: String? = null,
+        val executionMode: String? = null,
+        /** Product outcome, independent of the suite's screenshot/review state. */
+        val verifierStatus: String? = null,
+        val walletStatus: String? = null,
     )
 
     fun reportDir(role: Role, reportRoot: String = DEFAULT_REPORT_ROOT): Path =
@@ -46,7 +56,11 @@ object ConformanceReportWriter {
         reportRoot: String = DEFAULT_REPORT_ROOT,
         mergeExisting: Boolean = true,
         producer: String? = null,
+        mode: ConformanceExecutionMode = ConformanceExecutionMode.current,
     ) {
+        require(mode != ConformanceExecutionMode.FULL_PLAN || !mergeExisting || !producer.isNullOrBlank()) {
+            "Merged full-plan evidence requires a producer that owns the complete incoming result set"
+        }
         val dir = reportDir(role, reportRoot)
         Files.createDirectories(dir)
 
@@ -55,7 +69,12 @@ object ConformanceReportWriter {
             val existing = if (Files.exists(existingFile)) {
                 runCatching {
                     json.decodeFromString(ListSerializer(Entry.serializer()), Files.readString(existingFile))
-                }.getOrDefault(emptyList())
+                }.getOrElse { failure ->
+                    if (mode == ConformanceExecutionMode.FULL_PLAN) {
+                        throw IllegalStateException("Cannot merge malformed full-plan evidence: $existingFile", failure)
+                    }
+                    emptyList()
+                }
             } else {
                 emptyList()
             }
@@ -64,10 +83,16 @@ object ConformanceReportWriter {
             // entries", so re-running it drops results it no longer produces - otherwise a renamed or
             // removed test lingers forever and is counted as a permanent failure.
             val retained = existing.filterNot { producer != null && it.producer == producer }
-            val byName = LinkedHashMap<String, Entry>()
-            retained.forEach { byName[it.name] = it }
-            entries.forEach { byName[it.name] = it.copy(producer = producer) }
-            byName.values.toList()
+            if (mode == ConformanceExecutionMode.FULL_PLAN) {
+                // A suite plan can offer the same module under multiple variants. The producer
+                // replaces its previous complete run, while every case of this run stays visible.
+                retained + entries.map { it.copy(producer = producer) }
+            } else {
+                val byName = LinkedHashMap<String, Entry>()
+                retained.forEach { byName[it.name] = it }
+                entries.forEach { byName[it.name] = it.copy(producer = producer) }
+                byName.values.toList()
+            }
         } else {
             entries.map { it.copy(producer = producer) }
         }
@@ -107,7 +132,8 @@ object ConformanceReportWriter {
                 producer = "suite-availability",
             )
         }
-        check(!System.getenv("CONFORMANCE_REQUIRED").equals("true", ignoreCase = true)) {
+        check(ConformanceExecutionMode.current != ConformanceExecutionMode.FULL_PLAN &&
+            !System.getenv("CONFORMANCE_REQUIRED").equals("true", ignoreCase = true)) {
             "Required ${role.title} conformance suite is unavailable"
         }
     }
@@ -121,11 +147,18 @@ object ConformanceReportWriter {
         expectRejection: Boolean = false,
         producer: String? = null,
     ) {
+        val mode = ConformanceExecutionMode.current
         val entries = results.map { result ->
-            val accepted = result.isAccepted(expectRejection)
+            val accepted = result.isAccepted(expectRejection, mode)
             Entry(
                 name = result.testName.takeIf { it != "unknown" } ?: result.conformanceTestId,
                 status = when {
+                    result.blockerReason != null -> "blocked"
+                    mode == ConformanceExecutionMode.FULL_PLAN && result.skipReason != null ->
+                        if (accepted) "not-applicable" else "blocked"
+                    mode == ConformanceExecutionMode.FULL_PLAN && result.conformanceResult in setOf("BLOCKED", "SKIPPED") -> "blocked"
+                    mode == ConformanceExecutionMode.FULL_PLAN && result.conformanceResult == "REVIEW" -> "review"
+                    mode == ConformanceExecutionMode.FULL_PLAN && result.conformanceResult == "WARNING" -> "warning"
                     result.skipReason != null -> "skipped"
                     accepted -> "passed"
                     result.conformanceResult == "TIMEOUT" || result.walletStatus == "TIMEOUT" -> "timeout"
@@ -136,14 +169,22 @@ object ConformanceReportWriter {
                 suiteStatus = result.conformanceStatus ?: result.walletStatus ?: result.verifierStatus?.name,
                 testId = result.conformanceTestId.takeIf { it != "N/A" },
                 logUrl = logUrl(conformanceHost, conformancePort, result.conformanceTestId),
-                error = result.skipReason ?: result.message.takeIf { !accepted },
+                error = result.blockerReason ?: result.skipReason ?: result.message.takeIf { !accepted },
                 accepted = accepted,
+                executionMode = mode.value.takeIf { mode == ConformanceExecutionMode.FULL_PLAN },
+                verifierStatus = result.verifierStatus?.name,
+                walletStatus = result.walletStatus,
             )
         }
-        write(role, entries, reportRoot, producer = producer)
+        val reported = if (mode == ConformanceExecutionMode.FULL_PLAN && entries.isEmpty()) {
+            listOf(Entry("conformance-plan", "unavailable", error = "Suite returned no module results", executionMode = mode.value))
+        } else entries
+        write(role, reported, reportRoot, producer = producer)
     }
 
     fun failIfNeeded(role: Role, entries: List<Entry>) {
+        check(ConformanceExecutionMode.current != ConformanceExecutionMode.FULL_PLAN ||
+            entries.any { it.status == "passed" && it.accepted }) { "Full-plan run contains no executed passes" }
         val failed = entries.count { !it.accepted }
         if (failed > 0) {
             error(
@@ -157,8 +198,13 @@ object ConformanceReportWriter {
         role: Role,
         results: List<TestPlanResult>,
         expectRejection: Boolean = false,
+        mode: ConformanceExecutionMode = ConformanceExecutionMode.current,
     ) {
-        val failed = results.count { !it.isAccepted(expectRejection) }
+        check(mode != ConformanceExecutionMode.FULL_PLAN ||
+            results.any { it.skipReason == null && it.isAccepted(expectRejection, mode) }) {
+            "Full-plan run contains no executed passes"
+        }
+        val failed = results.count { !it.isAccepted(expectRejection, mode) }
         if (failed > 0) {
             error(
                 "$failed ${role.title} conformance test(s) failed. " +
@@ -170,9 +216,9 @@ object ConformanceReportWriter {
     private fun buildSummary(role: Role, entries: List<Entry>): String = buildString {
         appendLine("# ${role.title} Conformance Summary")
         appendLine()
-        val skipped = entries.count { it.status == "skipped" }
+        val skipped = entries.count { it.status in setOf("skipped", "not-applicable") }
         appendLine("- Total: ${entries.size}")
-        appendLine("- Passed: ${entries.count { it.accepted && it.status != "skipped" }}")
+        appendLine("- Passed: ${entries.count { it.accepted && it.status == "passed" }}")
         appendLine("- Failed: ${entries.count { !it.accepted }}")
         if (skipped > 0) appendLine("- Skipped (not applicable to this variant): $skipped")
         appendLine()
@@ -203,7 +249,19 @@ object ConformanceReportWriter {
     private fun String.sanitizeMarkdownCell(): String = replace("\n", " ").replace("|", "\\|")
 }
 
-fun TestPlanResult.isAccepted(expectRejection: Boolean = false): Boolean {
+fun TestPlanResult.isAccepted(
+    expectRejection: Boolean = false,
+    mode: ConformanceExecutionMode = ConformanceExecutionMode.current,
+): Boolean {
+    if (blockerReason != null) return false
+    if (mode == ConformanceExecutionMode.FULL_PLAN) {
+        if (skipReason != null) return skipReason.startsWith("Not applicable to this variant:") ||
+            (conformanceTestId.isNotBlank() && conformanceTestId != "N/A" &&
+                conformanceStatus == "FINISHED" && conformanceResult == "SKIPPED")
+        return conformanceTestId.isNotBlank() && conformanceTestId != "N/A" &&
+            errorMessage == null && conformanceStatus == "FINISHED" && conformanceResult == "PASSED" &&
+            isAccepted(expectRejection, ConformanceExecutionMode.CI)
+    }
     // A module that was never run cannot have failed; see TestPlanResult.skipReason.
     if (skipReason != null) return true
     if (expectRejection) {

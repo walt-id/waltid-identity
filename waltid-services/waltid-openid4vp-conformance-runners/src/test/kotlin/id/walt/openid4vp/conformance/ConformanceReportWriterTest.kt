@@ -1,8 +1,13 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
+import id.walt.openid4vp.conformance.report.FullPlanEvidence
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.report.ConformanceReportFormat
 import id.walt.openid4vp.conformance.report.isAccepted
+import id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import java.nio.file.Files
 import kotlin.test.Test
@@ -12,6 +17,145 @@ import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
 
 class ConformanceReportWriterTest {
+
+    @Test
+    fun screenshotBlockRetainsObservedVerifierAndWalletOutcomesWithoutPassing() {
+        val root = Files.createTempDirectory("observed-evidence-block").toString()
+        val role = ConformanceReportWriter.Role.VP_VERIFIER
+        ConformanceReportWriter.writeTestPlanResults(role, listOf(
+            TestPlanResult(testName = "accepted-but-no-screenshot", conformanceTestId = "actual-test",
+                conformanceStatus = "WAITING",
+                verifierStatus = id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.SUCCESSFUL,
+                blockerReason = "Real screenshot required"),
+            TestPlanResult(testName = "rejected-but-no-screenshot", conformanceTestId = "wallet-test",
+                conformanceStatus = "WAITING", walletStatus = "REJECTED",
+                blockerReason = "Real screenshot required"),
+        ), reportRoot = root)
+        val text = Files.readString(ConformanceReportWriter.reportDir(role, root).resolve("results.json"))
+        val rows = kotlinx.serialization.json.Json.decodeFromString<List<ConformanceReportWriter.Entry>>(text)
+        assertEquals(listOf("blocked", "blocked"), rows.map { it.status })
+        assertEquals("SUCCESSFUL", rows[0].verifierStatus)
+        assertEquals("REJECTED", rows[1].walletStatus)
+        assertTrue(rows.none { it.accepted })
+    }
+
+    @Test
+    fun legitimateSuiteSkipsRemainVisibleButCannotQualifyAnAllSkippedRun() {
+        val skip = TestPlanResult(conformanceTestId = "actual-test", conformanceStatus = "FINISHED",
+            conformanceResult = "SKIPPED", skipReason = "Suite skipped this module")
+        assertTrue(skip.isAccepted(mode = ConformanceExecutionMode.FULL_PLAN))
+        assertFalse(skip.copy(conformanceStatus = "WAITING").isAccepted(mode = ConformanceExecutionMode.FULL_PLAN))
+        assertFailsWith<IllegalStateException> {
+            ConformanceReportWriter.failIfNeededFromTestPlanResults(ConformanceReportWriter.Role.VCI_WALLET,
+                listOf(skip), mode = ConformanceExecutionMode.FULL_PLAN)
+        }
+        ConformanceReportWriter.failIfNeededFromTestPlanResults(ConformanceReportWriter.Role.VCI_WALLET,
+            listOf(skip, TestPlanResult(conformanceTestId = "executed-test", conformanceStatus = "FINISHED",
+                conformanceResult = "PASSED")), mode = ConformanceExecutionMode.FULL_PLAN)
+    }
+
+
+    @Test
+    fun fullPlanPreservesRepeatedModuleVariantsButReplacesThePreviousProducerRun() {
+        val root = Files.createTempDirectory("full-plan-variants").toString()
+        val role = ConformanceReportWriter.Role.VCI_WALLET
+        val repeated = listOf(
+            ConformanceReportWriter.Entry("issuance", "passed", testId = "immediate", accepted = true),
+            ConformanceReportWriter.Entry("issuance", "blocked", testId = "deferred", accepted = false),
+        )
+        ConformanceReportWriter.write(role, repeated, root, producer = "wallet", mode = ConformanceExecutionMode.FULL_PLAN)
+        val results = Files.readString(ConformanceReportWriter.reportDir(role, root).resolve("results.json"))
+        assertTrue(results.contains("immediate"))
+        assertTrue(results.contains("deferred"))
+        val summary = Files.readString(ConformanceReportWriter.reportDir(role, root).resolve("summary.md"))
+        assertTrue(summary.contains("- Total: 2"))
+        assertTrue(summary.contains("- Failed: 1"))
+        ConformanceReportWriter.write(role, listOf(repeated.first()), root, producer = "wallet", mode = ConformanceExecutionMode.FULL_PLAN)
+        assertFalse(Files.readString(ConformanceReportWriter.reportDir(role, root).resolve("results.json")).contains("deferred"))
+    }
+
+
+    @Test
+    fun fullPlanRefusesToDiscardMalformedPriorEvidence() {
+        val root = Files.createTempDirectory("malformed-full-plan")
+        val dir = ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VP_WALLET, root.toString())
+        Files.createDirectories(dir)
+        Files.writeString(dir.resolve("results.json"), "interrupted write")
+        assertFailsWith<IllegalStateException> {
+            ConformanceReportWriter.write(ConformanceReportWriter.Role.VP_WALLET, emptyList(), root.toString(),
+                producer = "wallet", mode = ConformanceExecutionMode.FULL_PLAN)
+        }
+        assertEquals("interrupted write", Files.readString(dir.resolve("results.json")))
+    }
+
+
+    @Test
+    fun suiteInapplicabilityIsNotCountedAsAnExecutedPass() {
+        val root = Files.createTempDirectory("full-plan-summary").toString()
+        ConformanceReportWriter.write(ConformanceReportWriter.Role.VP_WALLET, listOf(
+            ConformanceReportWriter.Entry("executed", "passed", accepted = true),
+            ConformanceReportWriter.Entry("excluded-by-suite", "not-applicable", accepted = true),
+        ), root, mergeExisting = false)
+        val summary = Files.readString(ConformanceReportWriter.reportDir(ConformanceReportWriter.Role.VP_WALLET, root).resolve("summary.md"))
+        assertTrue(summary.contains("- Passed: 1"))
+        assertTrue(summary.contains("- Skipped (not applicable to this variant): 1"))
+    }
+
+
+    @Test
+    fun fullPlanInventoryRetainsUnfinishedModulesAndExcludesConfigurationSecrets() {
+        val root = Files.createTempDirectory("full-plan-inventory")
+        val server = buildJsonObject { put("version", "5.3.4"); put("revision", "23353b3") }
+        val modules = listOf("first-module", "second-module").map { CreateTestPlanResponse.Module(it) }
+        val plan = CreateTestPlanResponse("plan-id", "haip-plan", modules)
+        FullPlanEvidence.write(server, plan, null, buildJsonObject { put("private_key", "never-export-this") }, root.toString())
+        val inventory = Files.readString(root.resolve("plans/plan-id.json"))
+        assertTrue(inventory.contains("full-plan"))
+        assertTrue(inventory.contains(FullPlanEvidence.SUITE_REVISION))
+        assertTrue(inventory.contains("second-module"))
+        assertFalse(inventory.contains("never-export-this"))
+        FullPlanEvidence.record(plan.id, 0, modules[0], "executed", "test-id", "FINISHED", "FAILED",
+            mode = ConformanceExecutionMode.FULL_PLAN, reportRoot = root.toString())
+        assertTrue(Files.readString(root.resolve("coverage/plan-id/0.json")).contains("FAILED"))
+        assertTrue(Files.readString(root.resolve("coverage/plan-id/1.json")).contains("No execution result recorded"))
+        assertFailsWith<IllegalStateException> {
+            FullPlanEvidence.write(server, plan.copy(id = "empty-plan", modules = emptyList()), null,
+                buildJsonObject {}, root.toString())
+        }
+        assertTrue(Files.exists(root.resolve("plans/empty-plan.json")))
+    }
+
+
+    @Test
+    fun fullPlanAcceptanceRequiresAnExecutedSuitePass() {
+        val pass = TestPlanResult(conformanceTestId = "test-id", conformanceStatus = "FINISHED",
+            conformanceResult = "PASSED", walletStatus = "PASSED")
+        assertTrue(pass.isAccepted(mode = ConformanceExecutionMode.FULL_PLAN))
+        for (result in listOf(
+            pass.copy(conformanceResult = "WARNING"), pass.copy(conformanceResult = "REVIEW"),
+            pass.copy(conformanceResult = "FAILED"), pass.copy(conformanceStatus = "WAITING"),
+            pass.copy(conformanceStatus = null), pass.copy(errorMessage = "adapter failed"),
+            pass.copy(conformanceTestId = "N/A"), pass.copy(conformanceTestId = ""), pass.copy(conformanceTestId = " "),
+            pass.copy(blockerReason = "Real result screen required"),
+            pass.copy(walletStatus = "ERROR"), pass.copy(skipReason = "FAPI client entry point missing"),
+            pass.copy(skipReason = "Suite skipped this module"),
+        )) assertFalse(result.isAccepted(mode = ConformanceExecutionMode.FULL_PLAN), result.toString())
+        assertTrue(pass.copy(conformanceResult = "REVIEW").isAccepted(mode = ConformanceExecutionMode.CI))
+        assertTrue(pass.copy(skipReason = "Not applicable to this variant: no request_method value applies")
+            .isAccepted(mode = ConformanceExecutionMode.FULL_PLAN))
+    }
+
+    @Test
+    fun fullPlanRequiresThePinnedRunningSuiteRatherThanOnlyAVersionLabel() {
+        FullPlanEvidence.requirePinnedSuite(buildJsonObject { put("version", "5.3.4"); put("revision", "23353b3") })
+        for ((version, revision) in listOf("5.2.4" to "23353b3", "5.3.4" to "db1080a", "5.3.4" to "2")) {
+            assertFailsWith<IllegalArgumentException> {
+                FullPlanEvidence.requirePinnedSuite(buildJsonObject { put("version", version); put("revision", revision) })
+            }
+        }
+        assertFailsWith<IllegalArgumentException> { FullPlanEvidence.requirePinnedSuite(buildJsonObject { put("version", "5.3.4") }) }
+    }
+
 
     @Test
     fun writesSummaryAndResultsForRole() {

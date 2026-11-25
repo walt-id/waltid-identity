@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import id.walt.openid4vp.conformance.testplans.http.ConformanceEvidenceRequired
+import id.walt.openid4vp.conformance.report.FullPlanEvidence
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.SuiteReachedTerminalBeforeReady
@@ -95,6 +97,7 @@ class WalletTestPlanRunner(
                 } else {
                     runModuleRetryingTransport(testPlanId, module)
                 }
+                FullPlanEvidence.record(testPlanId, index, module, result)
                 results.add(result)
 
                 println("   Result: ${result.walletStatus}")
@@ -232,6 +235,7 @@ class WalletTestPlanRunner(
         // name instead produced report rows whose log link pointed at a test that does not exist,
         // making exactly the failures that need investigating the ones that could not be investigated.
         var testId: String? = null
+        var observedWalletStatus: String? = null
 
         try {
             // Create test instance for this module (same API as verifier tests)
@@ -257,6 +261,8 @@ class WalletTestPlanRunner(
 
             val walletResponse = conformanceHttp.get(requestUrl)
             println("   Wallet (via adapter) responded: ${walletResponse.status}")
+            observedWalletStatus = if (walletResponse.status.value in 400..499) "REJECTED"
+                else "HTTP_${walletResponse.status.value}"
             conformance.markBrowserUrlVisited(testId, requestUrl)
 
             // OpenID4VP 1.0 8.2: a redirect_uri returned in the direct_post response must be opened
@@ -291,6 +297,7 @@ class WalletTestPlanRunner(
             return TestPlanResult(
                 testName = "${testPlan.producerId}/$moduleId",
                 conformanceTestId = testId,
+                conformanceStatus = testInfo.status,
                 conformanceResult = conformanceResult,
                 walletStatus = walletStatus,
                 errorMessage = null
@@ -324,8 +331,10 @@ class WalletTestPlanRunner(
             return TestPlanResult(
                 testName = "${testPlan.producerId}/$moduleId",
                 conformanceTestId = id ?: moduleId,
-                conformanceResult = "ERROR",
-                walletStatus = "ERROR",
+                conformanceStatus = (e as? ConformanceEvidenceRequired)?.suiteStatus,
+                conformanceResult = if (e is ConformanceEvidenceRequired) e.suiteResult else "ERROR",
+                walletStatus = if (e is ConformanceEvidenceRequired) observedWalletStatus ?: "BLOCKED" else "ERROR",
+                blockerReason = (e as? ConformanceEvidenceRequired)?.message,
                 errorMessage = if (ConformanceTransportRetry.isConnectionReset(e)) {
                     "Connection reset"
                 } else {

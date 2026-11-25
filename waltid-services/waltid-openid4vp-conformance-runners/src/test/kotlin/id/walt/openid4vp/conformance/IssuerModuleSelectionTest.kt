@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.openid4vp.conformance.testplans.IssuerIssuanceMode
 import id.walt.openid4vp.conformance.testplans.runner.IssuerModuleSelection
 import id.walt.openid4vp.conformance.testplans.requireExecutedBatchIssuance
 import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerVariantModuleRunResult
@@ -19,6 +20,26 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class IssuerModuleSelectionTest {
+
+    @Test
+    fun fullHaipPlanOwnsEncryptionVariantsWithoutMislabelingTheReportAsAPlainSlice() {
+        val variants = IssuerVariantMatrix.all().filter { it.isHaip }
+        val fullPlans = variants.map { it.copy(fullPlan = true) }
+            .distinctBy { it.testPlanCreationVariant() to it.credentialProofType }
+        assertEquals(4, fullPlans.size)
+        fullPlans.forEach { plan ->
+            assertEquals("full-plan", plan.toJsonObject()["execution_mode"]?.toString()?.trim('"'))
+            assertTrue("vci_credential_encryption" !in plan.toJsonObject())
+            assertTrue("vci_credential_encryption" !in plan.testPlanCreationVariant())
+            assertTrue(plan.id.contains("fullplan"))
+        }
+        assertTrue(variants.all { "vci_credential_encryption" in it.toJsonObject() })
+        assertFailsWith<IllegalArgumentException> { variants.first().copy(fapiProfile = "vci", fullPlan = true) }
+        assertFailsWith<IllegalArgumentException> {
+            variants.first().copy(issuanceMode = IssuerIssuanceMode.DEFERRED, fullPlan = true)
+        }
+    }
+
 
     @Test
     fun addingKeyAttestationPreservesTheExistingSelectionAndExclusions() {

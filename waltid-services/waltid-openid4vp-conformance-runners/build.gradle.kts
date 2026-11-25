@@ -81,6 +81,7 @@ dependencies {
     implementation(identityLibs.kotlintest)
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.ktor.client.mock)
+    testImplementation(identityLibs.bouncycastle.pkix)
     implementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
@@ -309,6 +310,16 @@ registerWalletProfileTestTask(
     descriptionText = "Run the HAIP full-target VCI wallet conformance profile."
 )
 
+registerWalletProfileTestTask(
+    taskName = "vciWalletSdJwtHaipFapiHappyPath",
+    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtHaipFapiHappyPath",
+    descriptionText = "Run the live HAIP SDK FAPI happy path before the complete wallet plan."
+)
+
+tasks.named<Test>("vciWalletSdJwtHaipFapiHappyPath") {
+    environment("CONFORMANCE_FAPI_DRIVER_CHECK", "true")
+}
+
 // ITB profile checks are intentionally separate from the ordinary regression suite:
 // unresolved external product dependencies must remain failing assertions, not expected failures.
 val itbTestSourceSet = sourceSets.create("itbTest") {
@@ -363,3 +374,55 @@ extra["demoKeyAttestationFixture"] = fixture
 apply(from = fixture.file("sources.gradle.kts"))
 val demoKeyAttestationSources = extra["demoKeyAttestationSources"]
 kotlin.sourceSets.named("main") { kotlin.srcDirs(demoKeyAttestationSources) }
+
+// Local gap runs have separate task outputs so one role cannot overwrite another role's JUnit evidence.
+fun registerHaipFullPlanTask(taskName: String, testFilter: String, role: String) {
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        description = "Run the complete OSS HAIP $role plans against the pinned local suite."
+        testClassesDirs = tasks.test.get().testClassesDirs
+        classpath = tasks.test.get().classpath
+        useJUnitPlatform()
+        filter { includeTestsMatching(testFilter) }
+        environment("CONFORMANCE_EXECUTION_MODE", "full-plan")
+        environment("CONFORMANCE_REQUIRED", "true")
+        val roleDirectory = when (role) {
+            "verifier" -> "vp-verifier"
+            "VP wallet" -> "vp-wallet"
+            "issuer" -> "vci-issuer"
+            "VCI wallet" -> "vci-wallet"
+            else -> error("Unknown full-plan role: $role")
+        }
+        val roleReport = layout.buildDirectory.dir("reports/openid-conformance-full-plan/$roleDirectory")
+        doFirst {
+            val stale = roleReport.get().asFile
+            check(!stale.exists() || stale.deleteRecursively()) { "Could not clear stale full-plan role report" }
+        }
+        onlyIf("full-plan runs require live conformance") {
+            check(!skipLiveConformance) { "Full-plan tasks cannot use skipLiveConformance=true" }
+            true
+        }
+        reports.junitXml.includeSystemOutLog.set(false)
+        reports.junitXml.includeSystemErrLog.set(false)
+        outputs.upToDateWhen { false }
+    }
+}
+
+registerHaipFullPlanTask("haipFullPlanVerifierTest", "id.walt.openid4vp.conformance.ConformanceTests", "verifier")
+registerHaipFullPlanTask("haipFullPlanVpWalletTest", "id.walt.openid4vp.conformance.VpWalletConformanceTests", "VP wallet")
+registerHaipFullPlanTask("haipFullPlanIssuerTest", "id.walt.openid4vp.conformance.IssuerConformanceTests", "issuer")
+registerHaipFullPlanTask(
+    "haipFullPlanVciWalletTest",
+    "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
+    "VCI wallet",
+)
+
+tasks.register<JavaExec>("prepareHaipFullPlanIssuerFixture") {
+    group = "verification"
+    description = "Generate opt-in strict HAIP issuer test configuration with a fresh signer and CRL."
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("id.walt.openid4vp.conformance.fixtures.HaipIssuerFixture")
+    val output = layout.buildDirectory.dir("conformance/haip-issuer-fixture")
+    val baseUrl = providers.gradleProperty("haipIssuerBaseUrl").orElse("https://localhost.emobix.co.uk:9443")
+    args(output.get().asFile.absolutePath, baseUrl.get())
+}

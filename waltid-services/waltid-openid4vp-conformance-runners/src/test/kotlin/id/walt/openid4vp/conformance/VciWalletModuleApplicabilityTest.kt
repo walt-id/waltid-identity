@@ -1,43 +1,39 @@
 package id.walt.openid4vp.conformance
 
 import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletModuleApplicability
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlin.test.Test
-import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class VciWalletModuleApplicabilityTest {
+    private val fapi = "fapi2-security-profile-final-client-test-happy-path"
 
     @Test
-    fun skipsFapi2ClientModules() {
-        assertEquals(
-            VciWalletModuleApplicability.FAPI2_SKIP_REASON,
-            VciWalletModuleApplicability.skipReason(
-                "fapi2-security-profile-final-client-test-happy-path",
-                buildJsonObject { put("vci_credential_issuance_mode", "immediate") },
-            ),
-        )
+    fun suiteAcceptanceCannotHideAStorageFailureOrAnAcceptedInvalidCallback() {
+        assertNotNull(VciWalletModuleApplicability.walletOutcomeFailure(fapi, "REJECTED"))
+        assertNull(VciWalletModuleApplicability.walletOutcomeFailure(fapi, "STORED"))
+        val invalidState = "fapi2-security-profile-final-client-test-ensure-authorization-response-with-invalid-state-fails"
+        assertNull(VciWalletModuleApplicability.walletOutcomeFailure(invalidState, "REJECTED"))
+        assertNotNull(VciWalletModuleApplicability.walletOutcomeFailure(invalidState, "STORED"))
+        // The pinned suite declares missing expires_in a positive interoperability case.
+        assertNull(VciWalletModuleApplicability.walletOutcomeFailure(
+            "fapi2-security-profile-final-client-test-token-endpoint-response-without-expires_in", "STORED"))
     }
 
     @Test
-    fun skipsDeferredIssuanceVariants() {
-        assertEquals(
-            VciWalletModuleApplicability.DEFERRED_SKIP_REASON,
-            VciWalletModuleApplicability.skipReason(
-                "oid4vci-1_0-wallet-test-credential-issuance",
-                buildJsonObject { put("vci_credential_issuance_mode", "deferred") },
-            ),
-        )
+    fun defaultCiDoesNotExpandIntoTheNewFapiDriver() {
+        assertNotNull(VciWalletModuleApplicability.skipReason(fapi, fullPlan = false))
     }
 
     @Test
-    fun runsImmediateIssuanceModules() {
-        assertNull(
-            VciWalletModuleApplicability.skipReason(
-                "oid4vci-1_0-wallet-test-client-attestation-challenge",
-                buildJsonObject { put("vci_credential_issuance_mode", "immediate") },
-            ),
-        )
+    fun fullPlanAndExplicitDriverChecksExecuteFapi() {
+        assertNull(VciWalletModuleApplicability.skipReason(fapi, fullPlan = true))
+        assertNull(VciWalletModuleApplicability.skipReason(fapi, fullPlan = false, explicitlySelected = true))
+    }
+
+    @Test
+    fun issuanceIncludingDeferredVariantsHasNoCapabilitySkip() {
+        assertNull(VciWalletModuleApplicability.skipReason("oid4vci-1_0-wallet-test-credential-issuance", fullPlan = true))
+        assertNull(VciWalletModuleApplicability.skipReason("oid4vci-1_0-wallet-test-credential-issuance", fullPlan = false))
     }
 }

@@ -5,6 +5,7 @@ import id.walt.openid4vp.conformance.config.ConformanceSuiteAlias
 import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * A point of the OpenID4VP 1.0 wallet conformance matrix.
@@ -21,6 +22,7 @@ class Oid4vpWalletVariantPlan(
     override val walletApiUrl: String,
     conformanceHost: String,
     conformancePort: Int,
+    credentialTrustAnchorPem: String = TestKeyMaterial.CREDENTIAL_ISSUER_CA_PEM,
 ) : WalletTestPlan {
 
     val name: String = walletVariant.id
@@ -90,8 +92,8 @@ class Oid4vpWalletVariantPlan(
                 "authorization_endpoint": "$walletApiUrl"
             },
             "credential": {
-                "trust_anchor_pem": ${TestKeyMaterial.CREDENTIAL_ISSUER_CA_PEM_JSON},
-                "status_list_trust_anchor_pem": ${TestKeyMaterial.CREDENTIAL_ISSUER_CA_PEM_JSON}
+                "trust_anchor_pem": ${JsonPrimitive(credentialTrustAnchorPem)},
+                "status_list_trust_anchor_pem": ${JsonPrimitive(credentialTrustAnchorPem)}
             },
             "client": {
                 $clientIdConfigEntry
@@ -114,8 +116,9 @@ class Oid4vpWalletVariantPlan(
             walletApiUrl: String,
             conformanceHost: String = ConformanceConfig.CONFORMANCE_HOST,
             conformancePort: Int = ConformanceConfig.CONFORMANCE_PORT,
+            credentialTrustAnchorPem: String = TestKeyMaterial.CREDENTIAL_ISSUER_CA_PEM,
         ): List<Oid4vpWalletVariantPlan> = WalletVariantMatrix.all().map { variant ->
-            Oid4vpWalletVariantPlan(variant, walletApiUrl, conformanceHost, conformancePort)
+            Oid4vpWalletVariantPlan(variant, walletApiUrl, conformanceHost, conformancePort, credentialTrustAnchorPem)
         }
     }
 }

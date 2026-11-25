@@ -2,6 +2,12 @@
 
 package id.walt.openid4vp.conformance
 
+import id.walt.wallet2.handlers.WalletIssuanceSessionService
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
+
+import id.walt.wallet2.OSSWallet2Service
+
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyType
@@ -113,6 +119,10 @@ class VciWalletConformanceTests {
         val isConformanceAvailable = conformanceAvailable.isSuccess
 
         @JvmStatic
+        val isFapiDriverCheckEnabled = isConformanceAvailable &&
+            System.getenv("CONFORMANCE_FAPI_DRIVER_CHECK") == "true"
+
+        @JvmStatic
         @AfterAll
         fun writeSkippedSummaryIfSuiteUnavailable() {
             if (isConformanceAvailable) return
@@ -215,6 +225,17 @@ class VciWalletConformanceTests {
             useScope = useScope,
             batchHolderKeyIds = batchHolderKeyIds,
             testKeyId = clientKeyId,
+            issuanceSessions = { walletIdentifier ->
+                val config = ConfigManager.getConfig<OSSWallet2ServiceConfig>().attestationConfig
+                WalletIssuanceSessionService(
+                    requireNotNull(OSSWallet2Service.resolver.resolveWallet(walletIdentifier)),
+                    attestationAssembler = config?.let {
+                        ClientAttestationAssembler(GenericHttpWalletAttestationProvider(
+                            attesterUrl = it.attesterUrl, requestBodyTemplate = it.requestBody))
+                    },
+                    httpClient = httpClient,
+                )
+            },
         ).also { it.start(httpClient) }
     }
 
@@ -429,25 +450,46 @@ class VciWalletConformanceTests {
      */
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun vciWalletSdJwtVcAuthorizationCodeHaipFullTarget() = withInProcessWallet { walletId ->
+    fun vciWalletSdJwtVcAuthorizationCodeHaipFullTarget() = runHaipWallet()
+
+    /** Fast live gate for the SDK/PAR/token/credential driver before running the full matrix. */
+    @Test
+    @EnabledIf("isFapiDriverCheckEnabled")
+    fun vciWalletSdJwtHaipFapiHappyPath() = runHaipWallet(
+        requiredModules = setOf("fapi2-security-profile-final-client-test-happy-path"))
+
+    private fun runHaipWallet(requiredModules: Set<String> = emptySet()) = withInProcessWallet { walletId ->
         // Minted per run: the suite is told the trust anchor, and the adapter signs with the matching
         // leaf, so nothing about the attester has to be committed or kept in sync by hand.
         val attestationAuthority = ClientAttestationTestAuthority.create(
             clientId = ConformanceConfig.VCI_WALLET_CLIENT_ID,
         )
-        runPlan(
-            VciWalletSdJwtHaip(
-                walletApiUrl = walletApiUrl,
-                credentialOfferEndpoint = "http://127.0.0.1:$adapterPort/credential-offer",
-                redirectUri = "http://127.0.0.1:$adapterPort/callback",
-                conformanceHost = conformanceHost,
-                conformancePort = conformancePort,
-                adapterHost = adapterHostIp,
-                attestationAuthority = attestationAuthority,
-            ),
-            walletId,
-            attestationAuthority,
-        )
+        createHttpClient().use { client ->
+            val clientKeyId = client.get("$walletApiUrl/wallet/$walletId/keys")
+                .body<List<WalletKeyInfo>>().single().keyId
+            val holders = List(2) {
+                client.post("$walletApiUrl/wallet/$walletId/keys/generate") {
+                    contentType(ContentType.Application.Json)
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
+                }.also { assertEquals(HttpStatusCode.Created, it.status) }.body<WalletKeyInfo>().keyId
+            }
+            runPlan(
+                VciWalletSdJwtHaip(
+                    walletApiUrl = walletApiUrl,
+                    credentialOfferEndpoint = "http://127.0.0.1:$adapterPort/credential-offer",
+                    redirectUri = "http://127.0.0.1:$adapterPort/callback",
+                    conformanceHost = conformanceHost,
+                    conformancePort = conformancePort,
+                    adapterHost = adapterHostIp,
+                    attestationAuthority = attestationAuthority,
+                ),
+                walletId,
+                attestationAuthority,
+                batchHolderKeyIds = holders,
+                clientKeyId = clientKeyId,
+                requiredModules = requiredModules,
+            )
+        }
     }
 
     /**

@@ -59,6 +59,28 @@ internal class IssuerConformanceBrowserAutomation(
     private val conformanceHost: String,
     private val conformancePort: Int,
 ) {
+    /** First PAR visit: reach the login page without entering credentials or accepting consent. */
+    fun visitLoginWithoutAuthenticating(interaction: BrowserInteraction) {
+        val browser = ConformanceBrowser.open()
+        try {
+            val timeout = Duration.ofSeconds(config.timeoutSeconds).toMillis().toDouble()
+            browser.page.setDefaultTimeout(timeout)
+            browser.page.setDefaultNavigationTimeout(timeout)
+            openBrowserInteraction(browser.page, interaction, WaitUntilState.DOMCONTENTLOADED)
+            check(browser.firstVisible("#username, input[name='username'], #password, input[name='password']") != null) {
+                "Initial PAR visit did not reach an unauthenticated login page"
+            }
+        } catch (error: Exception) {
+            // Playwright call logs may contain OAuth values; retain only the safe navigation URL.
+            throw IllegalStateException(
+                "Initial PAR login visit failed (${error::class.simpleName}) at " +
+                    browserDiagnosticUrl(browser.page.url()),
+            )
+        } finally {
+            browser.close()
+        }
+    }
+
     fun complete(interaction: BrowserInteraction) {
         val browser = ConformanceBrowser.open()
         val navigationEvents = ArrayDeque<String>()
@@ -81,9 +103,11 @@ internal class IssuerConformanceBrowserAutomation(
                     recordNavigation("FAILED ${request.method()} ${browserDiagnosticUrl(request.url())}: $code")
                 }
             }
+            var lastMainFrameResponse: Pair<String, Int>? = null
             page.onResponse { response ->
                 val request = response.request()
                 if (request.isNavigationRequest && request.frame() == page.mainFrame()) {
+                    lastMainFrameResponse = response.url() to response.status()
                     recordNavigation("HTTP ${response.status()} ${browserDiagnosticUrl(response.url())}")
                 }
             }
@@ -113,6 +137,10 @@ internal class IssuerConformanceBrowserAutomation(
                 if (now >= nextProgressLogAt) {
                     println("Browser automation current URL: ${browserDiagnosticUrl(currentUrl)}")
                     nextProgressLogAt = now + 5_000
+                }
+
+                lastMainFrameResponse?.takeIf { (url, status) -> url == currentUrl && status >= 400 }?.let { (_, status) ->
+                    error("Browser navigation rejected with HTTP $status at ${browserDiagnosticUrl(currentUrl)}")
                 }
 
                 if (currentUrl.startsWith("chrome-error://") || currentUrl.startsWith("about:neterror")) {
@@ -226,8 +254,11 @@ internal fun browserDiagnosticUrl(url: String): String = runCatching {
     when (uri.scheme?.lowercase()) {
         "http", "https" -> {
             require(uri.host != null)
-            URI(uri.scheme, null, uri.host, uri.port, uri.path, null, null).toASCIIString() +
-                if (uri.rawQuery != null || uri.rawFragment != null) " [parameters redacted]" else ""
+            val hasEncodedRequest = "/external_login/" in uri.path
+            val path = if (hasEncodedRequest) uri.path.substringBefore("/external_login/") +
+                "/external_login/redacted-request" else uri.path
+            URI(uri.scheme, null, uri.host, uri.port, path, null, null).toASCIIString() +
+                if (hasEncodedRequest || uri.rawQuery != null || uri.rawFragment != null) " [parameters redacted]" else ""
         }
         "chrome-error" -> "chrome-error://chromewebdata/"
         "about" -> "about:${uri.schemeSpecificPart.substringBefore('?').substringBefore('#')}"

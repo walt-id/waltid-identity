@@ -5,6 +5,9 @@ import com.sun.net.httpserver.HttpExchange
 import com.microsoft.playwright.TimeoutError
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
 import id.walt.openid4vp.conformance.testplans.httpdata.TestLogEntry
+import id.walt.openid4vp.conformance.testplans.httpdata.TestRunResult
+import id.walt.openid4vp.conformance.testplans.runner.browserInteractionSummary
+import kotlin.time.Instant
 import id.walt.openid4vp.conformance.testplans.runner.IssuerCredentialOfferDelivery
 import id.walt.openid4vp.conformance.testplans.runner.BrowserInteraction
 import id.walt.openid4vp.conformance.testplans.runner.IssuerBrowserAutomationConfig
@@ -33,11 +36,84 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IssuerCredentialOfferDeliveryTest {
+
+    @Test
+    fun browserInteractionSummaryDoesNotExposeAuthorizationParameters() {
+        val run = TestRunResult(
+            id = "test", name = "test", created = Instant.fromEpochMilliseconds(0), updated = Instant.fromEpochMilliseconds(0),
+            owner = TestRunResult.Owner("issuer", "subject"), exposed = JsonObject(emptyMap()),
+            browser = TestRunResult.Browser(showQrCode = false,
+                urls = listOf(JsonPrimitive("https://issuer.example/authorize?request_uri=private-value"))),
+        )
+        assertEquals("urlsWithMethod=0, urls=1, visitedUrlsWithMethod=0, visited=0", run.browserInteractionSummary())
+        assertFalse(run.browserInteractionSummary().contains("private-value"))
+    }
+
+    @Test
+    fun browserReportsHttpRejectionInsteadOfWaitingForLoginTimeout() {
+        withBrowserStub { server, _ ->
+            server.createContext("/authorize") { exchange ->
+                exchange.use { it.sendResponseHeaders(400, -1) }
+            }
+            server.start()
+            val automation = IssuerConformanceBrowserAutomation(
+                IssuerBrowserAutomationConfig(true, "runner-user", "runner-password", 10),
+                "127.0.0.1", server.address.port,
+            )
+            val error = assertFailsWith<IllegalStateException> {
+                automation.complete(BrowserInteraction(
+                    "http://localhost:${server.address.port}/authorize?request_uri=private-value", "GET"))
+            }
+            assertTrue(error.message.orEmpty().contains("HTTP 400"))
+            assertFalse(error.message.orEmpty().contains("Timeout"))
+            assertFalse(error.message.orEmpty().contains("private-value"))
+        }
+    }
+
+    @Test
+    fun initialParVisitDoesNotSubmitLoginBeforeTheSecondVisit() {
+        withBrowserStub { server, _ ->
+            val visits = AtomicInteger()
+            val authenticatedAtVisit = AtomicInteger()
+            server.createContext("/authorize") { exchange ->
+                visits.incrementAndGet()
+                exchange.respondHtml("""
+                    <html><body><form method="post" action="/login">
+                    <input id="username" name="username"><input id="password" name="password" type="password">
+                    <input id="kc-login" type="submit" value="Sign in">
+                    </form></body></html>
+                """.trimIndent())
+            }
+            server.createContext("/login") { exchange ->
+                authenticatedAtVisit.set(visits.get())
+                exchange.use {
+                    it.requestBody.readBytes()
+                    it.responseHeaders.add("Location", "http://127.0.0.1:${server.address.port}/callback")
+                    it.sendResponseHeaders(302, -1)
+                }
+            }
+            server.createContext("/callback") { it.respondHtml("<div id='submission_complete'>Done</div>") }
+            server.start()
+            val automation = IssuerConformanceBrowserAutomation(
+                IssuerBrowserAutomationConfig(true, "runner-user", "runner-password", 10),
+                "127.0.0.1", server.address.port,
+            )
+            val interaction = BrowserInteraction("http://localhost:${server.address.port}/authorize", "GET")
+            automation.visitLoginWithoutAuthenticating(interaction)
+            assertEquals(0, authenticatedAtVisit.get(), "First visit must leave login untouched")
+            automation.complete(interaction)
+            assertEquals(2, authenticatedAtVisit.get(), "Login belongs to the second visit")
+        }
+    }
     @Test
     fun browserDiagnosticsRemoveOAuthParametersAndUserInfo() {
         assertEquals(
             "https://issuer.example:9443/callback [parameters redacted]",
             browserDiagnosticUrl("https://user:password@issuer.example:9443/callback?code=secret&state=private#token"),
+        )
+        assertEquals(
+            "https://issuer.example/openid4vci/external_login/redacted-request [parameters redacted]",
+            browserDiagnosticUrl("https://issuer.example/openid4vci/external_login/encoded-authorization-state"),
         )
         assertEquals("<non-HTTP URL>", browserDiagnosticUrl("data:text/html,secret"))
         assertEquals("<unavailable URL>", browserDiagnosticUrl("not a URL?secret"))

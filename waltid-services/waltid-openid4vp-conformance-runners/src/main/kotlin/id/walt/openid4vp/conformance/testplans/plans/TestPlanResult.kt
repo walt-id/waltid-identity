@@ -36,9 +36,11 @@ data class TestPlanResult(
      * (suite result `PASSED` and, if observed, a successful verification session).
      */
     val expected: ExpectedModuleOutcome? = null,
+    /** Harness prerequisite that prevented completion; never a fabricated suite verdict. */
+    val blockerReason: String? = null,
 ) {
     val passed: Boolean
-        get() = errorMessage == null && expected?.let {
+        get() = blockerReason == null && (errorMessage == null && expected?.let {
             it.acceptsConformanceResult(conformanceResult) && it.acceptsVerifierStatus(verifierStatus)
         } ?: if (walletStatus != null) {
             // Wallet runners map TLS-only WARNING and screenshot REVIEW to walletStatus PASSED,
@@ -49,10 +51,10 @@ data class TestPlanResult(
         } else {
             conformanceResult == "PASSED" &&
                 (verifierStatus == null || verifierStatus == Verification2Session.VerificationSessionStatus.SUCCESSFUL)
-        }
+        })
 
     val message: String?
-        get() = errorMessage ?: when {
+        get() = blockerReason ?: errorMessage ?: when {
             passed -> null
             expected == null && conformanceResult != "PASSED" -> "Conformance: $conformanceResult"
             expected != null && !expected.acceptsConformanceResult(conformanceResult) ->

@@ -2,6 +2,7 @@
 
 package id.walt.openid4vp.conformance.testplans
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
@@ -38,7 +39,9 @@ class ConformanceTestRunner(
 
     /** Every point of the OpenID4VP 1.0 verifier matrix. */
     private val testPlans: List<Oid4vpVerifierVariantPlan> =
-        VerifierVariantMatrix.all().map {
+        VerifierVariantMatrix.all().filter {
+            ConformanceExecutionMode.current == ConformanceExecutionMode.CI || it.isHaip
+        }.map {
             Oid4vpVerifierVariantPlan(it, verifier2UrlPrefix, conformanceHost, conformancePort)
         }
 

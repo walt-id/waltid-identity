@@ -4,6 +4,10 @@ import com.nimbusds.jose.jwk.ECKey
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.ConfigRenderOptions
+import id.walt.openid4vp.conformance.fixtures.HaipIssuerFixture
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import kotlin.test.Test
@@ -13,6 +17,46 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class IssuerCiConfigurationTest {
+    @Test
+    fun optInHaipFixtureHasStrictSettingsAndValidMdocDataWithoutChangingBasicProfiles() {
+        val generated = HaipIssuerFixture("https://issuer.example:9443")
+        assertTrue(generated.service.getBoolean("enforcePushedAuthorizationRequests"))
+        assertTrue(generated.service.getBoolean("requirePkce"))
+        assertEquals("https://issuer.example:9443", generated.service.getString("baseUrl"))
+        val original = fixture("issuer2-profiles-ci.conf").getConfig("profiles")
+        val profiles = generated.profiles.getConfig("profiles")
+        val factory = CertificateFactory.getInstance("X.509")
+        val root = factory.generateCertificate(generated.pki.trustAnchorPem.byteInputStream()) as X509Certificate
+        profiles.root().keys.forEach { name ->
+            val profile = profiles.getConfig(name)
+            if (!profile.getString("credentialConfigurationId").contains("haip")) {
+                assertEquals(original.getConfig(name).root(), profile.root(), name)
+                return@forEach
+            }
+            val key = ECKey.parse(profile.getConfig("issuerKey.jwk").root().render(ConfigRenderOptions.concise()))
+            val leaf = factory.generateCertificate(profile.getStringList("x5Chain").single().byteInputStream()) as X509Certificate
+            leaf.verify(root.publicKey)
+            leaf.checkValidity()
+            assertContentEquals(key.toECPublicKey().encoded, leaf.publicKey.encoded, name)
+            if (!profile.hasPath("credentialData.\"org.iso.18013.5.1\"")) {
+                assertEquals(null, leaf.extendedKeyUsage, "SD-JWT signer must not be restricted to mDL signing")
+                return@forEach
+            }
+            val data = profile.getConfig("credentialData.\"org.iso.18013.5.1\"")
+            assertEquals("AT", data.getString("nationality"))
+            assertTrue(data.root().keys.none { it.startsWith("biometric_template_") })
+            val birthDate = LocalDate.parse(data.getString("birth_date"))
+            val today = LocalDate.now(ZoneOffset.UTC)
+            val age = data.getInt("age_in_years")
+            assertTrue(birthDate.plusYears(age.toLong()) <= today)
+            assertTrue(birthDate.plusYears(age.toLong() + 1) > today)
+            assertTrue(Instant.parse(profile.getString("msoData.validUntil")) < leaf.notAfter.toInstant())
+            assertEquals(0L, Instant.parse(profile.getString("msoData.validUntil")).epochSecond % 43_200,
+                "Batch expiry claims must use a coarse time bucket")
+            assertEquals(setOf("2.5.29.15", "2.5.29.37"), leaf.criticalExtensionOIDs)
+        }
+    }
+
     private fun fixture(name: String): Config = ConfigFactory.parseURL(
         requireNotNull(javaClass.getResource("/issuer2/$name"))
     ).resolve()
