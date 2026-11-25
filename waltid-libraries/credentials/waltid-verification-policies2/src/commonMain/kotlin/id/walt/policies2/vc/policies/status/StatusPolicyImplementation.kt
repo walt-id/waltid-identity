@@ -197,6 +197,10 @@ object StatusPolicyImplementation {
         val ietf = ietfEntryExtractor.extract(credential)
         val w3c = w3cEntryExtractor.extract(credential)
         ietf?.let {
+            val mechanisms = (it as? JsonObject)?.keys.orEmpty()
+            require(mechanisms == setOf("status_list")) {
+                "Unsupported credential status mechanisms: ${mechanisms - "status_list"}"
+            }
             processIETF(it, IETFStatusPolicyAttribute(args.value, args.values), credential, signerAuthorizer).getOrThrow()
         }
         w3c?.let { status ->
@@ -207,10 +211,13 @@ object StatusPolicyImplementation {
                 val type = when (parsed.type) {
                     Values.BITSTRING_STATUS_LIST_ENTRY -> Values.BITSTRING_STATUS_LIST
                     Values.STATUS_LIST_2021_ENTRY -> Values.STATUS_LIST_2021
-                    Values.REVOCATION_LIST_2020_ENTRY -> Values.REVOCATION_LIST_2020
                     else -> error("Unsupported credential status type: ${parsed.type}")
                 }
-                require(parsed.purpose in setOf("revocation", "suspension", "message")) {
+                val purposes = when (type) {
+                    Values.BITSTRING_STATUS_LIST -> setOf("revocation", "suspension", "refresh", "message")
+                    else -> setOf("revocation", "suspension")
+                }
+                require(parsed.purpose in purposes) {
                     "Unsupported credential status purpose: ${parsed.purpose}"
                 }
                 w3cStatusValidator.validate(parsed,
