@@ -37,11 +37,11 @@ class ValidationDataCollector(
             if (!visited.add(cert)) continue
             val chain = resolver.buildChains(cert).firstOrNull() ?: resolver.bestEffortChain(cert)
             chain.forEach { c ->
-                val isRoot = c.isSelfIssued || resolver.isTrustAnchor(c)
+                val isRoot = resolver.isTrustAnchor(c) || c.isIssuedBy(c)
                 if (!isRoot || includeRoot) required.add(c)
                 pool.add(c)
             }
-            if (!resolver.isTrustAnchor(chain.last())) missing += "issuer of ${chain.last().subject} not found"
+            if (!resolver.isTrustAnchor(chain.last()) && !chain.last().isIssuedBy(chain.last())) missing += "issuer of ${chain.last().subject} not found"
 
             for (i in 0 until chain.size - 1) {
                 val c = chain[i]
