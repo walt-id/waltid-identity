@@ -7,6 +7,8 @@ import id.walt.openid4vci.attestation.AttestationStatusResolver
 
 import id.walt.credentials.keyresolver.Crypto2JwtKeyResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
+import id.walt.trust.decision.TrustDecisionEvaluator
+import id.walt.trust.model.TrustedEntityType
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -35,6 +37,7 @@ sealed class ClientAttestationVerificationMethod {
          * A deployment that wraps the verifier, such as Enterprise Issuer2, may require
          * a linked trust registry to trust the leaf and use this name as an extra filter.
          */
+        @Deprecated("Use the x509-trust-registry verification method, which enforces entity types itself")
         val expectedEntityType: String? = null,
     ) : ClientAttestationVerificationMethod() {
         init {
@@ -42,6 +45,26 @@ sealed class ClientAttestationVerificationMethod {
                 "x509-chain verification requires at least one trusted root certificate"
             }
             expectedEntityType?.let { require(it.isNotBlank()) { "expectedEntityType must not be blank" } }
+        }
+    }
+
+    /**
+     * Trusts the attestation signer when a trust registry lists its x5c chain for one of
+     * [expectedEntityTypes], from an accepted source that is fresh. The deployment supplies the
+     * registry as a `TrustDecisionEvaluator`; see [X509TrustRegistryClientAttestationVerifier].
+     *
+     * @property requireAuthenticatedSource also require the trust list's signature to be authenticated.
+     */
+    @Serializable
+    @SerialName("x509-trust-registry")
+    data class X509TrustRegistry(
+        val expectedEntityTypes: Set<TrustedEntityType>,
+        val requireAuthenticatedSource: Boolean = false,
+    ) : ClientAttestationVerificationMethod() {
+        init {
+            require(expectedEntityTypes.isNotEmpty()) {
+                "x509-trust-registry verification requires at least one expected entity type"
+            }
         }
     }
 
@@ -60,6 +83,8 @@ suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
     keyReferenceResolver: ClientAttestationKeyReferenceResolver? = null,
     crypto2KeyReferenceResolver: Crypto2ClientAttestationKeyReferenceResolver? = null,
     statusResolver: AttestationStatusResolver? = null,
+    /** Required by [ClientAttestationVerificationMethod.X509TrustRegistry]; checked when an attestation is verified. */
+    trustEvaluator: TrustDecisionEvaluator? = null,
 ): ClientAttestationConfig =
     when (val source = verificationMethod) {
         is ClientAttestationVerificationMethod.StaticJwk -> {
@@ -78,6 +103,16 @@ suspend fun ClientAttestationVerifierConfig.toClientAttestationConfig(
         is ClientAttestationVerificationMethod.X509Chain ->
             ClientAttestationConfig(
                 attestationVerifier = X509ChainClientAttestationVerifier(source.trustedRootCertificatesPem),
+                statusPolicy = statusPolicy, statusResolver = statusResolver,
+            )
+
+        is ClientAttestationVerificationMethod.X509TrustRegistry ->
+            ClientAttestationConfig(
+                attestationVerifier = X509TrustRegistryClientAttestationVerifier(
+                    evaluator = trustEvaluator,
+                    expectedEntityTypes = source.expectedEntityTypes,
+                    requireAuthenticatedSource = source.requireAuthenticatedSource,
+                ),
                 statusPolicy = statusPolicy, statusResolver = statusResolver,
             )
 

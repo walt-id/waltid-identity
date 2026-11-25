@@ -314,10 +314,22 @@ object OpenId4VciRoutesDocs {
 
             Multiple proofs when batch issuance is disabled, or more proofs than the advertised limit,
             return `invalid_credential_request`. Invalid proof signatures return `invalid_proof`.
-            Each offered credential uses its configured `credentialStatus` for all copies issued from it.
-            When multiple proofs are supplied, those copies share the same status entry. Revoking that
-            entry revokes every credential referencing it, including copies issued by later requests.
-            Shared status references also make the copies linkable.
+            If two credential copies would bind to the same holder key, the whole request
+            returns `invalid_proof` before status reservation, signing, or
+            deferred acceptance. The wallet can retry with distinct keys.
+            A configured status object or flat W3C status array is shared by every copy, including
+            repeated issuance. Shared references make those copies linkable and revoking one affects all.
+            Flat SD-JWT VC/mdoc `credentialStatus` arrays provide one preallocated status object per copy;
+            nested W3C arrays provide one complete status group per copy.
+            After proof validation the issuer atomically reserves unused groups in verified binding order.
+            Status reference uniqueness is shared across profiles using the same Redis consumption ledger;
+            profile and operation ownership are retained internally, and retries recover their assignments.
+            With insufficient groups, the Credential Request returns `invalid_credential_request` before
+            signing and consumes no entries. A deferred poll returns `credential_request_denied` and
+            invalidates the transaction ID. The wallet can send a new Credential Request for that item
+            with fewer proofs.
+            This requires Redis persistence and works with both offered and offerless profile-derived
+            sessions. The caller remains responsible for allocating and managing the status entries.
             Different `credentials[]` items can supply different statuses, each used for its corresponding item.
             These rules apply to both single-profile and multi-credential offers.
 

@@ -25,13 +25,17 @@ import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationRes
 import id.walt.verifier2.verifierModule
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.body
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 
 class Verifier2WalletRejectionCallbackEventsIntegrationTest {
 
@@ -181,6 +185,22 @@ class Verifier2WalletRejectionCallbackEventsIntegrationTest {
                     )
                     webhook.assertDoesNotContain(sessionId, SessionEvent.parsed_presentation_available)
                     webhook.assertDoesNotContain(sessionId, SessionEvent.credential_policy_results_available)
+                }
+                test("A new wallet rejection after PII purge reaches the receiver") {
+                    assertEquals(HttpStatusCode.NoContent, http.delete("/verification-session/$sessionId/pii").status)
+                    val fresh = WalletPresentFunctionality2.walletRejectHandling(
+                        authorizationRequest = authorizationRequest,
+                        error = WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED,
+                        errorDescription = "Declined after purge",
+                    )
+                    assertEquals(true, fresh.getOrThrow().transmissionSuccess)
+                    val latest = http.get("/verification-session/$sessionId/info").body<Verification2Session>()
+                    val attemptId = assertNotNull(latest.presentationId)
+                    assertNotEquals(session.presentationId, attemptId)
+                    val callback = webhook.awaitPresentationEvents(
+                        sessionId, attemptId, listOf(SessionEvent.wallet_error_response_received),
+                    ).single()
+                    assertTrue("webhookGeneration" !in callback.session)
                 }
             }
         }

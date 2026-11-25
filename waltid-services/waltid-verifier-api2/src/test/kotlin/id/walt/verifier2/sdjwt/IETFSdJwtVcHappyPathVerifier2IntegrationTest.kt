@@ -335,9 +335,11 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 val presentationId = assertNotNull(info2.presentationId)
                 assertNotEquals(failedPresentationId, presentationId)
                 assertNull(info2.failure)
-                val updates = webhook.received().filter {
-                    it.target == sessionId && it.session["presentationId"]?.jsonPrimitive?.content == presentationId
-                }
+                val updates = webhook.awaitPresentationEvents(
+                    sessionId,
+                    presentationId,
+                    Verifier2WebhookRecorder.successfulPresentationEvents.drop(1),
+                )
                 assertEquals(
                     Verifier2WebhookRecorder.successfulPresentationEvents.drop(1).map { it.name },
                     updates.map { it.event },
@@ -381,10 +383,11 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 val afterRequest = http.get(latestPath).body<Verification2Session>()
                 assertEquals(latest.presentationId, afterRequest.presentationId)
                 assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, afterRequest.status)
-                val attemptUpdates = webhook.received().filter {
-                    it.session["presentationId"]?.jsonPrimitive?.content == latest.presentationId &&
-                        it.event != SessionEvent.authorization_request_requested.name
-                }
+                val attemptUpdates = webhook.awaitPresentationEvents(
+                    sessionId,
+                    assertNotNull(latest.presentationId),
+                    Verifier2WebhookRecorder.successfulPresentationEvents.drop(1),
+                )
                 assertEquals(
                     Verifier2WebhookRecorder.successfulPresentationEvents.drop(1).map { it.name },
                     attemptUpdates.map { it.event },

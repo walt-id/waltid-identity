@@ -70,9 +70,13 @@ final class WalletAPITests: XCTestCase {
             readerAuthentication: [], readerAuthenticationSummary: .absent, useCases: [], applicationAuthorizations: [])
         let plan = ProximitySharingPlan(review: review, expiresAt: .distantFuture,
             readerCertificateSHA256: "display-fixture", bridge: DisplayOnlySharingPlanBridge())
+        let unmatched = try ProximityUnsatisfiedRequest(documents: [.init(requestIndex: 0,
+            documentType: "org.iso.18013.5.1.mDL", requestedElements: [
+                .init(namespace: "org.iso.18013.5.1", elementIdentifier: "given_name", intentToRetain: false, satisfiesRequestedElements: []),
+            ])])
         let terminals: [ProximityState] = [
             .preparationRequired(plan),
-            .completed(exchanges: 1, declined: false), .noData(exchange: 2), .cancelled,
+            .completed(exchanges: 1, declined: false), .noData(exchange: 2, unsatisfiedRequest: unmatched), .cancelled,
             .failed(.init(category: .transport, code: "closed", message: "Closed", recovery: .startNewSession)),
         ]
         for terminal in terminals {

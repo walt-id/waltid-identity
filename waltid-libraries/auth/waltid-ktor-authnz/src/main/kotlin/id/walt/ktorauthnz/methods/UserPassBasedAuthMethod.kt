@@ -1,5 +1,12 @@
 package id.walt.ktorauthnz.methods
 
+import id.walt.ktorauthnz.KtorAuthnzManager
+import id.walt.ktorauthnz.accounts.PasswordHashUpgradeStore
+import id.walt.ktorauthnz.exceptions.InvalidCredentialsException
+import id.walt.ktorauthnz.exceptions.authCheck
+import id.walt.ktorauthnz.methods.storeddata.PasswordStoredData
+import id.walt.ktorauthnz.security.PasswordHash
+import id.walt.ktorauthnz.security.PasswordHashing
 import id.walt.ktorauthnz.exceptions.AuthSessionStateException
 import id.walt.ktorauthnz.methods.sessiondata.IdentifiedSessionData
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
@@ -102,6 +109,18 @@ abstract class UserPassBasedAuthMethod(
     }
 
     abstract suspend fun auth(session: AuthSession, credential: UserPasswordCredential, context: ApplicationCall): AccountIdentifier
+
+    internal suspend inline fun <reified T : PasswordStoredData> verifyStoredPassword(
+        identifier: AccountIdentifier, password: String
+    ): AccountIdentifier {
+        val stored = lookupAccountIdentifierStoredData<T>(identifier)
+        val hash = PasswordHash.fromString(checkNotNull(stored.passwordHash) { "Missing password hash" })
+        val store = KtorAuthnzManager.accountStore as? PasswordHashUpgradeStore
+        val result = PasswordHashing.check(password, hash, allowUpgrade = store != null)
+        authCheck(result.valid, InvalidCredentialsException())
+        result.updatedHash?.let { store?.upgradePasswordHash(identifier, stored, it) }
+        return identifier
+    }
 
     /** Whether passwords of this method are kept by ktor-authnz (and so can be changed and reset here). */
     open val managesPasswords: Boolean = false

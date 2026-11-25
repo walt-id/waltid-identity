@@ -13,8 +13,41 @@ import kotlin.test.*
 import kotlin.time.Instant
 
 class PublicIssuanceSessionTest {
+    private val redactedIssuerKey = buildJsonObject { put("type", "redacted") }
+
     @Test
-    fun `single session JSON equals the baseline serializer with every optional-field mode`() {
+    fun preallocatedInventoryAndPreparedResponsesArePrivateInBothSessionViews() {
+        val original = IssuanceSessionStorageCodec.decode(Json.encodeToString(baseline()))
+        val request = original.issuanceRequests.single().copy(
+            issuerKey = buildJsonObject { put("kid", "private-issuer-key") },
+            credentialStatus = JsonArray(listOf(JsonArray(listOf(buildJsonObject { put("unused", "private-status") })))),
+        )
+        val state = id.walt.issuer2.domain.CredentialStatusIssuanceState(
+            leaseId = "private-lease",
+            operations = mapOf("configuration" to id.walt.issuer2.domain.CredentialStatusIssuanceOperation(
+                "private-operation", listOf("private-holder"),
+                id.walt.openid4vci.responses.credential.CredentialResponse(listOf(
+                    id.walt.openid4vci.responses.credential.IssuedCredential(JsonPrimitive("private-signed-response")),
+                )),
+            )),
+        )
+        for (requests in listOf(listOf(request), listOf(request, request.copy(credentialIdentifier = "B")))) {
+            val session = original.copy(issuanceRequests = requests, credentialStatusIssuance = state)
+            assertTrue(Json.encodeToString(session).contains("private-signed-response"))
+            val public = session.toPublicJson().toString()
+            assertFalse(public.contains("private-"))
+            assertFalse(public.contains("credentialStatusIssuance"))
+        }
+        assertTrue((0 until singleIssuanceSessionDescriptor.elementsCount).none {
+            singleIssuanceSessionDescriptor.getElementName(it) == "credentialStatusIssuance"
+        })
+        assertTrue((0 until multiIssuanceSessionDescriptor.elementsCount).none {
+            multiIssuanceSessionDescriptor.getElementName(it) == "credentialStatusIssuance"
+        })
+    }
+
+    @Test
+    fun `single session keeps the historical JSON shape with the key redacted`() {
         for (defaults in listOf(false, true)) for (nulls in listOf(false, true)) for (completed in listOf(false, true)) {
             val json = Json { encodeDefaults = defaults; explicitNulls = nulls }
             val baseline = baseline().copy(
@@ -23,8 +56,10 @@ class PublicIssuanceSessionTest {
             )
             val original = json.encodeToJsonElement(baseline)
             val session = IssuanceSessionStorageCodec.decode(original.toString())
-            assertEquals(original, session.toPublicJson(json))
-            assertEquals(original, json.encodeToJsonElement(PublicIssuanceSession(session)))
+            val expected = json.encodeToJsonElement(baseline.copy(issuerKey = redactedIssuerKey))
+            assertEquals(expected, session.toPublicJson(json))
+            assertEquals(expected, json.encodeToJsonElement(PublicIssuanceSession(session)))
+            assertEquals(baseline.issuerKey, session.issuanceRequests.single().issuerKey)
         }
     }
 
@@ -43,10 +78,20 @@ class PublicIssuanceSessionTest {
                 assertEquals(JsonArray(keys), view["expectedCredentialProofKeyJwks"])
             }
         }
-        val requests = session.issuanceRequests + session.issuanceRequests.single().copy(credentialIdentifier = "B")
+        val managedKey = buildJsonObject {
+            put("type", "tse")
+            put("accessToken", "synthetic-token")
+        }
+        val requests = session.issuanceRequests + session.issuanceRequests.single().copy(
+            credentialIdentifier = "B",
+            issuerKey = managedKey,
+        )
         val narrowed = session.copy(issuanceRequests = requests, authorizedCredentialIdentifiers = listOf("configuration"))
         val view = narrowed.toPublicJson()
-        assertEquals(2, assertNotNull(view["issuanceRequests"]).jsonArray.size)
+        val publicRequests = assertNotNull(view["issuanceRequests"]).jsonArray
+        assertEquals(2, publicRequests.size)
+        publicRequests.forEach { assertEquals(redactedIssuerKey, it.jsonObject["issuerKey"]) }
+        assertEquals(managedKey, narrowed.issuanceRequests.last().issuerKey)
         assertFalse(view.containsKey("profileId"))
         assertEquals(JsonArray(listOf(JsonPrimitive("configuration"))), view["authorizedCredentialIdentifiers"])
     }
@@ -65,7 +110,7 @@ class PublicIssuanceSessionTest {
                 ),
             ),
         ))
-        assertEquals(JsonObject(legacy + report), session.toPublicJson())
+        assertEquals(JsonObject(legacy + report + ("issuerKey" to redactedIssuerKey)), session.toPublicJson())
         assertEquals(session, IssuanceSessionStorageCodec.decode(Json.encodeToString(session)))
         val batch = session.copy(
             issuanceRequests = session.issuanceRequests + session.issuanceRequests.single().copy(credentialIdentifier = "B"),
@@ -79,8 +124,14 @@ class PublicIssuanceSessionTest {
             val publicBatch = JsonObject((internal - buildSet {
                 add("deferredState")
                 add("issuanceClaimId")
+                add("credentialStatusIssuance")
                 if (batch.deferredStatus == null) add("deferredStatus")
-            }) + ("issuanceResults" to buildJsonObject { put("configuration", publicResult) }))
+            }) + mapOf(
+                "issuanceResults" to buildJsonObject { put("configuration", publicResult) },
+                "issuanceRequests" to JsonArray(internal.getValue("issuanceRequests").jsonArray.map {
+                    JsonObject(it.jsonObject + ("issuerKey" to redactedIssuerKey))
+                }),
+            ))
             assertEquals(batch, IssuanceSessionStorageCodec.decode(internal.toString()))
             assertEquals(publicBatch, batch.toPublicJson(json))
             assertEquals(publicBatch, json.encodeToJsonElement(PublicIssuanceSession(batch)))

@@ -16,6 +16,8 @@ import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -165,6 +167,20 @@ data class Verification2Session(
     @SerialName("failure")
     var failure: SessionFailure? = null,
 ) {
+    /** Internal outbox generation of this stored snapshot. An attempt keeps the generation it loaded. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    var webhookGeneration: Long = 0
+
+    /** Completed outcome masked by a standalone verifier's pre-admission processing claim. */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    var outcomeBeforeProcessingClaim: VerificationSessionStatus? = null
+
+    /** Keep internal delivery state when copying a session for storage or processing rollback. */
+    fun copyWithWebhookGeneration(generation: Long = webhookGeneration): Verification2Session =
+        copy().also { it.webhookGeneration = generation }
+
     /** Request retrieval only transitions an idle session; it never resets an attempt's outcome. */
     val needsInUseTransition: Boolean
         get() = status.successful == null && status !in setOf(
@@ -207,7 +223,7 @@ data class Verification2Session(
 
     fun deletePII() {
         setup = setup.publicView()
-        notifications = notifications?.publicView()
+        notifications = notifications?.withoutCredentials()
         ephemeralDecryptionKey = null
         crypto2EphemeralDecryptionKey = null
         policies = policies.publicView()
@@ -251,7 +267,7 @@ data class Verification2Session(
 
     private fun publicView(includeSameDeviceResult: Boolean): Verification2Session = copy(
         setup = setup.publicView(),
-        notifications = notifications?.publicView(),
+        notifications = notifications?.withoutCredentials(),
         policies = policies.publicView(),
         ephemeralDecryptionKey = null,
         crypto2EphemeralDecryptionKey = null,

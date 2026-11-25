@@ -194,11 +194,14 @@ struct ProximityPresentationView: View {
                 .walletSuccessDismissal(key: 0,
                     enabled: !declined && receipt != nil && viewModel.actionErrorMessage == nil
                         && viewModel.hostActionInProgress == nil, onDone: viewModel.requestClose)
-            case .noData:
-                ProximityTerminalContent(
-                    title: String(localized: "No data shared"),
-                    message: String(localized: "No credential data was shared for this request.")
-                )
+            case .noData(_, let request):
+                VStack(alignment: .leading, spacing: 16) {
+                    ProximityTerminalContent(
+                        title: String(localized: "Request could not be satisfied"),
+                        message: String(localized: "No credential data was shared for this request.")
+                    )
+                    ProximityUnsatisfiedRequestContent(request: request)
+                }
             case .cancelled:
                 ProximityTerminalContent(
                     title: String(localized: "Presentation cancelled"),

@@ -23,6 +23,14 @@ class InfrastructureFailureClassificationTest {
 
     private class MongoNotPrimaryException(message: String) : Exception(message)
 
+    private class CertIOException(message: String) : Exception(message)
+
+    @Test
+    fun malformedCertificateIoIsNotAnInfrastructureFailure() {
+        assertFalse(RuntimeException("Could not parse supplied certificate", CertIOException("Malformed DER"))
+            .isInfrastructureFailure())
+    }
+
     @Test
     fun storeTimeoutIsAnInfrastructureFailure() {
         assertTrue(

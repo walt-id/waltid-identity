@@ -397,6 +397,13 @@ status entries there when required. Custom format handlers receive the complete
 the first proof or allocate statuses before validation. There is no separate
 single/batch mode or bridge to the legacy OpenID4VC library.
 
+Each holder key can bind to at most one credential in a response. After proof verification,
+the provider compares the RFC 7638 thumbprints of the selected public keys. If two copies
+would share a key, it rejects the whole request with `invalid_proof` before accepting a
+deferred transaction or calling `CredentialIssuanceInputProvider.prepare`. This check also
+applies when an application supplies a custom `CredentialProofVerifier`.
+See [OpenID4VCI 1.0 §8.3](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-8.3).
+
 Custom token handlers now accept `TokenResponseOptions`. When a
 `credentialAuthorizationResolver` is configured, call it after grant validation and
 before signing, add its `tokenClaims()` to the signed access token, and return the

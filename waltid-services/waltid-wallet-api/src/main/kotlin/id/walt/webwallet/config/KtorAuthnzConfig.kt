@@ -54,7 +54,11 @@ data class KtorAuthnzConfig(
 
     val valkeyAuthUsername: String? = null,
     val valkeyAuthPassword: String? = null,
+    val legacyPasswordWritesDuringRollout: Boolean = false,
 ) {
+    // ConfigManager includes this object in its startup trace. Keep secrets and signing keys out of it.
+    override fun toString() = "KtorAuthnzConfig(hashAlgorithm=$hashAlgorithm, tokenType=$tokenType)"
+
     val configuredSigningKey by lazy { signingKey?.let { KeyManager.resolveSerializedKeyBlocking(it.toString()) } }
     val configuredVerificationKey by lazy { KeyManager.resolveSerializedKeyBlocking(verificationKey.toString()) }
 

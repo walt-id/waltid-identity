@@ -303,7 +303,7 @@ interface X509SigningAlgorithmInfo {
                     }
                     val ec = key.spec as? KeySpec.Ec
                         ?: throw IllegalArgumentException("X.509 ECDSA requires an EC signing key")
-                    require(ec.curve == EcCurve.P256 || ec.curve == EcCurve.P384 || ec.curve == EcCurve.P521) {
+                    require(ec.curve in setOf(EcCurve.P256, EcCurve.P384, EcCurve.P521, EcCurve.SECP256K1)) {
                         "Unsupported X.509 EC curve: ${ec.curve.name}"
                     }
                 }
