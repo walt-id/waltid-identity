@@ -32,7 +32,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.Date
 
-/** Per-run mDL signer and fresh, signed CRL; only committed public test keys are used. */
+/** Per-run credential signer and fresh, signed CRL; only committed public test keys are used. */
 internal class IssuerTestPki(
     crlUrl: String,
     signingJwk: String = TestKeyMaterial.CREDENTIAL_ISSUER_KEY_WITH_X5C,
@@ -81,7 +81,7 @@ internal class IssuerTestPki(
         val country = issuer.getRDNs(BCStyle.C).single().first.value.toString()
         val subject = X500NameBuilder(BCStyle.INSTANCE)
             .addRDN(BCStyle.C, country)
-            .addRDN(BCStyle.CN, "Conformance mDL document signer")
+            .addRDN(BCStyle.CN, if (documentSigner) "Conformance mDL document signer" else "Conformance SD-JWT credential signer")
             .build()
         val now = Instant.now()
         root.checkValidity(Date.from(now))

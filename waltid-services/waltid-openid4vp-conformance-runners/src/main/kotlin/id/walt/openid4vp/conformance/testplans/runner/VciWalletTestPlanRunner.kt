@@ -91,7 +91,9 @@ class VciWalletTestPlanRunner(
                 println("[${index + 1}/${modules.size}] Running: ${module.testModule}")
                 val skip = VciWalletModuleApplicability.skipReason(module.testModule,
                     fullPlan = ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN,
-                    explicitlySelected = requiredModules.isNotEmpty())
+                    explicitlySelected = requiredModules.isNotEmpty(),
+                    deferred = (module.variant["vci_credential_issuance_mode"]?.jsonPrimitive?.content
+                        ?: testPlan.variant["vci_credential_issuance_mode"]) == "deferred")
                 val result = (if (skip != null) TestPlanResult(
                     conformanceTestId = "N/A", conformanceResult = "SKIPPED", walletStatus = "SKIPPED", skipReason = skip,
                 ) else runModule(testPlanId, module)).copy(testName = "${testPlan.producerId}/${module.testModule}")

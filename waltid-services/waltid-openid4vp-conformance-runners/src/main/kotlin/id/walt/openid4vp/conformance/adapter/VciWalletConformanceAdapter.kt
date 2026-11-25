@@ -21,7 +21,7 @@ import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -60,6 +60,7 @@ import kotlinx.coroutines.CancellationException
  * @param useScope Authorize the offered configuration by scope, as HAIP requires
  * @param batchHolderKeyIds Two distinct stored holder keys for batch modules; empty for single-copy plans
  * @param issuanceSessions In-process SDK session resolver for FAPI VCI modules
+ * @param deferredTimeoutMillis Maximum polling budget for retained deferred issuance
  */
 class VciWalletConformanceAdapter(
     private val walletApiUrl: String = "http://127.0.0.1:7005",
@@ -71,8 +72,10 @@ class VciWalletConformanceAdapter(
     private val useScope: Boolean = false,
     private val batchHolderKeyIds: List<String> = emptyList(),
     private val issuanceSessions: (suspend (String) -> WalletIssuanceSessionService)? = null,
+    private val deferredTimeoutMillis: Long = ConformanceConfig.HTTP_REQUEST_TIMEOUT_MS - 5_000L,
 ) {
     init {
+        require(deferredTimeoutMillis > 0) { "Deferred polling budget must be positive" }
         require(batchHolderKeyIds.isEmpty() ||
             (batchHolderKeyIds.size == 2 && batchHolderKeyIds.all(String::isNotBlank) && batchHolderKeyIds.distinct().size == 2)) {
             "The batch conformance adapter requires two distinct stored holder keys"
@@ -560,14 +563,14 @@ class VciWalletConformanceAdapter(
         }
         val pending = deferredHandles(client).filterKeys { it !in existingDeferred }.toMutableMap()
         if (pending.isEmpty()) return ClaimResult(response.status.isSuccess(), body)
-        return withTimeout(ConformanceConfig.HTTP_REQUEST_TIMEOUT_MS - 5_000L) {
+        return withTimeoutOrNull(deferredTimeoutMillis) {
             while (pending.isNotEmpty()) {
                 val (id, handle) = pending.entries.first()
                 val seconds = handle["intervalSeconds"]?.jsonPrimitive?.longOrNull ?: 0L
                 require(seconds >= 0) { "Invalid deferred polling interval" }
                 delay(Math.multiplyExact(seconds, 1_000L))
                 val resumed = client.post("$walletApiUrl/wallet/$walletId/credentials/receive/deferred/$id")
-                if (!resumed.status.isSuccess()) return@withTimeout ClaimResult(false, "Deferred resume: ${resumed.status}")
+                if (!resumed.status.isSuccess()) return@withTimeoutOrNull ClaimResult(false, "Deferred resume: ${resumed.status}")
                 val outcome = Json.parseToJsonElement(resumed.bodyAsText()).jsonObject
                 when (outcome["type"]?.jsonPrimitive?.contentOrNull) {
                     "stored" -> pending.remove(id)
@@ -578,11 +581,11 @@ class VciWalletConformanceAdapter(
                             pending[next.getValue("id").jsonPrimitive.content] = next
                         }
                     }
-                    else -> return@withTimeout ClaimResult(false, "Deferred issuance did not store credentials: ${outcome["type"]}")
+                    else -> return@withTimeoutOrNull ClaimResult(false, "Deferred issuance did not store credentials: ${outcome["type"]}")
                 }
             }
             ClaimResult(true, "Deferred credentials stored")
-        }
+        } ?: ClaimResult(false, "Deferred issuance exceeded polling budget")
     }
 
     // ─────────────────────────────────────────────────────────────────────────────

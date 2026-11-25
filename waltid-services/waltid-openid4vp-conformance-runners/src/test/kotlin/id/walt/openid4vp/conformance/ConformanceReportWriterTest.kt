@@ -56,6 +56,27 @@ class ConformanceReportWriterTest {
 
 
     @Test
+    fun fullPlanCountsWarningReviewAndBlockedSeparatelyWithoutAcceptingThem() {
+        val role = ConformanceReportWriter.Role.VCI_WALLET
+        val root = Files.createTempDirectory("full-plan-outcomes").toString()
+        val entries = listOf(
+            ConformanceReportWriter.Entry("pass", "passed", accepted = true),
+            ConformanceReportWriter.Entry("failure", "failed"),
+            ConformanceReportWriter.Entry("timeout", "timeout"),
+            ConformanceReportWriter.Entry("blocked", "blocked"),
+            ConformanceReportWriter.Entry("warning", "warning"),
+            ConformanceReportWriter.Entry("review", "review"),
+        )
+        ConformanceReportWriter.write(role, entries, root, mergeExisting = false,
+            mode = ConformanceExecutionMode.FULL_PLAN)
+        val summary = Files.readString(ConformanceReportWriter.reportDir(role, root).resolve("summary.md"))
+        for (expected in listOf("Total: 6", "Passed: 1", "Failed: 2", "Blocked: 1", "Warning: 1", "Review: 1")) {
+            assertTrue(summary.contains("- $expected"), summary)
+        }
+        assertFailsWith<IllegalStateException> { ConformanceReportWriter.failIfNeeded(role, entries) }
+    }
+
+    @Test
     fun fullPlanPreservesRepeatedModuleVariantsButReplacesThePreviousProducerRun() {
         val root = Files.createTempDirectory("full-plan-variants").toString()
         val role = ConformanceReportWriter.Role.VCI_WALLET
@@ -69,7 +90,8 @@ class ConformanceReportWriterTest {
         assertTrue(results.contains("deferred"))
         val summary = Files.readString(ConformanceReportWriter.reportDir(role, root).resolve("summary.md"))
         assertTrue(summary.contains("- Total: 2"))
-        assertTrue(summary.contains("- Failed: 1"))
+        assertTrue(summary.contains("- Failed: 0"))
+        assertTrue(summary.contains("- Blocked: 1"))
         ConformanceReportWriter.write(role, listOf(repeated.first()), root, producer = "wallet", mode = ConformanceExecutionMode.FULL_PLAN)
         assertFalse(Files.readString(ConformanceReportWriter.reportDir(role, root).resolve("results.json")).contains("deferred"))
     }

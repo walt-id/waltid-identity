@@ -75,7 +75,9 @@ internal class HaipIssuerFixture(baseUrl: String) {
                 }
             }
         }
-        profiles = updated
+        // Resolved profiles own their fresh chains; do not emit unused stale chain helpers.
+        profiles = updated.withoutPath("defaultHaipIssuerX5chain")
+            .withoutPath("defaultHaipMdocIssuerX5chain")
     }
 
     fun writeTo(directory: Path) {

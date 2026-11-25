@@ -32,7 +32,17 @@ class VciWalletModuleApplicabilityTest {
     }
 
     @Test
-    fun issuanceIncludingDeferredVariantsHasNoCapabilitySkip() {
+    fun deferredSelectionStaysOptInWhileImmediateCiIssuanceRuns() {
+        val module = "oid4vci-1_0-wallet-test-credential-issuance"
+        assertNotNull(VciWalletModuleApplicability.skipReason(module, fullPlan = false, deferred = true))
+        assertNull(VciWalletModuleApplicability.skipReason(module, fullPlan = true, deferred = true))
+        assertNull(VciWalletModuleApplicability.skipReason(module, fullPlan = false,
+            explicitlySelected = true, deferred = true))
+        assertNull(VciWalletModuleApplicability.skipReason(module, fullPlan = false))
+    }
+
+    @Test
+    fun immediateIssuanceHasNoCapabilitySkip() {
         assertNull(VciWalletModuleApplicability.skipReason("oid4vci-1_0-wallet-test-credential-issuance", fullPlan = true))
         assertNull(VciWalletModuleApplicability.skipReason("oid4vci-1_0-wallet-test-credential-issuance", fullPlan = false))
     }

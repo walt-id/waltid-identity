@@ -20,6 +20,8 @@ class IssuerCiConfigurationTest {
     @Test
     fun optInHaipFixtureHasStrictSettingsAndValidMdocDataWithoutChangingBasicProfiles() {
         val generated = HaipIssuerFixture("https://issuer.example:9443")
+        assertFalse(generated.profiles.hasPath("defaultHaipIssuerX5chain"))
+        assertFalse(generated.profiles.hasPath("defaultHaipMdocIssuerX5chain"))
         assertTrue(generated.service.getBoolean("enforcePushedAuthorizationRequests"))
         assertTrue(generated.service.getBoolean("requirePkce"))
         assertEquals("https://issuer.example:9443", generated.service.getString("baseUrl"))
@@ -40,8 +42,10 @@ class IssuerCiConfigurationTest {
             assertContentEquals(key.toECPublicKey().encoded, leaf.publicKey.encoded, name)
             if (!profile.hasPath("credentialData.\"org.iso.18013.5.1\"")) {
                 assertEquals(null, leaf.extendedKeyUsage, "SD-JWT signer must not be restricted to mDL signing")
+                assertTrue(leaf.subjectX500Principal.name.contains("CN=Conformance SD-JWT credential signer"))
                 return@forEach
             }
+            assertTrue(leaf.subjectX500Principal.name.contains("CN=Conformance mDL document signer"))
             val data = profile.getConfig("credentialData.\"org.iso.18013.5.1\"")
             assertEquals("AT", data.getString("nationality"))
             assertTrue(data.root().keys.none { it.startsWith("biometric_template_") })

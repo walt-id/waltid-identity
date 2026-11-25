@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.VerifierVariant
 import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.VerifierVariantMatrix
 import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.Oid4vpVerifierVariantPlan
@@ -47,7 +48,8 @@ class VerifierVariantMatrixTest {
     @Test
     fun `revoked and identifier-listed credentials require rejection`() {
         VerifierVariantMatrix.haip().forEach { variant ->
-            val plan = Oid4vpVerifierVariantPlan(variant, "https://verifier.example", "suite.example", 8443)
+            val plan = Oid4vpVerifierVariantPlan(variant, "https://verifier.example", "suite.example", 8443,
+                executionMode = ConformanceExecutionMode.FULL_PLAN)
             assertEquals(ExpectedVerifierOutcome.REJECT,
                 plan.config.moduleOutcomes["oid4vp-1final-verifier-present-revoked-credential"])
             assertEquals(if (variant.isMdoc) ExpectedVerifierOutcome.REJECT else null,
@@ -58,12 +60,25 @@ class VerifierVariantMatrixTest {
     @Test
     fun `unrequested credential type must be rejected for SD-JWT variants`() {
         VerifierVariantMatrix.all().forEach { variant ->
-            val plan = Oid4vpVerifierVariantPlan(variant, "https://verifier.example", "suite.example", 8443)
+            val plan = Oid4vpVerifierVariantPlan(variant, "https://verifier.example", "suite.example", 8443,
+                executionMode = ConformanceExecutionMode.FULL_PLAN)
             assertEquals(
                 if (variant.isMdoc) null else ExpectedVerifierOutcome.REJECT,
                 plan.config.moduleOutcomes["oid4vp-1final-verifier-wrong-vct"],
                 variant.id,
             )
+        }
+    }
+
+    @Test
+    fun `CI does not inherit full plan status and credential type expectations`() {
+        VerifierVariantMatrix.haip().forEach { variant ->
+            val plan = Oid4vpVerifierVariantPlan(variant, "https://verifier.example", "suite.example", 8443,
+                executionMode = ConformanceExecutionMode.CI)
+            for (module in listOf("present-revoked-credential", "present-credential-on-identifier-list", "wrong-vct")) {
+                assertEquals(null, plan.config.moduleOutcomes["oid4vp-1final-verifier-$module"])
+            }
+            assertEquals(null, plan.config.verificationSessionSetup.core.policies.vc_policies)
         }
     }
 

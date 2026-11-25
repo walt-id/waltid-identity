@@ -8,6 +8,7 @@ import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
 import io.ktor.client.HttpClient
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.runBlocking
 import java.net.InetSocketAddress
@@ -16,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class VciWalletAdapterTest {
     @Test
@@ -63,6 +65,30 @@ class VciWalletAdapterTest {
     }
 
     @Test
+    fun deferredPollingDeadlineReturnsAFailedClaimRatherThanCancellation() = runBlocking {
+        val received = AtomicBoolean()
+        val polls = AtomicInteger()
+        withAdapter(deferredTimeoutMillis = 100) { backend, client, endpoint ->
+            backend.createContext("/wallet/test/credentials/receive") { exchange ->
+                when (exchange.requestURI.path) {
+                    "/wallet/test/credentials/receive" -> {
+                        received.set(true)
+                        exchange.json(409, "{}")
+                    }
+                    "/wallet/test/credentials/receive/deferred" -> exchange.json(200,
+                        if (received.get()) """[{"id":"new","intervalSeconds":60}]""" else "[]")
+                    else -> { polls.incrementAndGet(); exchange.json(500, "{}") }
+                }
+            }
+            backend.start()
+            val response = client.post(endpoint) { parameter("credential_offer", OFFER) }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("Deferred issuance exceeded polling budget"))
+            assertEquals(0, polls.get(), "Do not poll before the issuer's required interval")
+        }
+    }
+
+    @Test
     fun walletFailureIsNotReportedAsSuccessfulOfferProcessing() = runBlocking {
         withAdapter { backend, client, endpoint ->
             backend.createContext("/wallet/test/credentials/receive") { exchange ->
@@ -76,11 +102,12 @@ class VciWalletAdapterTest {
         }
     }
 
-    private suspend fun withAdapter(block: suspend (HttpServer, HttpClient, String) -> Unit) {
+    private suspend fun withAdapter(deferredTimeoutMillis: Long = 55_000, block: suspend (HttpServer, HttpClient, String) -> Unit) {
         val backend = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         val port = ServerSocket(0).use { it.localPort }
         val adapter = VciWalletConformanceAdapter(
-            walletApiUrl = "http://127.0.0.1:${backend.address.port}", adapterPort = port, walletId = "test")
+            walletApiUrl = "http://127.0.0.1:${backend.address.port}", adapterPort = port, walletId = "test",
+            deferredTimeoutMillis = deferredTimeoutMillis)
         HttpClient().use { client ->
             try {
                 adapter.start(client)

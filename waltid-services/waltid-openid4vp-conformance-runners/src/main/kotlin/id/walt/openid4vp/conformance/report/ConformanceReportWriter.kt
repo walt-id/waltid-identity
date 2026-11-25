@@ -101,7 +101,7 @@ object ConformanceReportWriter {
             dir.resolve("results.json"),
             json.encodeToString(ListSerializer(Entry.serializer()), merged)
         )
-        Files.writeString(dir.resolve("summary.md"), buildSummary(role, merged))
+        Files.writeString(dir.resolve("summary.md"), buildSummary(role, merged, mode))
         println("Wrote ${role.title} conformance report to $dir (${merged.size} entries)")
     }
 
@@ -213,13 +213,20 @@ object ConformanceReportWriter {
         }
     }
 
-    private fun buildSummary(role: Role, entries: List<Entry>): String = buildString {
+    private fun buildSummary(role: Role, entries: List<Entry>, mode: ConformanceExecutionMode): String = buildString {
         appendLine("# ${role.title} Conformance Summary")
         appendLine()
         val skipped = entries.count { it.status in setOf("skipped", "not-applicable") }
         appendLine("- Total: ${entries.size}")
         appendLine("- Passed: ${entries.count { it.accepted && it.status == "passed" }}")
-        appendLine("- Failed: ${entries.count { !it.accepted }}")
+        if (mode == ConformanceExecutionMode.FULL_PLAN) {
+            appendLine("- Failed: ${entries.count { it.status in setOf("failed", "error", "timeout") }}")
+            appendLine("- Blocked: ${entries.count { it.status in setOf("blocked", "unavailable") }}")
+            appendLine("- Warning: ${entries.count { it.status == "warning" }}")
+            appendLine("- Review: ${entries.count { it.status == "review" }}")
+        } else {
+            appendLine("- Failed: ${entries.count { !it.accepted }}")
+        }
         if (skipped > 0) appendLine("- Skipped (not applicable to this variant): $skipped")
         appendLine()
         appendLine("<details>")

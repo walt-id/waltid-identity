@@ -7,6 +7,26 @@ locations. A full-plan gap run is not a certification submission.
 Use the OSS issuer, verifier and Wallet2 adapters. Wallet2 adapter results establish
 backend/API behavior; they do not establish mobile-wallet or DC API UI conformance.
 
+## Ordinary CI versus full-plan behavior
+
+The complete suite inventory, new revoked/identifier-list/wrong-VCT verifier expectations,
+strict status policies, and deferred wallet variants are opt-in full-plan behavior.
+Default CI retains its existing module selection and signature-only verifier policies;
+explicitly selected wallet checks can still exercise deferred issuance.
+
+These driver correctness changes intentionally apply to both modes:
+
+- Failed claims return HTTP 400, and an unexpected wallet outcome cannot pass merely
+  because the suite accepted its protocol exchange.
+- A deferred polling deadline becomes a failed claim; parent cancellation propagates.
+- Browser HTTP errors fail promptly, and a pending invalid-request-URI page check can
+  revisit its last URL. This does not treat the error page as a successful login.
+- Browser-interaction diagnostics log counts instead of OAuth request values.
+
+Full-plan summaries count warnings, review requirements and blockers separately from
+failures. They remain unaccepted outcomes and still prevent successful qualification.
+Ordinary CI summary fields and acceptance rules are retained.
+
 ## Suite and local environment
 
 Build conformance-suite `release-v5.3.4` at

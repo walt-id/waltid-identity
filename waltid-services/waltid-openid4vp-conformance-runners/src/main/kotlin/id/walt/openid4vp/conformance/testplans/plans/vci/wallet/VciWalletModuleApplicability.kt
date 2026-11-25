@@ -2,10 +2,18 @@ package id.walt.openid4vp.conformance.testplans.plans.vci.wallet
 
 /** Preserve the shared CI profile while full-plan and explicit driver checks exercise FAPI. */
 object VciWalletModuleApplicability {
-    fun skipReason(module: String, fullPlan: Boolean, explicitlySelected: Boolean = false): String? =
-        if (!fullPlan && !explicitlySelected && module.startsWith("fapi2-security-profile-final-client-test-")) {
+    fun skipReason(
+        module: String,
+        fullPlan: Boolean,
+        explicitlySelected: Boolean = false,
+        deferred: Boolean = false,
+    ): String? = when {
+        fullPlan || explicitlySelected -> null
+        module.startsWith("fapi2-security-profile-final-client-test-") ->
             "FAPI client modules are outside the default CI profile; run full-plan mode or the explicit SDK driver check"
-        } else null
+        deferred -> "Deferred issuance is outside the default CI profile; run full-plan mode or explicitly select it"
+        else -> null
+    }
 
     private val rejectingModules = setOf(
         "fapi2-security-profile-final-client-test-discovery-issuer-mismatch",

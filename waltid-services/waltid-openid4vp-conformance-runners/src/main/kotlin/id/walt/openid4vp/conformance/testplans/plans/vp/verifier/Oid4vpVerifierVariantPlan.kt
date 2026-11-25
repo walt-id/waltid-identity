@@ -29,6 +29,7 @@ class Oid4vpVerifierVariantPlan(
     verifier2UrlPrefix: String,
     conformanceHost: String,
     conformancePort: Int,
+    executionMode: ConformanceExecutionMode = ConformanceExecutionMode.current,
 ) : TestPlan {
 
     val name: String get() = variant.id
@@ -108,7 +109,7 @@ class Oid4vpVerifierVariantPlan(
             """.trimIndent()
         ),
 
-        moduleOutcomes = moduleOutcomes(variant),
+        moduleOutcomes = moduleOutcomes(variant, executionMode),
 
         // url_query means the request travels complete in the URL rather than behind a request_uri.
         presentUsingFullRequestUrl = !variant.signedRequest,
@@ -116,7 +117,7 @@ class Oid4vpVerifierVariantPlan(
         verificationSessionSetup = CrossDeviceFlowSetup(
             core = GeneralFlowConfig(
                 dcqlQuery = Json.decodeFromString(dcqlQuery),
-                policies = if (ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN) ConformanceVerifierPolicies.fullPlan()
+                policies = if (executionMode == ConformanceExecutionMode.FULL_PLAN) ConformanceVerifierPolicies.fullPlan()
                 else ConformanceVerifierPolicies.withoutMdocIssuerAuth(),
 
                 signedRequest = variant.signedRequest,
@@ -190,7 +191,7 @@ class Oid4vpVerifierVariantPlan(
          * output instead of silently defaulting to a pass. Modules the suite does not include for a
          * given variant are simply never looked up.
          */
-        private fun moduleOutcomes(variant: VerifierVariant): Map<String, ExpectedVerifierOutcome> = buildMap {
+        private fun moduleOutcomes(variant: VerifierVariant, mode: ConformanceExecutionMode): Map<String, ExpectedVerifierOutcome> = buildMap {
             // Positive modules: a valid presentation must be accepted.
             put("oid4vp-1final-verifier-happy-flow", ExpectedVerifierOutcome.ACCEPT)
             put("oid4vp-1final-verifier-minimal-cnf-jwk", ExpectedVerifierOutcome.ACCEPT)
@@ -199,12 +200,18 @@ class Oid4vpVerifierVariantPlan(
             put("oid4vp-1final-verifier-request-uri-method-post", ExpectedVerifierOutcome.ACCEPT_OR_SKIP)
 
             // Negative modules: the verifier must reject the presentation.
-            put("oid4vp-1final-verifier-present-revoked-credential", ExpectedVerifierOutcome.REJECT)
+            if (mode == ConformanceExecutionMode.FULL_PLAN) {
+                put("oid4vp-1final-verifier-present-revoked-credential", ExpectedVerifierOutcome.REJECT)
+            }
             if (variant.isMdoc) {
-                put("oid4vp-1final-verifier-present-credential-on-identifier-list", ExpectedVerifierOutcome.REJECT)
+                if (mode == ConformanceExecutionMode.FULL_PLAN) {
+                    put("oid4vp-1final-verifier-present-credential-on-identifier-list", ExpectedVerifierOutcome.REJECT)
+                }
                 put("oid4vp-1final-verifier-invalid-session-transcript", ExpectedVerifierOutcome.REJECT)
             } else {
-                put("oid4vp-1final-verifier-wrong-vct", ExpectedVerifierOutcome.REJECT)
+                if (mode == ConformanceExecutionMode.FULL_PLAN) {
+                    put("oid4vp-1final-verifier-wrong-vct", ExpectedVerifierOutcome.REJECT)
+                }
                 put("oid4vp-1final-verifier-invalid-kb-jwt-signature", ExpectedVerifierOutcome.REJECT)
                 put("oid4vp-1final-verifier-invalid-credential-signature", ExpectedVerifierOutcome.REJECT)
                 put("oid4vp-1final-verifier-invalid-sd-hash", ExpectedVerifierOutcome.REJECT)
