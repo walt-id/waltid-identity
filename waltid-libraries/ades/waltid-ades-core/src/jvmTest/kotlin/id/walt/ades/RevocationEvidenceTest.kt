@@ -142,11 +142,15 @@ class RevocationEvidenceTest {
 
     @Test
     fun certificateReasonRestrictionsPreventAnUnscopedCrlFromClaimingCompleteCoverage() = runTest {
-        val restricted = pki.issue("CN=Partial CRL reasons", pki.issuingCa, withRevocationInfo = true,
-            crlReasons = ReasonFlags(ReasonFlags.keyCompromise))
-        val crl = X509Crl(pki.crl(pki.issuingCa))
-        assertEquals(setOf(1), restricted.certificate.crlDistributionPointReasons)
-        assertNull(ValidationDataResolver(ValidationData(), null).crlStatus(crl, restricted.certificate, pki.issuingCa.certificate))
+        val keyOnly = ReasonFlags(ReasonFlags.keyCompromise)
+        val otherReasons = ReasonFlags(ReasonFlags.cACompromise or ReasonFlags.affiliationChanged or ReasonFlags.superseded or
+            ReasonFlags.cessationOfOperation or ReasonFlags.certificateHold or ReasonFlags.privilegeWithdrawn or ReasonFlags.aACompromise)
+        for (reasons in listOf(listOf(keyOnly), listOf(keyOnly, otherReasons), listOf(keyOnly, null))) {
+            val restricted = pki.issue("CN=Partial CRL reasons", pki.issuingCa, withRevocationInfo = true, crlReasons = reasons)
+            val crl = X509Crl(pki.crl(pki.issuingCa))
+            assertFalse(restricted.certificate.crlDistributionPointReasons.orEmpty().containsAll((1..8).toList()))
+            assertNull(ValidationDataResolver(ValidationData(), null).crlStatus(crl, restricted.certificate, pki.issuingCa.certificate))
+        }
     }
 
     @Test
