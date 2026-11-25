@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
@@ -40,6 +41,23 @@ class JwtVcJsonHolderBindingPolicyTest {
         val jwt = key.signJws(payload.toString().encodeToByteArray(), mapOf("kid" to JsonPrimitive(kid)))
         val presentation = JwtVcJsonPresentation(jwt, payload, did, null, null, null, listOf(credential(did)))
         assertTrue(HolderBindingJwtVcJsonVPPolicy().runPolicy(presentation, null).success)
+    }
+
+    @Test
+    fun subjectFallbackUsesAuthenticatedSignerInsteadOfParsedIssuer() = runTest {
+        DidService.minimalInit()
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val did = DidService.registerByKey("key", key).did
+        val kid = DidService.resolveAuthenticationMethodId(did, key.getKeyId())
+        val payload = JsonObject(mapOf("iss" to JsonPrimitive(did)))
+        val jwt = key.signJws(payload.toString().encodeToByteArray(), mapOf("kid" to JsonPrimitive(kid)))
+        val unverifiedIssuer = "did:example:unverified"
+        val presentation = JwtVcJsonPresentation(jwt, payload, unverifiedIssuer, null, null, null,
+            listOf(credential(unverifiedIssuer)))
+        assertTrue(!HolderBindingJwtVcJsonVPPolicy().runPolicy(presentation, null).success)
+        assertFailsWith<IllegalArgumentException> {
+            CredentialHolderBinding.requireBoundToPresenter(credential(did), null, "unused")
+        }
     }
 
     @Test
@@ -88,16 +106,20 @@ class JwtVcJsonHolderBindingPolicyTest {
     @Test
     fun confirmationSupportsDifferentPublicKeyTypesAndIgnoresJwkMetadata() = runTest {
         // Public fixtures keep this key-comparison test independent of the iOS signing keychain.
+        // Expected RFC 7638 values were independently calculated from the required JWK members.
         val publicKeys = listOf(
-            """{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiYSkbL9b5BAsbk"}""",
-            """{"kty":"EC","crv":"P-256","x":"uAMG3ffORZJAxox6jd9WqKVCyf-nzebhG64f4uGkw80","y":"PBd-jzVV8ZM01_6Pra2o2uG05-6yhRCw-6hGCJcOtKc"}""",
-            """{"kty":"RSA","n":"uCXibTXC_yQ3LQiakyjGRoft03otjLmHFWSK7GMZvdpaL5uqt5OPUvfo7wlW8hywjcBxnJMLN4WoL1pjdS74bWYF2Fte4xHAoZsCQRffvv9aviK5QnW3qQGg95hk03ECowA0B1gb2GEQ5aoT1MpHZdBIBVmxcbHiYOtsoM85e7P7jJy6Z4QM6tQy26BImSlCuA6Zn4c4aK_-nzH3h0SNsChMJkx0TNvQkvKogwgOVw8NIGKkQstDPHudbIiLI0tPmD6co01rdhXo1kH-bD5cwbR9T66bLLsWtyq4VWj2CtkAyMtjb3AGhFNLK5kth20OUVIOe-AXtUm-6irMVFoIBQ","e":"AQAB"}""",
+            """{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiYSkbL9b5BAsbk"}""" to "OWXv714j_6Ww9PZNLsMLS4KJP3hn1wi27euYltkBOeM",
+            """{"kty":"EC","crv":"P-256","x":"uAMG3ffORZJAxox6jd9WqKVCyf-nzebhG64f4uGkw80","y":"PBd-jzVV8ZM01_6Pra2o2uG05-6yhRCw-6hGCJcOtKc"}""" to "ZDx9KDTstLgs6IbEYXN6JZIsOxGt8ZdvID1tSxJl1NM",
+            """{"kty":"RSA","n":"uCXibTXC_yQ3LQiakyjGRoft03otjLmHFWSK7GMZvdpaL5uqt5OPUvfo7wlW8hywjcBxnJMLN4WoL1pjdS74bWYF2Fte4xHAoZsCQRffvv9aviK5QnW3qQGg95hk03ECowA0B1gb2GEQ5aoT1MpHZdBIBVmxcbHiYOtsoM85e7P7jJy6Z4QM6tQy26BImSlCuA6Zn4c4aK_-nzH3h0SNsChMJkx0TNvQkvKogwgOVw8NIGKkQstDPHudbIiLI0tPmD6co01rdhXo1kH-bD5cwbR9T66bLLsWtyq4VWj2CtkAyMtjb3AGhFNLK5kth20OUVIOe-AXtUm-6irMVFoIBQ","e":"AQAB"}""" to "MXRPLvpPIerzwiKjZeiGcyjeCbw6k2sYUQlNLXJ2rQc"
         )
-        for (publicKey in publicKeys) {
-            val key = JWKKey.importJWK(publicKey).getOrThrow()
-            val jwk = JsonObject(key.exportJWKObject() + ("kid" to JsonPrimitive("local-test-key")))
+        for ((publicKey, expectedThumbprint) in publicKeys) {
+            val jwk = JsonObject(Json.parseToJsonElement(publicKey).jsonObject + ("kid" to JsonPrimitive("local-test-key")))
             val data = JsonObject(mapOf("cnf" to JsonObject(mapOf("jwk" to jwk))))
-            CredentialHolderBinding.requireBoundToPresenter(credential(null, data), "did:example:holder", key.getThumbprint())
+            try {
+                CredentialHolderBinding.requireBoundToPresenter(credential(null, data), null, expectedThumbprint)
+            } catch (cause: Exception) {
+                throw AssertionError("Holder-key comparison failed for ${jwk["kty"]}/${jwk["crv"]}", cause)
+            }
         }
     }
 
