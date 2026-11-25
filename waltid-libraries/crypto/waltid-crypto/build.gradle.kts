@@ -26,6 +26,9 @@ kotlin {
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
 
+            // Guarded HTTP client for caller-supplied URLs (JWKS)
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
+
             // Cache
             implementation(identityLibs.cache4k)
 

@@ -1,13 +1,13 @@
 package id.walt.crypto.keys.jwk
 
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
-import io.ktor.serialization.kotlinx.json.*
+import kotlin.jvm.JvmOverloads
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -15,14 +15,20 @@ import kotlinx.serialization.json.JsonObject
  * A provider that fetches, caches, and resolves JSON Web Keys (JWKs) from a JWKS endpoint URL.
  * It is thread-safe and caches the key set in memory to avoid repeated network requests.
  *
+ * The default client comes from [WebDataFetcher] id [WebDataFetcherId.JWKS_KEY_PROVIDER], so it refuses
+ * loopback, private-network, link-local and cloud-metadata targets, caps the response size, and applies timeouts.
+ * A `jwks_uri` often comes from untrusted metadata, so pass your own [httpClient] only if it has an equivalent guard.
+ *
  * @param jwksUri The URL of the JWKS endpoint.
+ * @param httpClient The client used to fetch [jwksUri].
  */
-class JwkKeyProvider(private val jwksUri: String) {
+class JwkKeyProvider @JvmOverloads constructor(
+    private val jwksUri: String,
+    private val httpClient: HttpClient = defaultHttpClient,
+) {
 
-    private val http = HttpClient {
-        install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
-        }
+    private companion object {
+        val defaultHttpClient: HttpClient by lazy { WebDataFetcher(WebDataFetcherId.JWKS_KEY_PROVIDER).httpClient }
     }
 
     private var cachedKeys: List<JWKKey>? = null
@@ -57,7 +63,7 @@ class JwkKeyProvider(private val jwksUri: String) {
             // Double-checked locking pattern
             cachedKeys?.let { return Result.success(it) }
 
-            val response = runCatching { http.get(jwksUri).body<JsonObject>() }
+            val response = runCatching { httpClient.get(jwksUri).body<JsonObject>() }
                 .getOrElse { throw IllegalArgumentException("Could view keys list document at JWKS endpoint", it) }
             val keysArray = response["keys"] as? JsonArray
                 ?: throw IllegalStateException("JWKS response from '$jwksUri' does not contain a 'keys' array.")
