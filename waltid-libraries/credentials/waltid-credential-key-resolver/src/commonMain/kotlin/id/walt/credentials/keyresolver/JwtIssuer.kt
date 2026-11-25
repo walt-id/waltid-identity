@@ -12,10 +12,22 @@ fun resolveJwtIssuer(payload: JsonObject): String? {
         is JsonObject -> (value["id"] as? JsonPrimitive)?.contentOrNull
         else -> null
     }
-    val outer = identity(payload["iss"])
-    val vc = (payload["vc"] as? JsonObject)?.takeIf { "@context" in it || "type" in it }
-    val w3c = if ("vct" in payload) null else vc ?: payload.takeIf { "@context" in it || "type" in it }
-    val inner = identity(w3c?.get("issuer"))
-    require(outer == null || inner == null || outer == inner) { "Conflicting JWT and credential issuer claims" }
-    return outer ?: inner ?: identity(payload["issuer"])
+    val outer = payload["iss"]?.let { value ->
+        require(value is JsonPrimitive && value.isString) { "JWT iss must be a string" }
+        value.content
+    }
+    val issuers = generateSequence(payload) { it["vc"] as? JsonObject }
+        .takeWhile { "vct" !in it }
+        .mapNotNull { identity(it["issuer"]) }
+        .toList()
+    require((listOfNotNull(outer) + issuers).distinct().size <= 1) {
+        "Conflicting JWT and credential issuer claims"
+    }
+    return outer ?: issuers.firstOrNull()
 }
+
+/** Select the same W3C object for SD-JWT format detection and issuer interpretation. */
+fun w3cJwtPayload(payload: JsonObject): JsonObject? =
+    generateSequence(payload) { it["vc"] as? JsonObject }
+        .takeWhile { "vct" !in it }
+        .lastOrNull { data -> listOf("@context", "type", "validFrom", "issuanceDate").any { it in data } }
