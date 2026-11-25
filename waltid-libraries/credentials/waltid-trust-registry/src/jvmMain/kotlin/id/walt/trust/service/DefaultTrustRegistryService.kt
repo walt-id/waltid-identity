@@ -718,10 +718,17 @@ class DefaultTrustRegistryService(
 
         val uniqueEntities = admitted.map { it.entity.entityId }.distinct()
         if (uniqueEntities.size > 1) {
+            val role = listOfNotNull(
+                expectedEntityType?.let { "entity type $it" },
+                expectedServiceType?.let { "service type $it" }
+            ).takeIf { it.isNotEmpty() }?.joinToString(" and ", prefix = " with ").orEmpty()
             return TrustDecision(
                 decision = TrustDecisionCode.MULTIPLE_MATCHES,
                 evidence = listOf(
-                    TrustEvidence("MULTIPLE_ENTITIES", "Found ${uniqueEntities.size} different entities matching certificate")
+                    TrustEvidence(
+                        "MULTIPLE_ENTITIES",
+                        "Found ${uniqueEntities.size} different entities in accepted sources$role matching certificate"
+                    )
                 ),
                 warnings = uniqueEntities.map { "Matched entity: $it" }
             )

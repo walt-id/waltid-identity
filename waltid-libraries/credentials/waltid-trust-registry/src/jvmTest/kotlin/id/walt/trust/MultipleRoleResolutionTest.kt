@@ -100,6 +100,16 @@ class MultipleRoleResolutionTest {
     fun twoListingsOfTheRequestedRoleStayAmbiguous() = runTest {
         registry(rpListing, secondRpListing).assertEachLookup(TrustedEntityType.RELYING_PARTY_PROVIDER) { _, decision ->
             assertEquals(TrustDecisionCode.MULTIPLE_MATCHES, decision.decision)
+            val evidence = decision.evidence.single { it.type == "MULTIPLE_ENTITIES" }.value
+            assertTrue("entity type RELYING_PARTY_PROVIDER" in evidence, evidence)
+        }
+    }
+
+    @Test
+    fun anIdentityWhoseEntityIsMissingIsNotAnAmbiguity() = runTest {
+        registry(rpListing, secondRpListing.copy(entityStored = false)).assertEachLookup(expectedEntityType = null) { _, decision ->
+            assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
+            assertEquals(RP_ENTITY, decision.matchedEntity?.entityId)
         }
     }
 
@@ -157,7 +167,8 @@ class MultipleRoleResolutionTest {
 
     /**
      * One accepted source per listing, each listing the certificate for one entity with one granted service, or with
-     * no service when [serviceType] is `null`.
+     * no service when [serviceType] is `null`. Without [entityStored], the identity points to an entity the store
+     * does not have.
      */
     private data class Listing(
         val sourceId: String,
@@ -167,6 +178,7 @@ class MultipleRoleResolutionTest {
         val certificate: X509Certificate,
         val nextUpdate: Instant,
         val accepted: Boolean = true,
+        val entityStored: Boolean = true,
     )
 
     private val pidListing = Listing(
@@ -188,7 +200,10 @@ class MultipleRoleResolutionTest {
                         authenticityState = AuthenticityState.AUTHENTICATED, accepted = listing.accepted
                     ),
                 ),
-                listOf(TrustedEntity(listing.entityId, listing.sourceId, listing.entityType, listing.entityId)),
+                listOfNotNull(
+                    TrustedEntity(listing.entityId, listing.sourceId, listing.entityType, listing.entityId)
+                        .takeIf { listing.entityStored }
+                ),
                 listOfNotNull(
                     listing.serviceType?.let {
                         TrustedService(
