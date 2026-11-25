@@ -679,6 +679,27 @@ class DefaultTrustRegistryService(
         trustedSignerCertificates = trustedSignerCertificates
     )
 
+    /** A matched identity with the entity, service and source it belongs to, read from the store once. */
+    private data class MatchedIdentity(
+        val identity: ServiceIdentity,
+        val entity: TrustedEntity,
+        val service: TrustedService?,
+        val source: TrustSource?
+    ) {
+        fun hasEntityType(expected: TrustedEntityType?) = expected == null || entity.entityType == expected
+
+        /** A listing without a service has no service type, so it never has the expected one. */
+        fun hasServiceType(expected: String?) = expected == null || service?.serviceType == expected
+
+        val isAdmitted: Boolean get() = source?.assurance?.accepted == true
+    }
+
+    /**
+     * Ambiguity is counted among the admitted listings in the requested role: a certificate listed for several
+     * entities resolves when exactly one of them has the expected entity and service type in an accepted source.
+     * With no expected type, every match is in the role. A source that is not accepted never decides trust, so its
+     * listings neither resolve the certificate nor make it ambiguous.
+     */
     private suspend fun buildDecisionFromIdentities(
         identities: List<ServiceIdentity>,
         instant: Instant,
@@ -686,44 +707,41 @@ class DefaultTrustRegistryService(
         expectedServiceType: String?,
         matchEvidenceType: String = "CERTIFICATE_MATCH"
     ): TrustDecision {
-        if (identities.size > 1) {
-            // Multiple matches — check if they're all from the same entity
-            val uniqueEntities = identities.map { it.entityId }.distinct()
-            if (uniqueEntities.size > 1) {
-                return TrustDecision(
-                    decision = TrustDecisionCode.MULTIPLE_MATCHES,
-                    evidence = listOf(
-                        TrustEvidence("MULTIPLE_ENTITIES", "Found ${uniqueEntities.size} different entities matching certificate")
-                    ),
-                    warnings = uniqueEntities.map { "Matched entity: $it" }
-                )
-            }
+        val matches = identities.mapNotNull { identity ->
+            val entity = store.getEntity(identity.entityId) ?: return@mapNotNull null
+            MatchedIdentity(
+                identity, entity, identity.serviceId?.let { store.getService(it) }, store.getSource(entity.sourceId)
+            )
         }
+        val inRole = matches.filter { it.hasEntityType(expectedEntityType) && it.hasServiceType(expectedServiceType) }
+        val admitted = inRole.filter { it.isAdmitted }
 
-        // Evaluate ALL matching identities and pick the best result
-        // Priority: TRUSTED > STALE_SOURCE > NOT_TRUSTED (with matching types preferred)
-        val candidates = identities.mapNotNull { identity ->
-            evaluateIdentity(identity, instant, expectedEntityType, expectedServiceType, matchEvidenceType)
-        }
-
-        if (candidates.isEmpty()) {
-            // All identities failed to resolve
+        val uniqueEntities = admitted.map { it.entity.entityId }.distinct()
+        if (uniqueEntities.size > 1) {
             return TrustDecision(
+                decision = TrustDecisionCode.MULTIPLE_MATCHES,
+                evidence = listOf(
+                    TrustEvidence("MULTIPLE_ENTITIES", "Found ${uniqueEntities.size} different entities matching certificate")
+                ),
+                warnings = uniqueEntities.map { "Matched entity: $it" }
+            )
+        }
+
+        // Evaluate the admitted listings in the role. Without one, the denial names the closest miss: a listing in the
+        // role whose source is not accepted, else a listing of another entity or service type.
+        // Priority: TRUSTED > STALE_SOURCE > NOT_TRUSTED
+        val candidates = admitted.ifEmpty { inRole }.ifEmpty { matches }.map { match ->
+            evaluateIdentity(match, instant, expectedEntityType, expectedServiceType, matchEvidenceType)
+        }
+
+        return candidates.minByOrNull { decisionPriority(it.decision) }
+            // No identity's entity could be read
+            ?: TrustDecision(
                 decision = TrustDecisionCode.NOT_TRUSTED,
                 evidence = listOf(
                     TrustEvidence("NO_VALID_IDENTITY", "No valid identity could be resolved")
                 )
             )
-        }
-
-        // Sort by decision priority: TRUSTED first, then STALE_SOURCE, then NOT_TRUSTED
-        // Within same decision, prefer type-matched results
-        return candidates.sortedWith(
-            compareBy(
-                { decisionPriority(it.decision) },
-                { if (it.evidence.any { e -> e.type.contains("MISMATCH") }) 1 else 0 }
-            )
-        ).first()
     }
 
     private fun decisionPriority(decision: TrustDecisionCode): Int = when (decision) {
@@ -734,23 +752,17 @@ class DefaultTrustRegistryService(
         else -> 4
     }
 
-    private suspend fun evaluateIdentity(
-        identity: ServiceIdentity,
+    /** Checks the role before the source, so a listing of another type is a type mismatch wherever it is listed. */
+    private fun evaluateIdentity(
+        match: MatchedIdentity,
         instant: Instant,
         expectedEntityType: TrustedEntityType?,
         expectedServiceType: String?,
-        matchEvidenceType: String = "CERTIFICATE_MATCH"
-    ): TrustDecision? {
-        val entity = store.getEntity(identity.entityId) ?: return null
-        val source = store.getSource(entity.sourceId)
-        val service = identity.serviceId?.let { store.getService(it) }
+        matchEvidenceType: String
+    ): TrustDecision {
+        val (identity, entity, service, source) = match
 
-        if (source?.assurance?.accepted != true) {
-            return sourceNotAcceptedDecision(source, entity, service)
-        }
-
-        // Type filtering
-        if (expectedEntityType != null && entity.entityType != expectedEntityType) {
+        if (!match.hasEntityType(expectedEntityType)) {
             return TrustDecision(
                 decision = TrustDecisionCode.NOT_TRUSTED,
                 matchedEntity = entity,
@@ -760,15 +772,22 @@ class DefaultTrustRegistryService(
             )
         }
 
-        if (expectedServiceType != null && service != null && service.serviceType != expectedServiceType) {
+        if (!match.hasServiceType(expectedServiceType)) {
             return TrustDecision(
                 decision = TrustDecisionCode.NOT_TRUSTED,
                 matchedEntity = entity,
                 matchedService = service,
                 evidence = listOf(
-                    TrustEvidence("SERVICE_TYPE_MISMATCH", "Expected $expectedServiceType but found ${service.serviceType}")
+                    TrustEvidence(
+                        "SERVICE_TYPE_MISMATCH",
+                        "Expected $expectedServiceType but found ${service?.serviceType ?: "no service"}"
+                    )
                 )
             )
+        }
+
+        if (source?.assurance?.accepted != true) {
+            return sourceNotAcceptedDecision(source, entity, service)
         }
 
         val freshness = evaluateFreshness(source, instant)
