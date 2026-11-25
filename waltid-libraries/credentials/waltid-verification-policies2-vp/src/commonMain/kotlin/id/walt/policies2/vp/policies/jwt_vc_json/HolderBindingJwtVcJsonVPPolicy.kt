@@ -10,6 +10,8 @@ import id.walt.crypto2.serialization.BinaryData
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /** Binds every embedded credential to the cryptographically verified envelope signer. */
 @Serializable
@@ -31,7 +33,8 @@ class HolderBindingJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
         val thumbprint = Jwk.sha256Thumbprint(EncodedKey.Jwk(
             data = BinaryData(publicJwk.toString().encodeToByteArray()), privateMaterial = false,
         ))
-        val issuer = requireNotNull(presentation.issuer)
+        val issuer = signature.results["signer_identifier"]?.jsonPrimitive?.contentOrNull
+            ?.takeIf { signature.results["holder_key_source"]?.jsonPrimitive?.contentOrNull == "DID" }
         val credentials = requireNotNull(presentation.credentials).also { require(it.isNotEmpty()) }
         for (credential in credentials) {
             CredentialHolderBinding.requireBoundToPresenter(credential, issuer, thumbprint)
