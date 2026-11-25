@@ -55,7 +55,7 @@ data class ChainValidationResult(
 /** X.509 certificate validation building block (EN 319 102-1 5.2.6, shell model). */
 class CertificateChainValidator(
     val resolver: ValidationDataResolver,
-    private val policy: AdesValidationPolicy,
+    internal val policy: AdesValidationPolicy,
 ) {
     /** RFC 5280 path constraints are shared with waltid-x509; AdES retains revocation and POE processing. */
     private suspend fun validatePath(chain: List<X509Certificate>, time: Instant): String? {
@@ -192,7 +192,9 @@ class TimestampValidator(
         )
 
         // TSA certificate validated at generation time; revocation known at any later point counts.
-        val chain = chainValidator.validate(tsa, genTime, fresh = { it !is RevocationStatus.Unknown })
+        // Evidence already stale before that time cannot establish the TSA's historical status.
+        val chain = chainValidator.validate(tsa, genTime,
+            fresh = chainValidator.freshAt(genTime, chainValidator.policy.validationTime ?: Clock.System.now()))
         val problems = v.problems + listOfNotNull(chain.message.takeIf { !chain.passed })
         return when {
             chain.passed -> TimestampValidationResult(evidence.type, Indication.PASSED, null, genTime, tsa, problems, token.tstInfo.accuracy)
