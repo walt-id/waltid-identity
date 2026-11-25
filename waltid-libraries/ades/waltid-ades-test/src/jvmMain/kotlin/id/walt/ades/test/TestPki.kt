@@ -166,7 +166,7 @@ class TestPki(
         ocspNoCheck: Boolean = false,
         withRevocationInfo: Boolean = false,
         keyUsageBits: Int? = null,
-        crlReasons: ReasonFlags? = null,
+        crlReasons: List<ReasonFlags?> = listOf(null),
         notBefore: Instant = now - 365.days,
         notAfter: Instant = now + 365.days,
     ): TestEntity {
@@ -192,7 +192,11 @@ class TestPki(
             val caName = if (issuer.name.contains("Root")) "root" else "issuing"
             builder.addExtension(
                 Extension.cRLDistributionPoints, false,
-                CRLDistPoint(arrayOf(DistributionPoint(DistributionPointName(GeneralNames(GeneralName(GeneralName.uniformResourceIdentifier, "$baseUrl/crl/$crlName.crl"))), crlReasons, null))),
+                CRLDistPoint(crlReasons.mapIndexed { index, reasons ->
+                    val suffix = if (index == 0) "" else "-$index"
+                    DistributionPoint(DistributionPointName(GeneralNames(GeneralName(GeneralName.uniformResourceIdentifier,
+                        "$baseUrl/crl/$crlName$suffix.crl"))), reasons, null)
+                }.toTypedArray()),
             )
             val aia = mutableListOf(AccessDescription(AccessDescription.id_ad_caIssuers, GeneralName(GeneralName.uniformResourceIdentifier, "$baseUrl/ca/$caName.crt")))
             if (!ca) aia += AccessDescription(AccessDescription.id_ad_ocsp, GeneralName(GeneralName.uniformResourceIdentifier, "$baseUrl/ocsp"))
