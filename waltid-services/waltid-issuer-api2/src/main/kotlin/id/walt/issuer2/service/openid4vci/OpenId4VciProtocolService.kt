@@ -105,6 +105,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.parseQueryString
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -585,7 +586,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                     credentialData = issuanceRequest.idTokenClaimsMapping?.let { claimsMapping ->
                         JsonObjectPathMapper.fromSourceToDestinationJsonPathsMap(
                             source = idTokenClaims,
-                            destination = issuanceRequest.credentialData,
+                            destination = profileService.claimsDestination(
+                                issuanceRequest.credentialConfigurationId, issuanceRequest.credentialData, claimsMapping,
+                            ),
                             jsonPathMapConfig = claimsMapping,
                         )
                     } ?: issuanceRequest.credentialData
@@ -1316,7 +1319,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             var statusOperation: CredentialStatusIssuanceOperation? = null
             var statusHolderKeys = emptyList<String>()
             var proofPublicKeyJwks: List<JsonObject>? = null
-            val issuedAt = Clock.System.now()
+            val issuedAt = currentCoroutineContext()[IssuanceClock]?.clock?.now() ?: Clock.System.now()
             val resolvedMsoValidity = if (configuration.format == CredentialFormat.MSO_MDOC) {
                 MsoValidityResolver.resolve(
                     issuanceRequest.msoData,

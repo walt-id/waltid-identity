@@ -5,11 +5,15 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
+import id.walt.openid4vci.mdoc.MdlAge
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
 import io.ktor.server.plugins.NotFoundException
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -19,6 +23,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class CredentialProfileServiceTest {
 
@@ -203,6 +208,68 @@ class CredentialProfileServiceTest {
             service.listProfiles()
         }
     }
+
+    @Test
+    fun `rejects invalid mDL birth dates and literal ages`() {
+        for (value in listOf(JsonPrimitive("1988-02-30"), JsonPrimitive("1988-08-25T00:00:00Z"), JsonPrimitive(19880825), JsonNull)) {
+            val error = assertFailsWith<IllegalArgumentException> {
+                mdlProfileService(birthDate = value).getProfile("isoMdl")
+            }
+            assertTrue(error.message.orEmpty().contains("credentialData.${MdlAge.NAMESPACE}.birth_date"))
+        }
+        for (value in listOf(JsonPrimitive(-1), JsonPrimitive("38"), JsonPrimitive(38.5), JsonPrimitive(true), JsonNull)) {
+            val error = assertFailsWith<IllegalArgumentException> {
+                mdlProfileService(age = value).getProfile("isoMdl")
+            }
+            assertTrue(error.message.orEmpty().contains("credentialData.${MdlAge.NAMESPACE}.age_in_years"))
+        }
+    }
+
+    @Test
+    fun `checks literal mDL age against the UTC date of a fixed validity start`() {
+        val validFrom = MsoData(validFrom = "2027-08-25T01:00:00+02:00")
+        val valid = mdlProfileService(age = JsonPrimitive(38), msoData = validFrom)
+        assertEquals("isoMdl", valid.getProfile("isoMdl").profileId)
+        val error = assertFailsWith<IllegalArgumentException> {
+            mdlProfileService(age = JsonPrimitive(39), msoData = validFrom).getProfile("isoMdl")
+        }
+        assertTrue(error.message.orEmpty().contains("credentialData.${MdlAge.NAMESPACE}.age_in_years must be 38"))
+    }
+
+    @Test
+    fun `allows a birth date supplied later by an ID token claims mapping`() {
+        val profile = mdlProfileService(
+            birthDate = null,
+            age = JsonPrimitive(38),
+            idTokenClaimsMapping = mapOf("$.birthdate" to "$.['${MdlAge.NAMESPACE}'].birth_date"),
+        ).getProfile("isoMdl")
+        assertEquals(JsonObject(mapOf("age_in_years" to JsonPrimitive(38))), profile.credentialData[MdlAge.NAMESPACE])
+    }
+
+    private fun mdlProfileService(
+        birthDate: JsonElement? = JsonPrimitive("1988-08-25"),
+        age: JsonElement = JsonPrimitive(38),
+        msoData: MsoData? = null,
+        idTokenClaimsMapping: Map<String, String>? = null,
+    ) = serviceWithProfiles(
+        profiles = mapOf("isoMdl" to profileConfig(
+            credentialConfigurationId = MDOC_CONFIGURATION_ID,
+            credentialData = buildJsonObject {
+                putJsonObject(MdlAge.NAMESPACE) {
+                    birthDate?.let { put("birth_date", it) }
+                    put("age_in_years", age)
+                }
+            },
+            msoData = msoData,
+            idTokenClaimsMapping = idTokenClaimsMapping,
+        )),
+        metadataConfig = metadataConfig(mapOf(
+            MDOC_CONFIGURATION_ID to buildJsonObject {
+                put("format", "mso_mdoc")
+                put("doctype", MdlAge.DOC_TYPE)
+            },
+        )),
+    )
 
     private fun serviceWithProfiles(
         profiles: Map<String, CredentialProfileConfig>,

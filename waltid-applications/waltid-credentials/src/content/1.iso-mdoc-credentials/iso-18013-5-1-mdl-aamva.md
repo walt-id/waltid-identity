@@ -34,7 +34,6 @@
     "birth_place": "Sample City",
     "resident_address": "Sample Street 123, 12345 Sample City, Sample State, Utopia",
     "portrait_capture_date": "2020-03-14T12:00:00Z",
-    "age_in_years": 54,
     "age_birth_year": 1971,
     "age_over_13": true,
     "age_over_16": true,
@@ -46,18 +45,14 @@
     "age_over_65": false,
     "age_over_68": false,
     "issuing_jurisdiction": "State of Utopia",
-    "nationality": "ZZ",
+    "nationality": "AT",
     "resident_city": "Sample City",
     "resident_state": "Sample State",
     "resident_postal_code": "12345",
     "resident_country": "ZZ",
     "family_name_national_character": null,
     "given_name_national_character": null,
-    "signature_usual_mark": null,
-    "biometric_template_face": null,
-    "biometric_template_finger": null,
-    "biometric_template_signature_sign": null,
-    "biometric_template_iris": null
+    "signature_usual_mark": null
   },
   "org.iso.18013.5.1.aamva": {
     "domestic_driving_privileges": null,

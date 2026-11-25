@@ -18,6 +18,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigning
 import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.openid4vci.mdoc.MdlAge
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.proofs.VerifiedCredentialBinding
@@ -36,6 +37,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
@@ -106,6 +108,8 @@ class MdocCredentialHandler(
                             display,
                             instance.verifiedBinding,
                             issuedAt,
+                            docType,
+                            effectiveValidFrom ?: signedAt,
                         ),
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
@@ -165,6 +169,8 @@ class MdocCredentialHandler(
                         display,
                         instance.verifiedBinding,
                         issuedAt,
+                        docType,
+                        effectiveValidFrom ?: signedAt,
                     ),
                     issuerKey = issuerKey.key,
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
@@ -194,14 +200,33 @@ class MdocCredentialHandler(
         display: List<CredentialDisplay>?,
         verifiedBinding: VerifiedCredentialBinding?,
         issuedAt: Instant,
+        docType: String,
+        validFrom: Instant,
     ): JsonObject {
         if (dataMapping.isNullOrEmpty()) return credentialData
         val namespaceMapping = dataMapping.mdocNamespaceMapping(credentialData) ?: return credentialData
-        return credentialData.mergeMdocPayloadWithMapping(
-            mapping = namespaceMapping,
+        val mdlMapping = namespaceMapping[MdlAge.NAMESPACE] as? JsonObject
+        val deriveAge = docType == MdlAge.DOC_TYPE &&
+            mdlMapping?.get(MdlAge.AGE_IN_YEARS) == JsonPrimitive(MdlAge.AGE_MAPPING)
+        val mapping = if (deriveAge) {
+            JsonObject(namespaceMapping + (MdlAge.NAMESPACE to JsonObject(mdlMapping.orEmpty() - MdlAge.AGE_IN_YEARS)))
+        } else {
+            namespaceMapping
+        }
+        val mappedData = credentialData.mergeMdocPayloadWithMapping(
+            mapping = mapping,
             context = mdocMappingContext(issuerId, display, verifiedBinding?.holderDid),
             data = dataFunctionsFor(InstantClock(issuedAt)),
         )
+        if (!deriveAge) return mappedData
+
+        // Derive the age after namespace mappings have supplied the final birth date.
+        val mdlData = mappedData.getValue(MdlAge.NAMESPACE).jsonObject
+        val birthDatePath = "credentialData.${MdlAge.NAMESPACE}.${MdlAge.BIRTH_DATE}"
+        val birthDate = MdlAge.parseBirthDate(mdlData[MdlAge.BIRTH_DATE], birthDatePath)
+        val age = MdlAge.completedYears(birthDate, validFrom, birthDatePath)
+        val mdlDataWithAge = JsonObject(mdlData + (MdlAge.AGE_IN_YEARS to JsonPrimitive(age)))
+        return JsonObject(mappedData + (MdlAge.NAMESPACE to mdlDataWithAge))
     }
 
     private fun mdocMappingContext(

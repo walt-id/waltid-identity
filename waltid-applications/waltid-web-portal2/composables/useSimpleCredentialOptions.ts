@@ -61,7 +61,6 @@ const MDL_DEFAULT_CREDENTIAL_DATA: Record<string, unknown> = {
     birth_place: "Graz",
     resident_address: "Mariahilfer Strasse 120/8",
     portrait_capture_date: "2024-12-20T12:00:00Z",
-    age_in_years: 36,
     age_birth_year: 1988,
     age_over_12: true,
     age_over_13: true,
@@ -75,7 +74,7 @@ const MDL_DEFAULT_CREDENTIAL_DATA: Record<string, unknown> = {
     age_over_65: false,
     age_over_68: false,
     issuing_jurisdiction: "AT-9",
-    nationality: "AUT",
+    nationality: "AT",
     resident_city: "Wien",
     resident_state: "Wien",
     resident_postal_code: "1070",
@@ -84,10 +83,6 @@ const MDL_DEFAULT_CREDENTIAL_DATA: Record<string, unknown> = {
     given_name_national_character: "Anna Maria",
     signature_usual_mark:
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0i8AAAAASUVORK5CYII=",
-    biometric_template_face: null,
-    biometric_template_finger: null,
-    biometric_template_signature_sign: null,
-    biometric_template_iris: null,
   },
 };
 
