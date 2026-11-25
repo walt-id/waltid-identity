@@ -6,10 +6,11 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.jose.CompactJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.openid4vp.clientidprefix.isMissing
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.prefixes.ClientIdX509Trust.authorizeX509Chain
+import id.walt.openid4vp.clientidprefix.prefixes.ClientIdX509Trust.validateX509Chain
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -53,7 +54,7 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
     ): ClientValidationResult {
         val jws = context.requestObjectJws
             ?: return ClientValidationResult.Failure(ClientIdError.MissingRequestObject)
-        if (trustConfiguration.x509TrustAnchors.isMissing()) {
+        if (!trustConfiguration.hasX509Trust) {
             return ClientValidationResult.Failure(ClientIdError.MissingX509TrustAnchors)
         }
 
@@ -78,7 +79,7 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
         val leafCertificate = certificates.firstOrNull()
             ?: return ClientValidationResult.Failure(ClientIdError.EmptyX5cHeader)
 
-        ClientIdCrypto2.validateCertificateChain(certificates, trustConfiguration.x509TrustStore)?.let { error ->
+        trustConfiguration.validateX509Chain(certificates)?.let { error ->
             return error
         }
         try {
@@ -93,6 +94,10 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
         val calculatedHash = hashOfCertificate(leafCertificate.encodedDer.toByteArray())
         if (clientId.hash != calculatedHash) {
             return ClientValidationResult.Failure(ClientIdError.X509HashMismatch)
+        }
+        // Last, so that only a signed request bound to this client id reaches a trust registry.
+        trustConfiguration.authorizeX509Chain(certificates)?.let { error ->
+            return error
         }
         return context.clientMetadata?.let(ClientValidationResult::Success)
             ?: ClientValidationResult.Failure(ClientIdError.MissingClientMetadata)

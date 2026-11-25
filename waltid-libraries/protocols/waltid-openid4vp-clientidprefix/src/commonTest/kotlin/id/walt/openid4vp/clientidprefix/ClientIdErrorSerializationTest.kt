@@ -24,6 +24,7 @@ class ClientIdErrorSerializationTest {
         ClientIdError.X509HashMismatch,
         ClientIdError.MissingX509TrustAnchors,
         ClientIdError.X509TrustAnchorMismatch,
+        ClientIdError.X509TrustSourceUnavailable,
         ClientIdError.RedirectUriHostMismatch("verifier.example.com", "other.example.com"),
         ClientIdError.DidResolutionFailed("not resolvable"),
         ClientIdError.AttestationError("expired"),

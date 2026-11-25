@@ -142,7 +142,7 @@ object AuthorizationRequestResolver {
                     if (unsignedRequestObjectPolicy == UnsignedRequestObjectPolicy.REQUIRE_SIGNED) {
                         add(ClientIdPrefix.REDIRECT_URI)
                     }
-                    if (trustConfiguration.x509TrustAnchors == null || !platformSupportsPkixCertificatePathValidation) {
+                    if (!trustConfiguration.hasX509Trust || !platformSupportsPkixCertificatePathValidation) {
                         add(ClientIdPrefix.X509_SAN_DNS)
                         add(ClientIdPrefix.X509_HASH)
                     }

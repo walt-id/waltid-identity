@@ -82,6 +82,32 @@ when (val result = ClientIdPrefixAuthenticator.authenticate(clientId, requestCon
 }
 ```
 
+### X.509 trust
+
+`x509_san_dns` and `x509_hash` fail closed unless `ClientIdTrustConfiguration` names a trust source.
+When both are set, the registry alone decides those prefixes, so a registry denial never falls through
+to a pinned anchor:
+
+- `x509TrustAnchors`: a static `X509CertificateTrustStore`. The chain is validated against it (PKIX).
+- `x509TrustRegistry`: a `ClientIdX509TrustRegistry` around a `TrustDecisionEvaluator` from
+  `waltid-trust-decision`. The wallet checks that `x5c` is one leaf-first chain, that every certificate
+  is within its validity period, the leaf profile, the request signature and the client id binding. Then
+  it asks the evaluator about the full `x5c` chain for `WALLET_PRESENTATION_AUTH_REQUEST`.
+  The decision must meet `TrustRequirement.RegistryFresh`: `TRUSTED` for a relying-party entity type,
+  from an accepted, fresh source. An `UNKNOWN` decision fails with `X509TrustSourceUnavailable`, any
+  other denial with `X509TrustAnchorMismatch`.
+
+```kotlin
+val trust = ClientIdTrustConfiguration(
+    x509TrustRegistry = ClientIdX509TrustRegistry(
+        evaluator = HttpTrustDecisionEvaluator("https://trust.example.com/resolve/certificate-chain"),
+    ),
+)
+```
+
+A `verifier_attestation` signed with `x5c` is checked only against `x509TrustAnchors`, with or without a
+registry.
+
 ## Related Libraries
 
 - **[waltid-openid4vp](../waltid-openid4vp/README.md)** - Core OpenID4VP models

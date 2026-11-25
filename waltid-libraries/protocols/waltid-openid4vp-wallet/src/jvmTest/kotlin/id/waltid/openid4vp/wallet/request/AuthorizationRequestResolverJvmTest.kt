@@ -2,6 +2,7 @@
 
 package id.waltid.openid4vp.wallet.request
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -9,6 +10,10 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.openid4vp.clientidprefix.ClientIdX509TrustRegistry
+import id.walt.trust.decision.TrustDecisionEvaluator
+import id.walt.trust.model.TrustDecision
+import id.walt.trust.model.TrustDecisionCode
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webdatafetching.WebDataFetcher
@@ -418,7 +423,7 @@ class AuthorizationRequestResolverJvmTest {
             AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
                 vpFormatsSupported = jsonObjectOf(),
                 trustConfiguration = ClientIdTrustConfiguration(
-                    x509TrustAnchors = InMemoryTrustStore(),
+                    x509TrustAnchors = InMemoryTrustStore(listOf(X509CertificateUtil.parseCertificatePem(ANCHOR_PEM))),
                     trustedVerifierAttestationIssuers = setOf("did:example:attester"),
                 ),
             )
@@ -426,6 +431,40 @@ class AuthorizationRequestResolverJvmTest {
 
         assertEquals(
             listOf("redirect_uri", "x509_san_dns", "x509_hash", "decentralized_identifier", "verifier_attestation"),
+            metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun `wallet metadata advertises x509 client id prefixes with a trust registry and no anchors`() {
+        val metadata = Json.parseToJsonElement(
+            AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = jsonObjectOf(),
+                trustConfiguration = ClientIdTrustConfiguration(
+                    x509TrustRegistry = ClientIdX509TrustRegistry(
+                        TrustDecisionEvaluator { TrustDecision(TrustDecisionCode.NOT_TRUSTED) }
+                    ),
+                ),
+            )
+        ).jsonObject
+
+        assertEquals(
+            listOf("redirect_uri", "x509_san_dns", "x509_hash", "decentralized_identifier"),
+            metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun `wallet metadata does not advertise x509 client id prefixes with an empty trust store`() {
+        val metadata = Json.parseToJsonElement(
+            AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = jsonObjectOf(),
+                trustConfiguration = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore()),
+            )
+        ).jsonObject
+
+        assertEquals(
+            listOf("redirect_uri", "decentralized_identifier"),
             metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
         )
     }
@@ -1262,5 +1301,21 @@ class AuthorizationRequestResolverJvmTest {
         put("use", "enc")
         put("alg", "ECDH-ES")
         put("kid", "enc-key")
+    }
+
+    private companion object {
+        /** The demo verifier certificate from wallet-api2's `wallet-service.conf`, used as a pinned anchor. */
+        const val ANCHOR_PEM = """-----BEGIN CERTIFICATE-----
+MIIB2DCCAX+gAwIBAgIUHM9IDlzSNPwZcKStPxhcDrQBxPEwCgYIKoZIzj0EAwIw
+MTEdMBsGA1UEAwwUdmVyaWZpZXIuZXhhbXBsZS5jb20xEDAOBgNVBAoMB3dhbHQu
+aWQwHhcNMjYwODEzMDAwMDAwWhcNMjgwODEzMDAwMDAwWjAxMR0wGwYDVQQDDBR2
+ZXJpZmllci5leGFtcGxlLmNvbTEQMA4GA1UECgwHd2FsdC5pZDBZMBMGByqGSM49
+AgEGCCqGSM49AwEHA0IABBv04AXNAZJjIqYkP+oJGpiJ95pqe4XE62bsqy05pJz9
+VkRMZdXYXSMff5AJLrnHiN0x5MV6u/8vrAcytGUe4z6jdTBzMAwGA1UdEwEB/wQC
+MAAwDgYDVR0PAQH/BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMCMB8GA1UdEQQY
+MBaCFHZlcmlmaWVyLmV4YW1wbGUuY29tMB0GA1UdDgQWBBSCJZ2bjB1VuLM8lvN8
+e/M4MYmLvzAKBggqhkjOPQQDAgNHADBEAiAI8wYnWdTWeqNLKMVw8UU4xPPnZkR4
+5NhD/iUNKexRdgIgCdTIULB9hbTNdm+S7nANVTuVw3Kw0tnUjF7Ihdia/dw=
+-----END CERTIFICATE-----"""
     }
 }
