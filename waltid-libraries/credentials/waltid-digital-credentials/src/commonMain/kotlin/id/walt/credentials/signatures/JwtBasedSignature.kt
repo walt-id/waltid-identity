@@ -20,7 +20,7 @@ interface JwtBasedSignature {
     suspend fun getCrypto2JwtBasedIssuer(
         credentialData: JsonObject,
         resolver: Crypto2JwtKeyResolver = Crypto2JwtKeyResolver(
-            verificationRelationship = VerificationRelationshipType.AssertionMethod,
+            didVerificationRelationship = VerificationRelationshipType.AssertionMethod,
         ),
     ): ResolvedJwtVerificationKey? = resolver.resolveFromJwt(jwtHeader, credentialData)
 }
