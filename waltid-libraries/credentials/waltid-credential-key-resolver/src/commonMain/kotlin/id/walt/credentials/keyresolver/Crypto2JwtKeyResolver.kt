@@ -45,13 +45,18 @@ fun interface Crypto2JwtVerificationKeyResolver {
  * [id.walt.credentials.keyresolver.resolvers.X5cTrustAnchors], before it is relied on.
  */
 class Crypto2JwtKeyResolver(
-    private val didResolver: Crypto2DidKeyResolver = DidDocumentCrypto2KeyResolver(
-        resolveDocument = { did -> DidService.resolve(did) },
-    ),
+    private val didResolver: Crypto2DidKeyResolver = defaultDidResolver(),
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
     private val allowInlineJwk: Boolean = false,
-    private val verificationRelationship: VerificationRelationshipType? = null,
+    private val didVerificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2JwtVerificationKeyResolver {
+    // Keep the released three-argument JVM constructor and its default-argument bridge.
+    constructor(
+        didResolver: Crypto2DidKeyResolver = defaultDidResolver(),
+        runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+        allowInlineJwk: Boolean = false,
+    ) : this(didResolver, runtime, allowInlineJwk, null)
+
     override suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey? {
         val kid = jwtHeader?.get("kid")?.jsonPrimitive?.contentOrNull
         return try {
@@ -59,7 +64,7 @@ class Crypto2JwtKeyResolver(
             when {
                 // 1. DID resolution is authoritative for DID issuer identifiers.
                 signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) -> {
-                    val key = resolveFromDid(signerIdentifier, kid, verificationRelationship)
+                    val key = resolveFromDid(signerIdentifier, kid, didVerificationRelationship)
                     ResolvedJwtVerificationKey(key, JwtKeyResolutionSource.DID, signerIdentifier, kid)
                 }
                 // 2. Inline X.509 certificate chain.
@@ -99,6 +104,10 @@ class Crypto2JwtKeyResolver(
             null
         }
     }
+
+    /** Released generic DID-key lookup; relationship-aware callers use the three-argument overload. */
+    suspend fun resolveFromDid(did: String, keyId: String? = null): Key =
+        resolveFromDid(did, keyId, relationship = null)
 
     suspend fun resolveFromDid(
         did: String,
@@ -211,6 +220,10 @@ class Crypto2JwtKeyResolver(
 
 
     companion object {
+        private fun defaultDidResolver(): Crypto2DidKeyResolver = DidDocumentCrypto2KeyResolver(
+            resolveDocument = { did -> DidService.resolve(did) },
+        )
+
         private val log = KotlinLogging.logger { }
     }
 }
