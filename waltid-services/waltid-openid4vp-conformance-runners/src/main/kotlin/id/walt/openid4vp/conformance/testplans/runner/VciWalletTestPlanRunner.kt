@@ -1,10 +1,13 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import id.walt.openid4vp.conformance.report.FullPlanEvidence
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
+import id.walt.openid4vp.conformance.testplans.http.ConformanceEvidenceRequired
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
-import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletModuleApplicability
 import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletTestPlan
+import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletModuleApplicability
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -55,6 +58,10 @@ class VciWalletTestPlanRunner(
         requiredModules: Set<String> = emptySet(),
         requiredVariant: Map<String, String> = emptyMap(),
     ): List<TestPlanResult> {
+        require(ConformanceExecutionMode.current != ConformanceExecutionMode.FULL_PLAN ||
+            (requiredModules.isEmpty() && requiredVariant.isEmpty())) {
+            "Full-plan mode forbids wallet module/variant slices"
+        }
         printHeader()
 
         val results = mutableListOf<TestPlanResult>()
@@ -82,7 +89,15 @@ class VciWalletTestPlanRunner(
 
             modules.forEachIndexed { index, module ->
                 println("[${index + 1}/${modules.size}] Running: ${module.testModule}")
-                val result = runModule(testPlanId, module).copy(testName = "${testPlan.producerId}/${module.testModule}")
+                val skip = VciWalletModuleApplicability.skipReason(module.testModule,
+                    fullPlan = ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN,
+                    explicitlySelected = requiredModules.isNotEmpty(),
+                    deferred = (module.variant["vci_credential_issuance_mode"]?.jsonPrimitive?.content
+                        ?: testPlan.variant["vci_credential_issuance_mode"]) == "deferred")
+                val result = (if (skip != null) TestPlanResult(
+                    conformanceTestId = "N/A", conformanceResult = "SKIPPED", walletStatus = "SKIPPED", skipReason = skip,
+                ) else runModule(testPlanId, module)).copy(testName = "${testPlan.producerId}/${module.testModule}")
+                FullPlanEvidence.record(testPlanId, index, module, result)
                 results.add(result)
                 println("   Status: ${result.conformanceResult}")
                 if (result.errorMessage != null) {
@@ -167,6 +182,7 @@ class VciWalletTestPlanRunner(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            testId?.let { cancelQuietly(it) }
             return TestPlanResult(
                 testName = "${testPlan.producerId}/${module.testModule}",
                 conformanceTestId = testId ?: module.testModule,
@@ -218,22 +234,30 @@ class VciWalletTestPlanRunner(
         println("   Test ID: $testId")
         println("   View: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
 
-        VciWalletModuleApplicability.skipReason(module.testModule, variantJson)?.let { reason ->
-            // Cancelled explicitly because a module left WAITING holds the plan alias and would
-            // take the next module down with it.
-            println("   Skipping: $reason")
-            conformance.cancelTest(testId)
-            return TestPlanResult(
-                conformanceTestId = testId,
-                conformanceResult = "SKIPPED",
-                walletStatus = "SKIPPED",
-                skipReason = reason,
-            )
-        }
 
         println("   Credential Offer Endpoint: $walletAdapterUrl/credential-offer")
 
-        deliverCredentialOfferToWallet(testId)
+        val walletResponse = if (module.testModule.startsWith("fapi2-security-profile-final-client-test-")) {
+            var issuer: String? = null
+            repeat(OFFER_POLL_ATTEMPTS) {
+                if (issuer == null) {
+                    if (conformance.getTestRunInfo(testId).status == "WAITING") {
+                        issuer = conformance.getTestRun(testId).exposed["credential_issuer"]?.jsonPrimitive?.content
+                    }
+                    if (issuer == null) delay(POLL_INTERVAL_MILLISECONDS)
+                }
+            }
+            checkNotNull(issuer) { "FAPI VCI module did not expose a credential issuer" }
+            val offer = conformance.getTestRun(testId).getBrowserUrls().firstOrNull()
+            walletHttpClient.post("$walletAdapterUrl/issuance-session") {
+                parameter("credential_issuer", issuer)
+                offer?.let { parameter("offer_url", it) }
+                parameter("format", testPlan.credentialFormat)
+            }
+        } else deliverCredentialOfferToWallet(testId, module.testModule.endsWith("-batch-credential-issuance"))
+        val observedWalletStatus = if (walletResponse.status.isSuccess()) "STORED" else "REJECTED"
+        val walletBody = walletResponse.bodyAsText()
+        if (walletBody.startsWith("Wallet SDK")) println("   $walletBody")
         println()
 
         val maxAttempts = MODULE_POLL_ATTEMPTS
@@ -244,6 +268,20 @@ class VciWalletTestPlanRunner(
             attempts++
 
             val testInfo = conformance.getTestRunInfo(testId)
+            if (testInfo.status == "WAITING") {
+                try {
+                    conformance.fulfillPendingImagePlaceholders(testId)
+                } catch (e: ConformanceEvidenceRequired) {
+                    conformance.cancelTest(testId)
+                    return TestPlanResult(
+                        conformanceTestId = testId,
+                        conformanceStatus = testInfo.status,
+                        conformanceResult = testInfo.result,
+                        walletStatus = observedWalletStatus,
+                        blockerReason = "Actual wallet UI evidence is required; observed SDK outcome: $observedWalletStatus",
+                    )
+                }
+            }
 
             if (testInfo.status == "INTERRUPTED") {
                 // An interrupted module did not finish its checks. WARNING here is usually TLS plus
@@ -267,8 +305,10 @@ class VciWalletTestPlanRunner(
                 // Quick Tunnels cannot satisfy EnsureIncomingTls12/13, so TLS-only WARNING must not
                 // fail the row or fill the GitHub Error column.
                 val skipped = result == "SKIPPED"
+                val outcomeFailure = VciWalletModuleApplicability.walletOutcomeFailure(module.testModule, observedWalletStatus)
                 val walletStatus = when {
                     skipped -> "SKIPPED"
+                    outcomeFailure != null -> "FAILED"
                     result == "PASSED" || result == "WARNING" || result == "REVIEW" -> "PASSED"
                     else -> result
                 }
@@ -279,7 +319,7 @@ class VciWalletTestPlanRunner(
                     walletStatus = walletStatus,
                     skipReason = "Suite skipped this module".takeIf { skipped },
                     errorMessage = if (!skipped && walletStatus != "PASSED") {
-                        "Test finished: $result"
+                        outcomeFailure ?: "Test finished: $result"
                     } else null
                 )
             }
@@ -298,8 +338,8 @@ class VciWalletTestPlanRunner(
         return TestPlanResult(
             conformanceTestId = testId,
             conformanceResult = "TIMEOUT",
-            walletStatus = "TIMEOUT",
-            errorMessage = "Module did not complete within ${MODULE_POLL_ATTEMPTS * POLL_INTERVAL_MILLISECONDS / 1000} seconds"
+            walletStatus = observedWalletStatus,
+            errorMessage = "Module did not complete within ${MODULE_POLL_ATTEMPTS * POLL_INTERVAL_MILLISECONDS / 1000} seconds; wallet outcome: $observedWalletStatus"
         )
     }
 
@@ -359,7 +399,7 @@ class VciWalletTestPlanRunner(
      * nothing happens until someone does, which is why an automated run otherwise just times out.
      * Forwarding the offer parameter to the adapter is what a user tapping that link would achieve.
      */
-    private suspend fun deliverCredentialOfferToWallet(testId: String) {
+    private suspend fun deliverCredentialOfferToWallet(testId: String, batch: Boolean): HttpResponse {
         // Poll for the offer URL rather than for a status: the authorization-code grant parks the test
         // in WAITING, but the pre-authorized code grant does not, so waiting on WAITING would time out
         // for a perfectly healthy pre-auth run.
@@ -388,11 +428,13 @@ class VciWalletTestPlanRunner(
         println("   Delivering $parameterName to the wallet adapter")
         val response = walletHttpClient.post("$walletAdapterUrl/credential-offer") {
             parameter(parameterName, parameterValue)
+            parameter("batch", batch)
         }
         val body = response.bodyAsText()
         // Printed untruncated on purpose: the adapter relays the wallet's own error body verbatim,
         // and that body is the only place a wallet-side failure reason ever appears.
-        println("   Adapter accepted the offer: ${response.status} $body")
+        println("   Adapter response: ${response.status} $body")
+        return response
     }
 
     private companion object {

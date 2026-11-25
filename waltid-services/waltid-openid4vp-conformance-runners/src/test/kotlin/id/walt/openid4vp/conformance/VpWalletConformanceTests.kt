@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.openid4vp.conformance.fixtures.IssuerTestPki
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
@@ -51,6 +53,11 @@ import kotlin.time.Duration.Companion.minutes
  * whole trust chain and the suite's `dcql_query` is guaranteed to match something in the store.
  */
 class VpWalletConformanceTests {
+    private val mdocTestPki by lazy {
+        IssuerTestPki(ConformanceConfig.WALLET_ADAPTER_URL.substringBefore("/openid4vp/authorize") +
+            VpWalletConformanceAdapter.ISSUER_CRL_PATH)
+    }
+
 
     companion object {
         private const val WALLET_HOST = "127.0.0.1"
@@ -93,7 +100,8 @@ class VpWalletConformanceTests {
                 .orEmpty()
 
         private fun isSelected(plan: Oid4vpWalletVariantPlan): Boolean =
-            selectedVariants.isEmpty() || selectedVariants.any { it in plan.name }
+            (ConformanceExecutionMode.current == ConformanceExecutionMode.CI || plan.isHAIP) &&
+                (selectedVariants.isEmpty() || selectedVariants.any { it in plan.name })
 
         fun createHttpClient(): HttpClient = HttpClient(Java) {
             install(ContentNegotiation) {
@@ -144,6 +152,7 @@ class VpWalletConformanceTests {
                 walletApiUrl = "http://$WALLET_HOST:$WALLET_PORT",
                 adapterPort = ConformanceConfig.WALLET_ADAPTER_PORT,
                 walletId = walletId,
+                issuerCrl = mdocTestPki.crl,
             )
 
             try {
@@ -153,6 +162,7 @@ class VpWalletConformanceTests {
                     walletApiUrl = ConformanceConfig.WALLET_ADAPTER_URL,
                     conformanceHost = conformanceHost,
                     conformancePort = conformancePort,
+                    credentialTrustAnchorPem = mdocTestPki.trustAnchorPem,
                 ).filter(::isSelected).forEach { plan ->
                     println("\n" + "=".repeat(80))
                     println("Running wallet plan: ${plan.name}")
@@ -217,7 +227,7 @@ class VpWalletConformanceTests {
         }
 
         test("Import mDL bound to the same holder key as device key") {
-            val mdl = issuer.issueMdl()
+            val mdl = issuer.issueMdl(mdocTestPki.signerCertificate)
             println("Provisioned mDL (docType=${WalletCredentialFixture.MDOC_DOCTYPE}): ${mdl.take(60)}...")
             val imported = wallet.post("/wallet/$walletId/credentials/import") {
                 contentType(ContentType.Application.Json)

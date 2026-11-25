@@ -64,6 +64,7 @@ waltid-openid4vp-conformance-runners/
 | [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md) | OSS issuer2 setup, execution, matrix, HAIP, and troubleshooting |
 | [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md) | VP verifier setup, status, and troubleshooting |
 | [docs/VCI-WALLET.md](docs/VCI-WALLET.md) | VCI wallet conformance documentation |
+| [docs/HAIP-FULL-PLAN.md](docs/HAIP-FULL-PLAN.md) | Opt-in local HAIP full-plan gap analysis |
 | [docs/VP-WALLET.md](docs/VP-WALLET.md) | VP wallet conformance documentation |
 | [TEST-PLANS-AND-PROFILES.md](TEST-PLANS-AND-PROFILES.md) | Test-plan inventory and profile reference |
 

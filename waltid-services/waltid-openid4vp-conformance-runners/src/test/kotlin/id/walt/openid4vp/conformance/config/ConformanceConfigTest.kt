@@ -2,8 +2,19 @@ package id.walt.openid4vp.conformance.config
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class ConformanceConfigTest {
+
+    @Test
+    fun fullPlanModeIsExplicitAndCiRemainsTheDefault() {
+        assertEquals(ConformanceExecutionMode.CI, ConformanceExecutionMode.fromEnvironment(emptyMap()))
+        assertEquals(ConformanceExecutionMode.FULL_PLAN, ConformanceExecutionMode.fromEnvironment(
+            mapOf("CONFORMANCE_EXECUTION_MODE" to "full-plan")))
+        assertFailsWith<IllegalStateException> {
+            ConformanceExecutionMode.fromEnvironment(mapOf("CONFORMANCE_EXECUTION_MODE" to "ful-plan"))
+        }
+    }
 
     @Test
     fun walletAdapterAuthorizationUrlUsesLocalAdapterByDefault() {

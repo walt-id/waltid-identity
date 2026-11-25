@@ -1,7 +1,14 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.VerifierVariant
 import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.VerifierVariantMatrix
+import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.Oid4vpVerifierVariantPlan
+import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.ConformanceVerifierPolicies
+import id.walt.openid4vp.conformance.testplans.runner.req.ExpectedVerifierOutcome
+import id.walt.policies2.vc.CredentialPolicyResult
+import id.walt.policies2.vc.policies.StatusPolicy
+import id.walt.policies2.vc.policies.status.model.IETFStatusPolicyAttribute
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -14,6 +21,66 @@ import kotlin.test.assertTrue
  * "No test modules ... applicable", so these rules are worth asserting rather than rediscovering.
  */
 class VerifierVariantMatrixTest {
+
+    @Test
+    fun `revocation coverage requires actual status evaluation rather than unrelated rejection`() {
+        val status = StatusPolicy(IETFStatusPolicyAttribute(value = 0u))
+        assertEquals(null, ConformanceVerifierPolicies.revocationFailureReason(listOf(
+            CredentialPolicyResult(status, false, error = "Status validation failed: expected one of [0], but got 1"))))
+        assertTrue(ConformanceVerifierPolicies.revocationFailureReason(listOf(
+            CredentialPolicyResult(status, false, error = "Status-list signer is not authorized"))) != null)
+        assertTrue(ConformanceVerifierPolicies.revocationFailureReason(emptyList()) != null)
+    }
+
+    @Test
+    fun `full plan status policy retains signature checking and exposes unsupported identifier lists`() {
+        assertEquals(listOf("signature", "credential-status"),
+            ConformanceVerifierPolicies.fullPlan()
+                .vc_policies!!.policies.map { it.id })
+        assertEquals(null, ConformanceVerifierPolicies.withoutMdocIssuerAuth().vc_policies)
+        assertTrue(ConformanceVerifierPolicies.fullPlan().vp_policies!!.msoMdoc.any { it.id == "mso_mdoc/issuer_auth" })
+        assertTrue(ConformanceVerifierPolicies.unsupportedModuleReason(
+            "oid4vp-1final-verifier-present-credential-on-identifier-list")!!.contains("not implemented"))
+        assertEquals(null, ConformanceVerifierPolicies.unsupportedModuleReason(
+            "oid4vp-1final-verifier-present-revoked-credential"))
+    }
+
+    @Test
+    fun `revoked and identifier-listed credentials require rejection`() {
+        VerifierVariantMatrix.haip().forEach { variant ->
+            val plan = Oid4vpVerifierVariantPlan(variant, "https://verifier.example", "suite.example", 8443,
+                executionMode = ConformanceExecutionMode.FULL_PLAN)
+            assertEquals(ExpectedVerifierOutcome.REJECT,
+                plan.config.moduleOutcomes["oid4vp-1final-verifier-present-revoked-credential"])
+            assertEquals(if (variant.isMdoc) ExpectedVerifierOutcome.REJECT else null,
+                plan.config.moduleOutcomes["oid4vp-1final-verifier-present-credential-on-identifier-list"])
+        }
+    }
+
+    @Test
+    fun `unrequested credential type must be rejected for SD-JWT variants`() {
+        VerifierVariantMatrix.all().forEach { variant ->
+            val plan = Oid4vpVerifierVariantPlan(variant, "https://verifier.example", "suite.example", 8443,
+                executionMode = ConformanceExecutionMode.FULL_PLAN)
+            assertEquals(
+                if (variant.isMdoc) null else ExpectedVerifierOutcome.REJECT,
+                plan.config.moduleOutcomes["oid4vp-1final-verifier-wrong-vct"],
+                variant.id,
+            )
+        }
+    }
+
+    @Test
+    fun `CI does not inherit full plan status and credential type expectations`() {
+        VerifierVariantMatrix.haip().forEach { variant ->
+            val plan = Oid4vpVerifierVariantPlan(variant, "https://verifier.example", "suite.example", 8443,
+                executionMode = ConformanceExecutionMode.CI)
+            for (module in listOf("present-revoked-credential", "present-credential-on-identifier-list", "wrong-vct")) {
+                assertEquals(null, plan.config.moduleOutcomes["oid4vp-1final-verifier-$module"])
+            }
+            assertEquals(null, plan.config.verificationSessionSetup.core.policies.vc_policies)
+        }
+    }
 
     @Test
     fun `matrix covers every applicable combination`() {

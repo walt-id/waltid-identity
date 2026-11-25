@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.http
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
+import id.walt.openid4vp.conformance.report.FullPlanEvidence
 import id.walt.openid4vp.conformance.testplans.httpdata.*
 import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner.Companion.baseUrlBuilderSetup
 import id.walt.openid4vp.conformance.utils.JsonUtils.fromJson
@@ -29,6 +31,16 @@ internal class SuiteReachedTerminalBeforeReady(
     val status: String,
 ) : IllegalStateException(
     "Test $testId reached terminal status $status before it was ready for presentation",
+)
+
+internal class ConformanceEvidenceRequired(
+    val testId: String,
+    val suiteStatus: String,
+    val suiteResult: String?,
+    observation: String? = null,
+) : IllegalStateException(
+    "Real result-screen evidence is required for test $testId; full-plan mode does not upload synthetic images" +
+        observation?.let { "; $it" }.orEmpty(),
 )
 
 class ConformanceInterface(
@@ -128,7 +140,11 @@ class ConformanceInterface(
         createTestPlanUrl: Url,
         testPlanCreationConfiguration: JsonObject
     ): CreateTestPlanResponse {
-        println("POST body: $testPlanCreationConfiguration")
+        val fullPlan = ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN
+        val server = if (fullPlan) conformanceHttp.get("/api/server").body<JsonObject>().also {
+            FullPlanEvidence.requirePinnedSuite(it)
+        } else null
+        if (!fullPlan) println("POST body: $testPlanCreationConfiguration")
         val response = conformanceHttp.post(createTestPlanUrl) {
             contentType(ContentType.Application.Json)
             setBody(testPlanCreationConfiguration)
@@ -139,7 +155,9 @@ class ConformanceInterface(
             throw IllegalStateException("Conformance suite error: $response")
         }
 
-        return response.fromJson<CreateTestPlanResponse>()
+        return response.fromJson<CreateTestPlanResponse>().also { plan ->
+            if (server != null) FullPlanEvidence.write(server, plan, createTestPlanUrl.parameters["variant"], testPlanCreationConfiguration)
+        }
     }
 
     /**
@@ -243,15 +261,18 @@ class ConformanceInterface(
      * the verifier's verification-result screenshot". Certification runs still require a human to
      * upload a real screenshot.
      */
-    suspend fun fulfillPendingImagePlaceholders(testId: String): Int =
-        getTestLog(testId)
-            .filter { it.isPendingUpload }
-            .onEach { entry ->
+    suspend fun fulfillPendingImagePlaceholders(testId: String): Int {
+        val pending = getTestLog(testId).filter { it.isPendingUpload }
+        if (ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN && pending.isNotEmpty()) {
+            val observed = getTestRunInfo(testId)
+            throw ConformanceEvidenceRequired(testId, observed.status, observed.result)
+        }
+        return pending.onEach { entry ->
                 println("Filling image placeholder '${entry.upload}' for ${entry.src} (${entry.requirements.joinToString()})")
                 uploadImagePlaceholder(testId, entry.upload!!, AUTOMATED_EVIDENCE_IMAGE)
             }
             .size
-
+    }
 
     /**
      * Cancel the test referenced by [testId] (`DELETE /api/runner/{id}`).

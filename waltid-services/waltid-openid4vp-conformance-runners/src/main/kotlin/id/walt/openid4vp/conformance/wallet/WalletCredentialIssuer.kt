@@ -33,6 +33,12 @@ import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
 import id.walt.sdjwt.SimpleJWTCryptoProvider
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import kotlin.time.Clock
+import kotlin.time.Instant
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
@@ -105,6 +111,7 @@ class WalletCredentialIssuer {
             holderKeyJWK = Json.parseToJsonElement(holderKey.toPublicJWK().toJSONString()) as JsonObject,
             issuerKeyId = issuerJwk.keyID,
             vct = WalletCredentialFixture.SD_JWT_VC_VCT,
+            exp = (Clock.System.now() + 365.days).epochSeconds,
             // x5c lets the suite chain the credential up to the configured trust anchor.
             additionalJwtHeader = mapOf("x5c" to issuerJwk.x509CertChain.map { it.toString() }),
         ).toString()
@@ -156,10 +163,16 @@ class WalletCredentialIssuer {
      * Returned as base64url CBOR of a bare `IssuerSigned`, which is the OpenID4VCI credential-response
      * shape that `CredentialParser` accepts.
      */
-    suspend fun issueMdl(): String {
+    suspend fun issueMdl(issuerCertificate: ByteArray = issuerLeafDer): String {
+        val certificate = CertificateFactory.getInstance("X.509")
+            .generateCertificate(issuerCertificate.inputStream()) as X509Certificate
+        val now = Clock.System.now()
+        val validUntil = minOf(now + 365.days, Instant.fromEpochMilliseconds(certificate.notAfter.time) - 1.minutes)
+        require(validUntil > now) { "Conformance mdoc signer certificate has expired" }
         val issued = MdocIssuer.issueTypesafe(
             issuerKey = issuerCrypto1Key,
-            issuerCertificate = listOf(CoseCertificate(issuerLeafDer)),
+            issuerCertificate = listOf(CoseCertificate(issuerCertificate)),
+            validUntil = validUntil,
             holderKey = holderCoseKey(),
             typesafeData = Mdl(
                 familyName = "Mustermann",
