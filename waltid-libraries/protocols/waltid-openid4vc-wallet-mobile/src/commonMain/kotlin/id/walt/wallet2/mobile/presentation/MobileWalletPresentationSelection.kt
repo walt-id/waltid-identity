@@ -128,7 +128,14 @@ public enum class DisclosureDisposition {
     public val requested: Boolean get() = this != AdditionalCleartext
 }
 
-/** A claim shown to the holder, with the inclusion rules for this particular request. */
+/**
+ * A claim shown to the holder, with the inclusion rules for this particular request.
+ * @property path Wallet-issued claim path used when selecting this disclosure.
+ * @property valueJson Claim value encoded as JSON.
+ * @property disposition Whether this claim travels with the credential or can be selected independently.
+ * @property name Optional human-readable claim name.
+ * @property displayValue Optional formatted value for display.
+ */
 public data class MobileWalletPresentationDisclosure(
     val path: String,
     val valueJson: String,
@@ -136,9 +143,13 @@ public data class MobileWalletPresentationDisclosure(
     val name: String? = null,
     val displayValue: String? = null,
 ) {
+    /** Whether the credential supports selective disclosure of this claim. */
     public val selectivelyDisclosable: Boolean get() = disposition.selectivelyDisclosable
+    /** Whether satisfying the request requires this claim. */
     public val required: Boolean get() = disposition.required
+    /** Whether the holder can independently toggle this claim. */
     public val selectable: Boolean get() = disposition.selectable
+    /** Whether the verifier requested this claim. */
     public val requested: Boolean get() = disposition.requested
 }
 
