@@ -32,6 +32,7 @@ const MDL_DEFAULT_CREDENTIAL_DATA: Record<string, unknown> = {
     family_name: "Musterfrau",
     given_name: "Anna Maria",
     birth_date: "1988-08-25",
+    // age_in_years: 38, // For UTC validFrom dates 2026-08-25 through 2027-08-24.
     issue_date: "2025-01-15",
     expiry_date: "2035-01-15",
     issuing_country: "AT",

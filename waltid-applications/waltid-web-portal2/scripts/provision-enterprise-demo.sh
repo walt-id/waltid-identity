@@ -236,6 +236,7 @@ profiles = {
                 "family_name": "Musterfrau",
                 "given_name": "Anna",
                 "birth_date": "1990-01-01",
+                # "age_in_years": 36,  # For UTC validFrom dates 2026-01-01 through 2026-12-31.
                 "issuing_country": "AT",
                 "driving_privileges": [{"vehicle_category_code": "B"}],
             }

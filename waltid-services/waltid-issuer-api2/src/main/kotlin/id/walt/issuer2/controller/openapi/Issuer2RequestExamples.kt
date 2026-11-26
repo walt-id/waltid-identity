@@ -344,9 +344,11 @@ object Issuer2RequestExamples {
         runtimeOverrides = CredentialOfferRuntimeOverrides(
             credentialData = buildJsonObject {
                 putJsonObject("org.iso.18013.5.1") {
+                    val birthDate = LocalDate.parse("1986-03-22")
                     put("family_name", "Doe")
                     put("given_name", "Jane")
-                    put("birth_date", "1986-03-22")
+                    put("birth_date", birthDate.toString())
+                    put("age_in_years", Period.between(birthDate, LocalDate.now(ZoneOffset.UTC)).years)
                     put("issue_date", "2019-10-20")
                     put("expiry_date", "2024-10-20")
                     put("issuing_country", "AT")
