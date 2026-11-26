@@ -264,6 +264,7 @@ public class MobileWallet internal constructor(
     private val readerTrustEvaluator: ReaderTrustEvaluator = MdocReaderAuthenticationTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
+    private val persistedCredentialIds: (() -> List<String>)? = null,
     private val closePersistence: () -> Unit = {},
     private val preparePersistenceForDeletion: suspend () -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
@@ -1373,7 +1374,8 @@ public class MobileWallet internal constructor(
                 }
                 WalletPresentationHandler.clearPreviews(wallet)
                 keyStore.listKeys().toList().forEach { key -> keyStore.removeKey(key.keyId) }
-                credentialStore.readCredentialSummaries().forEach { credential -> credentialStore.removeCredential(credential.id) }
+                val credentialIds = persistedCredentialIds?.invoke() ?: credentialStore.listCredentials().map { it.id }.toList()
+                credentialIds.forEach { id -> credentialStore.removeCredential(id) }
                 didStore.listDids().toList().forEach { did -> didStore.removeDid(did.did) }
                 syncDigitalCredentialRegistration()
                 localStoresCleared = true

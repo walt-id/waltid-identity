@@ -82,6 +82,14 @@ should use `engine { configureSession { URLCache = null } }`; a custom `URLSessi
 should set `configuration.urlCache = nil` before creating the session. A request
 policy that ignores cached responses does not prevent storing new response bodies.
 
+## Credential lists and detail
+
+Use `wallet.credentialSummaries()` for list rows. Each row includes a stored ID, format, display metadata and type hints. When opening a row, call `wallet.credentialRead(id)` to load that credential and its local status. A missing ID returns `null`. Use `credentials()` or `credentialReads()` when the caller needs every full credential.
+
+Managed storage indexes these fields when saving a credential. Kotlin custom stores can implement `WalletCredentialInventory` to supply their own projection. The default implementation derives summaries from the full rows provided by the store.
+
+Cancel screen-owned observers on dismissal. Call `wallet.close()` when the wallet owner ends to release its database driver and SDK-owned HTTP clients. The caller owns any HTTP client it supplies. Stored credentials and resumable issuance sessions survive close.
+
 ## Credential status
 
 Status reads are local. Use `credentialReads()` for composed credential/status data or
@@ -276,18 +284,23 @@ Requests with a safe response channel return `Invalid` for review and explicit
 rejection. No protocol error is sent by preview.
 
 ```kotlin
-val preview = wallet.previewPresentation(requestUrl)
-preview.request.verifierMetadata?.display?.name?.let(::showVerifierName)
-when (val encryption = preview.request.responseEncryption) {
-    MobileWalletResponseEncryption.NotRequired -> showPlainResponseNotice()
-    is MobileWalletResponseEncryption.Required -> showEncryptedResponseNotice(
-        algorithm = encryption.keyManagementAlgorithm,
-        contentEncryption = encryption.contentEncryptionAlgorithm,
-        verifierKeyId = encryption.verifierKeyId,
-        verifierKeyThumbprint = encryption.verifierKeyThumbprint,
-    )
+when (val result = wallet.previewPresentationForClaimReview(requestUrl)) {
+    is MobileWalletPresentationPreviewResult.Invalid -> showRequestError(result.message)
+    is MobileWalletPresentationPreviewResult.Ready -> {
+        val preview = result.preview
+        val selections = chooseCredentials(preview.credentialOptions)
+        val disclosures = chooseDisclosures(preview.credentialOptions)
+        val review = wallet.reviewPresentation(preview.previewHandle, selections, disclosures)
+        if (confirmSharing(review)) {
+            wallet.submitPresentation(preview.previewHandle, selections, disclosures)
+        } else {
+            wallet.rejectPresentation(preview.previewHandle)
+        }
+    }
 }
 ```
+
+The selection and confirmation functions above belong to the host. For SD-JWT and mdoc options with requested claims, this preview carries type hints in the option's credential JSON. Render the effective claims returned by `reviewPresentation` and submit the same choices after consent. `previewPresentation` retains its full-payload behavior. On Android, use `previewDigitalCredentialPresentationForClaimReview` and `reviewDigitalCredentialPresentation` for the corresponding Digital Credentials API flow.
 
 Response-encryption metadata describes protection of the authorization response. It
 does not establish verifier trust and does not expose verifier key material.

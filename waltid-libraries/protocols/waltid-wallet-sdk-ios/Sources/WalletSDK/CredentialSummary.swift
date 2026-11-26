@@ -2,13 +2,21 @@ import Foundation
 
 /// A wallet inventory row with display metadata and format-specific type hints.
 public struct CredentialSummary: Identifiable, Equatable, Sendable {
+    /// The identifier used to read or remove the stored credential.
     public let id: String
+    /// The stored credential format identifier.
     public let format: String
+    /// The issuer identifier, when available.
     public let issuer: String?
+    /// The subject identifier, when available.
     public let subject: String?
+    /// The display label stored with the credential, when available.
     public let label: String?
+    /// The time the credential was added to the wallet, when available.
     public let addedAt: Date?
+    /// JSON containing the format-specific type fields used to identify the card.
     public let typeMetadataJSON: String
+    /// Optional issuer or wallet display metadata encoded as JSON.
     public let metadataJSON: String?
 
     init(id: String, format: String, issuer: String?, subject: String?, label: String?, addedAt: Date?,
@@ -24,6 +32,7 @@ public struct CredentialSummary: Identifiable, Equatable, Sendable {
     }
 
     /// Projects an already-loaded credential for an inventory backed by a custom store.
+    /// - Parameter credential: The full credential returned by the store.
     public init(_ credential: Credential) {
         id = credential.id
         format = credential.format

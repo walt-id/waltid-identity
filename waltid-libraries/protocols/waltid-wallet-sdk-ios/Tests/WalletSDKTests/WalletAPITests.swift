@@ -878,7 +878,11 @@ final class WalletAPITests: XCTestCase {
         )
         XCTAssertEqual(preview.credentialOptions.single?.credentialID, "credential-1")
         XCTAssertEqual(preview.credentialOptions.single?.multiple, true)
+        let compact = try await wallet.previewPresentationForClaimReview(request: request)
+        guard case .ready(let compactPreview) = compact else { return XCTFail("Expected a compact preview") }
+        XCTAssertEqual(compactPreview.previewHandle, preview.previewHandle)
         XCTAssertEqual(bridge.previewCalls, [request])
+        XCTAssertEqual(bridge.claimReviewPreviewCalls, [request])
     }
 
     func testPreviewPresentationReturnsTypedProtocolError() async throws {
@@ -1399,6 +1403,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var deleteCredentialResult = true
     private(set) var presentCalls: [PresentCall] = []
     private(set) var previewCalls: [URL] = []
+    private(set) var claimReviewPreviewCalls: [URL] = []
     private(set) var submitCalls: [SubmitCall] = []
     private(set) var rejectCalls: [RejectCall] = []
     private(set) var annexCPreviewCalls: [AnnexCPreviewCall] = []
@@ -1547,6 +1552,12 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
         presentCalls.append(.init(request: request, did: did, runPolicies: runPolicies))
         return presentResult
+    }
+
+    func previewPresentationForClaimReview(request: URL) async throws -> PresentationPreviewResult {
+        if let error { throw error }
+        claimReviewPreviewCalls.append(request)
+        return previewResult
     }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {

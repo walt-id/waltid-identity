@@ -27,7 +27,7 @@ let session = try await wallet.startIssuance(
     )
 )
 let outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id)
-let credentials = try await wallet.credentials()
+let rows = try await wallet.credentialSummaries()
 let presentation = try await wallet.present(
     request: authorizationRequestURL,
     did: identity.did
@@ -144,6 +144,7 @@ reset; plaintext-to-encrypted migration is not performed.
 ### Wallet Data
 
 - ``Credential``
+- ``CredentialSummary``
 - ``StoredCredential``
 - ``StoredDid``
 - ``SigningIdentity``

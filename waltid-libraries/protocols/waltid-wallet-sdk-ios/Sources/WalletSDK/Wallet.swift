@@ -289,6 +289,7 @@ public actor Wallet {
     }
 
     /// Reads the full credential and its local status when opening a detail view.
+    /// - Parameter id: The stored credential identifier.
     public func credential(id: String) async throws -> Credential? {
         try await bridge.credential(id: id)
     }
@@ -343,6 +344,7 @@ public actor Wallet {
     }
 
     /// Returns type metadata for selective options with requested claims. Use the prepared claim review to render consent.
+    /// - Parameter request: The OpenID4VP authorization request URL.
     public func previewPresentationForClaimReview(request: URL) async throws -> PresentationPreviewResult {
         try await bridge.previewPresentationForClaimReview(request: request)
     }

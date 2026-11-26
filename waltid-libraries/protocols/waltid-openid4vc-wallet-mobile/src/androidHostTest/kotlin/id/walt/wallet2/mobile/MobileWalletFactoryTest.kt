@@ -94,6 +94,7 @@ class MobileWalletFactoryTest {
                     override fun close() { closed++ }
                 }
             }
+            database.queries.insertCredential("unindexed", "unreadable", "mso_mdoc", null, 0, null, null)
             wallet.close()
             wallet.close()
             assertEquals(1, opened)
@@ -103,6 +104,7 @@ class MobileWalletFactoryTest {
             wallet.deleteWallet()
             assertEquals(2, opened)
             assertEquals(2, closed)
+            assertTrue(database.queries.selectCredentialIds().executeAsList().isEmpty())
         }
     }
 

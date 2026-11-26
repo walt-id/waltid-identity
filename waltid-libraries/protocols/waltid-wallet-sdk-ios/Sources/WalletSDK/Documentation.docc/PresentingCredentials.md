@@ -1,6 +1,6 @@
 # Presenting Credentials
 
-Use ``Wallet/previewPresentation(request:)`` and
+Use ``Wallet/previewPresentationForClaimReview(request:)`` and
 ``Wallet/submitPresentation(previewHandle:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:paymentConsentRevision:)``
 to review and answer an OpenID4VP authorization request with credentials from
 the local wallet.
@@ -13,7 +13,7 @@ Pass the verifier request URL and, when needed, the DID returned by
 ``SigningIdentityManager/initialize()``.
 
 ```swift
-let previewResult = try await wallet.previewPresentation(request: authorizationRequestURL)
+let previewResult = try await wallet.previewPresentationForClaimReview(request: authorizationRequestURL)
 
 let result: PresentationResult
 switch previewResult {
@@ -32,11 +32,20 @@ case .ready(let preview):
             verifierKeyThumbprint: details.verifierKeyThumbprint
         )
     }
-    result = try await wallet.submitPresentation(
-        previewHandle: preview.previewHandle,
-        selectedCredentialOptions: preview.credentialOptions.map(\.selection),
-        did: identity.did
+    let selected = chooseCredentials(preview.credentialOptions)
+    let disclosures = chooseDisclosures(preview.credentialOptions)
+    let review = try await wallet.reviewPresentation(
+        previewHandle: preview.previewHandle, selectedCredentialOptions: selected,
+        selectedDisclosureOptions: disclosures, did: identity.did
     )
+    if await confirmSharing(review) {
+        result = try await wallet.submitPresentation(
+            previewHandle: preview.previewHandle, selectedCredentialOptions: selected,
+            selectedDisclosureOptions: disclosures, did: identity.did
+        )
+    } else {
+        result = try await wallet.rejectPresentation(previewHandle: preview.previewHandle)
+    }
 case .invalid(let error):
     showRequestError(error)
     // After user interaction, either dismiss locally or notify the verifier.
@@ -65,6 +74,8 @@ combining mutually exclusive response artifacts. Keep `.prepared(.openURL)` and
 succeeds, and surface delivery failures so the user can retry.
 
 ### Review the Effective Claims
+
+The selection and confirmation functions above belong to the app. For SD-JWT and mdoc options with requested claims, the compact preview carries type hints in the credential JSON field. ``Wallet/previewPresentation(request:)`` remains available for consumers that need the full option data.
 
 After selecting credentials and disclosures, call `reviewPresentation` on the retained preview handle.
 The returned claims include clear-text data carried by selected ancestor disclosures. Preserve each query's

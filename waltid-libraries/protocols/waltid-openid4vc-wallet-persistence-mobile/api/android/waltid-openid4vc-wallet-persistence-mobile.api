@@ -213,6 +213,7 @@ public final class id/walt/wallet2/persistence/db/WalletPersistenceQueries : app
 	public final fun selectByKeyId (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lapp/cash/sqldelight/Query;
 	public final fun selectCredentialById (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectCredentialById (Ljava/lang/String;Lkotlin/jvm/functions/Function7;)Lapp/cash/sqldelight/Query;
+	public final fun selectCredentialIds ()Lapp/cash/sqldelight/Query;
 	public final fun selectCredentialStatus (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectCredentialStatusMaintenance (Ljava/lang/String;)Lapp/cash/sqldelight/Query;
 	public final fun selectCredentialStatusMaintenance (Ljava/lang/String;Lkotlin/jvm/functions/Function3;)Lapp/cash/sqldelight/Query;

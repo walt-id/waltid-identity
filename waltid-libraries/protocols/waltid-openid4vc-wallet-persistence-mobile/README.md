@@ -113,10 +113,12 @@ The mobile facade opens encrypted databases by default and keeps managed databas
 The mobile schema includes the following tables:
 
 - `key_references` - Versioned managed or software key descriptors
-- `credentials` - Stored credentials
+- `credentials` - Stored credential bytes and metadata
+- `credential_inventory` - Display fields and type hints for list reads
+- `credential_status_snapshots` - Local credential status evidence
 - `dids` - Stored DIDs
 
-This is a fresh mobile schema; it does not migrate or retain legacy key references. Schema creation is managed by SQLDelight on the target platform driver.
+Schema 3 adds the inventory inside the encrypted database. The first inventory read fills missing rows from existing credentials in bounded batches. Writes maintain the index, and the original signed credentials remain in `credentials`. Schema 2 SDKs reject the upgraded database. Update apps and extensions that share a database together.
 
 ## API documentation
 

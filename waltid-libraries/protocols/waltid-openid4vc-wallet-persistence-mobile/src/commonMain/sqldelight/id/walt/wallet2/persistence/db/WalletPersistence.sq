@@ -33,6 +33,9 @@ CREATE TABLE credentials (
     holder_key_binding TEXT
 );
 
+selectCredentialIds:
+SELECT id FROM credentials;
+
 selectAllCredentials:
 SELECT * FROM credentials;
 

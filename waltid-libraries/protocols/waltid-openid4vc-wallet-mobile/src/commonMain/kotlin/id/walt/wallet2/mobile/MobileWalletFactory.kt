@@ -300,6 +300,7 @@ internal fun createSqlDelightMobileWallet(
         proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
         proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
         deleteLocalPersistence = deleteLocalPersistence,
+        persistedCredentialIds = { queries.selectCredentialIds().executeAsList() }.takeIf { config.persistence.credentialStore == null },
         closePersistence = closePersistence,
         preparePersistenceForDeletion = preparePersistenceForDeletion,
     )
