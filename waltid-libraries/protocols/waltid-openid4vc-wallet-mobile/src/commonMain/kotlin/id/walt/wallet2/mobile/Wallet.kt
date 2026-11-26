@@ -40,7 +40,7 @@ import id.walt.wallet2.handlers.WalletScaPresentationAuthorizer
 import id.walt.wallet2.issuance.CredentialReceiptTrust
 import id.walt.wallet2.mobile.credentials.CredentialWithStatus
 import id.walt.wallet2.mobile.credentials.WalletCredential
-import id.walt.wallet2.mobile.credentials.toMobileWalletCredential
+import id.walt.wallet2.mobile.credentials.toWalletCredential
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCParsedRequest
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCPreview
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCRequest
@@ -53,13 +53,13 @@ import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
 import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialRequest
 import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialRequestInfo
 import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialResponse
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCEngine
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletRegistration
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletRegistryProjection
+import id.walt.wallet2.mobile.digitalcredentials.AnnexCPresentationEngine
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistration
+import id.walt.wallet2.mobile.digitalcredentials.RegistryProjection
 import id.walt.wallet2.mobile.digitalcredentials.StaleRegistryEntryException
 import id.walt.wallet2.mobile.digitalcredentials.UnavailableCredentialRegistry
 import id.walt.wallet2.mobile.digitalcredentials.registryRecords
-import id.walt.wallet2.mobile.digitalcredentials.toMobileDigitalCredentialResponse
+import id.walt.wallet2.mobile.digitalcredentials.toDigitalCredentialResponse
 import id.walt.wallet2.mobile.digitalcredentials.toDigitalCredentialPreview
 import id.walt.wallet2.mobile.identity.SigningIdentityManager
 import id.walt.wallet2.mobile.identity.WalletKeyType
@@ -73,8 +73,8 @@ import id.walt.wallet2.mobile.issuance.IssuanceHolders
 import id.walt.wallet2.mobile.issuance.IssuanceRequest
 import id.walt.wallet2.mobile.issuance.IssuanceSession
 import id.walt.wallet2.mobile.issuance.IssuanceSessionId
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceKeys
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceProviders
+import id.walt.wallet2.mobile.issuance.IssuanceKeys
+import id.walt.wallet2.mobile.issuance.IssuanceProviders
 import id.walt.wallet2.mobile.issuance.WalletAttestationConfig
 import id.walt.wallet2.mobile.issuance.WalletProviderConfig
 import id.walt.wallet2.mobile.presentation.PresentationErrorCode
@@ -85,16 +85,16 @@ import id.walt.wallet2.mobile.presentation.PresentationReview
 import id.walt.wallet2.mobile.presentation.PresentationSelection
 import id.walt.wallet2.mobile.presentation.ReviewedPresentationClaims
 import id.walt.wallet2.mobile.presentation.TransactionDataProfile
-import id.walt.wallet2.mobile.presentation.toMobilePresentationResult
-import id.walt.wallet2.mobile.presentation.toMobilePreview
-import id.walt.wallet2.mobile.presentation.toMobileReview
+import id.walt.wallet2.mobile.presentation.toPresentationResult
+import id.walt.wallet2.mobile.presentation.toPresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.toReviewedPresentationClaims
 import id.walt.wallet2.mobile.presentation.toTransactionDataTypeRegistry
 import id.walt.wallet2.mobile.proximity.ProximityCapabilities
 import id.walt.wallet2.mobile.proximity.ProximityConfiguration
 import id.walt.wallet2.mobile.proximity.ProximityCoordinator
 import id.walt.wallet2.mobile.proximity.ProximitySession
 import id.walt.wallet2.mobile.proximity.snapshot
-import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
+import id.walt.wallet2.persistence.keys.PolicyAwareWalletKeyStore
 import id.walt.wallet2.status.CredentialStatusRefreshMode
 import id.walt.wallet2.status.CredentialStatusRefreshResult
 import id.walt.wallet2.status.WalletCredentialReference
@@ -131,7 +131,7 @@ import kotlinx.serialization.json.jsonObject
  */
 public class Wallet internal constructor(
     walletId: String,
-    private val keyStore: MobileWalletKeyStore,
+    private val keyStore: PolicyAwareWalletKeyStore,
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val issuanceSessionStore: WalletIssuanceSessionStore? = null,
@@ -139,7 +139,7 @@ public class Wallet internal constructor(
         { _, _ -> error("This Wallet does not support key-use authorization preflight") },
     private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet,
     private val generateAndPersistHolderKey: suspend (WalletKeyType, KeyUseAuthorizationPolicy) -> id.walt.crypto2.keys.Key =
-        { _, _ -> error("Holder key creation requires the persistent mobile wallet factory") },
+        { _, _ -> error("Holder key creation requires a wallet opened by WalletFactory") },
     attestationConfig: WalletAttestationConfig? = null,
     attestationProvider: WalletAttestationProvider? = null,
     walletProviderConfig: WalletProviderConfig? = null,
@@ -149,11 +149,11 @@ public class Wallet internal constructor(
     private val clientIdTrustConfiguration: ClientIdTrustConfiguration = ClientIdTrustConfiguration(),
     private val credentialIssuerMetadataTrustResolver: CredentialIssuerMetadataTrustResolver? = null,
     private val credentialRegistry: CredentialRegistry = UnavailableCredentialRegistry,
-    registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
+    registrationProjection: RegistryProjection = RegistryProjection.Full,
     private val readerTrustEvaluator: ReaderTrustEvaluator = MdocReaderAuthenticationTrustEvaluator,
     private val onEvent: suspend (WalletEvent) -> Unit = {},
     onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
-    private val persistenceOwner: MobileWalletPersistenceOwner? = null,
+    private val persistenceOwner: WalletPersistenceOwner? = null,
     private val deleteLocalPersistence: suspend () -> Unit = {},
     private val statusMaintenance: StatusMaintenanceEnrollmentStore? = null,
     private val managedCredentialStatus: Boolean = false,
@@ -168,7 +168,7 @@ public class Wallet internal constructor(
     private val scaAuthorizer: WalletScaPresentationAuthorizer? = null,
     paymentCredentialIssuers: List<PaymentCredentialIssuer> = emptyList(),
     paymentMetadataHttpClient: HttpClient? = null,
-    createSigningIdentityManager: ((MobileWalletLifecycle, suspend () -> Unit) -> SigningIdentityManager)? = null,
+    createSigningIdentityManager: ((WalletLifecycle, suspend () -> Unit) -> SigningIdentityManager)? = null,
 ) {
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
@@ -178,7 +178,7 @@ public class Wallet internal constructor(
 
     /** Signing identity creation, backup and restoration; recovery integrations are explicitly configured. */
     public val signingIdentity: SigningIdentityManager
-        get() = checkNotNull(signingIdentityManager) { "Identity lifecycle requires the persistent mobile wallet factory" }
+        get() = checkNotNull(signingIdentityManager) { "Identity lifecycle requires a wallet opened by WalletFactory" }
 
     /** Initial and conflated status-only snapshots; observation does not retain network work. */
     public val credentialStatuses: Flow<WalletCredentialStatusSnapshot>
@@ -307,18 +307,18 @@ public class Wallet internal constructor(
     }
 
     /**
-     * Lists all credentials currently stored in the mobile wallet.
+     * Lists the credentials stored in this wallet.
      *
      * @return Credential entries, including display JSON, ordered by the underlying credential store.
      */
     public suspend fun credentials(): List<WalletCredential> = lifecycle.use {
-        wallet.streamAllCredentials().map { it.toMobileWalletCredential() }.toList()
+        wallet.streamAllCredentials().map { it.toWalletCredential() }.toList()
     }
 
     /** Reads credentials with typed, local status metadata without rebuilding them for status updates. */
     public suspend fun credentialReads(): List<CredentialWithStatus> = lifecycle.use {
         wallet.readCredentialsWithStatus().map { read ->
-            CredentialWithStatus(read.credential.toMobileWalletCredential(), read.status, read.evaluatedAt)
+            CredentialWithStatus(read.credential.toWalletCredential(), read.status, read.evaluatedAt)
         }
     }
 
@@ -518,7 +518,7 @@ public class Wallet internal constructor(
             scaAuthorizer = scaAuthorizer,
             paymentConsentPolicy = paymentConsentPolicy.takeIf { paymentConsentRevision != null },
         )
-        return@use response.toMobileDigitalCredentialResponse()
+        return@use response.toDigitalCredentialResponse()
     }
 
     /** Builds the single-field OpenID4VP DC API error object required by Appendix A. */
@@ -527,7 +527,7 @@ public class Wallet internal constructor(
             protocol = DcApiRequestProtocol.fromValue(protocol),
             error = WalletPresentFunctionality2.OID4VPErrorCode.entries.firstOrNull { it.code == error }
                 ?: throw IllegalArgumentException("Unsupported OpenID4VP error code"),
-        ).toMobileDigitalCredentialResponse()
+        ).toDigitalCredentialResponse()
 
     /** Parses a raw Annex C `DeviceRequest` into the shape a consent screen can render. */
     public fun parseAnnexCDeviceRequest(deviceRequestBase64Url: String): AnnexCParsedRequest =
@@ -586,7 +586,7 @@ public class Wallet internal constructor(
             onEvent = ::emitSessionEvent,
         )
 
-        result.toMobilePreview(preferredLocales, transactionDataProfiles)
+        result.toPresentationPreviewResult(preferredLocales, transactionDataProfiles)
     }
 
     /** Captures the disclosures, selected status advisories and payment the host must show before submission. */
@@ -603,7 +603,7 @@ public class Wallet internal constructor(
     /** Releases the exact reviewed selection after the host obtains confirmation. */
     public suspend fun submitPresentation(review: PresentationReview): PresentationResult = lifecycle.use {
         WalletPresentationHandler.submitReviewedPresentation(wallet, review.retained,
-            transactionDataProfiles.toTransactionDataTypeRegistry(), scaAuthorizer, ::emitSessionEvent).toMobilePresentationResult()
+            transactionDataProfiles.toTransactionDataTypeRegistry(), scaAuthorizer, ::emitSessionEvent).toPresentationResult()
     }
 
     /** Same selection review for a retained Digital Credentials API request. */
@@ -616,7 +616,7 @@ public class Wallet internal constructor(
             SubmitDcApiPresentationRequest(requestId,
                 selection.coreCredentials(),
                 selection.coreDisclosures(), did = did)
-        ).toMobileReview()
+        ).toReviewedPresentationClaims()
     }
 
     /** Discards a reviewed presentation after local dismissal. */
@@ -641,11 +641,11 @@ public class Wallet internal constructor(
                 errorDescription = errorDescription,
             ),
             onEvent = ::emitSessionEvent,
-        ).toMobilePresentationResult()
+        ).toPresentationResult()
     }
 
     /**
-     * Deletes local wallet material owned by this mobile wallet instance.
+     * Deletes the local data owned by this wallet.
      *
      * A running wallet or signing-identity operation rejects deletion before changing anything.
      * Close other in-process wallets that share this storage before deletion. Hosts sharing storage with
@@ -727,7 +727,7 @@ public class Wallet internal constructor(
     }
 
     private var persistenceClosed = false
-    private val lifecycle = MobileWalletLifecycle()
+    private val lifecycle = WalletLifecycle()
 
     private var localStoresCleared = false
 
@@ -735,9 +735,9 @@ public class Wallet internal constructor(
         PaymentConsentResolver(paymentCredentialIssuers, paymentMetadataHttpClient), preferredLocales,
     )
 
-    private val eventStream = MobileWalletEventStream()
+    private val eventStream = WalletEventStream()
 
-    private val issuanceProviders = MobileWalletIssuanceProviders(walletProviderConfig, attestationConfig, attestationProvider, issuanceHttpClient)
+    private val issuanceProviders = IssuanceProviders(walletProviderConfig, attestationConfig, attestationProvider, issuanceHttpClient)
 
     private val issuanceSessionState = WalletIssuanceSessionState(walletId, issuanceSessionStore)
 
@@ -752,9 +752,9 @@ public class Wallet internal constructor(
         }
     }
 
-    private val registration = MobileWalletRegistration(wallet, credentialRegistry, preferredLocales, registrationProjection, onDigitalCredentialRegistryChanged)
+    private val registration = CredentialRegistration(wallet, credentialRegistry, preferredLocales, registrationProjection, onDigitalCredentialRegistryChanged)
 
-    private val annexCEngine = MobileWalletAnnexCEngine(
+    private val annexCEngine = AnnexCPresentationEngine(
         wallet = wallet,
         readerTrustEvaluator = readerTrustEvaluator,
         registryRecords = { wallet.registryRecords(preferredLocales) },
@@ -782,7 +782,7 @@ public class Wallet internal constructor(
     }
 
     private val signingIdentityManager = createSigningIdentityManager?.invoke(lifecycle, registration::afterMutation)
-    private val issuanceKeys = MobileWalletIssuanceKeys(
+    private val issuanceKeys = IssuanceKeys(
         keyStore, didStore, signingIdentityManager, defaultKeyUseAuthorizationPolicy, generateAndPersistHolderKey,
     )
 
@@ -808,9 +808,9 @@ public class Wallet internal constructor(
         }
 
     private suspend fun emitSessionEvent(event: WalletSessionEvent) {
-        val mobileEvent = event.toMobileWalletEvent()
-        eventStream.tryEmit(mobileEvent)
-        onEvent(mobileEvent)
+        val walletEvent = event.toWalletEvent()
+        eventStream.tryEmit(walletEvent)
+        onEvent(walletEvent)
     }
 
 }

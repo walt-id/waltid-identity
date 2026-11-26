@@ -35,7 +35,7 @@ public actual class WalletFactory(
     private val nfcConfiguration: AndroidWalletNfcConfiguration? = null,
 ) {
     /**
-     * Creates an Android mobile wallet for [config].
+     * Opens the Android wallet described by [config].
      *
      * The database is named from [WalletConfiguration.walletId]. The factory wires the Android managed-key
      * provider together with the Crypto2 software-key fallback used for supported unprotected requests.
@@ -52,7 +52,7 @@ public actual class WalletFactory(
         val registry = config.digitalCredentials.resolveRegistry {
             AndroidDigitalCredentialRegistry(applicationContext)
         }
-        return createEncryptedSqlDelightMobileWallet(
+        return openEncryptedSqlDelightWallet(
             config = config,
             databaseLocation = applicationContext.getDatabasePath("wallet_${config.walletId}.db").canonicalPath,
             keyNamespace = "${applicationContext.packageName}/${config.walletId}",

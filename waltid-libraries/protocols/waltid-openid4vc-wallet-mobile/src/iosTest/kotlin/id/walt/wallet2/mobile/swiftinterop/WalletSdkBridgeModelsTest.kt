@@ -195,13 +195,13 @@ class WalletSdkBridgeModelsTest {
     @Test
     fun bridgeRequiresCompleteCrossProcessConfiguration() {
         assertFailsWith<IllegalArgumentException> {
-            WalletBridgeConfiguration(appGroupIdentifier = "group.example").toMobileWalletConfig()
+            WalletBridgeConfiguration(appGroupIdentifier = "group.example").toWalletConfiguration()
         }
 
         val config = WalletBridgeConfiguration(
             appGroupIdentifier = "group.example",
             keychainAccessGroup = "TEAM.example",
-        ).toMobileWalletConfig()
+        ).toWalletConfiguration()
 
         assertEquals("group.example", config.digitalCredentials.crossProcessAccess?.appGroupIdentifier)
         assertEquals("TEAM.example", config.digitalCredentials.crossProcessAccess?.keychainAccessGroup)

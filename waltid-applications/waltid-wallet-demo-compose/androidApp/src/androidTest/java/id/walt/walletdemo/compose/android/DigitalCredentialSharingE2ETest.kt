@@ -53,7 +53,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.openAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewTestTags
 import java.io.ByteArrayOutputStream
@@ -1051,7 +1051,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 hasGooglePlayServices(context),
             )
 
-            val created = createAndroidDemoMobileWallet(
+            val created = openAndroidDemoWallet(
                 context = context,
                 // This Play Store emulator cannot enforce protected signing keys; production
                 // defaults remain covered by the app, while this fixture needs ordinary keys.

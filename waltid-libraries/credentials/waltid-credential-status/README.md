@@ -90,7 +90,7 @@ It is not a reusable application cache or a scheduler.
 
 The [core wallet](../../protocols/waltid-openid4vc-wallet/README.md) owns snapshots, persistence,
 per-record coalescing and explicit IfDue/Force refresh. Its snapshots expose an optional
-`nextRefreshAt` under current freshness/backoff, so hosts can schedule due work while active. The [mobile facade](../../protocols/waltid-openid4vc-wallet-mobile/README.md)
+`nextRefreshAt` under current freshness/backoff, so hosts can schedule due work while active. The [wallet SDK](../../protocols/waltid-openid4vc-wallet-mobile/README.md)
 adds Kotlin Flow and the [Swift SDK](../../protocols/waltid-wallet-sdk-ios/README.md) adds a bounded
 native stream. Hosts own foreground/manual triggers, preferences and any future background scheduling.
 

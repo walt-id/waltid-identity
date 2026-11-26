@@ -422,13 +422,13 @@ public class AndroidDigitalCredentialRegistry(
     private fun RegistryEntry.withLocalThumbnail(): RegistryEntry {
         if (display.iconPng != null) return this
         val png = display.cardArt.fallbackPng?.takeIf(::isImageBytes)
-            ?: solidColorPng(parseCssRgb(display.cardArt.backgroundColor) ?: MobileWalletRegistryIcons.DefaultCardBlueRgb)
+            ?: solidColorPng(parseCssRgb(display.cardArt.backgroundColor) ?: RegistryIcons.DefaultCardBlueRgb)
         return copy(display = display.withIcon(png))
     }
 
     private suspend fun RegistryEntry.withResolvedThumbnail(): RegistryEntry {
         if (display.cardArt.imageUris.isEmpty()) return withLocalThumbnail()
-        val png = MobileWalletRegistryIcons.resolveIconPng(
+        val png = RegistryIcons.resolveIconPng(
             art = display.cardArt,
             fetchHttps = ::fetchRegistryIconBytes,
         )

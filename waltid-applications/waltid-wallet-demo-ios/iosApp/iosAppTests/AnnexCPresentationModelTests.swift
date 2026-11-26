@@ -342,10 +342,10 @@ final class AnnexCPresentationModelTests: XCTestCase {
             self.rawRequest = rawRequest
         }
 
-        var requestSnapshot: MobileDocumentRequestSnapshot {
-            MobileDocumentRequestSnapshot(presentments: [
-                MobileDocumentPresentmentSnapshot(documentRequestSets: [
-                    MobileDocumentRequestSetSnapshot(requests: [
+        var requestSnapshot: MdocRequestSnapshot {
+            MdocRequestSnapshot(presentments: [
+                MdocPresentmentSnapshot(documentRequestSets: [
+                    MdocRequestSetSnapshot(requests: [
                         AnnexCDocumentRequest(
                             documentType: "org.iso.18013.5.1.mDL",
                             namespaces: ["org.iso.18013.5.1": ["family_name"]]

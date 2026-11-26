@@ -22,7 +22,7 @@ import id.walt.wallet2.data.WalletPublicKeyMaterial
 import id.walt.wallet2.data.WalletKeyUsageUnsupportedException
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
-import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
+import id.walt.wallet2.persistence.keys.PolicyAwareWalletKeyStore
 import id.walt.crypto2.keys.KeyUseAuthorizationException
 import id.walt.crypto2.keys.KeyUseAuthorizationFailure
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
@@ -49,7 +49,7 @@ public class SqlDelightKeyStore(
     private val managedKeyProvider: PlatformManagedKeyProvider,
     private val queries: WalletPersistenceQueries,
     private val identityWalletId: String = "default",
-) : MobileWalletKeyStore {
+) : PolicyAwareWalletKeyStore {
     private val softwareRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
 
     /** Legacy key material is not supported by the mobile store. */

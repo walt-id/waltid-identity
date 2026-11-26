@@ -9,7 +9,7 @@ import id.walt.wallet2.consent.PaymentConsentFailure
 import id.walt.wallet2.handlers.PresentationReviewChangedException
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.mobile.presentation.PresentationErrorCode
-import id.walt.wallet2.mobile.presentation.toMobileErrorCode
+import id.walt.wallet2.mobile.presentation.toPresentationErrorCode
 import id.walt.wallet2.mobile.WalletStorageInUseException
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.wallet2.status.CredentialStatusReviewChangedException
@@ -120,7 +120,7 @@ public class WalletBridgeError internal constructor(
                 paymentConsentFailure = paymentFailure,
                 presentationValidationFailure = presentationFailure?.let {
                     WalletBridgePresentationValidationFailure(
-                        errorCode = it.error.code.toMobileErrorCode(),
+                        errorCode = it.error.code.toPresentationErrorCode(),
                         message = it.error.message,
                         responseSafetyFailure = it.responseSafetyFailure.message ?: "Unsafe response channel",
                     )

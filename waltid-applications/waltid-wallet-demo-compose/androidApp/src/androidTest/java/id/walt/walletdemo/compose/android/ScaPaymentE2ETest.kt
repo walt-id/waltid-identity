@@ -13,7 +13,7 @@ import id.walt.wallet2.mobile.Wallet
 import id.walt.wallet2.mobile.identity.SigningIdentityState
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyProtectionLevel
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.openAndroidDemoWallet
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextContainingVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import kotlinx.coroutines.runBlocking
@@ -100,7 +100,7 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
                 "Select the physical payment test with -e wallet.sca approve"
             }
             val offer = DemoTestBackend.createOffer(DemoTestBackend.scaPaymentSdJwtScenario)
-            val created = createAndroidDemoMobileWallet(context, demoWalletConfig())
+            val created = openAndroidDemoWallet(context, demoWalletConfig())
             provisionedWallet = created.wallet
             check(provisionedWallet.credentials().isEmpty() && provisionedWallet.signingIdentity.state() == SigningIdentityState.Absent) {
                 "Preview app already contains wallet material; use a fresh installation"
@@ -108,7 +108,7 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
             val device = UiDevice.getInstance(instrumentation)
             WalletComposeE2EHelper.launchAndCreateScaIdentity(context, device)
             WalletComposeE2EHelper.receiveThroughApp(device, offer.offerUrl)
-            provisionedWallet = createAndroidDemoMobileWallet(context, demoWalletConfig()).wallet
+            provisionedWallet = openAndroidDemoWallet(context, demoWalletConfig()).wallet
             val active = provisionedWallet.signingIdentity.state() as? SigningIdentityState.Active
                 ?: error("The app did not create a signing identity")
             assertEquals(KeyProtectionLevel.HARDWARE, active.identity.keyFacts.protection)
@@ -120,7 +120,7 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
             val identityJwk = Json.parseToJsonElement(active.identity.publicJwk).jsonObject
             listOf("kty", "crv", "x", "y").forEach { assertEquals(identityJwk[it], boundJwk[it]) }
             // Reopen through the factory used by independently launched Credential Manager activities.
-            provisionedWallet = createAndroidDemoMobileWallet(context, demoWalletConfig()).wallet
+            provisionedWallet = openAndroidDemoWallet(context, demoWalletConfig()).wallet
             assertEquals(active, provisionedWallet.signingIdentity.state())
             assertEquals(provisionedCredentialIds, provisionedWallet.credentials().map { it.id }.toSet())
             val registration = provisionedWallet.refreshDigitalCredentialRegistration()

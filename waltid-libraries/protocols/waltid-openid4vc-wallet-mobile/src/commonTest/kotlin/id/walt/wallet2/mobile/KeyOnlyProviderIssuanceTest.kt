@@ -97,7 +97,7 @@ class KeyOnlyProviderIssuanceTest {
         anonymous: Boolean,
         keyAttestation: Boolean,
     ): Wallet {
-        val keys = InMemoryMobileWalletKeyStore().apply { addCrypto2Key(holder) }
+        val keys = InMemoryPolicyAwareWalletKeyStore().apply { addCrypto2Key(holder) }
         val attester = key("attester")
         val certificate = X509CertificateUtil.createSelfSignedCertificate(
             attester,

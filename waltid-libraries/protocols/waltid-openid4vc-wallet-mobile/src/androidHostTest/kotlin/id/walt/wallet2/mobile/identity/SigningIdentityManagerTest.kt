@@ -17,7 +17,7 @@ import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.did.dids.Crypto2DidService
 import id.walt.wallet2.mobile.Wallet
 import id.walt.wallet2.mobile.WalletConfiguration
-import id.walt.wallet2.mobile.createSqlDelightMobileWallet
+import id.walt.wallet2.mobile.openSqlDelightWallet
 import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistrationResult
 import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistry
 import id.walt.wallet2.mobile.digitalcredentials.RegistryEntry
@@ -762,7 +762,7 @@ class SigningIdentityManagerTest {
         )
         init { WalletPersistenceDatabase.Schema.create(driver) }
         val wallet = reopen()
-        fun reopen(signingIdentity: SigningIdentityConfiguration = config.signingIdentity) = createSqlDelightMobileWallet(
+        fun reopen(signingIdentity: SigningIdentityConfiguration = config.signingIdentity) = openSqlDelightWallet(
             config = config.copy(signingIdentity = signingIdentity),
             db = db,
             keyProvider = native,

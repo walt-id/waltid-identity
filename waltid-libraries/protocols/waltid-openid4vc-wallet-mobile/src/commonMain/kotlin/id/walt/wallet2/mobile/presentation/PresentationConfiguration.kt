@@ -53,7 +53,7 @@ public class PresentationConfiguration(
 }
 
 /**
- * Transaction data profile accepted by the mobile wallet.
+ * Transaction data profile accepted by the wallet.
  *
  * Wallet apps should keep this list aligned with the ecosystem or service they trust.
  * Requests containing transaction data with a type outside this list are rejected before

@@ -7,7 +7,7 @@ import id.walt.mdoc.proximity.mobile.IosWifiAwareProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistry
 import id.walt.wallet2.mobile.digitalcredentials.WalletAppGroupAccess
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletRegistryProjection
+import id.walt.wallet2.mobile.digitalcredentials.RegistryProjection
 import id.walt.wallet2.persistence.encryption.IosDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.IosPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
@@ -21,7 +21,7 @@ public actual class WalletFactory(
     private val nfcHostPlatformAdapter: NfcHostPlatformAdapter? = null,
 ) {
     /**
-     * Creates an iOS mobile wallet using native SQLDelight storage and the default iOS platform key provider.
+     * Opens the wallet with native SQLDelight storage and the default iOS key provider.
      */
     public actual suspend fun open(config: WalletConfiguration): Wallet {
         val sharedAccess = config.digitalCredentials.crossProcessAccess
@@ -34,14 +34,14 @@ public actual class WalletFactory(
                 walletId = config.walletId,
             )
         }
-        return createEncryptedSqlDelightMobileWallet(
+        return openEncryptedSqlDelightWallet(
             config = config,
             databaseLocation = "${sharedAccess?.appGroupIdentifier.orEmpty()}/wallet_${config.walletId}.db",
             keyNamespace = "${sharedAccess?.keychainAccessGroup.orEmpty()}/${config.walletId}",
             registry = registry,
             registrationProjection = if (registry is IosIdentityDocumentRegistry) {
-                MobileWalletRegistryProjection.MdocIdentity
-            } else MobileWalletRegistryProjection.Full,
+                RegistryProjection.MdocIdentity
+            } else RegistryProjection.Full,
             managedDatabaseKeyProvider = IosDatabaseEncryptionKeyProvider(sharedAccess?.keychainAccessGroup),
             // Signum's IosKeychainProvider does not expose kSecAttrAccessGroup, so signing keys land
             // in the app's default access group — the first `keychain-access-groups` entitlement entry.

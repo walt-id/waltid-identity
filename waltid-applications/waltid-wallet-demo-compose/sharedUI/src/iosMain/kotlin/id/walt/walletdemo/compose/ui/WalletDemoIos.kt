@@ -176,7 +176,7 @@ fun walletDemoViewController(
                 }
             }
         }
-        MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
+        WalletDemoHost(controller, proximityController, readerTrustSettingsController)
     }
 }
 

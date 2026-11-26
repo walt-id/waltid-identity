@@ -19,12 +19,12 @@ import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
  * @property transactionDataProfilesWarning Set when the accepted transaction data profiles could not
  *   be loaded, in which case the wallet rejects every request carrying `transaction_data`.
  */
-data class AndroidDemoMobileWallet(
+data class AndroidDemoWallet(
     val wallet: Wallet,
     val transactionDataProfilesWarning: String?,
 ) {
     suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult {
-        val demoWallet = MobileDemoWallet(wallet, transactionDataProfilesWarning)
+        val demoWallet = SdkDemoWallet(wallet, transactionDataProfilesWarning)
         val availability = demoWallet.signingProtectionAvailability(signingProtection)
         check(availability == WalletDemoSigningProtectionAvailability.Available) {
             "Signing protection is unavailable: $availability"
@@ -47,13 +47,13 @@ data class AndroidDemoMobileWallet(
  * a different database and so finds no credentials, and omitted `transactionDataProfiles` reject
  * every request carrying `transaction_data` that the main UI would have accepted.
  */
-suspend fun createAndroidDemoMobileWallet(
+suspend fun openAndroidDemoWallet(
     context: Context,
     config: DemoWalletConfig = DemoWalletConfig(),
     interactionContextProvider: () -> FragmentActivity? = { null },
-): AndroidDemoMobileWallet {
+): AndroidDemoWallet {
     val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
-    return AndroidDemoMobileWallet(
+    return AndroidDemoWallet(
         wallet = WalletFactory(
             context = context,
             interactionContextProvider = interactionContextProvider,
@@ -98,8 +98,8 @@ fun createAndroidDemoWallet(
 ): ProximityDemoWallet {
 
     return LazyProximityDemoWallet {
-        createAndroidDemoMobileWallet(context, config, interactionContextProvider).let { created ->
-            MobileDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning,
+        openAndroidDemoWallet(context, config, interactionContextProvider).let { created ->
+            SdkDemoWallet(created.wallet, warning = created.transactionDataProfilesWarning,
                 preferredSigningProtection = config.signingProtectionMode.defaultSelection)
         }
     }

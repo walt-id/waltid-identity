@@ -265,7 +265,7 @@ iOS (Native)
 ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
 open iosApp.xcodeproj
-xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppTests/MobileWalletIntegrationTests -parallel-testing-enabled NO
+xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppTests/WalletIntegrationTests -parallel-testing-enabled NO
 xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppUITests/PublicDemoBackendE2ETests -parallel-testing-enabled NO
 ```
 
@@ -307,7 +307,7 @@ the deterministic reference gallery.
 
 For signed DID presentation after a process restart, both iOS demos' `testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2`
 terminate and relaunch the app before previewing a signed `did:key` request and sharing the saved credential.
-Android's `MobileWalletRestartTest` runs in the self-instrumenting `androidE2eTests` module,
+Android's `WalletRestartTest` runs in the self-instrumenting `androidE2eTests` module,
 separately from the wallet process. One test receives a credential, force-stops and relaunches the app,
 then presents the saved credential through a signed `did:key` request.
 From the Identity repository root, select an emulator or device:

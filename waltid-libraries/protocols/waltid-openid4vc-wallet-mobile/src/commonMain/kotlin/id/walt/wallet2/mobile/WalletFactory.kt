@@ -5,7 +5,7 @@ package id.walt.wallet2.mobile
  */
 public expect class WalletFactory {
     /**
-     * Creates a mobile wallet instance for the current platform.
+     * Opens the configured wallet and its persistent storage.
      *
      * @param config Wallet configuration. Defaults use the stable `default` wallet identifier and P-256 key material.
      */

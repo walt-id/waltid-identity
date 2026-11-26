@@ -12,7 +12,7 @@ waltidMobile {
 
 group = "id.walt.walletdemo.compose"
 
-val enableMobileWallet = enableAndroidBuild || enableIosBuild
+val enableWalletSdk = enableAndroidBuild || enableIosBuild
 
 kotlin {
     compilerOptions {
@@ -44,7 +44,7 @@ kotlin {
             implementation(identityLibs.ktor.serialization.kotlinx.json)
         }
 
-        if (enableMobileWallet) {
+        if (enableWalletSdk) {
             val mobileMain = create("mobileMain") {
                 dependsOn(commonMain.get())
                 dependencies {
@@ -140,7 +140,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     }
 }
 
-if (enableMobileWallet) {
+if (enableWalletSdk) {
     val fixture = layout.projectDirectory.dir("../../waltid-wallet-demo-test-fixtures/key-attestation")
     extra["demoKeyAttestationFixture"] = fixture
     apply(from = fixture.file("sources.gradle.kts"))

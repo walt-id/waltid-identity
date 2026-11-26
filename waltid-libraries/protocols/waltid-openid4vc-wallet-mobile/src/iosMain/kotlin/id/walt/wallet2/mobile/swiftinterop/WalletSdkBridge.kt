@@ -50,7 +50,7 @@ public class WalletSdkBridge private constructor(
      * Creates a bridge backed by the supplied [Wallet].
      */
     public constructor(wallet: Wallet) : this(
-        operations = MobileWalletSdkBridgeOperations(wallet),
+        operations = DefaultWalletSdkBridgeOperations(wallet),
         eventFlow = wallet.events,
     )
 

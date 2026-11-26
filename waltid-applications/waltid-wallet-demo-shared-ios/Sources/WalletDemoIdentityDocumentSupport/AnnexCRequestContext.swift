@@ -12,7 +12,7 @@ import IdentityDocumentServicesUI
 /// ``sendResponse(_:)`` closure, which the platform invokes after the user has consented.
 public protocol AnnexCRequestContext: Sendable {
     /// Apple's pre-consent request, as values.
-    var requestSnapshot: MobileDocumentRequestSnapshot { get }
+    var requestSnapshot: MdocRequestSnapshot { get }
 
     /// Origin the platform verified for the requesting website, if it asserted one.
     var verifiedOrigin: URL? { get }
@@ -29,8 +29,8 @@ public protocol AnnexCRequestContext: Sendable {
 #if os(iOS)
 @available(iOS 26.0, *)
 extension ISO18013MobileDocumentRequestContext: AnnexCRequestContext {
-    public var requestSnapshot: MobileDocumentRequestSnapshot {
-        MobileDocumentRequestSnapshot(request)
+    public var requestSnapshot: MdocRequestSnapshot {
+        MdocRequestSnapshot(request)
     }
 
     public var verifiedOrigin: URL? {

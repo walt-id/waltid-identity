@@ -354,21 +354,6 @@ public final class id/walt/wallet2/persistence/keys/KeyUseAuthorizationPrompt$Co
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
-public abstract interface class id/walt/wallet2/persistence/keys/MobileWalletKeyStore : id/walt/wallet2/data/WalletKeyStore {
-	public abstract fun keyUseAuthorizationPolicy (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class id/walt/wallet2/persistence/keys/MobileWalletKeyStore$DefaultImpls {
-	public static fun addCrypto2Key (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Lid/walt/crypto2/keys/Key;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun getCrypto2Key (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun getDefaultCrypto2Key (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun getDefaultKey (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun getDefaultKeyMaterial (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun getKeyMaterial (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun getPublicKeyMaterial (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static fun listKeysAsList (Lid/walt/wallet2/persistence/keys/MobileWalletKeyStore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
 public abstract interface class id/walt/wallet2/persistence/keys/PlatformManagedKeyProvider {
 	public abstract fun deleteManagedKey (Lid/walt/crypto2/keys/StoredKey$Managed;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun deleteUncommittedKey (Lid/walt/wallet2/persistence/keys/WalletKeyCreationRequest;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -427,6 +412,21 @@ public final class id/walt/wallet2/persistence/keys/PlatformManagedKeyRestoratio
 	public final fun getKey ()Lid/walt/crypto2/keys/ManagedKey;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class id/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore : id/walt/wallet2/data/WalletKeyStore {
+	public abstract fun keyUseAuthorizationPolicy (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore$DefaultImpls {
+	public static fun addCrypto2Key (Lid/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore;Lid/walt/crypto2/keys/Key;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getCrypto2Key (Lid/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getDefaultCrypto2Key (Lid/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getDefaultKey (Lid/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getDefaultKeyMaterial (Lid/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getKeyMaterial (Lid/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore;Ljava/lang/String;Ljava/util/Set;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun getPublicKeyMaterial (Lid/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static fun listKeysAsList (Lid/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/wallet2/persistence/keys/WalletKeyCreationRequest {
@@ -546,7 +546,7 @@ public final class id/walt/wallet2/persistence/stores/SqlDelightIssuanceSessionS
 	public fun remove (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class id/walt/wallet2/persistence/stores/SqlDelightKeyStore : id/walt/wallet2/persistence/keys/MobileWalletKeyStore {
+public final class id/walt/wallet2/persistence/stores/SqlDelightKeyStore : id/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore {
 	public fun <init> (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;Ljava/lang/String;)V
 	public synthetic fun <init> (Lid/walt/wallet2/persistence/keys/PlatformManagedKeyProvider;Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun addCrypto2Key (Lid/walt/crypto2/keys/Key;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

@@ -27,7 +27,7 @@ import id.walt.wallet2.mobile.presentation.PresentationCredentialSelection
 import id.walt.wallet2.mobile.presentation.PresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.openAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.logic.defaultCredentialSelection
 import id.walt.walletdemo.compose.logic.toSharingReview
@@ -67,7 +67,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         val allowlist = context.assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
         val input = AndroidDigitalCredentialProvider.extract(intent, allowlist)
         val config = demoWalletConfig()
-        val created = createAndroidDemoMobileWallet(context, config, ::interactionActivity)
+        val created = openAndroidDemoWallet(context, config, ::interactionActivity)
         val wallet = created.wallet
         statusWallet = wallet
         created.bootstrap(config.selectedSigningProtection(context))
