@@ -157,7 +157,12 @@ class UrlAllowListHttpClientTest {
     @Test
     fun `status and JWKS clients validate the connecting address with a configured CIO engine`() {
         val enterprise = WebDataFetchingConfiguration(http = HttpEngine.CIO)
-        val ids = listOf(WebDataFetcherId.STATUS_POLICY, WebDataFetcherId.STATUS_POLICY2, WebDataFetcherId.JWKS_KEY_PROVIDER)
+        val ids = listOf(
+            WebDataFetcherId.STATUS_POLICY,
+            WebDataFetcherId.STATUS_POLICY2,
+            WebDataFetcherId.JWKS_KEY_PROVIDER,
+            WebDataFetcherId.WELL_KNOWN_KEY_RESOLVER,
+        )
         for (id in ids) {
             WebDataFetcher(id, enterprise).use { fetcher ->
                 val engine = fetcher.httpClient.engine.config as OkHttpConfig

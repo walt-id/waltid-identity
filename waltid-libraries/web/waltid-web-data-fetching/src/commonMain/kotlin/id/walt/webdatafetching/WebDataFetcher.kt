@@ -12,6 +12,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.CancellationException
 
 class WebDataFetcher private constructor(
     private val id: String,
@@ -44,7 +45,7 @@ class WebDataFetcher private constructor(
                 dataFetcherConfiguration
             }
             configuration.applyConfigurationToHttpClient(this)
-            installPrivateNetworkGuard(::requireUrlAllowed)
+            installPrivateNetworkGuard(credentialFetch, ::currentUrlPolicy)
             install(ContentNegotiation) { json() }
         }
         return if (credentialFetch) {
@@ -57,9 +58,11 @@ class WebDataFetcher private constructor(
     @PublishedApi
     internal val urlPolicyRevision: String get() = WebDataFetcherManager.urlPolicyRevision(id)
 
+    private fun currentUrlPolicy() = WebDataFetcherManager.getConfigurationForId(id, defaultConfiguration).url
+
     @PublishedApi
     internal fun requireUrlAllowed(url: Url) {
-        WebDataFetcherManager.getConfigurationForId(id, defaultConfiguration).url?.requireUrlAllowed(url)
+        currentUrlPolicy()?.requireUrlAllowed(url)
     }
 
     companion object {
@@ -67,6 +70,7 @@ class WebDataFetcher private constructor(
             WebDataFetcherId.STATUS_POLICY.name,
             WebDataFetcherId.STATUS_POLICY2.name,
             WebDataFetcherId.JWKS_KEY_PROVIDER.name,
+            WebDataFetcherId.WELL_KNOWN_KEY_RESOLVER.name,
         )
 
         /**
@@ -126,6 +130,7 @@ class WebDataFetcher private constructor(
         }
 
         val httpResponse = httpResponseResult.getOrElse { ex ->
+            if (ex is CancellationException) throw ex
             throw DataFetchingException("Could not send request to: $url (${ex.message ?: "unknown error"})", ex)
         }
 
@@ -145,6 +150,7 @@ class WebDataFetcher private constructor(
                 runCatching {
                     dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
                 }.getOrElse { ex ->
+                    if (ex is CancellationException) throw ex
                     throw DataFetchingException(
                         // The body is not included: the URL is often caller-supplied, and this message can reach
                         // client-facing errors and logs.
@@ -156,7 +162,10 @@ class WebDataFetcher private constructor(
         } else {
             runCatching {
                 httpResponse.body<Res>()
-            }.getOrElse { ex -> throw DataFetchingException("Failed to deserialize response from: $url", ex) }
+            }.getOrElse { ex ->
+                if (ex is CancellationException) throw ex
+                throw DataFetchingException("Failed to deserialize response from: $url", ex)
+            }
         }
 
         val result = WebDataFetchingResult(

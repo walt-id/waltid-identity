@@ -1,6 +1,7 @@
 package id.walt.webdatafetching.ssrf
 
 import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.url.UrlConfiguration
 import id.walt.webdatafetching.engines.OkHttpEngine
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
@@ -15,6 +16,7 @@ import io.ktor.client.utils.EmptyContent
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -131,9 +133,9 @@ internal actual fun WebDataFetchingConfiguration.credentialHttpClient(configure:
     }
 }
 
-actual fun HttpClientConfig<*>.installPrivateNetworkGuard() = installPrivateNetworkGuard { }
+actual fun HttpClientConfig<*>.installPrivateNetworkGuard() = installPrivateNetworkGuard(false) { null }
 
-internal actual fun HttpClientConfig<*>.installPrivateNetworkGuard(checkUrl: (Url) -> Unit) {
+internal actual fun HttpClientConfig<*>.installPrivateNetworkGuard(credentialFetch: Boolean, urlPolicy: () -> UrlConfiguration?) {
     // OkHttp connects to the addresses its Dns returns. The engine type is not visible on HttpClientConfig<*>,
     // so this is a no-op for every other engine, which keeps the pre-connect check below.
     val clientFollowsRedirects = this
@@ -143,7 +145,7 @@ internal actual fun HttpClientConfig<*>.installPrivateNetworkGuard(checkUrl: (Ur
     install(createClientPlugin("PrivateNetworkGuard") {
         on(Send) { request ->
             val initialUrl = request.url.build()
-            checkUrl(initialUrl)
+            urlPolicy()?.requireUrlAllowed(initialUrl)
             requireAllowedTarget(initialUrl)
             var call = proceed(request)
             val method = request.method
@@ -158,12 +160,16 @@ internal actual fun HttpClientConfig<*>.installPrivateNetworkGuard(checkUrl: (Ur
                 hops++
 
                 val target = resolveRedirectTarget(location)
-                checkUrl(target)
+                val previous = currentRequest.url.build()
+                if (previous.protocol == URLProtocol.HTTPS && target.protocol == URLProtocol.HTTP) {
+                    throw UnsupportedRedirectException("Refusing to follow an HTTPS redirect to HTTP")
+                }
+                urlPolicy()?.requireUrlAllowed(target)
                 requireAllowedTarget(target)
 
                 val nextRequest = HttpRequestBuilder().takeFrom(currentRequest).apply {
                     url(target)
-                    if (!sameAuthority(currentRequest.url.build(), target)) {
+                    if (!sameAuthority(previous, target)) {
                         headers.remove(HttpHeaders.Authorization)
                     }
                     if (call.response.status in DOWNGRADE_TO_GET_STATUSES) {

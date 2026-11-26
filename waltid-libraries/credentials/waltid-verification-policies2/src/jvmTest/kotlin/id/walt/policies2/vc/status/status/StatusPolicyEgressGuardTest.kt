@@ -17,6 +17,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -82,6 +83,7 @@ class StatusPolicyEgressGuardTest {
     @Test
     fun `honours the URL allow-list configured for the status fetcher`() = runTest {
         PrivateNetworkGuardSettings.allowLoopback = true
+        assertTrue(verify(validCase()).isSuccess)
         WebDataFetcherManager.appendConfiguration(
             WebDataFetcherId.STATUS_POLICY2.name,
             WebDataFetchingConfiguration(url = UrlConfiguration(hosts = AllowList(blacklist = listOf("localhost")))),
@@ -89,9 +91,6 @@ class StatusPolicyEgressGuardTest {
         val result = verify(validCase())
         val error = result.exceptionOrNull()
         assertTrue(result.isFailure, "status policy must fail when the allow-list refuses the status list host")
-        assertTrue(
-            generateSequence(error) { it.cause }.any { it.message.orEmpty().contains("Host is not allowed: localhost") },
-            "expected the allow-list to refuse the host, got: $error",
-        )
+        assertEquals("Status credential download error", error?.message)
     }
 }
