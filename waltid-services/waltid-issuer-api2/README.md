@@ -58,6 +58,9 @@ From the `waltid-identity` root:
 
 By default the service listens on `0.0.0.0:7005`.
 
+For proximity testing with the bundled `isoMdl` profile, add the following certificate to the reader's issuer trust store.
+[Demo mDL IACA certificate (PEM)](../waltid-openid4vp-conformance-runners/src/test/resources/certs/issuer2-demo-mdl-root-ca.pem)
+
 ## Configuration
 
 Configuration files live in `config/`:
