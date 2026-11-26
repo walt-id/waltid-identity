@@ -10,6 +10,7 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
+import id.walt.did.dids.resolver.normalizeDidUrl
 import id.walt.did.dids.resolver.Crypto2DidKeyResolver
 import id.walt.did.dids.resolver.DidDocumentCrypto2KeyResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -44,17 +45,22 @@ fun interface Crypto2JwtVerificationKeyResolver {
  * [id.walt.credentials.keyresolver.resolvers.X5cTrustAnchors], before it is relied on.
  */
 class Crypto2JwtKeyResolver(
-    private val didResolver: Crypto2DidKeyResolver = DidDocumentCrypto2KeyResolver(
-        resolveDocument = { did -> DidService.resolve(did) },
-    ),
+    private val didResolver: Crypto2DidKeyResolver = defaultDidResolver(),
     private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
     private val allowInlineJwk: Boolean = false,
     private val didVerificationRelationship: VerificationRelationshipType? = null,
 ) : Crypto2JwtVerificationKeyResolver {
+    // Keep the released three-argument JVM constructor and its default-argument bridge.
+    constructor(
+        didResolver: Crypto2DidKeyResolver = defaultDidResolver(),
+        runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+        allowInlineJwk: Boolean = false,
+    ) : this(didResolver, runtime, allowInlineJwk, null)
+
     override suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): ResolvedJwtVerificationKey? {
-        val signerIdentifier = extractSignerIdentifier(jwtPayload)
         val kid = jwtHeader?.get("kid")?.jsonPrimitive?.contentOrNull
         return try {
+            val signerIdentifier = resolveJwtIssuer(jwtPayload)
             when {
                 // 1. DID resolution is authoritative for DID issuer identifiers.
                 signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) -> {
@@ -98,6 +104,10 @@ class Crypto2JwtKeyResolver(
             null
         }
     }
+
+    /** Released generic DID-key lookup; relationship-aware callers use the three-argument overload. */
+    suspend fun resolveFromDid(did: String, keyId: String? = null): Key =
+        resolveFromDid(did, keyId, relationship = null)
 
     suspend fun resolveFromDid(
         did: String,
@@ -160,6 +170,12 @@ class Crypto2JwtKeyResolver(
         if (keys.size == 1 && kid == did && did.startsWith("did:key:")) {
             return keys.single()
         }
+        val exactMatches = keys.filter { normalizeDidUrl(did, it.id.value) == normalizeDidUrl(did, kid) }
+        require(exactMatches.size <= 1) { "Multiple DID verification keys match kid: $kid" }
+        exactMatches.singleOrNull()?.let { return it }
+        require(!kid.startsWith("did:") && !kid.startsWith('/') && !kid.startsWith('?')) {
+            "No DID verification key matches kid: $kid"
+        }
         val kidCandidates = idCandidates(kid)
         val matches = keys.filter { key -> idCandidates(key.id.value).any(kidCandidates::contains) }
         require(matches.size <= 1) { "Multiple DID verification keys match kid: $kid" }
@@ -201,30 +217,13 @@ class Crypto2JwtKeyResolver(
             .filter(String::isNotBlank)
             .toSet()
 
-    /**
-     * Normalizes a key ID to a full DID URL.
-     *
-     * Per DID Core spec, verification methods are typically referenced by fragment.
-     * Bare strings without a prefix are treated as fragments (most common case).
-     * Explicit path (/), query (?), or fragment (#) prefixes are preserved.
-     */
-    private fun normalizeDidUrl(did: String, id: String): String = when {
-        id.startsWith("did:") -> id // Already a full DID URL
-        id.startsWith('#') || id.startsWith('/') || id.startsWith('?') -> "$did$id" // Explicit component
-        else -> "$did#$id" // Bare string treated as fragment (most common case)
-    }
 
-    private fun extractSignerIdentifier(payload: JsonObject): String? =
-        (payload["iss"] ?: payload["issuer"])?.let { element ->
-            when (element) {
-                is JsonNull -> null
-                is JsonPrimitive -> element.contentOrNull
-                is JsonObject -> element["id"]?.jsonPrimitive?.contentOrNull
-                else -> null
-            }
-        }
 
     companion object {
+        private fun defaultDidResolver(): Crypto2DidKeyResolver = DidDocumentCrypto2KeyResolver(
+            resolveDocument = { did -> DidService.resolve(did) },
+        )
+
         private val log = KotlinLogging.logger { }
     }
 }
