@@ -59,6 +59,8 @@ Before launch, verify that unauthenticated callers cannot create sessions, read 
 ## Supported credential formats
 
 - `dc+sd-jwt` — IETF SD-JWT VCs (with selective disclosure)
+Default credential policies are `["signature", "credential-status"]`. Status checking automatically detects supported status mechanisms and accepts value `0`. Credentials without status information remain acceptable; malformed, unsupported, revoked, or unverifiable declared status fails verification. Custom `vc_policies` replace the defaults, so include both policies when customizing. For advanced acceptance rules, use `{"policy":"credential-status","argument":{"values":[0,2]}}`; the discriminator is optional unless explicitly selecting a format.
+
 - `jwt_vc_json` — W3C Verifiable Credentials as JWT
 - `mso_mdoc` — ISO mdoc (e.g., mobile Driving License)
 

@@ -10,8 +10,7 @@ import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.mdoc.proximity.MdocProximityVerifier
 import id.walt.mdoc.verification.MdocVerifier
-import id.walt.policies2.vc.VCPolicyList
-import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.VerificationPolicyManager
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
@@ -52,7 +51,7 @@ object ExternalReaderVerification {
         val setup = ExternalReaderFlowSetup(request.core)
         val query = setup.core.dcqlQuery ?: setup.core.requestedElements?.let(::buildRequestedElementsDcqlQuery)
         val policies = setup.core.policies.copy(
-            vc_policies = setup.core.policies.vc_policies ?: VCPolicyList(listOf(CredentialSignaturePolicy())),
+            vc_policies = setup.core.policies.vc_policies ?: VerificationPolicyManager.defaultCredentialPolicies(),
         )
         val now = Clock.System.now()
         val session = Verification2Session(

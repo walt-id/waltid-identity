@@ -1,15 +1,24 @@
 package id.walt.policies2.vc.status.status
 
 import id.walt.credentials.CredentialParser
+import id.walt.mdoc.objects.mso.Status
+import id.walt.mdoc.objects.mso.UniformResourceIdentifier
+import id.walt.policies2.vc.policies.status.model.IETFEntry
+import id.walt.policies2.vc.policies.status.model.IETFStatusPolicyAttribute
+import kotlinx.serialization.json.decodeFromJsonElement
+import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.StatusPolicy
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vc.policies.PolicyServiceKey
+import id.walt.policies2.vc.policies.status.model.AutoStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.TestInstance
@@ -66,6 +75,80 @@ class StatusPolicyTest {
         )
 
         assertTrue(result.isSuccess, result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `automatic status policy validates the existing format and failure matrix`() = runTest {
+        for ((group, resources) in server.credentials) {
+            for (resource in resources) {
+                val context = resource.data
+                // Custom-valued entries have explicit acceptance rules, covered by verify above.
+                val attributes = when (context) {
+                    is SingleStatusResourceData -> listOf(context.attribute)
+                    is MultiStatusResourceData -> context.attribute
+                }
+                if (attributes.any { it.getAllowedValues() != listOf(0u) }) continue
+                val credential = CredentialParser.parseOnly(jsonModule.encodeToString(context.holderCredential))
+                val result = StatusPolicy().verify(credential)
+                assertEquals(context.valid && group != "revocationlist2020", result.isSuccess, "$group/${resource.id}: ${result.exceptionOrNull()?.message}")
+            }
+        }
+    }
+
+    @Test
+    fun `automatic detection preserves explicit nonzero acceptance values`() = runTest {
+        val context = server.credentials.getValue("bitstringstatuslist")
+            .first { it.id.contains("custom-valid") }.data as SingleStatusResourceData
+        val credential = CredentialParser.parseOnly(jsonModule.encodeToString(context.holderCredential))
+        assertTrue(StatusPolicy().verify(credential).isFailure)
+        val result = StatusPolicy(AutoStatusPolicyAttribute(values = context.attribute.getAllowedValues())).verify(credential)
+        assertTrue(result.isSuccess, result.exceptionOrNull()?.message)
+        val values = context.attribute.getAllowedValues().joinToString(",")
+        val policies = Json.decodeFromString<VCPolicyList>("""[{"policy":"credential-status","argument":{"values":[$values]}}]""")
+        assertTrue(policies.policies.single().verify(credential).isSuccess)
+    }
+
+    @Test
+    fun `automatic detection rejects unsupported siblings beside a clear token status list`() = runTest {
+        val context = server.credentials.values.flatten().map { it.data }
+            .filterIsInstance<SingleStatusResourceData>()
+            .first { it.valid && "status" in it.holderCredential }
+        val original = context.holderCredential
+        assertTrue(StatusPolicy().verify(CredentialParser.parseOnly(jsonModule.encodeToString(original))).isSuccess)
+        val withSibling = JsonObject(original + ("status" to JsonObject(
+            original.getValue("status").jsonObject + ("unsupported_method" to JsonObject(emptyMap()))
+        )))
+        val result = StatusPolicy().verify(CredentialParser.parseOnly(jsonModule.encodeToString(withSibling)))
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message.orEmpty().contains("unsupported_method"))
+    }
+
+    @Test
+    fun `automatic mdoc status rejects unsupported siblings while explicit IETF still evaluates its list`() = runTest {
+        MdocIssuerFixture.ensureKeys()
+        val context = server.credentials.values.flatten().map { it.data }
+            .filterIsInstance<SingleStatusResourceData>()
+            .first { it.valid && it.attribute is IETFStatusPolicyAttribute && it.attribute.getAllowedValues() == listOf(0u) }
+        val entry = jsonModule.decodeFromJsonElement<IETFEntry>(context.holderCredential.getValue("status"))
+        val status = Status(statusList = Status.StatusListInfo(entry.index, UniformResourceIdentifier(entry.uri)))
+        val execution = PolicyExecutionContext(mapOf(
+            PolicyServiceKey.STATUS_LIST_SIGNER_AUTHORIZER to StatusListSignerAuthorizer { true },
+        ))
+        val clear = MdocIssuerFixture.issue(status)
+        val verified = StatusPolicy().verify(clear, execution)
+        assertTrue(verified.isSuccess, verified.exceptionOrNull()?.message)
+        for ((name, declared) in listOf(
+            "identifier_list" to status.copy(identifierList = Status.IdentifierListInfo(
+                byteArrayOf(1), UniformResourceIdentifier("https://status.example/identifier-list"))),
+            "type" to status.copy(type = "UnsupportedStatus", uri = UniformResourceIdentifier("https://status.example/etsi")),
+        )) {
+            val credential = MdocIssuerFixture.issue(declared)
+            val result = StatusPolicy().verify(credential, execution)
+            assertTrue(result.isFailure, "$name must not disappear during extraction")
+            assertTrue(result.exceptionOrNull()?.message.orEmpty().contains(name))
+            val explicit = StatusPolicy(IETFStatusPolicyAttribute(value = 0u)).verify(credential, execution)
+            assertTrue(explicit.isSuccess, explicit.exceptionOrNull()?.message)
+        }
     }
 
     companion object {

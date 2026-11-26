@@ -15,11 +15,15 @@ object VerificationPolicyManager {
      */
     val simpleVerificationPolicies = listOf<CredentialVerificationPolicy2>(
         CredentialSignaturePolicy(),
+        StatusPolicy(),
         ExpirationDatePolicy(),
         NotBeforePolicy(),
         RevocationPolicy(),
         VctIntegrityPolicy(),
     ).associateBy { it.id }
+
+    /** Default credential checks shared by all Verifier2 flows. */
+    fun defaultCredentialPolicies() = VCPolicyList(listOf(CredentialSignaturePolicy(), StatusPolicy()))
 
     fun getSimpleVerificationPolicyByName(id: String): CredentialVerificationPolicy2 =
         simpleVerificationPolicies[id]

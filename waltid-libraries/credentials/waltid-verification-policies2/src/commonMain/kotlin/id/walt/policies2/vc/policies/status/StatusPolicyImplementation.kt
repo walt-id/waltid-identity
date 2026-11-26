@@ -1,6 +1,8 @@
 package id.walt.policies2.vc.policies.status
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.formats.MdocsCredential
+import id.walt.policies2.vc.policies.status.Values
 import id.walt.policies2.vc.policies.status.bit.BitValueReaderFactory
 import id.walt.policies2.vc.policies.status.content.CwtParser
 import id.walt.policies2.vc.policies.status.content.JsonElementParser
@@ -20,17 +22,22 @@ import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifie
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
 import id.walt.policies2.vc.policies.status.validator.IETFStatusValidator
 import id.walt.policies2.vc.policies.status.validator.W3CStatusValidator
+import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.serializer
 
 object StatusPolicyImplementation {
     private val httpClient = HttpClient {
+        installPrivateNetworkGuard()
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
@@ -101,7 +108,12 @@ object StatusPolicyImplementation {
         signerAuthorizer: StatusListSignerAuthorizer? = null,
     ): Result<JsonElement> {
         val statusEntry = try {
-            getStatusEntryElementExtractor(attributes).extract(data)
+            when (attributes) {
+                is AutoStatusPolicyAttribute -> return runStatusCheck { verifyAutomatically(data, attributes, signerAuthorizer) }
+                    .map { available -> JsonObject(mapOf("policy_available" to JsonPrimitive(available))) }
+                is IETFStatusPolicyAttribute -> ietfEntryExtractor.extract(data)
+                is W3CStatusPolicyAttribute, is W3CStatusPolicyListArguments -> w3cEntryExtractor.extract(data)
+            }
         } catch (error: IllegalArgumentException) {
             return Result.failure(error)
         }
@@ -117,6 +129,7 @@ object StatusPolicyImplementation {
         signerAuthorizer: StatusListSignerAuthorizer?,
     ) =
         when (args) {
+            is AutoStatusPolicyAttribute -> error("Automatic status checking resolves arguments before validation")
             is IETFStatusPolicyAttribute -> processIETF(data, args, credential, signerAuthorizer)
             is W3CStatusPolicyAttribute -> processW3C(data, args, credential, signerAuthorizer)
             is W3CStatusPolicyListArguments -> processListW3C(data, args, credential, signerAuthorizer)
@@ -179,8 +192,45 @@ object StatusPolicyImplementation {
         ietfStatusValidator.validate(statusEntry, attribute, credential, signerAuthorizer).getOrThrow()
     }
 
-    private fun getStatusEntryElementExtractor(args: StatusPolicyArgument) = when (args) {
-        is IETFStatusPolicyAttribute -> ietfEntryExtractor
-        is W3CStatusPolicyAttribute, is W3CStatusPolicyListArguments -> w3cEntryExtractor
+    private suspend fun verifyAutomatically(
+        credential: DigitalCredential,
+        args: AutoStatusPolicyAttribute,
+        signerAuthorizer: StatusListSignerAuthorizer?,
+    ): Boolean {
+        val ietf = ietfEntryExtractor.extract(credential)
+        val w3c = w3cEntryExtractor.extract(credential)
+        ietf?.let {
+            val declarations = if (credential is MdocsCredential) {
+                credential.documentMso.status?.let { status -> Json.encodeToJsonElement(status).jsonObject }
+            } else it as? JsonObject
+            val mechanisms = declarations?.keys.orEmpty()
+            require(mechanisms == setOf("status_list")) {
+                "Unsupported credential status mechanisms: ${mechanisms - "status_list"}"
+            }
+            processIETF(it, IETFStatusPolicyAttribute(args.value, args.values), credential, signerAuthorizer).getOrThrow()
+        }
+        w3c?.let { status ->
+            val entries = if (status is JsonArray) status.toList() else listOf(status)
+            require(entries.isNotEmpty()) { "credentialStatus must not be empty" }
+            for (entry in entries) {
+                val parsed = w3cEntryContentParser.parse(entry)
+                val type = when (parsed.type) {
+                    Values.BITSTRING_STATUS_LIST_ENTRY -> Values.BITSTRING_STATUS_LIST
+                    Values.STATUS_LIST_2021_ENTRY -> Values.STATUS_LIST_2021
+                    else -> error("Unsupported credential status type: ${parsed.type}")
+                }
+                val purposes = when (type) {
+                    Values.BITSTRING_STATUS_LIST -> setOf("revocation", "suspension", "refresh", "message")
+                    else -> setOf("revocation", "suspension")
+                }
+                require(parsed.purpose in purposes) {
+                    "Unsupported credential status purpose: ${parsed.purpose}"
+                }
+                w3cStatusValidator.validate(parsed,
+                    W3CStatusPolicyAttribute(args.value, args.values, parsed.purpose, type),
+                    credential, signerAuthorizer).getOrThrow()
+            }
+        }
+        return ietf != null || w3c != null
     }
 }

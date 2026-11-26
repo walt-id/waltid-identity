@@ -5,6 +5,10 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonTransformingSerializer
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
@@ -21,10 +25,30 @@ sealed class StatusPolicyAttribute : StatusPolicyArgument() {
     fun getAllowedValues(): List<UInt> = values?.takeIf { it.isNotEmpty() } ?: listOfNotNull(value)
 }
 
+/** Detect status mechanisms from the credential, accepting only valid status by default. */
+@Serializable
+@SerialName("auto")
+data class AutoStatusPolicyAttribute(
+    override val value: UInt? = 0u,
+    override val values: List<UInt>? = null,
+) : StatusPolicyAttribute() {
+    init {
+        require(value != null || !values.isNullOrEmpty()) { "Either 'value' or 'values' must be provided" }
+    }
+}
+
+/** Explicit discriminators remain supported; omitted discriminators select detection. */
+object OptionalStatusPolicyArgumentSerializer : JsonTransformingSerializer<StatusPolicyArgument>(StatusPolicyArgument.serializer()) {
+    override fun transformDeserialize(element: JsonElement): JsonElement =
+        if (element is JsonObject && "discriminator" !in element) {
+            JsonObject(element + ("discriminator" to JsonPrimitive("auto")))
+        } else element
+}
+
 @Serializable
 @SerialName("w3c")
 data class W3CStatusPolicyAttribute(
-    override val value: UInt? = null,
+    override val value: UInt? = 0u,
     override val values: List<UInt>? = null,
     val purpose: String,
     val type: String,
@@ -37,7 +61,7 @@ data class W3CStatusPolicyAttribute(
 @Serializable
 @SerialName("ietf")
 data class IETFStatusPolicyAttribute(
-    override val value: UInt? = null,
+    override val value: UInt? = 0u,
     override val values: List<UInt>? = null,
 ) : StatusPolicyAttribute() {
     init {
