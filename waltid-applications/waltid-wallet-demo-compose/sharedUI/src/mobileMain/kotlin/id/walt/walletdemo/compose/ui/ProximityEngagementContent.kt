@@ -32,9 +32,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import id.walt.wallet2.mobile.ProximityEngagement
-import id.walt.wallet2.mobile.ProximityEngagementMethod
-import id.walt.wallet2.mobile.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximityEngagement
+import id.walt.wallet2.mobile.proximity.ProximityEngagementMethod
+import id.walt.wallet2.mobile.proximity.ProximityState
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoProximityApprovalMode
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState

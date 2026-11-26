@@ -24,7 +24,7 @@ struct OfferReviewView: View {
                     VStack(spacing: 0) {
                         ForEach(preview.credentials, id: \.configurationID) { credential in
                             OfferedCredentialRow(credential: credential,
-                                issuerName: preview.issuer.name ?? preview.issuer.identifier,
+                                issuerName: preview.issuer.display.name ?? preview.issuer.identifier,
                                 issuerIdentifier: preview.issuer.identifier,
                                 copies: Binding(get: { copies[credential.configurationID] ?? 1 },
                                                 set: { onCopiesChange(credential.configurationID, $0) }),

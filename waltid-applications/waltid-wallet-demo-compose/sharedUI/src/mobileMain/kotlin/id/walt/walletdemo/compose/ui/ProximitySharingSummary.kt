@@ -11,11 +11,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import id.walt.wallet2.mobile.ProximityApprovalTiming
-import id.walt.wallet2.mobile.ProximityElementReference
-import id.walt.wallet2.mobile.ProximityPreparedSharing
-import id.walt.wallet2.mobile.ProximityReview
-import id.walt.wallet2.mobile.ProximitySubmission
+import id.walt.wallet2.mobile.proximity.ProximityApprovalTiming
+import id.walt.wallet2.mobile.proximity.ProximityElementReference
+import id.walt.wallet2.mobile.proximity.ProximityPreparedSharing
+import id.walt.wallet2.mobile.proximity.ProximityReview
+import id.walt.wallet2.mobile.proximity.ProximitySubmission
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.ui.components.CredentialCardArtModel

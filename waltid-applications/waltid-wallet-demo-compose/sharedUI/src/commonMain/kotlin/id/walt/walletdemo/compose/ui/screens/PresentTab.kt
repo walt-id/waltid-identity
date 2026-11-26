@@ -86,7 +86,7 @@ internal fun PresentTab(
             reviewKey = listOf(preview, state.claimReview, state.presentationNavigationResetKey,
                 state.selectedPresentationCredentialOptions, state.selectedPresentationDisclosureOptions),
             credentialStatuses = selectedReviewStatuses(information,
-                state.selectedPresentationCredentialOptions, state.credentialStatuses),
+                state.selectedPresentationCredentialOptions, (state.claimReview as? WalletDemoClaimReview.Ready)?.review?.retained?.statuses ?: state.credentialStatuses),
             paymentReview = state.paymentReview, isPayment = isPayment,
             enabled = state.presentationReviewEnabled && refresh == null,
             selectionComplete = information != null && state.claimReview.canConfirm && state.presentationCredentialSelectionComplete(),

@@ -7,8 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.credentials.ExperimentalDigitalCredentialApi
-import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateProvider
-import id.walt.wallet2.mobile.AndroidDigitalCredentialCreateResponse
+import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialCreateProvider
+import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialCreateResponse
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateUiState
 import id.walt.walletdemo.compose.ui.WalletDemoOfferDraft

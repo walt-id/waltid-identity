@@ -1060,9 +1060,15 @@ private actor TransactionCodeWalletClient: WalletClient {
     func credentials() async throws -> [Credential] {
         if credentialReadFailure { throw WalletError.internalFailure("Storage read unavailable") }
         let available = startsWithCredential || credentialIssued ? storedCredentialIDs.map { id in
-            Credential(id: id, format: Self.credential.format, issuer: Self.credential.issuer,
-                subject: Self.credential.subject, label: Self.credential.label, addedAt: nil,
-                credentialDataJSON: Self.credential.credentialDataJSON)
+            Credential(
+                id: id,
+                format: Self.credential.format,
+                credentialDataJSON: Self.credential.credentialDataJSON,
+                issuer: Self.credential.issuer,
+                subject: Self.credential.subject,
+                label: Self.credential.label,
+                addedAt: nil
+            )
         }.filter { visibleReceivedIDs?.contains($0.id) ?? true } : []
         return available.filter { !deletedCredentialIDs.contains($0.id) }
     }
@@ -1085,13 +1091,14 @@ private actor TransactionCodeWalletClient: WalletClient {
                 grant: issuanceGrant,
                 issuer: IssuanceIssuerPreview(
                     identifier: "https://issuer.example",
-                    name: "Example Issuer",
-                    locale: nil,
-                    logoURI: nil,
-                    logoAltText: nil,
-                    metadataProvenance: .unsigned
+                    metadataProvenance: .unsigned,
+                    display: .init(name: "Example Issuer")
                 ),
-                credentials: [IssuanceCredentialPreview(configurationID: "ExampleCredential", format: "vc+sd-jwt", name: "Example credential", descriptionText: nil, logoURI: nil)],
+                credentials: [IssuanceCredentialPreview(
+                    configurationID: "ExampleCredential",
+                    format: "vc+sd-jwt",
+                    display: .init(name: "Example credential")
+                )],
                 transactionCode: transactionCode,
                 batchSize: batchSize
             )
@@ -1141,7 +1148,8 @@ private actor TransactionCodeWalletClient: WalletClient {
         return .cancelled(sessionID: sessionID)
     }
 
-    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+    func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome {
+        let deferredCredentialID = continuation.id
         resumedDeferredCredentialIDs.append(deferredCredentialID)
         if deferWithProgress {
             credentialIssued = true
@@ -1174,10 +1182,10 @@ private actor TransactionCodeWalletClient: WalletClient {
                         queryID: "pid",
                         credentialID: Self.credential.id,
                         format: Self.credential.format,
+                        credentialDataJSON: Self.credential.credentialDataJSON,
                         issuer: Self.credential.issuer,
                         subject: Self.credential.subject,
                         label: Self.credential.label,
-                        credentialDataJSON: Self.credential.credentialDataJSON,
                         disclosures: []
                     )
                 ]
@@ -1238,10 +1246,10 @@ private actor TransactionCodeWalletClient: WalletClient {
     private static let credential = Credential(
         id: "credential-1",
         format: "vc+sd-jwt",
+        credentialDataJSON: "{}",
         issuer: "https://issuer.example",
         subject: nil,
         label: "PID",
-        addedAt: nil,
-        credentialDataJSON: "{}"
+        addedAt: nil
     )
 }

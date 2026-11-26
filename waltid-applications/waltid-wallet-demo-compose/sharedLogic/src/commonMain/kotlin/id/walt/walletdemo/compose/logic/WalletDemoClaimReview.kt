@@ -1,7 +1,17 @@
 package id.walt.walletdemo.compose.logic
 
 /** SDK-owned effective values. Received paths describe the payload; source paths own metadata/controls. */
-data class WalletDemoPreparedClaimReview(val credentials: List<WalletDemoCredentialClaims>)
+data class WalletDemoPreparedClaimReview(
+    val credentials: List<WalletDemoCredentialClaims>,
+    val retained: WalletDemoRetainedPresentation? = null,
+)
+
+/** The mobile SDK owns the decision and rechecks it after native authorization. */
+class WalletDemoRetainedPresentation(
+    val statuses: WalletDemoCredentialStatuses,
+    val payment: WalletDemoPaymentConsent?,
+    val submit: suspend () -> WalletDemoOperationResult,
+)
 data class WalletDemoCredentialClaims(
     val queryId: String,
     val credentialId: String,

@@ -1,7 +1,7 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.runtime.Composable
-import id.walt.wallet2.mobile.ProximityRemediationAction
+import id.walt.wallet2.mobile.proximity.ProximityRemediationAction
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 
 internal class WalletDemoProximityHostActions(

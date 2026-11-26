@@ -11,15 +11,21 @@ import XCTest
 final class SharingReviewModelTests: XCTestCase {
     func testEffectiveConsentUsesDetailsLocaleForTreeChoicesAndInclusionReasons() throws {
         let city = #""home_address"."city""#
-        let option = PresentationCredentialOption(queryID: "employee", credentialID: "one", format: "dc+sd-jwt",
-            issuer: nil, subject: nil, label: "Identity",
+        let option = PresentationCredentialOption(
+            queryID: "employee",
+            credentialID: "one",
+            format: "dc+sd-jwt",
             credentialDataJSON: #"{"home_address":{"city":"Vienna","country":"AT","postal_code":"1010"}}"#,
+            issuer: nil,
+            subject: nil,
+            label: "Identity",
             disclosures: [
                 .init(path: city, name: "City", valueJSON: #""Vienna""#, displayValue: nil, selectivelyDisclosable: true, required: true),
                 .init(path: #""home_address"."country""#, name: "Country", valueJSON: #""AT""#, displayValue: nil, selectivelyDisclosable: true),
                 .init(path: #""home_address"."postal_code""#, name: "Postal code", valueJSON: #""1010""#, displayValue: nil, selectivelyDisclosable: true),
             ],
-            metadataJSON: #"{"credentialClaims":[{"path":["home_address"],"display":[{"locale":"en","name":"Address"},{"locale":"de","name":"Anschrift"}]},{"path":["home_address","city"],"display":[{"locale":"en","name":"City"},{"locale":"de","name":"Wohnort"}]},{"path":["home_address","country"],"display":[{"locale":"en","name":"Country"},{"locale":"de","name":"Land"}]},{"path":["home_address","postal_code"],"display":[{"locale":"en","name":"Postal code"},{"locale":"de","name":"Postleitzahl"}]}]}"#)
+            metadataJSON: #"{"credentialClaims":[{"path":["home_address"],"display":[{"locale":"en","name":"Address"},{"locale":"de","name":"Anschrift"}]},{"path":["home_address","city"],"display":[{"locale":"en","name":"City"},{"locale":"de","name":"Wohnort"}]},{"path":["home_address","country"],"display":[{"locale":"en","name":"Country"},{"locale":"de","name":"Land"}]},{"path":["home_address","postal_code"],"display":[{"locale":"en","name":"Postal code"},{"locale":"de","name":"Postleitzahl"}]}]}"#
+        )
         let prepared = effectivePrepared(#"{"home_address":{"city":"Vienna","country":"AT"}}"#)
         // English is first in the issuer metadata; a regional German preference must override it.
         for (locale, labels) in [
@@ -123,10 +129,18 @@ final class SharingReviewModelTests: XCTestCase {
 
     func testOptionalArrayControlUsesIssuerMetadataAtItsOriginalIndex() throws {
         let base = effectiveOption()
-        let option = PresentationCredentialOption(queryID: base.queryID, credentialID: base.credentialID, format: base.format,
-            issuer: nil, subject: nil, label: base.label, credentialDataJSON: base.credentialDataJSON,
+        let option = PresentationCredentialOption(
+            queryID: base.queryID,
+            credentialID: base.credentialID,
+            format: base.format,
+            credentialDataJSON: base.credentialDataJSON,
+            issuer: nil,
+            subject: nil,
+            label: base.label,
             disclosures: [.init(path: #""certifications".1"#, name: "SDK fallback", valueJSON: #"{"name":"Cloud security"}"#,
-                displayValue: nil, selectivelyDisclosable: true)], metadataJSON: base.metadataJSON)
+                displayValue: nil, selectivelyDisclosable: true)],
+            metadataJSON: base.metadataJSON
+        )
         let nodes = try effectiveReview(effectivePrepared("{}"), option).contributions[0].nodes.sharingSection(always: false)
         let candidate = try XCTUnwrap(nodes.first?.children.first)
         XCTAssertEqual(candidate.path, [.key("certifications"), .index(1)])
@@ -138,10 +152,18 @@ final class SharingReviewModelTests: XCTestCase {
     func testEqualContributionsMergeOnlyWhenOriginalArrayIdentitiesAlsoMatch() throws {
         let base = effectiveOption()
         func option(_ query: String, index: Int) -> PresentationCredentialOption {
-            .init(queryID: query, credentialID: base.credentialID, format: base.format, issuer: nil, subject: nil,
-                label: base.label, credentialDataJSON: base.credentialDataJSON,
+            .init(
+                queryID: query,
+                credentialID: base.credentialID,
+                format: base.format,
+                credentialDataJSON: base.credentialDataJSON,
+                issuer: nil,
+                subject: nil,
+                label: base.label,
                 disclosures: [.init(path: "\"certifications\".\(index)", name: "Certification", valueJSON: #"{"name":"Cloud security"}"#,
-                    displayValue: nil, selectivelyDisclosable: true, required: true)], metadataJSON: base.metadataJSON)
+                    displayValue: nil, selectivelyDisclosable: true, required: true)],
+                metadataJSON: base.metadataJSON
+            )
         }
         let raw = effectivePrepared(#"{"certifications":[{"name":"Cloud security"}]}"#).credentials[0]
         func contribution(_ query: String, index: Int) -> PresentationCredentialClaims {
@@ -174,10 +196,17 @@ final class SharingReviewModelTests: XCTestCase {
             .init(path: #""employment"."salary""#, name: "salary", valueJSON: #"{"amount":0,"eligible":false,"until":null}"#, displayValue: nil, selectivelyDisclosable: true),
             .init(path: #""home_address"."city""#, name: "City", valueJSON: #""Bengaluru""#, displayValue: nil, selectivelyDisclosable: true),
         ]
-        return .init(queryID: "employee", credentialID: "one", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Employee",
+        return .init(
+            queryID: "employee",
+            credentialID: "one",
+            format: "dc+sd-jwt",
             credentialDataJSON: #"{"employment":{"job_title":"Engineer","manager_name":"Withheld"},"certifications":[{}, {"name":"Cloud security"}]}"#,
+            issuer: nil,
+            subject: nil,
+            label: "Employee",
             disclosures: disclosures,
-            metadataJSON: #"{"credentialClaims":[{"path":["certifications",1],"display":[{"name":"Cloud security"}]}]}"#)
+            metadataJSON: #"{"credentialClaims":[{"path":["certifications",1],"display":[{"name":"Cloud security"}]}]}"#
+        )
     }
 
     private func effectiveReview(_ prepared: PreparedPresentationReview, _ option: PresentationCredentialOption,
@@ -598,13 +627,13 @@ final class SharingReviewModelTests: XCTestCase {
     func testARejectedRequestStillDescribesWhoAskedSoTheUserCanDecideWhetherToNotifyThem() {
         let request = PresentationRequestContext(
             clientID: "https://verifier.example",
+            requestAuthentication: .unauthenticated,
             verifierMetadata: VerifierMetadata(
                 display: MetadataDisplay(name: "Example Verifier", locale: "en", logoURI: nil, logoAltText: nil),
                 clientURI: nil,
                 policyURI: nil,
                 termsOfServiceURI: nil
             ),
-            requestAuthentication: .unauthenticated,
             responseEncryption: .notRequired
         ).sharingRequest()
 
@@ -797,10 +826,17 @@ final class SharingReviewModelTests: XCTestCase {
 
     private func informationOption(id: String = "one", query: String = "pid", name: String, required: Bool = true,
         extra: [PresentationDisclosure] = [], replacing: [PresentationDisclosure]? = nil) -> PresentationCredentialOption {
-        .init(queryID: query, credentialID: id, format: "dc+sd-jwt", issuer: "Issuer", subject: nil, label: "Identity",
+        .init(
+            queryID: query,
+            credentialID: id,
+            format: "dc+sd-jwt",
             credentialDataJSON: #"{"given_name":"Ada","family_name":"Lovelace","birth_date":"1815-12-10"}"#,
+            issuer: "Issuer",
+            subject: nil,
+            label: "Identity",
             disclosures: replacing ?? [.init(path: "given_name", name: "given_name", valueJSON: "\"\(name)\"",
-                displayValue: name, selectivelyDisclosable: true, required: required, selectable: !required)] + extra)
+                displayValue: name, selectivelyDisclosable: true, required: required, selectable: !required)] + extra
+        )
     }
 
     // MARK: - Fixtures
@@ -819,12 +855,12 @@ final class SharingReviewModelTests: XCTestCase {
             previewHandle: PresentationPreviewHandle(value: "preview"),
             request: PresentationRequestInfo(
                 clientID: "https://verifier.example",
-                verifierMetadata: verifierMetadata,
                 requestAuthentication: .unauthenticated,
-                responseURI: URL(string: "https://verifier.example/response"),
-                state: "state-123",
                 nonce: "nonce-456",
                 responseEncryption: responseEncryption,
+                verifierMetadata: verifierMetadata,
+                responseURI: URL(string: "https://verifier.example/response"),
+                state: "state-123",
                 transactionData: transactionData
             ),
             credentialOptions: [option(queryID: "pid", credentialID: "cred-1")],
@@ -871,10 +907,10 @@ final class SharingReviewModelTests: XCTestCase {
             queryID: queryID,
             credentialID: credentialID,
             format: "mso_mdoc",
+            credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe","given_name":"Ada"}}"#,
             issuer: "https://issuer.example",
             subject: "did:example:holder",
             label: "Mobile Driving Licence",
-            credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe","given_name":"Ada"}}"#,
             disclosures: disclosures
         )
     }

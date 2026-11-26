@@ -2,11 +2,11 @@ package id.walt.walletdemo.compose.logic
 
 import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.readertrust.ReaderTrustDecision
-import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
-import id.walt.wallet2.mobile.MobileWalletDigitalCredentialPreview
-import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
-import id.walt.wallet2.mobile.MobileWalletPresentationCredentialRequirement
-import id.walt.wallet2.mobile.MobileWalletReaderAuthentication
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCPreview
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialPreview
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialRequirement
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletReaderAuthentication
 
 /**
  * Maps an OpenID4VP Digital Credentials API preview onto the shared sharing-review model.

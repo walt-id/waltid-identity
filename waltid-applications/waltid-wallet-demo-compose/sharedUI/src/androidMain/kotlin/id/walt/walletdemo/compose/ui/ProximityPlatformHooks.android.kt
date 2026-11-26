@@ -30,8 +30,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import id.walt.wallet2.mobile.ProximityHostActionResult
-import id.walt.wallet2.mobile.ProximityRemediationAction
+import id.walt.wallet2.mobile.proximity.ProximityHostActionResult
+import id.walt.wallet2.mobile.proximity.ProximityRemediationAction
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred

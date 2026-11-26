@@ -137,14 +137,16 @@ internal class WalletApi2DemoWallet(
 
     override suspend fun beginAuthorizationIssuance(
         sessionId: String,
+        redirectUri: String,
         credentials: List<WalletDemoCredentialSelection>,
     ): WalletDemoIssuanceAuthorization = withIssuance(sessionId) { session ->
         val selections = prepareSelections(sessionId, credentials)
         val configurationIds = selections.map { it.credentialConfigurationId }
-        val result = client.authorizationUrl(walletId, session.offerUrl, session.redirectUri, configurationIds)
+        val result = client.authorizationUrl(walletId, session.offerUrl, redirectUri.ifBlank { session.redirectUri }, configurationIds)
         check(result.credentialConfigurationIds.toSet() == configurationIds.toSet()) { "Authorization changed the selected configurations" }
         checkIssuanceActive(sessionId)
         val updated = session.copy(
+            redirectUri = redirectUri.ifBlank { session.redirectUri },
             codeVerifier = result.codeVerifier,
             authorizationState = result.state,
             credentials = selections,
@@ -229,25 +231,6 @@ internal class WalletApi2DemoWallet(
         } finally {
             processingIssuanceSessions.remove(sessionId)
         }
-    }
-
-    override suspend fun rejectIssuedCredential(
-        notificationId: String,
-        accessToken: String,
-        credentialIssuerBaseUrl: String?,
-        notificationEndpoint: String?,
-        eventDescription: String?,
-    ) {
-        client.rejectIssuedCredential(
-            walletId,
-            RejectIssuedCredentialRequestDto(
-                notificationId = notificationId,
-                accessToken = accessToken,
-                credentialIssuerBaseUrl = credentialIssuerBaseUrl,
-                notificationEndpoint = notificationEndpoint,
-                eventDescription = eventDescription,
-            ),
-        )
     }
 
     private suspend fun checkIssuanceActive(sessionId: String) {

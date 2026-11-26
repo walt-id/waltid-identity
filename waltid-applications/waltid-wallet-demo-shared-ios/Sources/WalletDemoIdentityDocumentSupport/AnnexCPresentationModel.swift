@@ -11,8 +11,7 @@ public protocol AnnexCPresentationWallet: Sendable {
     func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot?
     func cachedCredentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error>
     func closeStatusWallet() async throws
-    func submitStatusReviewedAnnexCPresentation(reviewedStatus: [String: String], requestID: String, verifiedOrigin: String,
-        deviceRequestBase64URL: String, encryptionInfoBase64URL: String, selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse
+    func submitStatusReviewedAnnexCPresentation(_ submission: AnnexCSubmission, reviewedStatus: [String: String]) async throws -> DigitalCredentialResponse
 
     /// Stage 1: retain the pre-consent request and report what could satisfy it.
     func previewAnnexCPresentation(
@@ -22,19 +21,14 @@ public protocol AnnexCPresentationWallet: Sendable {
     ) async throws -> AnnexCPresentationPreview
 
     /// Stage 2: match the raw request against the retained preview and seal the response.
-    func submitAnnexCPresentation(
-        requestID: String,
-        verifiedOrigin: String,
-        deviceRequestBase64URL: String,
-        encryptionInfoBase64URL: String,
-        selectedCredentialOptions: [PresentationCredentialSelection]
-    ) async throws -> DigitalCredentialResponse
+    func submitAnnexCPresentation(_ submission: AnnexCSubmission) async throws -> DigitalCredentialResponse
 }
 
 public extension AnnexCPresentationWallet {
     func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? { nil }
     func cachedCredentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { AsyncThrowingStream { $0.finish() } }
     func closeStatusWallet() async throws {}
+
 }
 extension Wallet: AnnexCPresentationWallet {
     public func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? { try await credentialStatusSnapshot() }
@@ -206,20 +200,17 @@ public final class AnnexCPresentationModel: ObservableObject {
         phase = .submitting
         do {
             try await context.sendResponse { rawRequest in
+                let submission = AnnexCSubmission(
+                    preview: preview,
+                    deviceRequestBase64URL: rawRequest.deviceRequest,
+                    encryptionInfoBase64URL: rawRequest.encryptionInfo,
+                    selectedCredentialOptions: selections
+                )
                 let response: DigitalCredentialResponse
                 if let reviewedStatus {
-                    response = try await wallet.submitStatusReviewedAnnexCPresentation(
-                        reviewedStatus: reviewedStatus, requestID: preview.requestID, verifiedOrigin: preview.verifiedOrigin,
-                        deviceRequestBase64URL: rawRequest.deviceRequest, encryptionInfoBase64URL: rawRequest.encryptionInfo,
-                        selectedCredentialOptions: selections)
+                    response = try await wallet.submitStatusReviewedAnnexCPresentation(submission, reviewedStatus: reviewedStatus)
                 } else {
-                    response = try await wallet.submitAnnexCPresentation(
-                        requestID: preview.requestID,
-                        verifiedOrigin: preview.verifiedOrigin,
-                        deviceRequestBase64URL: rawRequest.deviceRequest,
-                        encryptionInfoBase64URL: rawRequest.encryptionInfo,
-                        selectedCredentialOptions: selections
-                    )
+                    response = try await wallet.submitAnnexCPresentation(submission)
                 }
                 return try encryptedResponseData(fromResponseJSON: response.dataJSON)
             }

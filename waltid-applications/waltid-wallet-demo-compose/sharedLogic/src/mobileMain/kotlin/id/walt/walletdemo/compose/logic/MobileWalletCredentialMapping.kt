@@ -1,6 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.credentials.MobileWalletCredential
 
 /** One display mapping for in-app and provider result receipts. */
 fun MobileWalletCredential.toDemoCredential(): WalletDemoCredential = WalletDemoCredential(

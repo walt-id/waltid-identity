@@ -1,7 +1,7 @@
 package id.walt.walletdemo.compose.ui
 
 import android.Manifest
-import id.walt.wallet2.mobile.ProximityRemediationAction
+import id.walt.wallet2.mobile.proximity.ProximityRemediationAction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

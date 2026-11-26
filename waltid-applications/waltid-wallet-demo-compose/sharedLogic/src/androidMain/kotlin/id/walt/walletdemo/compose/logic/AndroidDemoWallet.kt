@@ -1,14 +1,16 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import android.content.Context
-import android.os.LocaleList
-import id.walt.wallet2.mobile.MobileWallet
 import androidx.fragment.app.FragmentActivity
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
+import id.walt.wallet2.mobile.AndroidMobileWalletNfcConfiguration
+import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.wallet2.mobile.AndroidMobileWalletNfcConfiguration
+import id.walt.wallet2.mobile.identity.MobileWalletKeyAuthorization
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceConfig
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationConfig
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 
 /**
  * An Android demo [MobileWallet] together with anything the caller must warn the user about.
@@ -59,6 +61,13 @@ suspend fun createAndroidDemoMobileWallet(
         ).create(
             MobileWalletConfig(
                 walletId = config.walletId,
+                keyAuthorization = MobileWalletKeyAuthorization(
+                    policy = config.signingProtectionMode.defaultSelection.toKeyUseAuthorizationPolicy(),
+                    prompt = KeyUseAuthorizationPrompt(
+                        reason = "Authorize wallet signing",
+                        cancelText = "Cancel",
+                    ),
+                ),
                 signingIdentity = id.walt.wallet2.mobile.identity.SigningIdentityConfiguration(
                     recoveryProviders = listOf(
                         id.walt.wallet2.recovery.blockstore.BlockStoreIdentityRecovery(context, "wallet-demo"),
@@ -67,21 +76,16 @@ suspend fun createAndroidDemoMobileWallet(
                     ),
                     alternativeAuthorizations = config.signingProtectionMode.alternativeAuthorizations(),
                 ),
-                attestationConfig = config.toWalletAttestationConfig(),
-                walletProvider = config.toWalletProviderConfig(),
-                transactionDataProfiles = transactionDataProfiles.profiles,
-                paymentCredentialIssuers = config.paymentCredentialIssuers(),
-                preferredLocales = LocaleList.getDefault().let { locales ->
-                    List(locales.size()) { index -> locales[index].toLanguageTag() }
-                },
-                defaultKeyUseAuthorizationPolicy =
-                    config.signingProtectionMode.defaultSelection.toKeyUseAuthorizationPolicy(),
-                keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
-                    reason = "Authorize wallet signing",
-                    cancelText = "Cancel",
+                issuance = MobileWalletIssuanceConfig(
+                    attestation = config.toWalletAttestationConfig(),
+                    walletProvider = config.toWalletProviderConfig(),
+                ),
+                presentation = MobileWalletPresentationConfig(
+                    verifierTrust = DemoClientIdTrust.configuration,
+                    transactionDataProfiles = transactionDataProfiles.profiles,
+                    paymentCredentialIssuers = config.paymentCredentialIssuers(),
                 ),
             ),
-            DemoClientIdTrust.configuration,
         ).attachKeyAttestationProviderResolver(DemoKeyAttestationProviders()),
         transactionDataProfilesWarning = transactionDataProfiles.warning,
     )

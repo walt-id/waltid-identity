@@ -43,15 +43,15 @@ public struct CredentialCardSummary {
             title: CredentialTitles.displayName(
                 format: credential.format,
                 credentialDataJSON: credential.typePayloadJSON,
-                displayName: credential.name,
+                displayName: credential.display.name,
                 fallback: credential.format
             ),
             issuer: issuer,
-            backgroundColor: credential.backgroundColor,
-            backgroundImageURI: credential.backgroundImageURI?.absoluteString,
-            textColor: credential.textColor,
-            logoURI: credential.logoURI?.absoluteString,
-            logoAltText: credential.logoAltText
+            backgroundColor: credential.display.backgroundColor,
+            backgroundImageURI: credential.display.backgroundImageURI,
+            textColor: credential.display.textColor,
+            logoURI: credential.display.logoURI,
+            logoAltText: credential.display.logoAltText
         )
     }
 

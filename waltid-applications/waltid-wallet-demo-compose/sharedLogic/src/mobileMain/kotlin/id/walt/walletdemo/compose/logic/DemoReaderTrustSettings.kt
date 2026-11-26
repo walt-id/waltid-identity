@@ -1,9 +1,9 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.ProximityReaderPolicy
-import id.walt.wallet2.mobile.ProximityReaderTrustImportPreview
-import id.walt.wallet2.mobile.ProximityReaderTrustSettings
-import id.walt.wallet2.mobile.ProximityReaderTrustSettingsCodec
+import id.walt.wallet2.mobile.proximity.ProximityReaderPolicy
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustImportPreview
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettings
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettingsCodec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope

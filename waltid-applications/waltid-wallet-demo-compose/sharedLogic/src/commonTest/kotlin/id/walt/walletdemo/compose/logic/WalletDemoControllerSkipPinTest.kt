@@ -192,7 +192,7 @@ private class RecordingDemoWallet : DemoWallet {
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
     override suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?) =
         error("unused")
-    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>) = error("unused")
+    override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>) = error("unused")
     override suspend fun continuePreAuthorizedIssuance(sessionId: String, transactionCode: String?, credentials: List<WalletDemoCredentialSelection>) =
         error("unused")
     override suspend fun continueAuthorizationIssuance(sessionId: String, callbackUri: String): WalletDemoIssuanceOutcome {

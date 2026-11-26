@@ -70,7 +70,7 @@ private class MockDemoWallet : DemoWallet {
         ),
     )
 
-    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
+    override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
         WalletDemoIssuanceAuthorization("https://issuer.example/authorize")
 
     override suspend fun continuePreAuthorizedIssuance(
