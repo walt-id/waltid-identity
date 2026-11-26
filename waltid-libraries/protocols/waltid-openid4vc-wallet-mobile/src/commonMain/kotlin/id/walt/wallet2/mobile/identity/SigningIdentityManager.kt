@@ -3,48 +3,52 @@ package id.walt.wallet2.mobile.identity
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.random.CryptographyRandom
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyOrigin
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeySecurityLevel
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.keys.toSpkiDer
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.keys.KeyOrigin
-import id.walt.crypto2.keys.KeyProtectionLevel
-import id.walt.crypto2.keys.KeySecurityLevel
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.mobile.MobileDidSupport
 import id.walt.wallet2.mobile.MobileWalletLifecycle
+import id.walt.wallet2.mobile.identity.MobileDidSupport
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
-import id.walt.crypto2.keys.KeyUseAuthorizationFailure
-import id.walt.crypto2.keys.KeyUseAuthorizationException
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
-import id.walt.crypto2.keys.KeyUseAuthorizationSupport
-import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyProtection
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.uuid.Uuid
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Owns one wallet's active signing identity. Creation and recovery use complete SDK-issued options.
@@ -67,24 +71,6 @@ public class SigningIdentityManager internal constructor(
     private val onActive: suspend () -> Unit,
     private val lifecycle: MobileWalletLifecycle = MobileWalletLifecycle(),
 ) {
-    private val journal = SigningIdentityJournal(walletId, queries)
-    private val owner = Any()
-    private val mutex = Mutex()
-    private suspend inline fun <T> withIdentity(block: () -> T): T =
-        lifecycle.use { mutex.withLock { block() } }
-    private suspend inline fun updateIdentity(block: () -> SigningIdentityOperationResult): SigningIdentityOperationResult =
-        lifecycle.use { mutex.withLock { block() }.notifyActive() }
-    private val software = CryptoRuntime(defaultSoftwareKeyProviders())
-    private val providers = configuration.recoveryProviders.associateBy { it.id }
-    private val custodians = configuration.keyCustodians.associateBy { it.id }
-    private val authorization: KeyUseAuthorizationPolicy get() = when (val value = configuration.authorization) {
-        SigningIdentityAuthorization.WalletDefault -> defaultAuthorization
-        is SigningIdentityAuthorization.Explicit -> value.policy
-    }
-
-    private val authorizations: List<KeyUseAuthorizationPolicy>
-        get() = (listOf(authorization) + configuration.alternativeAuthorizations).distinct()
-
     /** Offers only complete choices compatible with the host policy and current native/provider prerequisites. */
     public suspend fun creationOptions(intent: SigningIdentityIntent = SigningIdentityIntent.WithoutRecovery,
         attestation: SigningIdentityAttestationRequest = SigningIdentityAttestationRequest.None): SigningIdentityCreationOptions = withIdentity {
@@ -93,7 +79,6 @@ public class SigningIdentityManager internal constructor(
 
     /** Returns established identity metadata, including an explicit unavailable or interrupted state. */
     public suspend fun state(): SigningIdentityState = withIdentity { currentState() }
-
     /** Reopens the selected identity, or creates the recommended identity without recovery using configured defaults.
      * Pending and unavailable states never cause replacement key generation. Use creationOptions for an explicit choice.
      */
@@ -226,48 +211,6 @@ public class SigningIdentityManager internal constructor(
             SigningIdentityOperationResult.Active(updated)
         } catch (cause: CancellationException) { throw cause }
         catch (cause: Exception) { failed(providerFailure(cause)) }
-    }
-
-    /** Credential bindings inherit the identity's retained restriction. A recoverable identity cannot
-     * acquire a backup/custody restriction merely because a later issuance request asks for it. */
-    internal suspend fun requireKeyPolicy(keyId: String, policy: SigningIdentityKeyPolicy): Unit = mutex.withLock {
-        if (policy == SigningIdentityKeyPolicy.GeneralPurpose) return@withLock
-        val record = journal.read()
-        require(record != null && record.keyId == keyId && record.phase == IdentityPhase.Active && liveKey(record) != null) {
-            "The selected holder key is not an active managed identity"
-        }
-        require(record.policy == policy || record.policy == SigningIdentityKeyPolicy.HardwareGenerated) {
-            "The selected identity does not satisfy the required holder-key policy"
-        }
-        require(record.backup == null && record.recovery == null && record.identity?.custody.orEmpty().isEmpty()) {
-            "The required holder-key policy prohibits external private-key copies"
-        }
-    }
-
-    private suspend fun recoveryRecord(record: IdentityRecord): RecoveryRecord? {
-        val identity = requireNotNull(record.identity)
-        val source = record.backup?.let { providers[it.providerId] }
-        val existing = if (record.recovery == null) source?.retrieve(record.backup.recordId)?.copyBytes() else null
-        return record.recovery ?: existing?.let { bytes ->
-            try {
-                decodeRecovery(bytes, identity.id).also {
-                    require(it.keyId == identity.keyId && it.did == identity.did && it.publicJwk == identity.publicJwk) {
-                        "Recovery record belongs to another identity"
-                    }
-                }
-            } finally { bytes.fill(0) }
-        } ?: run {
-            val key = keys.getCrypto2Key(identity.keyId) ?: return null
-            val exported = key.capabilities.privateKeyExporter?.exportPrivateKey() as? EncodedKey.Jwk
-                ?: return null
-            RecoveryRecord(identityId = identity.id, keyId = identity.keyId, did = identity.did,
-                publicJwk = identity.publicJwk, secret = RecoverySecret.Exported(exported.data.toByteArray().decodeToString()),
-                constraints = recoveryConstraints(record))
-                .also {
-                    val bytes = it.encode()
-                    try { decodeRecovery(bytes, identity.id) } finally { bytes.fill(0) }
-                }
-        }
     }
 
     /** Offers registered custody destinations only when the current policy permits private-key export. */
@@ -413,6 +356,84 @@ public class SigningIdentityManager internal constructor(
         finally { bytes.fill(0) }
     }
 
+    /** Reports each configured recovery provider, including its unmet prerequisites. */
+    public suspend fun recoveryProviderStatuses(): List<IdentityRecoveryProviderStatus> = lifecycle.use {
+        providers.values.map { provider ->
+            val availability = try { provider.availability() }
+            catch (cause: CancellationException) { throw cause }
+            catch (_: Exception) { RecoveryAvailability.Unavailable("The recovery service could not be reached. Try again.") }
+            IdentityRecoveryProviderStatus(provider.id, provider.displayName, availability)
+        }
+    }
+
+    /** Credential bindings inherit the identity's retained restriction. A recoverable identity cannot
+     * acquire a backup/custody restriction merely because a later issuance request asks for it. */
+    internal suspend fun requireKeyPolicy(keyId: String, policy: SigningIdentityKeyPolicy): Unit = mutex.withLock {
+        if (policy == SigningIdentityKeyPolicy.GeneralPurpose) return@withLock
+        val record = journal.read()
+        require(record != null && record.keyId == keyId && record.phase == IdentityPhase.Active && liveKey(record) != null) {
+            "The selected holder key is not an active managed identity"
+        }
+        require(record.policy == policy || record.policy == SigningIdentityKeyPolicy.HardwareGenerated) {
+            "The selected identity does not satisfy the required holder-key policy"
+        }
+        require(record.backup == null && record.recovery == null && record.identity?.custody.orEmpty().isEmpty()) {
+            "The required holder-key policy prohibits external private-key copies"
+        }
+    }
+
+    private val journal = SigningIdentityJournal(walletId, queries)
+
+    private val owner = Any()
+
+    private val mutex = Mutex()
+
+    private suspend inline fun <T> withIdentity(block: () -> T): T =
+        lifecycle.use { mutex.withLock { block() } }
+
+    private suspend inline fun updateIdentity(block: () -> SigningIdentityOperationResult): SigningIdentityOperationResult =
+        lifecycle.use { mutex.withLock { block() }.notifyActive() }
+
+    private val software = CryptoRuntime(defaultSoftwareKeyProviders())
+
+    private val providers = configuration.recoveryProviders.associateBy { it.id }
+
+    private val custodians = configuration.keyCustodians.associateBy { it.id }
+
+    private val authorization: KeyUseAuthorizationPolicy get() = when (val value = configuration.authorization) {
+        SigningIdentityAuthorization.WalletDefault -> defaultAuthorization
+        is SigningIdentityAuthorization.Explicit -> value.policy
+    }
+
+    private val authorizations: List<KeyUseAuthorizationPolicy>
+        get() = (listOf(authorization) + configuration.alternativeAuthorizations).distinct()
+
+    private suspend fun recoveryRecord(record: IdentityRecord): RecoveryRecord? {
+        val identity = requireNotNull(record.identity)
+        val source = record.backup?.let { providers[it.providerId] }
+        val existing = if (record.recovery == null) source?.retrieve(record.backup.recordId)?.copyBytes() else null
+        return record.recovery ?: existing?.let { bytes ->
+            try {
+                decodeRecovery(bytes, identity.id).also {
+                    require(it.keyId == identity.keyId && it.did == identity.did && it.publicJwk == identity.publicJwk) {
+                        "Recovery record belongs to another identity"
+                    }
+                }
+            } finally { bytes.fill(0) }
+        } ?: run {
+            val key = keys.getCrypto2Key(identity.keyId) ?: return null
+            val exported = key.capabilities.privateKeyExporter?.exportPrivateKey() as? EncodedKey.Jwk
+                ?: return null
+            RecoveryRecord(identityId = identity.id, keyId = identity.keyId, did = identity.did,
+                publicJwk = identity.publicJwk, secret = RecoverySecret.Exported(exported.data.toByteArray().decodeToString()),
+                constraints = recoveryConstraints(record))
+                .also {
+                    val bytes = it.encode()
+                    try { decodeRecovery(bytes, identity.id) } finally { bytes.fill(0) }
+                }
+        }
+    }
+
     // Publish only committed identities, after releasing the identity mutex so host callbacks may read state.
     private suspend fun SigningIdentityOperationResult.notifyActive(): SigningIdentityOperationResult = also {
         if (this is SigningIdentityOperationResult.Active) onActive()
@@ -445,7 +466,7 @@ public class SigningIdentityManager internal constructor(
     }
 
     private fun nativeSettingsPermitIdentitySigning(): Boolean {
-        val settings = configuration.platform as? id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore ?: return true
+        val settings = configuration.platform as? PlatformKeyConfiguration.AndroidKeystore ?: return true
         val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
         // Identity signatures cover protocol bytes. Protected Confirmation requires signing its own CBOR structure.
         if (settings.userConfirmationRequired || settings.userPresenceRequired) return false
@@ -467,16 +488,6 @@ public class SigningIdentityManager internal constructor(
         option.authorization in authorizations && option.storage in supportedStorage(option.recoverable, option.authorization, option.attestation) &&
             (!option.recoverable || (configuration.policy == SigningIdentityKeyPolicy.GeneralPurpose &&
                 providers[option.providerId]?.let { providerAvailability(it) } == option.recoveryAvailability))
-
-    /** Reports each configured recovery provider, including its unmet prerequisites. */
-    public suspend fun recoveryProviderStatuses(): List<IdentityRecoveryProviderStatus> = lifecycle.use {
-        providers.values.map { provider ->
-            val availability = try { provider.availability() }
-            catch (cause: CancellationException) { throw cause }
-            catch (_: Exception) { RecoveryAvailability.Unavailable("The recovery service could not be reached. Try again.") }
-            IdentityRecoveryProviderStatus(provider.id, provider.displayName, availability)
-        }
-    }
 
     private suspend fun providerAvailability(provider: IdentityRecoveryProvider): RecoveryAvailability = try {
         provider.availability()
@@ -606,7 +617,7 @@ public class SigningIdentityManager internal constructor(
         return record
     }
 
-    private suspend fun matchesDid(did: String, publicJwk: String, spec: id.walt.crypto2.keys.KeySpec = identitySpec): Boolean {
+    private suspend fun matchesDid(did: String, publicJwk: String, spec: KeySpec = identitySpec): Boolean {
         if (!did.startsWith("did:jwk:") && !did.startsWith("did:key:")) return false
         requirePublicJwk(publicJwk)
         if (did.startsWith("did:jwk:")) requirePublicJwk(recoveryBase64.decode(did.removePrefix("did:jwk:")).decodeToString())
@@ -618,7 +629,7 @@ public class SigningIdentityManager internal constructor(
     }
 
     private fun requirePublicJwk(value: String) {
-        val jwk = recordJson.parseToJsonElement(value) as? kotlinx.serialization.json.JsonObject
+        val jwk = recordJson.parseToJsonElement(value) as? JsonObject
             ?: error("Expected a public JWK")
         require(jwk.keys.none { it in setOf("d", "p", "q", "dp", "dq", "qi", "oth", "k") }) {
             "Private members are forbidden in public identity metadata"
@@ -627,7 +638,7 @@ public class SigningIdentityManager internal constructor(
 
     private suspend fun proveOriginalKey(key: Key, publicJwk: String) {
         val public = software.restore(StoredKey.Software(StoredKey.CURRENT_VERSION, KeyId("identity-proof"), identitySpec,
-            setOf(id.walt.crypto2.keys.KeyUsage.VERIFY), EncodedKey.Jwk(BinaryData(publicJwk.encodeToByteArray()), false)))
+            setOf(KeyUsage.VERIFY), EncodedKey.Jwk(BinaryData(publicJwk.encodeToByteArray()), false)))
         val challenge = CryptographyRandom.nextBytes(32)
         try {
             val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)

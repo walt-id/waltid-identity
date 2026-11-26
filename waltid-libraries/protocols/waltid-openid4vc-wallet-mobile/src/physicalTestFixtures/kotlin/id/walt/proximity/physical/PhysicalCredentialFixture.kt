@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 package id.walt.proximity.physical
 
 import id.walt.certificate.x509.X509CertificateUtil
@@ -15,6 +15,7 @@ import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
 import id.walt.wallet2.data.*
 import id.walt.wallet2.stores.inmemory.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 

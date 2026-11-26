@@ -4,12 +4,31 @@ import android.content.ComponentName
 import id.walt.mdoc.proximity.mobile.AndroidBleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.AndroidNfcHostPlatformAdapter
 import id.walt.mobile.test.PhysicalDeviceTest
-import id.walt.wallet2.mobile.*
+import id.walt.wallet2.mobile.proximity.ProximityAction
+import id.walt.wallet2.mobile.proximity.ProximityActionResult
+import id.walt.wallet2.mobile.proximity.ProximityActionType
+import id.walt.wallet2.mobile.proximity.ProximityBleBearerPolicy
+import id.walt.wallet2.mobile.proximity.ProximityBleConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityBleRoles
+import id.walt.wallet2.mobile.proximity.ProximityConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityCoordinator
+import id.walt.wallet2.mobile.proximity.ProximityDocumentSubmission
+import id.walt.wallet2.mobile.proximity.ProximityElementReference
+import id.walt.wallet2.mobile.proximity.ProximityEngagement
+import id.walt.wallet2.mobile.proximity.ProximityEngagementMethod
+import id.walt.wallet2.mobile.proximity.ProximityNfcHandover
+import id.walt.wallet2.mobile.proximity.ProximityNfcRetrievalConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityRetrievalOptions
+import id.walt.wallet2.mobile.proximity.ProximitySessionConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximitySubmission
+import id.walt.wallet2.mobile.proximity.ProximityTransport
+import id.walt.wallet2.mobile.proximity.legalActions
+import kotlin.test.*
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import org.junit.Test
-import kotlin.test.*
-import kotlin.time.Duration.Companion.seconds
 
 @PhysicalDeviceTest
 class AndroidHolderPhysicalTest {

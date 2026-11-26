@@ -1,52 +1,56 @@
 package id.walt.wallet2.mobile.test
 
-import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
-import id.walt.wallet2.mobile.identity.SigningIdentity
-import id.walt.wallet2.mobile.identity.SigningIdentityAuthorization
-import id.walt.wallet2.mobile.identity.SigningIdentityConfiguration
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.withTimeout
-import id.walt.wallet2.mobile.ScaAuthorizationTestActivity
-import id.walt.wallet2.handlers.WalletIssuanceErrorCode
-import org.junit.Assume.assumeTrue
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.mobile.test.EnterpriseMobileTest
 import id.walt.mobile.test.PhysicalDeviceTest
-import kotlinx.coroutines.delay
 import id.walt.mobile.test.backend.EnterpriseMobileAttestationConfig
 import id.walt.mobile.test.backend.EnterpriseMobileFixtureClient
 import id.walt.mobile.test.backend.EnterpriseMobilePlatform
 import id.walt.mobile.test.backend.EnterpriseMobileScenario
+import id.walt.wallet2.handlers.WalletIssuanceErrorCode
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.wallet2.mobile.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.MobileWalletCredentialSelection
-import id.walt.wallet2.mobile.MobileWalletCredentialHolders
-import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
-import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
-import id.walt.wallet2.mobile.MobileWalletPresentationPreviewResult
-import id.walt.wallet2.mobile.MobileWalletPresentationResult
-import id.walt.wallet2.mobile.WalletAttestationConfig
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
-import kotlinx.coroutines.runBlocking
-import org.junit.Test
-import java.util.UUID
-import java.util.regex.Pattern
+import id.walt.wallet2.mobile.ScaAuthorizationTestActivity
+import id.walt.wallet2.mobile.identity.MobileWalletKeyAuthorization
+import id.walt.wallet2.mobile.identity.SigningIdentity
+import id.walt.wallet2.mobile.identity.SigningIdentityAuthorization
+import id.walt.wallet2.mobile.identity.SigningIdentityConfiguration
+import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
+import id.walt.wallet2.mobile.issuance.IssuanceClientRegistration
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialSelection
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceConfig
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.issuance.WalletAttestationConfig
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.http.*
-import kotlin.test.assertNotNull
-import kotlin.test.assertIs
+import java.util.UUID
+import java.util.regex.Pattern
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.junit.Assume.assumeTrue
+import org.junit.Test
 
 @EnterpriseMobileTest
 class EnterpriseMobileWalletIntegrationTest {
@@ -77,13 +81,14 @@ class EnterpriseMobileWalletIntegrationTest {
                 wallet.signingIdentity.initialize().activeIdentity()
                 val redirect = "walbatchtest://callback"
                 val session = wallet.startIssuance(MobileWalletIssuanceRequest(
-                    MobileWalletCredentialOffer.Uri(offer.offerUrl), clientId = "wallet-client", redirectUri = redirect))
+                    offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
+                ))
                 val outcome = if (authorized) {
-                    val authorization = wallet.beginAuthorizationIssuance(session.id)
-                    assertNotNull(Url(authorization.url).parameters["request_uri"])
+                    val authorization = (session as MobileWalletIssuanceSession.AuthorizationCode).beginAuthorization(IssuanceClientRegistration("wallet-client", redirect))
+                    assertNotNull(Url(authorization.request.url).parameters["request_uri"])
                     val reopened = createWallet(walletId, offer.attestation)
                     reopened.signingIdentity.initialize().activeIdentity()
-                    var callback = authorization.url
+                    var callback = authorization.request.url
                     HttpClient { followRedirects = false }.use { browser ->
                         repeat(8) {
                             if (!callback.startsWith("$redirect?")) {
@@ -94,8 +99,8 @@ class EnterpriseMobileWalletIntegrationTest {
                         }
                     }
                     assertTrue(callback.startsWith("$redirect?"))
-                    reopened.continueAuthorizationIssuance(session.id, callback)
-                } else wallet.continuePreAuthorizedIssuance(session.id, offer.txCode)
+                    reopened.continueAuthorizationIssuance(authorization.id, callback)
+                } else (session as MobileWalletIssuanceSession.PreAuthorized).accept(offer.txCode, clientId = "wallet-client")
                 val stored = assertIs<WalletIssuanceOutcome.Stored>(outcome)
                 assertEquals(1, stored.credentialIds.size)
                 val reopened = createWallet(walletId, offer.attestation)
@@ -136,14 +141,20 @@ class EnterpriseMobileWalletIntegrationTest {
 
         val wallet1 = createWallet(walletId, offer.attestation)
         val bootstrapResult = wallet1.signingIdentity.initialize().activeIdentity()
-        wallet1.receiveCredential(offer.offerUrl, offer.txCode)
+        val credentialIds = wallet1.receiveCredential(offer.offerUrl, offer.txCode)
 
         val wallet2 = createWallet(walletId, offer.attestation)
         val credentials = wallet2.credentials()
         assertTrue(credentials.isNotEmpty(), "Enterprise credential should persist across wallet recreation")
 
         val session = fixture.createVerifierSession(scenario, EnterpriseMobilePlatform.ANDROID)
-        val presentResult = wallet2.present(session.authorizationRequestUri, did = bootstrapResult.did)
+        val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(wallet2.previewPresentation(session.authorizationRequestUri)).preview
+        val selection = preview.credentialOptions.single { it.credentialId in credentialIds }.selection
+        val presentResult = wallet2.submitPresentation(wallet2.reviewPresentation(
+            preview.previewHandle,
+            MobileWalletPresentationSelection(credentials = listOf(selection)),
+            did = bootstrapResult.did,
+        ))
         assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
             presentResult,
             "Should present persisted Enterprise credential for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
@@ -160,17 +171,16 @@ class EnterpriseMobileWalletIntegrationTest {
         // The selected identity can differ from the build's default. Copies must retain its policy.
         val wallet = MobileWalletFactory(context).create(MobileWalletConfig(
             walletId = walletId,
+            keyAuthorization = MobileWalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10)),
             signingIdentity = SigningIdentityConfiguration(
                 authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None),
             ),
-            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricTimedReuse(10),
         ))
         wallet.signingIdentity.initialize().activeIdentity()
-        val session = wallet.startIssuance(MobileWalletIssuanceRequest(MobileWalletCredentialOffer.Uri(offer.offerUrl)))
-        val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(
-            sessionId = session.id,
-            credentials = listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, MobileWalletCredentialHolders.NewKeys(2))),
+        val session = wallet.startIssuance(MobileWalletIssuanceRequest(
+            offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
         ))
+        val outcome = assertIs<WalletIssuanceOutcome.Stored>((session as MobileWalletIssuanceSession.PreAuthorized).accept(credentials = listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, MobileWalletCredentialHolders.NewKeys(2))), clientId = "eudiw-abca"))
         assertEquals(2, outcome.credentialIds.toSet().size)
 
         assertCopiesPresentAfterRecreation(walletId, outcome.credentialIds, fixture, scenario)
@@ -192,10 +202,10 @@ class EnterpriseMobileWalletIntegrationTest {
             ).preview
             val option = preview.credentialOptions.first { it.credentialId == credentialId }
             // No key override: each copy must use its own persisted holder binding.
-            assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(reopened.submitPresentation(
+            assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(reopened.submitPresentation(reopened.reviewPresentation(
                 previewHandle = preview.previewHandle,
-                selectedCredentialOptions = listOf(MobileWalletPresentationCredentialSelection(option.queryId, option.credentialId)),
-            ))
+                selection = MobileWalletPresentationSelection(credentials = listOf(option.selection)),
+            )))
             fixture.waitForVerifierSuccess(verification.sessionId)
         }
     }
@@ -212,16 +222,15 @@ class EnterpriseMobileWalletIntegrationTest {
         val wallet = createWallet(walletId, null)
         wallet.signingIdentity.initialize().activeIdentity()
         val session = wallet.startIssuance(MobileWalletIssuanceRequest(
-            MobileWalletCredentialOffer.Uri(offer.offerUrl), clientId = "wallet-client", redirectUri = "walbatchtest://callback",
+            offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
         ))
         val holders = wallet.createIssuanceHolderKeys(2)
-        val authorization = wallet.beginAuthorizationIssuance(session.id,
-            listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, MobileWalletCredentialHolders.Existing(holders))))
+        val authorization = (session as MobileWalletIssuanceSession.AuthorizationCode).beginAuthorization(IssuanceClientRegistration("wallet-client", "walbatchtest://callback"), listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, MobileWalletCredentialHolders.Existing(holders))))
         // Recreate the SDK before the browser callback; accepted choices must come from persisted state.
         val reopened = createWallet(walletId, null)
         reopened.signingIdentity.initialize().activeIdentity()
         BatchAuthorizationTestActivity.callback = CompletableDeferred()
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(authorization.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(authorization.request.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         val callback = withTimeout(120_000) {
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
             while (!BatchAuthorizationTestActivity.callback.isCompleted) {
@@ -241,7 +250,7 @@ class EnterpriseMobileWalletIntegrationTest {
             BatchAuthorizationTestActivity.callback.await()
         }
         val stored = assertIs<WalletIssuanceOutcome.Stored>(
-            reopened.continueAuthorizationIssuance(session.id, callback))
+            reopened.continueAuthorizationIssuance(authorization.id, callback))
         assertEquals(2, stored.credentialIds.toSet().size)
         assertCopiesPresentAfterRecreation(walletId, stored.credentialIds, fixture, scenario)
     }
@@ -267,16 +276,18 @@ class EnterpriseMobileWalletIntegrationTest {
             val offer = fixture.createOffer(scenario, EnterpriseMobilePlatform.ANDROID)
             val walletId = "android-enterprise-batch-cancel-${UUID.randomUUID()}"
             val wallet = MobileWalletFactory(activity, interactionContextProvider = { activity }).create(
-                MobileWalletConfig(walletId = walletId, defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None),
+                MobileWalletConfig(
+                    walletId = walletId,
+                    keyAuthorization = MobileWalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
+                ),
             )
             wallet.signingIdentity.initialize().activeIdentity()
-            val session = wallet.startIssuance(MobileWalletIssuanceRequest(MobileWalletCredentialOffer.Uri(offer.offerUrl)))
+            val session = wallet.startIssuance(MobileWalletIssuanceRequest(
+                offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
+            ))
             val first = wallet.createIssuanceHolderKeys(1, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None)
             val second = wallet.createIssuanceHolderKeys(1, keyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet)
-            val failed = assertIs<WalletIssuanceOutcome.Failed>(wallet.continuePreAuthorizedIssuance(
-                sessionId = session.id,
-                credentials = listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, MobileWalletCredentialHolders.Existing(first + second))),
-            ))
+            val failed = assertIs<WalletIssuanceOutcome.Failed>((session as MobileWalletIssuanceSession.PreAuthorized).accept(credentials = listOf(MobileWalletCredentialSelection(session.offer.credentials.single().configurationId, MobileWalletCredentialHolders.Existing(first + second))), clientId = "eudiw-abca"))
             assertEquals(WalletIssuanceErrorCode.CRYPTO, failed.error.code)
             assertTrue(failed.storedCredentialIds.isEmpty())
             assertTrue(failed.deferredCredentials.isEmpty())
@@ -323,7 +334,13 @@ class EnterpriseMobileWalletIntegrationTest {
         assertTrue(credentials.isNotEmpty(), "Should have stored ${scenario.displayName} credentials")
 
         val session = fixture.createVerifierSession(scenario, EnterpriseMobilePlatform.ANDROID)
-        val presentResult = wallet.present(session.authorizationRequestUri, did = bootstrapResult.did)
+        val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(wallet.previewPresentation(session.authorizationRequestUri)).preview
+        val selection = preview.credentialOptions.single { it.credentialId in credentialIds }.selection
+        val presentResult = wallet.submitPresentation(wallet.reviewPresentation(
+            preview.previewHandle,
+            MobileWalletPresentationSelection(credentials = listOf(selection)),
+            did = bootstrapResult.did,
+        ))
         assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(
             presentResult,
             "Enterprise verifier2 presentation should succeed for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
@@ -352,9 +369,9 @@ class EnterpriseMobileWalletIntegrationTest {
     ) = MobileWalletFactory(context).create(
         MobileWalletConfig(
             walletId = walletId,
-            attestationConfig = attestation?.toWalletAttestationConfig(),
+            keyAuthorization = MobileWalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
+            issuance = MobileWalletIssuanceConfig(attestation = attestation?.toWalletAttestationConfig()),
             onEvent = { event -> println("WALLET EVENT: $event") },
-            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
         )
     )
 
@@ -371,12 +388,9 @@ class EnterpriseMobileWalletIntegrationTest {
         transactionCode: String?,
     ): List<String> =
         when (
-            val outcome = continuePreAuthorizedIssuance(
-                sessionId = startIssuance(
-                    MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offerUrl))
-                ).id,
-                transactionCode = transactionCode,
-            )
+            val outcome = (startIssuance(MobileWalletIssuanceRequest(
+                        offer = MobileWalletCredentialOffer.Uri(offerUrl),
+                    )) as MobileWalletIssuanceSession.PreAuthorized).accept(transactionCode, clientId = "eudiw-abca")
         ) {
             is WalletIssuanceOutcome.Stored -> outcome.credentialIds
             is WalletIssuanceOutcome.Deferred -> error("Expected stored credentials, got deferred outcome: $outcome")

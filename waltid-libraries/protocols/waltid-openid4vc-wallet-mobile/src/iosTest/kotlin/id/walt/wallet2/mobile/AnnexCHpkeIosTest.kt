@@ -3,11 +3,12 @@ package id.walt.wallet2.mobile
 import at.asitplus.signum.supreme.asymmetric.HPKE
 import id.walt.cose.Cose
 import id.walt.cose.CoseKey
-import kotlinx.coroutines.test.runTest
+import id.walt.wallet2.mobile.digitalcredentials.encryptAnnexCHpke
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlinx.coroutines.test.runTest
 
 class AnnexCHpkeIosTest {
     @Test

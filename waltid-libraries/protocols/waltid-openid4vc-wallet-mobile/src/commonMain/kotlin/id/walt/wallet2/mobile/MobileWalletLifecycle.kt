@@ -1,21 +1,20 @@
 package id.walt.wallet2.mobile
 
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Admission shared by the wallet facade and retained signing-identity manager. */
 internal class MobileWalletLifecycle {
-    private val mutex = Mutex()
-    private val deletionMutex = Mutex()
-    private var closed = false
-    private var activeOperations = 0
-    private var deleted = false
-
     suspend inline fun <T> use(block: () -> T): T {
         mutex.withLock {
-            check(!closed) { "Mobile wallet is closed" }
+            check(!closed.value) { "Mobile wallet is closed" }
             activeOperations++
         }
         try {
@@ -24,16 +23,30 @@ internal class MobileWalletLifecycle {
             withContext(NonCancellable) { mutex.withLock { activeOperations-- } }
         }
     }
-
-    suspend fun close(cleanup: () -> Unit) = deletionMutex.withLock {
-        val shouldClose = mutex.withLock {
-            if (closed) false else {
-                check(activeOperations == 0) { "Cannot close the mobile wallet while an operation is in progress" }
-                closed = true
-                true
-            }
+    fun <T> observe(source: Flow<T>): Flow<T> = channelFlow {
+        if (closed.value) return@channelFlow
+        val collector = launch { source.collect { send(it) } }
+        val closing = launch {
+            closed.first { it }
+            collector.cancel()
         }
-        if (shouldClose) cleanup()
+        try {
+            collector.join()
+        } finally {
+            closing.cancel()
+        }
+    }
+
+    suspend fun close(cleanup: suspend () -> Unit) = deletionMutex.withLock {
+        if (disposed || deleted) return@withLock
+        mutex.withLock {
+            check(activeOperations == 0) { "Cannot close the mobile wallet while an operation is in progress" }
+            closed.value = true
+        }
+        withContext(NonCancellable) {
+            cleanup()
+            disposed = true
+        }
     }
 
     /**
@@ -44,11 +57,20 @@ internal class MobileWalletLifecycle {
         if (deleted) return@withLock
         mutex.withLock {
             check(activeOperations == 0) { "Cannot delete the mobile wallet while an operation is in progress" }
-            closed = true
+            closed.value = true
         }
         withContext(NonCancellable) {
             cleanup()
             deleted = true
         }
     }
+    private val mutex = Mutex()
+    private val deletionMutex = Mutex()
+
+    private val closed = MutableStateFlow(false)
+    private var disposed = false
+
+    private var activeOperations = 0
+
+    private var deleted = false
 }

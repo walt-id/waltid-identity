@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 @file:Suppress("DEPRECATION") // Pinned peer's byte-oriented parser exposes each authentication verdict.
 
 package id.walt.wallet2.mobile
@@ -17,16 +17,42 @@ import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.proximity.mobile.*
 import id.walt.wallet2.data.*
+import id.walt.wallet2.mobile.peer.SelectCorrectedNfcReader
+import id.walt.wallet2.mobile.proximity.ProximityAction
+import id.walt.wallet2.mobile.proximity.ProximityActionResult
+import id.walt.wallet2.mobile.proximity.ProximityConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityConnectedRoute
+import id.walt.wallet2.mobile.proximity.ProximityCoordinator
+import id.walt.wallet2.mobile.proximity.ProximityDocumentSubmission
+import id.walt.wallet2.mobile.proximity.ProximityElementReference
+import id.walt.wallet2.mobile.proximity.ProximityEngagementMethod
+import id.walt.wallet2.mobile.proximity.ProximityNfcHandover
+import id.walt.wallet2.mobile.proximity.ProximityNfcRetrievalConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityRetrievalOptions
+import id.walt.wallet2.mobile.proximity.ProximityReview
+import id.walt.wallet2.mobile.proximity.ProximitySession
+import id.walt.wallet2.mobile.proximity.ProximitySessionConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximitySubmission
+import id.walt.wallet2.mobile.proximity.ProximityTransport
 import id.walt.wallet2.stores.inmemory.*
+import java.security.cert.CertPathValidator
+import java.security.cert.CertificateFactory
+import java.security.cert.PKIXParameters
+import java.security.cert.TrustAnchor
+import java.security.cert.X509Certificate
+import kotlin.test.*
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import org.multipaz.cbor.*
+import org.multipaz.crypto.Algorithm
 import org.multipaz.crypto.Crypto
 import org.multipaz.crypto.EcCurve as PeerCurve
-import org.multipaz.crypto.Algorithm
 import org.multipaz.mdoc.connectionmethod.MdocConnectionMethodNfc
 import org.multipaz.mdoc.engagement.EngagementParser
 import org.multipaz.mdoc.nfc.mdocReaderNfcHandover
@@ -36,16 +62,8 @@ import org.multipaz.mdoc.role.MdocRole
 import org.multipaz.mdoc.sessionencryption.SessionEncryption
 import org.multipaz.mdoc.transport.MdocTransportOptions
 import org.multipaz.mdoc.transport.NfcTransportMdocReader
-import id.walt.wallet2.mobile.peer.SelectCorrectedNfcReader
 import org.multipaz.nfc.*
 import org.multipaz.util.Logger
-import java.security.cert.CertificateFactory
-import java.security.cert.CertPathValidator
-import java.security.cert.PKIXParameters
-import java.security.cert.TrustAnchor
-import java.security.cert.X509Certificate
-import kotlin.test.*
-import kotlin.time.Duration.Companion.seconds
 
 /** Production coordinator, APDU router, consent and signer against Multipaz 0.100.0. No radio. */
 class IndependentNfcReaderTest {

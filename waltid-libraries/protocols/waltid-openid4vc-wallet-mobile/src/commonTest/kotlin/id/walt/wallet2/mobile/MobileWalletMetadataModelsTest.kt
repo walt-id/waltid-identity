@@ -1,10 +1,13 @@
 package id.walt.wallet2.mobile
 
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.wallet2.mobile.presentation.MobileWalletResponseEncryption
+import id.walt.wallet2.mobile.presentation.toMobileResponseEncryption
+import id.walt.wallet2.mobile.presentation.toMobileVerifierMetadata
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class MobileWalletMetadataModelsTest {
     @OptIn(ExperimentalSerializationApi::class)

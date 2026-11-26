@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -7,6 +8,9 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.mobile.issuance.IssuanceClientRegistration
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
 import id.walt.wallet2.stores.inmemory.*
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationProvider
 import io.ktor.client.HttpClient
@@ -15,9 +19,9 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.*
 import io.ktor.http.content.OutgoingContent
 import io.ktor.serialization.kotlinx.json.json
+import kotlin.test.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
-import kotlin.test.*
 
 /** Public SDK operations over the real session engine and Crypto2 signer. */
 class MobileWalletAttestationChallengeTest {
@@ -109,13 +113,14 @@ class MobileWalletAttestationChallengeTest {
                     """{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"single-use-code"}}"""
                 val session = wallet.startIssuance(MobileWalletIssuanceRequest(
                     offer = MobileWalletCredentialOffer.InlineJson("""{"credential_issuer":"https://issuer.example","credential_configuration_ids":["identity"],"grants":$grants}"""),
-                    clientId = "wallet", redirectUri = "openid://callback", keyId = "instance"))
+                    keyId = "instance",
+                ))
                 val outcome = if (authorized) {
-                    val authorization = wallet.beginAuthorizationIssuance(session.id)
-                    assertNotNull(Url(authorization.url).parameters["request_uri"])
+                    val authorization = (session as MobileWalletIssuanceSession.AuthorizationCode).beginAuthorization(IssuanceClientRegistration("wallet", "openid://callback"))
+                    assertNotNull(Url(authorization.request.url).parameters["request_uri"])
                     // A new SDK object must recover freshness and PKCE from the persisted session.
-                    openWallet().continueAuthorizationIssuance(session.id, "openid://callback?code=code&state=${authorization.state}")
-                } else wallet.continuePreAuthorizedIssuance(session.id)
+                    openWallet().continueAuthorizationIssuance(authorization.id, "openid://callback?code=code&state=${authorization.request.state}")
+                } else (session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "wallet")
                 assertIs<WalletIssuanceOutcome.Deferred>(outcome)
                 assertEquals(if (discovery) iteration + 1 else 0, discoveries)
                 assertEquals((if (authorized) 2 else 1) * (iteration + 1), attesterCalls)

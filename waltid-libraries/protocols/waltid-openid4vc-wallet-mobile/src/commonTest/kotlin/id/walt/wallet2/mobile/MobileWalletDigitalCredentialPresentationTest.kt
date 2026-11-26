@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.mobile
 
@@ -24,10 +24,10 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.issuance.MdocIssuer
@@ -48,14 +48,36 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.withImportedHolderKeyBinding
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistrationResult
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequest
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletReaderAuthentication
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletRegistryProjection
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletStaleRegistryEntryException
+import id.walt.wallet2.mobile.digitalcredentials.UnavailableMobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationDisclosureSelection
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
+import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataItem
+import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataProfile
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -64,18 +86,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 /**
  * Presentation over the OS-mediated Digital Credentials API, driven through the [MobileWallet] facade
@@ -84,6 +99,19 @@ import kotlin.test.assertTrue
  * become the metadata the provider consent UI renders.
  */
 class MobileWalletDigitalCredentialPresentationTest {
+
+    @Test
+    fun presentationSelectionCapturesCallerListsAndPreservesExplicitEmptyDisclosures() {
+        val credential = MobileWalletPresentationCredentialSelection("query", "credential")
+        val credentials = mutableListOf(credential)
+        val disclosures = mutableListOf<MobileWalletPresentationDisclosureSelection>()
+        val selection = MobileWalletPresentationSelection(credentials, disclosures)
+        credentials.clear()
+        disclosures.add(MobileWalletPresentationDisclosureSelection("query", "credential", "name"))
+        assertEquals(listOf(credential), selection.credentials)
+        assertEquals(emptyList(), selection.disclosures)
+        assertEquals(null, MobileWalletPresentationSelection(listOf(credential)).disclosures)
+    }
 
     @Test
     fun statusReviewedSubmissionOwnsSelectionsBeforeItsFirstSuspendedRead() = runTest {
@@ -106,7 +134,11 @@ class MobileWalletDigitalCredentialPresentationTest {
                 resumeReading.await()
             }
             val submitted = async {
-                fixture.wallet.submitStatusReviewedDigitalCredentialPresentation(preview.requestId, selections, disclosures, reviewed)
+                fixture.wallet.submitStatusReviewedDigitalCredentialPresentation(
+                    preview.requestId,
+                    MobileWalletPresentationSelection(credentials = selections, disclosures = disclosures),
+                    reviewed,
+                )
             }
             try {
                 reading.await()
@@ -143,12 +175,12 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         val review = fixture.wallet.reviewDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selection = MobileWalletPresentationSelection(credentials = preview.credentialOptions.selections()),
         )
         assertFalse(review.credentials.single().wholeCredential)
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selection = MobileWalletPresentationSelection(credentials = preview.credentialOptions.selections()),
         )
 
         assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, response.protocol)
@@ -183,12 +215,12 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         val review = fixture.wallet.reviewDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selection = MobileWalletPresentationSelection(credentials = preview.credentialOptions.selections()),
         )
         assertFalse(review.credentials.single().wholeCredential)
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selection = MobileWalletPresentationSelection(credentials = preview.credentialOptions.selections()),
         )
 
         val data = Json.parseToJsonElement(response.dataJson).jsonObject
@@ -225,8 +257,10 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertTrue(disclosure.required)
         val review = fixture.wallet.reviewDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
-            selectedDisclosureOptions = emptyList(),
+            selection = MobileWalletPresentationSelection(
+                credentials = preview.credentialOptions.selections(),
+                disclosures = emptyList(),
+            ),
         ).credentials.single()
         val attachment = Json.parseToJsonElement(review.claimsJson).jsonObject.getValue(MDOC_NAMESPACE)
             .jsonObject.getValue("arbitrary_attachment").jsonPrimitive
@@ -237,9 +271,11 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertEquals(3, review.locations.size)
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
-            // Required mdoc claims are retained by the query and are not optional UI toggles.
-            selectedDisclosureOptions = emptyList(),
+            selection = MobileWalletPresentationSelection(
+                credentials = preview.credentialOptions.selections(),
+                // Required mdoc claims are retained by the query.
+                disclosures = emptyList(),
+            ),
         )
         val data = Json.parseToJsonElement(response.dataJson).jsonObject
         val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(
@@ -290,10 +326,12 @@ class MobileWalletDigitalCredentialPresentationTest {
         val option = preview.credentialOptions.single()
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
-            selectedDisclosureOptions = listOf(MobileWalletPresentationDisclosureSelection(
+            selection = MobileWalletPresentationSelection(
+                credentials = preview.credentialOptions.selections(),
+                disclosures = listOf(MobileWalletPresentationDisclosureSelection(
                 option.queryId, option.credentialId, option.disclosures.single { it.requested }.path,
             )),
+            ),
         )
         val data = Json.parseToJsonElement(response.dataJson).jsonObject
         val presented = SDJwt.parse(fixture.presentationFor("pid", data))
@@ -343,7 +381,7 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selection = MobileWalletPresentationSelection(credentials = preview.credentialOptions.selections()),
         )
 
         val data = Json.parseToJsonElement(response.dataJson).jsonObject
@@ -395,7 +433,7 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selection = MobileWalletPresentationSelection(credentials = preview.credentialOptions.selections()),
         )
 
         assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED, response.protocol)
@@ -822,11 +860,13 @@ class MobileWalletDigitalCredentialPresentationTest {
         assertFailsWith<IllegalArgumentException> {
             fixture.wallet.submitDigitalCredentialPresentation(
                 requestId = preview.requestId,
-                selectedCredentialOptions = listOf(
+                selection = MobileWalletPresentationSelection(
+                    credentials = listOf(
                     MobileWalletPresentationCredentialSelection(
                         preview.credentialOptions.first().queryId,
                         "pid-2",
                     ),
+                ),
                 ),
             )
         }
@@ -857,7 +897,7 @@ class MobileWalletDigitalCredentialPresentationTest {
 
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selection = MobileWalletPresentationSelection(credentials = preview.credentialOptions.selections()),
         )
 
         val data = Json.parseToJsonElement(response.dataJson).jsonObject
@@ -908,7 +948,7 @@ class MobileWalletDigitalCredentialPresentationTest {
         // into the KB-JWT, which is what makes the authorization non-repudiable.
         val response = fixture.wallet.submitDigitalCredentialPresentation(
             requestId = preview.requestId,
-            selectedCredentialOptions = preview.credentialOptions.selections(),
+            selection = MobileWalletPresentationSelection(credentials = preview.credentialOptions.selections()),
         )
         val presentation = fixture.presentationFor("pid", Json.parseToJsonElement(response.dataJson).jsonObject)
         val kbJwtPayload = Json.parseToJsonElement(

@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto2.CryptoRuntime
@@ -18,6 +19,8 @@ import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncry
 import id.walt.openid4vci.requests.credential.encryption.Crypto2JweCredentialRequestDecryptor
 import id.walt.openid4vci.responses.credential.encryption.Crypto2JweCredentialResponseEncryptor
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore
@@ -32,6 +35,10 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -42,10 +49,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertNotEquals
 
 /**
  * The Compose demo and iOS demo call [MobileWallet]. This checks that path, not only Wallet API.
@@ -159,9 +162,11 @@ class MobileWalletCredentialEncryptionTest {
         }.buildString()
 
         val session = wallet.startIssuance(
-            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offerUrl)),
+            MobileWalletIssuanceRequest(
+                offer = MobileWalletCredentialOffer.Uri(offerUrl),
+            ),
         )
-        val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
+        val outcome = assertIs<WalletIssuanceOutcome.Stored>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
         val stored = requireNotNull(credentials.getCredential(outcome.credentialIds.single()))
 
         assertEquals(listOf("application/jwt"), requestTypes)
@@ -263,12 +268,14 @@ class MobileWalletCredentialEncryptionTest {
         )
         val issuing = wallet()
         val session = issuing.startIssuance(
-            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(preAuthorizedOffer())),
+            MobileWalletIssuanceRequest(
+                offer = MobileWalletCredentialOffer.Uri(preAuthorizedOffer()),
+            ),
         )
-        val deferred = assertIs<WalletIssuanceOutcome.Deferred>(issuing.continuePreAuthorizedIssuance(session.id))
+        val deferred = assertIs<WalletIssuanceOutcome.Deferred>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
         kotlinx.coroutines.runBlocking { delay(1_100) }
         val outcome = assertIs<WalletIssuanceOutcome.Stored>(
-            wallet().resumeDeferredIssuance(deferred.credentials.single().id),
+            wallet().resumeDeferredIssuance(deferred.credentials.single()),
         )
         val stored = requireNotNull(credentials.getCredential(outcome.credentialIds.single()))
 

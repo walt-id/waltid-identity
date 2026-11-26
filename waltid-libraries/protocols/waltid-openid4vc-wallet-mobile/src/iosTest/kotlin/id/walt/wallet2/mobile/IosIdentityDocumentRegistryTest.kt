@@ -1,17 +1,26 @@
 package id.walt.wallet2.mobile
 
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.launch
-import platform.Foundation.NSUUID
-import platform.Foundation.NSUserDefaults
+import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentProjectionRecord
+import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentProjectionResult
+import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentProjectionState
+import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistrationStatus
+import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistry
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryField
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runTest
+import platform.Foundation.NSUUID
+import platform.Foundation.NSUserDefaults
 
 class IosIdentityDocumentRegistryTest {
     @Test

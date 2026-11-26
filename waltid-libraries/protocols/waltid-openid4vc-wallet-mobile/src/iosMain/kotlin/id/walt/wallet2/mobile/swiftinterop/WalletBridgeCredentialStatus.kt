@@ -1,8 +1,8 @@
 package id.walt.wallet2.mobile.swiftinterop
 
-import id.walt.wallet2.mobile.MobileWalletCredential
-import id.walt.wallet2.mobile.MobileWalletCredentialRead
-import id.walt.wallet2.mobile.MobileWalletCredentialStatusValue
+import id.walt.wallet2.mobile.credentials.MobileWalletCredential
+import id.walt.wallet2.mobile.credentials.MobileWalletCredentialRead
+import id.walt.wallet2.mobile.credentials.MobileWalletCredentialStatusValue
 import id.walt.wallet2.status.WalletCredentialStatusSnapshot
 import id.walt.wallet2.status.toResponse
 import kotlinx.serialization.json.Json

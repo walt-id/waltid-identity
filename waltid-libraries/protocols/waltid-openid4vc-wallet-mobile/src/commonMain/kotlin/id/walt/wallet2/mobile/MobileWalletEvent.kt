@@ -65,6 +65,8 @@ internal class MobileWalletEventStream(
     replay: Int = 10,
     extraBufferCapacity: Int = 32,
 ) {
+    fun tryEmit(event: MobileWalletEvent): Boolean = mutableEvents.tryEmit(event)
+
     private val mutableEvents = MutableSharedFlow<MobileWalletEvent>(
         replay = replay,
         extraBufferCapacity = extraBufferCapacity,
@@ -72,8 +74,6 @@ internal class MobileWalletEventStream(
     )
 
     val events: Flow<MobileWalletEvent> = mutableEvents.asSharedFlow()
-
-    fun tryEmit(event: MobileWalletEvent): Boolean = mutableEvents.tryEmit(event)
 }
 
 internal fun WalletSessionEvent.toMobileWalletEvent(): MobileWalletEvent =

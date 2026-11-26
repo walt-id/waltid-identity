@@ -2,13 +2,10 @@
 
 package id.walt.wallet2.mobile
 
-import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
-import id.walt.mdoc.readertrust.ReaderTrustState
-import id.walt.mdoc.readertrust.ReaderTrustEvaluator
-import id.walt.mdoc.readertrust.ReaderTrustDecision
-import id.walt.mdoc.readertrust.ReaderAuthenticationScope
-import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
-import id.walt.crypto2.keys.Key as ManagedKeyMaterial
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialsConfig
+import id.walt.wallet2.mobile.issuance.MobileWalletHolderBinding
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
@@ -31,19 +28,21 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
-import id.walt.crypto2.jose.CompactJws
-import id.walt.crypto2.jose.Jwk
-import id.walt.crypto2.jose.JwsAlgorithm
-import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.jose.CompactJws
+import id.walt.crypto2.jose.Jwk
+import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.EcCurve
-import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.EdwardsCurve
+import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
@@ -55,16 +54,18 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.ReaderAuthenticationPayloads
 import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.mdoc.readertrust.ReaderTrustEvaluator
+import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.openid4vci.offers.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.x509.GenericX509CertificateBuilder
-import id.walt.x509.GenericX509CertificateProfileData
-import id.walt.x509.X509DistinguishedName
-import id.walt.x509.X509KeyUsage
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
@@ -74,63 +75,85 @@ import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletPublicKeyMaterial
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.data.withImportedHolderKeyBinding
+import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
-import id.walt.wallet2.handlers.AtomicWalletIssuanceSessionStore
+import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCDocumentRequest
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCParsedRequest
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCRequest
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCSubmission
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistrationResult
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequest
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletReaderAuthentication
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletRegistryProjection
+import id.walt.wallet2.mobile.digitalcredentials.UnavailableMobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.identity.MobileWalletKeyType
+import id.walt.wallet2.mobile.identity.toKeySpec
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceConfig
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.issuance.WalletAttestationConfig
+import id.walt.wallet2.mobile.issuance.WalletProviderConfig
+import id.walt.wallet2.mobile.presentation.MobileWalletClientIdScheme
+import id.walt.wallet2.mobile.presentation.MobileWalletMetadataDisplay
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationConfig
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialRequirement
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationDisclosure
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationErrorCode
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreview
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreviewHandle
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationRequestContext
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationRequestInfo
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.presentation.MobileWalletRequestAuthentication
+import id.walt.wallet2.mobile.presentation.MobileWalletResponseEncryption
+import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataItem
+import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataProfile
+import id.walt.wallet2.mobile.presentation.MobileWalletVerifierMetadata
+import id.walt.wallet2.mobile.presentation.toMobilePresentationResult
+import id.walt.wallet2.mobile.presentation.toMobileRequestAuthentication
+import id.walt.wallet2.mobile.presentation.toTransactionDataTypeRegistry
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.MobileWalletKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.x509.GenericX509CertificateBuilder
+import id.walt.x509.GenericX509CertificateProfileData
+import id.walt.x509.X509DistinguishedName
+import id.walt.x509.X509KeyUsage
 import id.waltid.openid4vp.wallet.UnsafePresentationErrorResponseException
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.RequestObjectAuthentication
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.client.HttpClient
-import io.ktor.client.request.HttpRequestData
-import io.ktor.http.content.OutgoingContent
-import io.ktor.http.content.TextContent
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.engine.mock.respondError
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.HttpRequestData
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
+import io.ktor.http.Url
+import io.ktor.http.content.OutgoingContent
+import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.http.Url
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.encodeToByteArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -143,8 +166,67 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 class MobileWalletTest {
+    @Test
+    fun closingWalletCompletesEventCollectionAndRejectsNewOperations() = runTest {
+        val wallet = walletWithTrust(ClientIdTrustConfiguration())
+        val collecting = async { wallet.events.toList() }
+        testScheduler.runCurrent()
+        wallet.close()
+        assertTrue(collecting.await().isEmpty())
+        assertTrue(wallet.events.toList().isEmpty())
+        assertFailsWith<IllegalStateException> {
+            wallet.listDeferredIssuance()
+        }
+    }
+
+    @Test
+    fun platformRegistryIsCreatedOnlyWhenOmitted() {
+        val custom = object : MobileWalletCredentialRegistry by UnavailableMobileWalletCredentialRegistry {}
+        assertEquals(custom, MobileWalletDigitalCredentialsConfig().resolveRegistry { custom })
+        for (registry in listOf(custom, UnavailableMobileWalletCredentialRegistry)) {
+            assertEquals(registry, MobileWalletDigitalCredentialsConfig(registry).resolveRegistry {
+                error("An explicitly supplied registry must take precedence")
+            })
+        }
+    }
+
+    @Test
+    fun existingIssuanceHolderBindingsSnapshotTheInput() {
+        val key = MobileWalletHolderBinding("wallet-key")
+        val source = mutableListOf(key)
+        val existing = MobileWalletCredentialHolders.Existing(source)
+        source.clear()
+        assertEquals(listOf(key), existing.bindings)
+        assertFailsWith<IllegalArgumentException> { MobileWalletCredentialHolders.Existing(source) }
+    }
+
 
     @Test
     fun deletionRejectsActiveKeyCreationWithoutClosingTheWallet() = runTest {
@@ -344,27 +426,15 @@ class MobileWalletTest {
     @Test
     fun mobileWalletConfigUsesStableDefaults() {
         val config = MobileWalletConfig()
-        val (
-            walletId,
-            attestationConfig,
-            walletProvider,
-            persistence,
-            onEvent,
-            preferredLocales,
-            transactionDataProfiles,
-            paymentCredentialIssuers,
-            credentialIssuerMetadataTrustResolver,
-        ) = config
-
-        assertEquals("default", walletId)
-        assertEquals(null, attestationConfig)
-        assertEquals(null, walletProvider)
-        assertEquals(MobileWalletPersistence(), persistence)
-        assertEquals(emptyList(), preferredLocales)
-        assertEquals(emptyList(), transactionDataProfiles)
-        assertEquals(emptyList(), paymentCredentialIssuers)
-        assertEquals(null, credentialIssuerMetadataTrustResolver)
-        assertSame(config.onEvent, onEvent)
+        assertEquals("default", config.walletId)
+        assertNull(config.issuance.attestation)
+        assertNull(config.issuance.walletProvider)
+        assertNull(config.issuance.metadataTrustResolver)
+        assertEquals(platformPreferredLocales(), config.preferredLocales)
+        assertTrue(config.copy(preferredLocales = emptyList()).preferredLocales.isEmpty())
+        assertTrue(config.presentation.transactionDataProfiles.isEmpty())
+        assertTrue(config.presentation.paymentCredentialIssuers.isEmpty())
+        assertNull(config.presentation.verifierTrust.x509TrustAnchors)
         assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
         assertEquals(null, config.persistence.credentialStore)
         assertEquals(null, config.persistence.didStore)
@@ -483,20 +553,55 @@ class MobileWalletTest {
     }
 
     @Test
-    fun mobileWalletConfigAcceptsCustomTransactionDataProfiles() {
-        val profiles = listOf(
-            MobileWalletTransactionDataProfile(
-                type = "example.transaction",
-                displayName = "Example Transaction",
-                fields = listOf("amount"),
-            )
+    fun configurationCapturesSelectionsAndTrustAcrossDerivation() {
+        val fields = mutableListOf("amount")
+        val profile = MobileWalletTransactionDataProfile("example.transaction", fields = fields)
+        val profiles = mutableListOf(profile)
+        val redirects = mutableListOf("https://verifier.example/response")
+        val clients = mutableMapOf("registered" to ClientMetadata(redirectUris = redirects))
+        val locales = mutableListOf("de-AT")
+        val original = MobileWalletConfig(
+            presentation = MobileWalletPresentationConfig(
+            verifierTrust = ClientIdTrustConfiguration(preRegisteredClients = clients),
+            transactionDataProfiles = profiles,
+        ),
+            preferredLocales = locales,
         )
+        val derived = original.copy(walletId = "second")
+        fields.clear()
+        profiles.clear()
+        redirects.clear()
+        clients.clear()
+        locales.clear()
 
-        val config = MobileWalletConfig(transactionDataProfiles = profiles)
+        assertEquals(listOf("de-AT"), derived.preferredLocales)
+        assertEquals(listOf("amount"), original.presentation.transactionDataProfiles.single().fields)
+        assertEquals(setOf("example.transaction"), derived.presentation.transactionDataProfiles.toTransactionDataTypeRegistry().types)
+        assertEquals(listOf("https://verifier.example/response"), derived.presentation.verifierTrust.preRegisteredClients["registered"]?.redirectUris)
+        val replacement = original.copy(presentation = MobileWalletPresentationConfig(transactionDataProfiles = listOf(
+            profile.copy(displayName = "Replacement", fields = listOf("total")),
+        )))
+        assertEquals("Replacement", replacement.presentation.transactionDataProfiles.single().displayName)
+        assertEquals("example.transaction", original.presentation.transactionDataProfiles.single().displayName)
+    }
 
-        assertEquals(profiles, config.transactionDataProfiles)
-        val registry = profiles.toTransactionDataTypeRegistry()
-        assertEquals(setOf("example.transaction"), registry.types)
+    @Test
+    fun rejectsAmbiguousProfilesAndInvalidEndpointsDuringConstructionOrCopy() {
+        val profile = MobileWalletTransactionDataProfile("example.transaction")
+        assertFailsWith<IllegalArgumentException> { MobileWalletPresentationConfig(transactionDataProfiles = listOf(profile, profile)) }
+        assertFailsWith<IllegalArgumentException> {
+            MobileWalletPresentationConfig(transactionDataProfiles = listOf(profile.copy(fields = listOf("sum", "sum"))))
+        }
+        val valid = MobileWalletConfig(
+            issuance = MobileWalletIssuanceConfig(attestation = WalletAttestationConfig("https://issuer.example", "attest", "sentinel")),
+        )
+        assertFailsWith<IllegalArgumentException> { valid.copy(walletId = " ") }
+        assertFailsWith<IllegalArgumentException> { valid.copy(issuance = valid.issuance.copy(attestation = valid.issuance.attestation!!.copy(baseUrl = "relative"))) }
+        assertFailsWith<IllegalArgumentException> { valid.copy(issuance = valid.issuance.copy(attestation = valid.issuance.attestation!!.copy(baseUrl = "https://issuer.example:99999"))) }
+        assertFailsWith<IllegalArgumentException> { valid.copy(issuance = valid.issuance.copy(attestation = valid.issuance.attestation!!.copy(attesterPath = "tenant?query"))) }
+        assertFailsWith<IllegalArgumentException> { valid.copy(issuance = valid.issuance.copy(attestation = valid.issuance.attestation!!.copy(hostHeader = "bad host"))) }
+        assertFalse("sentinel" in valid.issuance.attestation.toString())
+        assertFalse("sentinel" in WalletProviderConfig("https://provider.example", "org.service", "sentinel").toString())
     }
 
     @Test
@@ -554,7 +659,8 @@ class MobileWalletTest {
         assertTrue(issuanceSessionStore.records.isEmpty())
         assertFailsWith<IllegalStateException> {
             wallet.startIssuance(MobileWalletIssuanceRequest(
-                offer = MobileWalletCredentialOffer.InlineJson(preAuthorizedOfferJson())))
+                offer = MobileWalletCredentialOffer.InlineJson(preAuthorizedOfferJson()),
+            ))
         }
     }
 
@@ -1245,9 +1351,11 @@ class MobileWalletTest {
         )
 
         val session = wallet.startIssuance(
-            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(preAuthorizedOfferUrl()))
+            MobileWalletIssuanceRequest(
+                offer = MobileWalletCredentialOffer.Uri(preAuthorizedOfferUrl()),
+            )
         )
-        val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
+        val outcome = assertIs<WalletIssuanceOutcome.Stored>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
 
         // The credential is in the wallet and reported as issued, both of which the registry cannot revoke.
         val storedId = outcome.credentialIds.single()
@@ -1282,11 +1390,13 @@ class MobileWalletTest {
         )
 
         val session = wallet.startIssuance(
-            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.InlineJson(preAuthorizedOfferJson()))
+            MobileWalletIssuanceRequest(
+                offer = MobileWalletCredentialOffer.InlineJson(preAuthorizedOfferJson()),
+            )
         )
         assertEquals(WalletIssuanceGrant.PRE_AUTHORIZED_CODE, session.offer.grant)
 
-        val outcome = assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
+        val outcome = assertIs<WalletIssuanceOutcome.Stored>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
         assertEquals(1, outcome.credentialIds.size)
     }
 
@@ -1311,39 +1421,12 @@ class MobileWalletTest {
         )
 
         val session = wallet.startIssuance(
-            MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(preAuthorizedOfferUrl()))
-        )
-        assertIs<WalletIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(session.id))
-        assertEquals(listOf("credential_accepted"), notifications)
-    }
-
-    @Test
-    fun rejectIssuedCredentialPostsCredentialDeleted() = runTest {
-        val notifications = mutableListOf<String>()
-        val holderKey = CryptoRuntime(defaultSoftwareKeyProviders()).generateSoftwareKey(
-            GenerateSoftwareKeyRequest(
-                id = KeyId("deleted-notification-holder-key"),
-                spec = KeySpec.Ec(EcCurve.P256),
-                usages = setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
+            MobileWalletIssuanceRequest(
+                offer = MobileWalletCredentialOffer.Uri(preAuthorizedOfferUrl()),
             )
         )
-        val wallet = MobileWallet(
-            walletId = "deleted-notification-wallet",
-            keyStore = InMemoryMobileWalletKeyStore().also { it.addCrypto2Key(holderKey) },
-            didStore = InMemoryDidStore().also {
-                it.addDid(WalletDidEntry(did = "did:key:holder", document = JsonObject(emptyMap())))
-            },
-            credentialStore = InMemoryCredentialStore(),
-            issuanceHttpClient = mockIssuer(notifications),
-        )
-
-        wallet.rejectIssuedCredential(
-            notificationId = "notification-id",
-            accessToken = "access",
-            credentialIssuerBaseUrl = MOCK_ISSUER,
-        )
-
-        assertEquals(listOf("credential_deleted"), notifications)
+        assertIs<WalletIssuanceOutcome.Stored>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
+        assertEquals(listOf("credential_accepted"), notifications)
     }
 
     @Test
@@ -2138,7 +2221,7 @@ class MobileWalletTest {
     }
 
     @Test
-    fun immediatePresentationPreservesProtocolErrorHandling() = runTest {
+    fun hostCanDismissInvalidTransactionOrReturnTheClassifiedProtocolError() = runTest {
         val key = JWKKey.generate(KeyType.Ed25519)
         val id = key.getKeyId()
         val wallet = MobileWallet(
@@ -2177,10 +2260,12 @@ class MobileWalletTest {
                 parameters.append("client_id", "verifier2")
                 parameters.append("request", signed)
             }.buildString()
+            val invalid = assertIs<MobileWalletPresentationPreviewResult.Invalid>(wallet.previewPresentation(url))
             if (invalidTransactionData) {
-                assertFailsWith<IllegalArgumentException> { wallet.present(url) }
+                assertEquals(MobileWalletPresentationErrorCode.invalidTransactionData, invalid.errorCode)
+                wallet.discardPresentationPreview(invalid.previewHandle)
             } else {
-                val result = assertIs<MobileWalletPresentationResult.Prepared.OpenUrl>(wallet.present(url))
+                val result = assertIs<MobileWalletPresentationResult.Prepared.OpenUrl>(wallet.rejectPresentation(invalid.previewHandle))
                 assertTrue(result.url.contains("error=invalid_request"))
             }
         }

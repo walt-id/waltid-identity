@@ -133,8 +133,8 @@ public sealed interface SigningIdentityState {
      */
     public data class Active(public val identity: SigningIdentity) : SigningIdentityState
     /** An interrupted setup must be resumed or cancelled before activation.
-     * @property reason Why the operation needs attention before retry.
      * @property identityId Identifier of the journaled operation's identity.
+     * @property reason Why the operation needs attention before retry.
      */
     public data class Pending(public val identityId: String, public val reason: SigningIdentityFailure) : SigningIdentityState
     /** Existing state requires attention; a replacement is never generated automatically.
@@ -158,8 +158,8 @@ public sealed interface SigningIdentityOperationResult {
      */
     public data class Active(public val identity: SigningIdentity) : SigningIdentityOperationResult
     /** An interrupted setup must be resumed or cancelled before activation.
-     * @property reason Why the operation needs attention before retry.
      * @property identityId Identifier of the journaled operation's identity.
+     * @property reason Why the operation needs attention before retry.
      */
     public data class Pending(public val identityId: String, public val reason: SigningIdentityFailure) : SigningIdentityOperationResult
     /** The operation could not complete.

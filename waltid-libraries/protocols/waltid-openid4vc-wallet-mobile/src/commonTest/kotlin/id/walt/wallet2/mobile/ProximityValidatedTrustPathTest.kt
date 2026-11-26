@@ -3,10 +3,24 @@ package id.walt.wallet2.mobile
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import kotlinx.coroutines.test.runTest
+import id.walt.wallet2.mobile.proximity.ProximityCertificateRevocationResult
+import id.walt.wallet2.mobile.proximity.ProximityConfiguredReaderTrustEvaluator
+import id.walt.wallet2.mobile.proximity.ProximityCrlFetchResult
+import id.walt.wallet2.mobile.proximity.ProximityCrlFetcher
+import id.walt.wallet2.mobile.proximity.ProximityCrlRevocationEvaluator
+import id.walt.wallet2.mobile.proximity.ProximityCrlScope
+import id.walt.wallet2.mobile.proximity.ProximityReaderAuthenticationScope
+import id.walt.wallet2.mobile.proximity.ProximityReaderEvidence
+import id.walt.wallet2.mobile.proximity.ProximityReaderRevocationPolicy
+import id.walt.wallet2.mobile.proximity.ProximityReaderRevocationState
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustAnchor
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustDecision
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlinx.coroutines.test.runTest
 
 class ProximityValidatedTrustPathTest {
     @Test

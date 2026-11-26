@@ -4,8 +4,13 @@ import id.walt.certificate.x509.revocation.CrlTestFixtures
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.test.runTest
+import id.walt.wallet2.mobile.proximity.ProximityCertificateRevocationResult
+import id.walt.wallet2.mobile.proximity.ProximityCrlFetchResult
+import id.walt.wallet2.mobile.proximity.ProximityCrlFetcher
+import id.walt.wallet2.mobile.proximity.ProximityCrlRevocationEvaluator
+import id.walt.wallet2.mobile.proximity.ProximityCrlScope
+import id.walt.wallet2.mobile.proximity.ProximityReaderAuthenticationScope
+import id.walt.wallet2.mobile.proximity.ProximityReaderEvidence
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -13,6 +18,8 @@ import kotlin.test.assertIs
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
 
 class ProximityCrlRevocationTest {
     @Test

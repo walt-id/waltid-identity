@@ -3,17 +3,17 @@ package id.walt.wallet2.mobile
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
 import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
 import id.walt.mdoc.readertrust.ReaderAuthenticationScope
 import id.walt.mdoc.readertrust.ReaderTrustDecision
 import id.walt.mdoc.readertrust.ReaderTrustState
-import id.walt.mdoc.readertrust.MdocReaderAuthenticationTrustEvaluator
-import kotlinx.coroutines.test.runTest
-import kotlinx.io.bytestring.ByteString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
+import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.ByteString
 
 class MdocReaderAuthenticationTrustEvaluatorTest {
 

@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.mobile.test
 
@@ -7,12 +7,12 @@ import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.*
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.mdoc.proximity.mobile.BleMdocRoleSelection
 import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
-import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.createEncryptedSqlDelightMobileWallet
@@ -20,12 +20,12 @@ import id.walt.wallet2.mobile.identity.*
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import kotlin.test.*
 import kotlin.uuid.Uuid
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /** Shared Android/iOS qualification phases. Only public metadata may leave the application. */
 internal class RecoveryWorkflow(
@@ -140,7 +140,7 @@ internal class RecoveryTestWallet private constructor(
             val config = MobileWalletConfig(walletId = "wal749-recovery-$runId", signingIdentity = SigningIdentityConfiguration(
                 recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
             lateinit var driver: SqlDriver
-            val wallet = createEncryptedSqlDelightMobileWallet(config, ClientIdTrustConfiguration(), databaseKeys, nativeKeys,
+            val wallet = createEncryptedSqlDelightMobileWallet(config, databaseKeys, nativeKeys,
                 proximityTransportFactory = object : BleProximityTransportFactory {
                     override suspend fun capability(roles: BleMdocRoleSelection): Nothing =
                         error("Recovery must not query radio capabilities")
