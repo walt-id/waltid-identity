@@ -169,8 +169,15 @@ class Issuer2MsoDataWalletFlowTest {
     fun offerRejectsAgeOverrideInconsistentWithInheritedBirthDateAndValidity() = testApplication {
         installIssuer2WithConfigFiles(configureProfilesConfig = { config ->
             val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
-            val profile = config.profiles.getValue(id).copy(msoData = MsoData(validFrom = "2027-08-25T00:00:00Z"))
-            config.copy(profiles = config.profiles + (id to profile))
+            val profile = config.profiles.getValue(id)
+            val mdlData = profile.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject
+            val updatedProfile = profile.copy(
+                msoData = MsoData(validFrom = "2027-08-25T00:00:00Z"),
+                credentialData = JsonObject(profile.credentialData + (
+                    ISO_MDL_NAMESPACE to JsonObject(mdlData + ("age_in_years" to JsonPrimitive(39)))
+                )),
+            )
+            config.copy(profiles = config.profiles + (id to updatedProfile))
         })
         val client = apiClient()
         val response = client.post("/issuer2/credential-offers") {
