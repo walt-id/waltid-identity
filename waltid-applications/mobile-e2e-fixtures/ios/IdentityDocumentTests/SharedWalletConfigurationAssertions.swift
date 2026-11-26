@@ -128,6 +128,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
     // stay un-bootstrapped for the assertions above to mean anything.
     let bootstrapProbeWallet = try await Wallet(configuration: hostConfiguration)
     let probedResolution = try await initializeSigningIdentity(bootstrapProbeWallet)
+    try await bootstrapProbeWallet.close()
     XCTAssertEqual(
         probedResolution.keyID,
         hostBootstrap.keyID,
@@ -143,6 +144,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
         line: line
     )
 
+    try await hostWallet.close()
     try await providerWallet.deleteLocalData()
 }
 
@@ -192,6 +194,7 @@ public func assertProviderResolvesThePublishedWalletID(
         line: line
     )
 
+    try await hostWallet.close()
     try await providerWallet.deleteLocalData()
 }
 

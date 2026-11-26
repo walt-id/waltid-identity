@@ -9,7 +9,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
     @MainActor
     func testClaimReviewBlocksSubmissionOnFailureAndRetryUsesCurrentRevision() async throws {
         let preparation = PendingClaimPreparation()
-        let client = claimClient(preparation)
+        let client = try claimClient(preparation)
         let viewModel = try await paymentViewModel(client)
         try await waitUntilAsync { await preparation.count == 1 }
         XCTAssertFalse(viewModel.claimReview.canConfirm)
@@ -34,7 +34,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
     @MainActor
     func testSelectionChangeDiscardsLateClaimReviewAndSubmitsTheCurrentSelection() async throws {
         let preparation = PendingClaimPreparation()
-        let client = claimClient(preparation)
+        let client = try claimClient(preparation)
         let viewModel = try await paymentViewModel(client)
         try await waitUntilAsync { await preparation.count == 1 }
         let credential = try XCTUnwrap(viewModel.selectedPresentationCredentialOptions.first)
@@ -60,7 +60,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
     @MainActor
     func testLockCancelsClaimPreparationWithoutRestoringAnOldReview() async throws {
         let preparation = PendingClaimPreparation()
-        let client = claimClient(preparation)
+        let client = try claimClient(preparation)
         let viewModel = try await paymentViewModel(client)
         try await waitUntilAsync { await preparation.count == 1 }
         viewModel.lock()
@@ -144,8 +144,8 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertTrue(submitted.isEmpty)
     }
 
-    private func claimClient(_ preparation: PendingClaimPreparation) -> MockWalletClient {
-        let option = try! PresentationCredentialOption(
+    private func claimClient(_ preparation: PendingClaimPreparation) throws -> MockWalletClient {
+        let option = try PresentationCredentialOption(
             queryID: "pid", credential: .init(id: "claim-credential", format: "dc+sd-jwt", credentialDataJSON: #"{"given_name":"Ada"}"#, issuer: nil, subject: nil, label: "Employee"),
             disclosures: [.init(
                 path: "$.given_name",
@@ -154,7 +154,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
                 name: "Given name"
             )]
         )
-        let preview = PresentationPreview(previewHandle: .init(value: "claim-preview"),
+        let preview = PresentationPreview(previewHandle: try .init(value: "claim-preview"),
             request: .init(clientID: "https://verifier.example", requestAuthentication: .unauthenticated,
                 nonce: "fixture", responseEncryption: .notRequired), credentialOptions: [option])
         return MockWalletClient(presentationPreviewResult: .ready(preview), claimPreparation: { credentials, disclosures in
