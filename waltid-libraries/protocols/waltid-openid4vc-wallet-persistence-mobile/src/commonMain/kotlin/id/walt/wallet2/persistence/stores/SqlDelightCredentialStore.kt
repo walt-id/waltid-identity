@@ -22,6 +22,8 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 private val json = Json { ignoreUnknownKeys = true }
+private const val MAX_BACKFILL_ROWS = 32
+private const val MAX_BACKFILL_CHARS = 512 * 1024
 
 /**
  * SQLDelight-backed implementation of [WalletCredentialStore] for mobile wallets.
@@ -50,9 +52,23 @@ public class SqlDelightCredentialStore private constructor(
         }
     }
 
-    /** Older databases acquire their derived card metadata one row at a time on the first inventory read. */
-    override suspend fun credentialSummaries(): List<WalletCredentialSummary> =
-        queries.selectCredentialSummaries().executeAsList().mapNotNull { row ->
+    /** Backfill old rows with bounded transactions. A replacement cannot inherit the previous row's display fields. */
+    override suspend fun credentialSummaries(): List<WalletCredentialSummary> {
+        val pending = mutableListOf<Pair<WalletCredentialSummary, String>>()
+        var pendingChars = 0
+        fun flush() {
+            if (pending.isEmpty()) return
+            queries.transaction {
+                for ((summary, expected) in pending) {
+                    queries.saveCredentialInventoryIfCurrent(summary.issuer, summary.subject, summary.typeMetadataJson,
+                        summary.id, expected)
+                }
+            }
+            pending.clear()
+            pendingChars = 0
+        }
+
+        val summaries = queries.selectCredentialSummaries().executeAsList().mapNotNull { row ->
             val types = row.type_metadata
             if (types != null) {
                 WalletCredentialSummary(row.id, row.format, row.issuer, row.subject, row.label,
@@ -60,13 +76,17 @@ public class SqlDelightCredentialStore private constructor(
             } else {
                 val original = queries.selectCredentialById(row.id).executeAsOneOrNull() ?: return@mapNotNull null
                 val summary = original.toStoredCredential().toCredentialSummary()
-                // A concurrent replacement or deletion must never inherit the previous row's projection.
-                queries.saveCredentialInventoryIfCurrent(issuer = summary.issuer, subject = summary.subject,
-                    type_metadata = summary.typeMetadataJson, credential_id = original.id,
-                    expected_credential = original.serialized_credential)
+                val signed = original.serialized_credential
+                if (pending.size >= MAX_BACKFILL_ROWS || signed.length > MAX_BACKFILL_CHARS - pendingChars) flush()
+                pending.add(summary to signed)
+                pendingChars += signed.length
+                if (pendingChars >= MAX_BACKFILL_CHARS) flush()
                 summary
             }
         }
+        flush()
+        return summaries
+    }
 
     /**
      * Stores a credential and its display metadata.

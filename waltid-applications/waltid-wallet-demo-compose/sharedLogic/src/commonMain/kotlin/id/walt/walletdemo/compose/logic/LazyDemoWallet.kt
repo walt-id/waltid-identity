@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.flow
 
 internal open class LazyDemoWallet<Wallet : DemoWallet>(
     private val createWallet: suspend () -> Wallet,
-) : DemoWallet {
+) : DemoWallet, DemoWalletInventory {
     private val mutex = Mutex()
     private var wallet: Wallet? = null
 

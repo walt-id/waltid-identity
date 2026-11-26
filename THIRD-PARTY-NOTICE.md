@@ -4,7 +4,7 @@ This document lists third-party libraries distributed with waltid-identity.
 
 The Apple wallet persistence module includes a modified native SQLite driver from
 [SQLDelight 2.4.1](https://github.com/sqldelight/sqldelight/tree/2.4.1/drivers/native-driver).
-It uses the project's [Apache License, Version 2.0](LICENSES/Apache-2.0.txt).
+It uses the project's [Apache License, Version 2.0](LICENSE).
 The wallet build gives the driver an internal package and releases its listener
 lock when the database closes.
 

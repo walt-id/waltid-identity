@@ -54,8 +54,6 @@ interface DemoWallet {
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability
     suspend fun listCredentials(): List<WalletDemoCredential>
-    suspend fun listCredentialSummaries(): List<WalletDemoCredential> = listCredentials()
-    suspend fun credential(id: String): WalletDemoCredential? = listCredentials().firstOrNull { it.id == id }
     suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential>
     suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
     suspend fun beginAuthorizationIssuance(
@@ -118,3 +116,15 @@ interface DemoWallet {
      */
     fun pendingAuthorizationIssuance(): WalletDemoIssuanceSession? = null
 }
+
+/** Optional indexed reads for hosts that load card details on demand. */
+interface DemoWalletInventory {
+    suspend fun listCredentialSummaries(): List<WalletDemoCredential>
+    suspend fun credential(id: String): WalletDemoCredential?
+}
+
+internal suspend fun DemoWallet.listCredentialSummaries(): List<WalletDemoCredential> =
+    if (this is DemoWalletInventory) this.listCredentialSummaries() else listCredentials()
+
+internal suspend fun DemoWallet.credential(id: String): WalletDemoCredential? =
+    if (this is DemoWalletInventory) this.credential(id) else listCredentials().firstOrNull { it.id == id }

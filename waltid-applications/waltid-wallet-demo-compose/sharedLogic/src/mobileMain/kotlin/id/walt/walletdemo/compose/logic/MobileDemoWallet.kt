@@ -43,7 +43,7 @@ internal class MobileDemoWallet(
     private val isIos: Boolean = false,
     private val onRegistrationRefreshed: suspend () -> Unit = {},
     private val preferredSigningProtection: WalletDemoSigningProtection = WalletDemoSigningProtection.Biometric,
-) : ProximityDemoWallet {
+) : ProximityDemoWallet, DemoWalletInventory {
     override suspend fun proximityPresentationCapabilities(
         configuration: ProximityConfiguration,
     ): ProximityCapabilities =
