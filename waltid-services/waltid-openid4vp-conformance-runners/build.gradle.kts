@@ -411,6 +411,6 @@ registerHaipFullPlanTask("haipFullPlanVerifierTest", "id.walt.openid4vp.conforma
 registerHaipFullPlanTask("haipFullPlanVpWalletTest", "id.walt.openid4vp.conformance.VpWalletConformanceTests", "VP wallet")
 registerHaipFullPlanTask(
     "haipFullPlanVciWalletTest",
-    "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
+    "id.walt.openid4vp.conformance.VciWalletConformanceTests.*AuthorizationCodeHaipFullTarget",
     "VCI wallet",
 )

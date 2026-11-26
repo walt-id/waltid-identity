@@ -28,10 +28,30 @@ selected variants and local configuration. Raw suite/application logs can contai
 fixture keys and credentials; keep them in ignored local artifacts and redact
 shared evidence. Existing full-run evidence remains tied to its tested source.
 
+## HAIP combinations covered
+
+| Role | Format | Selected combination |
+|------|--------|----------------------|
+| VP wallet | SD-JWT VC | `x509_hash`, `request_uri_signed`, encrypted `direct_post.jwt` |
+| VP wallet | mdoc (`iso_mdl`) | `x509_hash`, `request_uri_signed`, encrypted `direct_post.jwt` |
+| VP verifier | SD-JWT VC | `x509_hash`, `request_uri_signed`, encrypted `direct_post.jwt` |
+| VP verifier | mdoc (`iso_mdl`) | `x509_hash`, `request_uri_signed`, encrypted `direct_post.jwt` |
+| VCI wallet | SD-JWT VC | Issuer-initiated authorization code, offer by value, client attestation, DPoP |
+| VCI wallet | mdoc | Issuer-initiated authorization code, offer by value, client attestation, DPoP |
+
+These are six selected combinations, not every possible HAIP combination. For each
+VCI wallet format, the suite supplies immediate/plain, deferred/plain and
+immediate/encrypted credential issuance variants, plus applicable FAPI client tests.
+Wallet-initiated VCI and offers by reference are not added here. Issuer-side
+combinations remain in the separate issuer work.
+
 ## Selection and commands
 
 Full-plan mode selects the two HAIP verifier variants, the two HAIP VP wallet
-variants, and the existing SD-JWT issuer-initiated/by-value VCI wallet profile.
+variants, and two VCI wallet profiles: SD-JWT VC and mdoc, both issuer-initiated with offers by value.
+Each VCI wallet profile uses client attestation and DPoP; the suite expands immediate/plain,
+deferred/plain and immediate/encrypted issuance plus its applicable FAPI client modules.
+The mdoc profile is enabled only in this upgraded-suite mode; ordinary CI selection stays unchanged.
 The VCI wallet runner rejects module/variant slices in full-plan mode.
 Ordinary CI retains its existing selection, including deferred and FAPI skips.
 Explicitly selected checks can exercise those modules independently.

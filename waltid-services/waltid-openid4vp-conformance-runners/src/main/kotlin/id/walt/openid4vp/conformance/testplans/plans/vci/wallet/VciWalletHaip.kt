@@ -6,11 +6,14 @@ import id.walt.openid4vp.conformance.testplans.keys.ClientAttestationTestAuthori
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
 /**
- * VCI Wallet Test Plan: SD-JWT VC HAIP full target
+ * VCI Wallet Test Plan: SD-JWT VC or ISO mdoc HAIP target
  *
  * This profile targets the full HAIP wallet conformance suite contract.
  *
@@ -30,7 +33,7 @@ import kotlinx.serialization.json.putJsonObject
  * This runner therefore only sets the remaining wallet-specific selectors here
  * and supplies the HAIP-specific configuration objects required by the suite.
  */
-class VciWalletSdJwtHaip(
+class VciWalletHaip(
     val walletApiUrl: String,
     val credentialOfferEndpoint: String,
     val redirectUri: String,
@@ -45,7 +48,15 @@ class VciWalletSdJwtHaip(
      * resulting failure surfaces as an opaque signature error.
      */
     val attestationAuthority: ClientAttestationTestAuthority,
+    override val credentialFormat: String = "sd_jwt_vc",
 ) : VciWalletTestPlan {
+
+    init {
+        require(credentialFormat in setOf("sd_jwt_vc", "mdoc")) { "Unsupported HAIP credential format: $credentialFormat" }
+    }
+
+    private val formatLabel = if (credentialFormat == "mdoc") "ISO mdoc" else "SD-JWT VC"
+    private val configurationId = if (credentialFormat == "mdoc") "eu.europa.ec.eudi.pid.mdoc.1" else "eu.europa.ec.eudi.pid.1"
 
     companion object {
         // Key attestation is a separate HAIP feature from client attestation: it attests the
@@ -84,7 +95,7 @@ class VciWalletSdJwtHaip(
         """.trimIndent()
     }
 
-    override val description = "VCI Wallet: SD-JWT VC + authorization_code (HAIP full target)"
+    override val description = "VCI Wallet: $formatLabel + authorization_code (HAIP target)"
     override val planName: String = "oid4vci-1_0-wallet-haip-test-plan"
     override val isHaip: Boolean = true
     override val clientAuthType: String = "client_attestation"
@@ -92,18 +103,17 @@ class VciWalletSdJwtHaip(
     override val grantType: String = "authorization_code"
 
     override val variant = mapOf(
-        "credential_format" to "sd_jwt_vc",
+        "credential_format" to credentialFormat,
         "vci_authorization_code_flow_variant" to "issuer_initiated",
         // The HAIP plan fixes authorization_request_type itself and rejects it being restated
         // ("Variant 'authorization_request_type' has been set by user, but test plan already sets
         // this variant"), so unlike the non-HAIP plans it must not appear here.
         "vci_credential_offer_variant" to "by_value"
-
     )
 
     override val configuration: JsonObject = buildJsonObject {
-        put("alias", ConformanceSuiteAlias.unique("vci_wallet_sdjwt_haip_full_target"))
-        put("description", "Wallet VCI - SD-JWT VC + client_attestation + authorization_code (HAIP full target)")
+        put("alias", ConformanceSuiteAlias.unique("vci_wallet_${credentialFormat}_haip"))
+        put("description", "Wallet VCI - $formatLabel + client_attestation + authorization_code (HAIP full target)")
 
         putJsonObject("server") {
             putJsonObject("jwks") {
@@ -176,6 +186,20 @@ class VciWalletSdJwtHaip(
             }
         }
 
+        if (credentialFormat == "mdoc") {
+            val credential = VciWalletMdocDpop(
+                walletApiUrl, credentialOfferEndpoint, redirectUri, conformanceHost, conformancePort, adapterHost,
+            ).configuration.getValue("credential").jsonObject
+            val signer = credential.getValue("signing_jwk").jsonObject
+            val root = signer.getValue("x5c").jsonArray.last().jsonPrimitive.content
+            val anchor = "-----BEGIN CERTIFICATE-----\n${root.chunked(64).joinToString("\n")}\n-----END CERTIFICATE-----"
+            putJsonObject("credential") {
+                put("signing_jwk", signer)
+                put("trust_anchor_pem", anchor)
+                put("status_list_trust_anchor_pem", anchor)
+            }
+        }
+
         putJsonObject("client_attestation") {
             // issuer and trust_anchor are both mandatory for HAIP; AbstractVCIWalletTest refuses
             // to configure the test without them.
@@ -190,7 +214,7 @@ class VciWalletSdJwtHaip(
 
         putJsonObject("vci") {
             put("credential_offer_endpoint", ConformanceConfig.vciSuiteCredentialOfferEndpoint(adapterHost))
-            put("credential_configuration_id", "eu.europa.ec.eudi.pid.1")
+            put("credential_configuration_id", configurationId)
         }
 
         put("waitTimeoutSeconds", 30)

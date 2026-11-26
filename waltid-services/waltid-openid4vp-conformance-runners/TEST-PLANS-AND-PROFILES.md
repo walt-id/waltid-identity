@@ -48,20 +48,20 @@ Examples:
 - ✅ Nonce handling (c_nonce + nonce_endpoint)
 - ✅ Authorization code flow
 
-#### VciWalletSdJwtHaip
-**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/wallet/VciWalletSdJwtHaip.kt`  
+#### VciWalletHaip
+**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/wallet/VciWalletHaip.kt`
 **Test Class:** `VciWalletConformanceTests.kt`
 
 **Configuration:**
 - **Protocol:** OpenID4VCI 1.0
 - **Role:** Wallet (Credential Receiver)
-- **Credential Format:** SD-JWT VC (`vc+sd-jwt`)
-- **Authentication:** DPoP + private_key_jwt
-- **Flow:** Authorization Code
+- **Credential Formats:** SD-JWT VC and mdoc (mdoc is opt-in on suite 5.3.4)
+- **Authentication:** DPoP + client attestation
+- **Flow:** Issuer-initiated Authorization Code, offer by value
 - **Profile:** HAIP full target (`fapi_profile=vci_haip`)
 - **Conformance Plan:** `oid4vci-1_0-wallet-haip-test-plan`
 
-**Purpose:** Alternative wallet-side profile aligned to the currently implemented HAIP issuance criteria in OSS. Covers the HAIP-aligned auth-code, DPoP, offer, scope, and SD-JWT validation path without requiring wallet attestation interoperability yet.
+**Purpose:** Execute the HAIP wallet plan with client attestation, scope-based authorization, and the chosen credential format. The upgraded local task runs both formats and all suite-offered module variants.
 
 #### VciWalletMdocDpop
 **File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vci/wallet/VciWalletMdocDpop.kt`  

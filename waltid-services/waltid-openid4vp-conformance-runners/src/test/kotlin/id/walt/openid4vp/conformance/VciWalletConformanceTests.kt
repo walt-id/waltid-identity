@@ -20,6 +20,7 @@ import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.openid4vp.conformance.adapter.VciWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.keys.ClientAttestationTestAuthority
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
@@ -82,6 +83,10 @@ import kotlin.time.Duration.Companion.minutes
 class VciWalletConformanceTests {
 
     companion object {
+        @JvmStatic
+        fun isMdocHaipCheckEnabled(): Boolean =
+            ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN && isConformanceAvailable
+
         /** Request field the adapter's attester reads the wallet's public JWK from. */
         private const val ATTESTER_REQUEST_JWK_FIELD = "jwk"
 
@@ -176,7 +181,20 @@ class VciWalletConformanceTests {
         requiredVariant: Map<String, String> = emptyMap(),
     ): List<TestPlanResult> {
         val httpClient = createHttpClient()
-        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority, batchHolderKeyIds, clientKeyId, useScope)
+        // Every suite plan may offer a batch module, including the ordinary CI profiles.
+        // Keep the client key separate; only batch=true requests use the two new holder keys.
+        val effectiveClientKeyId = clientKeyId ?: httpClient.get("$walletApiUrl/wallet/$walletId/keys")
+            .body<List<WalletKeyInfo>>().single().keyId
+        val effectiveHolderKeyIds = batchHolderKeyIds.ifEmpty {
+            List(2) {
+                httpClient.post("$walletApiUrl/wallet/$walletId/keys/generate") {
+                    contentType(ContentType.Application.Json)
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
+                }.also { assertEquals(HttpStatusCode.Created, it.status) }.body<WalletKeyInfo>().keyId
+            }
+        }
+        val adapter = startAdapterIfNeeded(httpClient, walletId, attestationAuthority,
+            effectiveHolderKeyIds, effectiveClientKeyId, useScope)
         val adapterBaseUrl = "http://127.0.0.1:$adapterPort"
 
         try {
@@ -259,7 +277,7 @@ class VciWalletConformanceTests {
                     withInProcessWallet(withVerifier = true) { walletId ->
                         val attester = if (profile == "haip") ClientAttestationTestAuthority.create(
                             clientId = ConformanceConfig.VCI_WALLET_CLIENT_ID) else null
-                        val base = if (attester != null) VciWalletSdJwtHaip(
+                        val base = if (attester != null) VciWalletHaip(
                             walletApiUrl, "http://127.0.0.1:$adapterPort/credential-offer",
                             "http://127.0.0.1:$adapterPort/callback", conformanceHost, conformancePort, adapterHostIp,
                             attestationAuthority = attester,
@@ -452,44 +470,38 @@ class VciWalletConformanceTests {
     @EnabledIf("isConformanceAvailable")
     fun vciWalletSdJwtVcAuthorizationCodeHaipFullTarget() = runHaipWallet()
 
+    /** Additional upgraded-suite profile; ordinary CI keeps its existing selection. */
+    @Test
+    @EnabledIf("isMdocHaipCheckEnabled")
+    fun vciWalletIsoMdocAuthorizationCodeHaipFullTarget() = runHaipWallet(credentialFormat = "mdoc")
+
     /** Fast live gate for the SDK/PAR/token/credential driver before running the full matrix. */
     @Test
     @EnabledIf("isFapiDriverCheckEnabled")
     fun vciWalletSdJwtHaipFapiHappyPath() = runHaipWallet(
         requiredModules = setOf("fapi2-security-profile-final-client-test-happy-path"))
 
-    private fun runHaipWallet(requiredModules: Set<String> = emptySet()) = withInProcessWallet { walletId ->
+    private fun runHaipWallet(requiredModules: Set<String> = emptySet(), credentialFormat: String = "sd_jwt_vc") = withInProcessWallet { walletId ->
         // Minted per run: the suite is told the trust anchor, and the adapter signs with the matching
         // leaf, so nothing about the attester has to be committed or kept in sync by hand.
         val attestationAuthority = ClientAttestationTestAuthority.create(
             clientId = ConformanceConfig.VCI_WALLET_CLIENT_ID,
         )
-        createHttpClient().use { client ->
-            val clientKeyId = client.get("$walletApiUrl/wallet/$walletId/keys")
-                .body<List<WalletKeyInfo>>().single().keyId
-            val holders = List(2) {
-                client.post("$walletApiUrl/wallet/$walletId/keys/generate") {
-                    contentType(ContentType.Application.Json)
-                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
-                }.also { assertEquals(HttpStatusCode.Created, it.status) }.body<WalletKeyInfo>().keyId
-            }
-            runPlan(
-                VciWalletSdJwtHaip(
-                    walletApiUrl = walletApiUrl,
-                    credentialOfferEndpoint = "http://127.0.0.1:$adapterPort/credential-offer",
-                    redirectUri = "http://127.0.0.1:$adapterPort/callback",
-                    conformanceHost = conformanceHost,
-                    conformancePort = conformancePort,
-                    adapterHost = adapterHostIp,
-                    attestationAuthority = attestationAuthority,
-                ),
-                walletId,
-                attestationAuthority,
-                batchHolderKeyIds = holders,
-                clientKeyId = clientKeyId,
-                requiredModules = requiredModules,
-            )
-        }
+        runPlan(
+            VciWalletHaip(
+                walletApiUrl = walletApiUrl,
+                credentialOfferEndpoint = "http://127.0.0.1:$adapterPort/credential-offer",
+                redirectUri = "http://127.0.0.1:$adapterPort/callback",
+                conformanceHost = conformanceHost,
+                conformancePort = conformancePort,
+                adapterHost = adapterHostIp,
+                attestationAuthority = attestationAuthority,
+                credentialFormat = credentialFormat,
+            ),
+            walletId,
+            attestationAuthority,
+            requiredModules = requiredModules,
+        )
     }
 
     /**
