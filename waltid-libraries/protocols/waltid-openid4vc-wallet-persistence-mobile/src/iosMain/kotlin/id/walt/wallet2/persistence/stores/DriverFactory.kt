@@ -2,7 +2,7 @@ package id.walt.wallet2.persistence.stores
 
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
-import id.walt.wallet2.persistence.sqldelight.NativeSqliteDriver
+import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import co.touchlab.sqliter.DatabaseConfiguration
 import co.touchlab.sqliter.DatabaseFileContext
 import co.touchlab.sqliter.JournalMode
