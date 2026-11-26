@@ -109,20 +109,7 @@ final class WalletE2EUI {
     }
 
     func waitUntilWalletReady(timeout: TimeInterval) -> String? {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if let failed = latestStatus(prefixes: ["Bootstrap failed"]) {
-                return failed
-            }
-            // Prepared wallet content, rather than transient feedback, establishes readiness.
-            let prepared = app.descendants(matching: .any).matching(NSPredicate(
-                format: "identifier == %@ OR identifier BEGINSWITH %@",
-                "wallet.credentials.empty", "wallet.credentialCard."
-            )).firstMatch
-            if prepared.exists { return "Wallet ready" }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        }
-        return latestStatus(prefixes: ["Wallet ready", "Bootstrap failed", "Bootstrapping"])
+        waitForPreparedWallet(app, timeout: timeout)
     }
 
     func latestStatus(prefixes: [String]) -> String? {

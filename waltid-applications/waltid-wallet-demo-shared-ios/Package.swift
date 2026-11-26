@@ -13,6 +13,7 @@ let package = Package(
         .iOS("15.4"),
     ],
     products: [
+        .library(name: "WalletDemoBackgroundStatus", targets: ["WalletDemoBackgroundStatus"]),
         .library(
             name: "WalletDemoIdentityDocumentSupport",
             targets: ["WalletDemoIdentityDocumentSupport"]
@@ -38,6 +39,7 @@ let package = Package(
         .package(url: "https://github.com/twostraws/CodeScanner.git", exact: "2.5.2"),
     ],
     targets: [
+        .target(name: "WalletDemoBackgroundStatus"),
         .target(
             name: "WalletDemoSharingUI",
             dependencies: [

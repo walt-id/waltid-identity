@@ -29,11 +29,22 @@ data class WalletCredentialRead(
 class WalletCredentialStatusSnapshot(
     val evaluatedAt: Instant,
     credentials: List<WalletCredentialStatus>,
-    refreshing: Set<WalletCredentialReference> = emptySet(),
-    val nextRefreshAt: Instant? = null,
+    refreshing: Set<WalletCredentialReference>,
+    val nextRefreshAt: Instant?,
+    pendingNotices: List<PendingCredentialStatusNotice>,
 ) {
+    constructor(
+        evaluatedAt: Instant,
+        credentials: List<WalletCredentialStatus>,
+        refreshing: Set<WalletCredentialReference> = emptySet(),
+        nextRefreshAt: Instant? = null,
+    ) : this(evaluatedAt, credentials, refreshing, nextRefreshAt, emptyList())
+
     private val values = credentials.toList()
     private val active = refreshing.toSet()
+    private val notices = pendingNotices.toList()
+    /** Changes to present after unlock, derived from the same signed credentials as the status entries. */
+    val pendingNotices: List<PendingCredentialStatusNotice> get() = notices.toList()
     val credentials: List<WalletCredentialStatus> get() = values.toList()
     val refreshing: Set<WalletCredentialReference> get() = active.toSet()
     init {
@@ -41,8 +52,8 @@ class WalletCredentialStatusSnapshot(
         require(values.map { it.reference }.distinct().size == values.size)
     }
     override fun equals(other: Any?) = other is WalletCredentialStatusSnapshot && evaluatedAt == other.evaluatedAt &&
-        values == other.values && active == other.active && nextRefreshAt == other.nextRefreshAt
-    override fun hashCode() = listOf(evaluatedAt, values, active, nextRefreshAt).hashCode()
+        values == other.values && active == other.active && nextRefreshAt == other.nextRefreshAt && notices == other.notices
+    override fun hashCode() = listOf(evaluatedAt, values, active, nextRefreshAt, notices).hashCode()
 }
 
 data class WalletCredentialStatus(

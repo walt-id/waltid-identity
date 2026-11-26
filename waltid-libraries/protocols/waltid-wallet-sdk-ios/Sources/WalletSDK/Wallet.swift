@@ -52,6 +52,66 @@ public actor Wallet {
     /// Reads local status without rebuilding credential artwork or requesting issuer data.
     public func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot { try await bridge.credentialStatusSnapshot() }
 
+    /// Loads the foreground opt-in for an existing managed wallet. Unsupported stores return nil.
+    public func credentialStatusMaintenanceEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await bridge.credentialStatusMaintenanceEnrollment()
+    }
+
+    /// Changes the opt-in after foreground authorization. Store the returned binding only in app-private state.
+    /// - Parameter preference: The new maintenance preference to commit to the managed wallet.
+    public func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await bridge.setCredentialStatusMaintenance(preference)
+    }
+
+    /// Reconciles the current wallet's enrollment with the app's automatic-check setting.
+    /// - Parameters:
+    ///   - automaticChecks: Whether the holder enabled automatic status checks.
+    ///   - resumePaused: Pass true only after the holder explicitly re-enables automatic checks.
+    /// - Returns: The wallet's updated enrollment, or nil when the store cannot enroll.
+    public func reconcileCredentialStatusMaintenance(
+        automaticChecks: Bool, resumePaused: Bool = false
+    ) async throws -> CredentialStatusMaintenanceEnrollment? {
+        try await bridge.reconcileCredentialStatusMaintenance(automaticChecks: automaticChecks, resumePaused: resumePaused)
+    }
+
+    /// Asks active readers to reconcile observations another handle committed. This is a local read.
+    public func invalidateCredentialStatusSnapshot() async throws {
+        try await bridge.invalidateCredentialStatusSnapshot()
+    }
+
+    /// Acknowledges the displayed version so a newer notice for the same credential stays pending.
+    /// - Parameters:
+    ///   - credentialID: The stored credential ID from the displayed notice.
+    ///   - version: The opaque version from the displayed notice.
+    public func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
+        try await bridge.acknowledgeCredentialStatusNotice(credentialID: credentialID, version: version)
+    }
+
+    /// Runs one due-only pass against an enrolled existing wallet without creating a Wallet instance.
+    /// Supply the original storage namespace and cancel this async operation when the host's execution window expires.
+    /// - Parameters:
+    ///   - binding: The opaque grant returned when the managed wallet was enrolled.
+    ///   - crossProcessAccess: The App Group and Keychain access group used to create the wallet, if configured.
+    ///   - maxItems: The maximum number of credentials to process in this pass.
+    ///   - budget: The execution budget for the maintenance pass, in seconds.
+    public static func refreshDueStatusesForExistingWallet(
+        binding: String, crossProcessAccess: WalletCrossProcessAccess? = nil,
+        maxItems: Int = 25, budget: TimeInterval = 20
+    ) async throws -> CredentialStatusMaintenanceResult {
+        guard (1...1000).contains(maxItems), let milliseconds = Int64(exactly: (budget * 1000).rounded(.down)), milliseconds > 0 else {
+            throw WalletError.invalidInput("Invalid background status work limit")
+        }
+        #if canImport(WalletCore) && os(iOS)
+        return try await KMPWalletCoreBridge.refreshDueStatusesForExistingWallet(
+            binding: binding, crossProcessAccess: crossProcessAccess, maxItems: Int32(maxItems),
+            timeoutMilliseconds: milliseconds
+        )
+        #else
+        return .ineligible
+        #endif
+    }
+
+
     /// Explicitly checks wallet-owned credentials; omitted IDs select all stored credentials.
     ///
     /// Force bypasses freshness reuse for eligible checks; validity, backoff and execution limits still apply.

@@ -1,0 +1,2 @@
+ALTER TABLE credential_status_snapshots ADD COLUMN notice TEXT;
+ALTER TABLE credential_status_maintenance ADD COLUMN cursor_id TEXT;

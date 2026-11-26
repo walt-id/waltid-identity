@@ -2,8 +2,9 @@ import CryptoKit
 import SnapshotTesting
 import CoreImage
 import SwiftUI
+import WalletDemoBackgroundStatus
 import WalletDemoIdentityDocumentSupport
-import WalletSDK
+@testable import WalletSDK
 @testable import WalletDemoSharingUI
 import XCTest
 @testable import iosApp
@@ -46,6 +47,33 @@ final class WalletVisualTests: XCTestCase {
         try capture(CredentialsTabView(viewModel: model, selectedDetailsID: .constant(nil), cards: cards,
             onOpenSettings: {}, onScan: {}, onShareNearby: {})
             .environment(\.credentialStatusUI, CredentialStatusUIContext(values: [credential.id: status])), id: "status.home.issue")
+    }
+
+    func testCredentialStatusHomeNotice() async throws { try await credentialStatusHomeNotice() }
+    func testCredentialStatusHomeNoticeDark() async throws { try await credentialStatusHomeNotice(dark: true) }
+
+    private func credentialStatusHomeNotice(dark: Bool = false) async throws {
+        let fixtures = try WalletVisualFixtures()
+        let credential = try fixtures.credential()
+        let status = try fixtures.credentialStatus("revoked_current")
+        let suspended = try fixtures.credentialStatus("suspended")
+        let checkedAt = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-20T12:00:37Z"))
+        let notice = PendingCredentialStatusNotice(credentialID: credential.id, version: "revoked-v1",
+            kind: .revoked, checkedAt: checkedAt, historical: false)
+        let other = Credential(id: "queued-credential", format: "jwt_vc_json", issuer: credential.issuer,
+            subject: nil, label: "Access card", addedAt: nil, credentialDataJSON: #"{"given_name":"Ada"}"#)
+        let queued = PendingCredentialStatusNotice(credentialID: other.id, version: "suspended-v1",
+            kind: .suspended, checkedAt: checkedAt.addingTimeInterval(23), historical: false)
+        let model = makeModel()
+        model.credentials = [credential, other]
+        model.isReady = true
+        model.statusMessage = "Wallet operation completed"
+        let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
+        let content = CredentialsTabView(viewModel: model, selectedDetailsID: .constant(nil), cards: cards,
+            onOpenSettings: {}, onScan: {}, onShareNearby: {}, statusNotices: [notice, queued])
+            .environment(\.credentialStatusUI, CredentialStatusUIContext(values: [credential.id: status, other.id: suspended]))
+        try await captureWhenReady(content, id: dark ? "status.home.notice.dark" : "status.home.notice",
+            colorScheme: dark ? .dark : .light, isReady: { cards.count == 2 }, failure: "Both credential cards must be rendered")
     }
 
     func testCredentialStatusMixedArtwork() async throws { try await credentialStatusMixedArtwork() }
@@ -135,6 +163,26 @@ final class WalletVisualTests: XCTestCase {
     func testCredentialStatusSettingsPartial() async throws { try await credentialStatusSettings(checking: false) }
     func testCredentialStatusSettingsChecking() async throws { try await credentialStatusSettings(checking: true) }
     func testCredentialStatusSettingsHelp() async throws { try await credentialStatusSettings(checking: false, helpExpanded: true) }
+    func testCredentialStatusBackgroundOff() async throws { try await credentialStatusBackgroundSettings(paused: false) }
+    func testCredentialStatusBackgroundPaused() async throws { try await credentialStatusBackgroundSettings(paused: true) }
+
+    private func credentialStatusBackgroundSettings(paused: Bool) async throws {
+        let enrollment = CredentialStatusMaintenanceEnrollment(preference: paused ? .paused : .off, binding: nil)
+        let client = MockWalletClient(reconcileStatus: { _, _ in enrollment })
+        let model = makeModel(walletClient: client, backgroundStatusScheduler: .shared)
+        model.automaticCredentialStatusChecks = true
+        model.auth = .unlocked
+        model.isReady = true
+        model.handleApplicationBecameActive()
+        defer { model.handleApplicationEnteredBackground() }
+        let screen = NavigationView { CredentialStatusSettingsView(viewModel: model) }.navigationViewStyle(.stack)
+        try await captureWhenReady(screen, id: paused ? "status.settings.background_paused" : "status.settings.background_off",
+            isReady: { model.backgroundStatusChecks != nil },
+            failure: "The wallet must recover the saved background enrollment before capture")
+        XCTAssertEqual(model.automaticCredentialStatusChecks, !paused)
+        XCTAssertEqual(model.backgroundStatusChecks, paused)
+    }
+
     private func credentialStatusSettings(checking: Bool, helpExpanded: Bool = false) async throws {
         let model = makeModel(walletClient: MockWalletClient(operationDelayMilliseconds: 30_000))
         model.automaticCredentialStatusChecks = false
@@ -839,11 +887,14 @@ final class WalletVisualTests: XCTestCase {
                     id: noneSelected ? "batch.offer.none_selected" : "batch.offer.two_targets_three_copies")
     }
 
-    private func makeModel(biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil, pinStore: (any DemoPinStore)? = nil, walletClient: any WalletClient = MockWalletClient()) -> WalletViewModel {
+    private func makeModel(biometricAuthenticator: (any DemoBiometricAuthenticator)? = nil, pinStore: (any DemoPinStore)? = nil,
+                           walletClient: any WalletClient = MockWalletClient(),
+                           backgroundStatusScheduler: WalletDemoBackgroundStatusScheduler? = nil) -> WalletViewModel {
         WalletViewModel(
             walletID: "visual-settings",
             signingProtectionStore: InMemoryWalletDemoSigningProtectionStore(),
             walletClient: walletClient,
+            backgroundStatusScheduler: backgroundStatusScheduler,
             readerTrustSettingsPersistence: InMemoryDemoReaderTrustSettingsPersistence(),
             identityDocumentRegistrationUpdate: {},
             pinStore: pinStore ?? InMemoryDemoPinStore(),

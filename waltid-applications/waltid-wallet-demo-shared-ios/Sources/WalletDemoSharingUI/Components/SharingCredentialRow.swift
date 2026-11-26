@@ -9,6 +9,7 @@ struct SharingCredentialRow: View {
     let isReadOnly: Bool
     let onToggleCredential: (PresentationCredentialSelection) -> Void
     let hasAlternatives: Bool
+    var showsCredentialStatus = true
     var showAdditionalInformationHint = true
 
     var body: some View {
@@ -26,7 +27,7 @@ struct SharingCredentialRow: View {
                     .accessibilityIdentifier(WalletAccessibilityID.presentationCredential(option.selection.id))
             }
             .accessibilityIdentifier(WalletAccessibilityID.presentationCredentialToggle(option.selection.id))
-        CredentialStatusSection(credentialID: option.credentialID, compact: true)
+        if showsCredentialStatus { CredentialStatusSection(credentialID: option.credentialID, compact: true) }
         }
     }
 }

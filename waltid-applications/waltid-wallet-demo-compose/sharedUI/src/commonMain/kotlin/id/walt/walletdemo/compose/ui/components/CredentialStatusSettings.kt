@@ -20,6 +20,11 @@ import id.walt.walletdemo.compose.ui.resources.Res
 import id.walt.walletdemo.compose.ui.resources.credential_status_auto
 import id.walt.walletdemo.compose.ui.resources.credential_status_auto_detail
 import id.walt.walletdemo.compose.ui.resources.credential_status_auto_signed_in
+import id.walt.walletdemo.compose.ui.resources.credential_status_background
+import id.walt.walletdemo.compose.ui.resources.credential_status_background_detail
+import id.walt.walletdemo.compose.ui.resources.credential_status_background_error
+import id.walt.walletdemo.compose.ui.resources.credential_status_background_unavailable
+import id.walt.walletdemo.compose.ui.resources.credential_status_background_system_disabled
 import id.walt.walletdemo.compose.ui.resources.credential_status_check_all
 import id.walt.walletdemo.compose.ui.resources.credential_status_checking
 import id.walt.walletdemo.compose.ui.resources.credential_status_deferred
@@ -41,10 +46,25 @@ internal fun CredentialStatusSettings(custodial: Boolean) {
     val status = LocalCredentialStatusUi.current
     val supported = !status.snapshot.legacySubmission
     WalletSection(footer = stringResource(if (custodial) Res.string.credential_status_auto_signed_in else Res.string.credential_status_auto_detail) +
-        "\n" + stringResource(Res.string.credential_status_privacy)) {
+        "\n" + stringResource(Res.string.credential_status_privacy) +
+        if (status.setBackground != null) "\n" + stringResource(Res.string.credential_status_background_detail) else "") {
         SettingsToggleRow(stringResource(Res.string.credential_status_auto), status.automatic,
             { status.setAutomatic?.invoke(it) }, Modifier.testTag("settings-credential-status-automatic"),
-            enabled = supported && status.setAutomatic != null)
+            enabled = supported && status.setAutomatic != null && !status.savingBackground)
+        status.setBackground?.let { update ->
+            SettingsDivider()
+            SettingsToggleRow(stringResource(Res.string.credential_status_background),
+                status.automatic && status.background == true, update, Modifier.testTag("settings-credential-status-background"),
+                enabled = status.automatic && status.background != null && (status.backgroundSchedulingAvailable || status.background) && !status.savingBackground)
+            if (!status.backgroundSchedulingAvailable) {
+                SettingsNotice(stringResource(Res.string.credential_status_background_system_disabled))
+            } else if (status.background == null && status.automatic && !status.savingBackground) {
+                SettingsNotice(stringResource(Res.string.credential_status_background_unavailable))
+            }
+            if (status.backgroundSaveFailed) {
+                SettingsNotice(stringResource(Res.string.credential_status_background_error), error = true)
+            }
+        }
     }
     WalletSection(footer = status.summary?.takeIf { it.deferred > 0 }?.let { stringResource(Res.string.credential_status_deferred) }) {
         val checking = stringResource(Res.string.credential_status_checking)

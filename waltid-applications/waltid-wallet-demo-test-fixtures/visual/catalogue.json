@@ -895,7 +895,7 @@
     {
       "id": "settings.dc_api.enabled",
       "requirements": [
-        "Enabled digital credential API setting"
+        "The wallet shows credential status during Digital Credentials API review"
       ],
       "composeTest": "settingsDcApiEnabled",
       "swiftTest": "testSettingsDcApiEnabled"
@@ -903,7 +903,7 @@
     {
       "id": "settings.dc_api.disabled",
       "requirements": [
-        "Disabled digital credential API setting"
+        "Status checks are skipped; iOS still requires Share for each request"
       ],
       "composeTest": "settingsDcApiDisabled",
       "swiftTest": "testSettingsDcApiDisabled"
@@ -1388,6 +1388,47 @@
       "note": "Opens the actual Compose dialog through the production submit action and verifies Back does not submit. Native uses its actual system alert in app-host interaction/journey evidence, not a synthetic replica."
     },
     {
+      "id": "status.settings.background_off",
+      "title": "Background status checks default off",
+      "requirements": [
+        "Automatic checks are on, background checks are off and the manual check is available"
+      ],
+      "composeTest": "credentialStatusBackgroundOff",
+      "swiftTest": "testCredentialStatusBackgroundOff"
+    },
+    {
+      "id": "status.settings.background_paused",
+      "title": "Pausing automatic checks",
+      "requirements": [
+        "A saved background opt-in is paused, the background control is disabled and the manual check is available"
+      ],
+      "composeTest": "credentialStatusBackgroundPaused",
+      "swiftTest": "testCredentialStatusBackgroundPaused"
+    },
+    {
+      "id": "status.home.notice",
+      "title": "Dated revocation notice on unlocked Home",
+      "requirements": [
+        "The single light notice shows the credential, status, local check time, View credential, a close icon and the count of other pending notices"
+      ],
+      "composeTest": "credentialStatusHomeNotice",
+      "swiftTest": "testCredentialStatusHomeNotice"
+    },
+    {
+      "id": "status.home.notice.dark",
+      "title": "Dated revocation notice on unlocked Home in dark mode",
+      "requirements": [
+        "The same notice separates from the dark Home background with the same content, remaining count and controls"
+      ],
+      "composeTest": "credentialStatusHomeNoticeDark",
+      "swiftTest": "testCredentialStatusHomeNoticeDark",
+      "configuration": {
+        "android": { "theme": "dark" },
+        "compose-ios": { "theme": "dark" },
+        "swiftui": { "theme": "dark" }
+      }
+    },
+    {
       "id": "status.settings.partial",
       "requirements": [
         "Foreground preference and structured completed, unchanged, deferred and error counts"
@@ -1456,6 +1497,11 @@
     }
   ],
   "galleryPreview": [
+    "status.settings.background_off",
+    "status.settings.background_paused",
+    "status.home.notice",
+    "settings.dc_api.enabled",
+    "settings.dc_api.disabled",
     "status.home.mixed_artwork",
     "status.details.clear",
     "status.details.adverse",
@@ -1478,6 +1524,7 @@
     "settings.root.default"
   ],
   "galleryVariants": [
+    "status.home.notice.dark",
     "payment.recurring.compact_large_text",
     "payment.localized.compact_large_text",
     "onboarding.pin.compact_dark_large_text",

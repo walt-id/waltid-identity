@@ -19,7 +19,8 @@ final class WalletE2EUI {
         button.tap()
     }
 
-    func launch(attestation: [String: String] = [:], environment: [String: String] = [:], initializeSigningIdentity: Bool = true) {
+    func launch(attestation: [String: String] = [:], environment: [String: String] = [:],
+                initializeSigningIdentity: Bool = true, unlock: Bool = true) {
         app.launchEnvironment["E2E_WALLET_ID"] = app.launchEnvironment["E2E_WALLET_ID"] ?? "e2e-\(UUID().uuidString)"
         app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] =
             app.launchEnvironment["WALLET_SIGNING_PROTECTION_MODE"] ?? "disabled"
@@ -34,6 +35,7 @@ final class WalletE2EUI {
             addCredentialStatusFixture()
         }
         app.launch()
+        guard unlock else { return }
         unlockWallet()
         if initializeSigningIdentity && app.launchEnvironment["E2E_MOCK_WALLET"] != "1" {
             completeKeySetupIfNeeded()
@@ -54,8 +56,24 @@ final class WalletE2EUI {
                 ["reference": ["storeIndex": 0, "credentialId": id],
                  "status": try XCTUnwrap(value["status"]), "presentation": try XCTUnwrap(value["presentation"])]
             }
-            let data = try JSONSerialization.data(withJSONObject: ["evaluatedAt": try XCTUnwrap(value["evaluatedAt"]),
-                "credentials": records, "refreshing": []])
+            let evaluatedAt = try XCTUnwrap(value["evaluatedAt"])
+            var snapshot: [String: Any] = ["evaluatedAt": evaluatedAt, "credentials": records, "refreshing": []]
+            if app.launchEnvironment["E2E_MOCK_STATUS_NOTIFICATION"] == "1" {
+                let presentation = try XCTUnwrap(value["presentation"] as? [String: Any])
+                let checkedAt = try XCTUnwrap(presentation["lastCheckedAt"] as? String)
+                var notices: [[String: Any]] = [[
+                    "reference": ["storeIndex": 0, "credentialId": "cred-1"],
+                    "version": "revoked-v1", "kind": "REVOKED", "checkedAt": checkedAt, "historical": false,
+                ]]
+                if app.launchEnvironment["E2E_MOCK_STATUS_QUEUE"] == "1" {
+                    notices.append([
+                        "reference": ["storeIndex": 0, "credentialId": "photo-id-1"],
+                        "version": "revoked-v2", "kind": "REVOKED", "checkedAt": checkedAt, "historical": false,
+                    ])
+                }
+                snapshot["pendingNotices"] = notices
+            }
+            let data = try JSONSerialization.data(withJSONObject: snapshot)
             app.launchEnvironment["E2E_MOCK_STATUS_JSON"] = String(decoding: data, as: UTF8.self)
         } catch { XCTFail("Could not load the shared credential status fixture: \(error)") }
     }
@@ -113,22 +131,7 @@ final class WalletE2EUI {
     }
 
     func waitUntilWalletReady(timeout: TimeInterval) -> String? {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            guard let elements = walletSnapshotElements() else { return nil }
-            if let failure = latestStatus(prefixes: ["Bootstrap failed"], elements: elements) {
-                return failure
-            }
-            // Both are rendered only after isReady, including the initial credential read.
-            // Idle readiness has no banner; wait for the prepared wallet content.
-            if elements.contains(where: {
-                $0.identifier == "wallet.credentials.empty" || $0.identifier.hasPrefix("wallet.credentialCard.")
-            }) {
-                return "Wallet ready"
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        }
-        return nil
+        waitForPreparedWallet(app, timeout: timeout)
     }
 
     private func walletSnapshotElements() -> [any XCUIElementSnapshot]? {

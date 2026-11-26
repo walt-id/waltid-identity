@@ -35,11 +35,6 @@ public extension AnnexCPresentationWallet {
     func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? { nil }
     func cachedCredentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { AsyncThrowingStream { $0.finish() } }
     func closeStatusWallet() async throws {}
-    func submitStatusReviewedAnnexCPresentation(reviewedStatus: [String: String], requestID: String, verifiedOrigin: String,
-        deviceRequestBase64URL: String, encryptionInfoBase64URL: String, selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse {
-        try await submitAnnexCPresentation(requestID: requestID, verifiedOrigin: verifiedOrigin, deviceRequestBase64URL: deviceRequestBase64URL,
-            encryptionInfoBase64URL: encryptionInfoBase64URL, selectedCredentialOptions: selectedCredentialOptions)
-    }
 }
 extension Wallet: AnnexCPresentationWallet {
     public func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? { try await credentialStatusSnapshot() }
@@ -57,6 +52,8 @@ public final class AnnexCPresentationModel: ObservableObject {
     @Published public private(set) var preview: AnnexCPresentationPreview?
     /// User-facing failure text, if the flow cannot continue.
     @Published public private(set) var failure: String?
+    /// A failed direct response keeps this request in explicit wallet review.
+    @Published public private(set) var directSubmissionFailure: String?
     /// Locks interaction once a response is being sealed or the platform request has ended.
     public var isSubmitting: Bool { phase == .submitting || phase == .finished }
     /// What the user is being asked to share, in the wallet's shared review vocabulary.
@@ -119,7 +116,7 @@ public final class AnnexCPresentationModel: ObservableObject {
     }
 
     /// Runs stage 1: parses the request, opens the shared wallet, and builds the consent preview.
-    public func prepare() async {
+    public func prepare(reviewStatus: Bool = true) async {
         guard phase == .idle else { return }
         phase = .preparing
         do {
@@ -136,24 +133,7 @@ public final class AnnexCPresentationModel: ObservableObject {
                 return
             }
             self.wallet = wallet
-            do {
-                if let snapshot = try await wallet.cachedCredentialStatuses() { installStatuses(snapshot) }
-                else { credentialStatusReadState = .unavailable }
-            } catch is CancellationError { throw CancellationError() }
-            catch {
-                credentialStatusReadState = .unavailable
-                statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
-            }
-            statusObservation = Task { [weak self] in
-                do { for try await snapshot in try await wallet.cachedCredentialStatusUpdates() {
-                    try Task.checkCancellation(); self?.installStatuses(snapshot)
-                }
-                    if !Task.isCancelled, self?.credentialStatusReadState == .loading { self?.credentialStatusReadState = .unavailable }
-                } catch is CancellationError {} catch {
-                    self?.credentialStatusReadState = .unavailable
-                    self?.statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
-                }
-            }
+            if reviewStatus { try await startStatusReview(wallet) }
             let prepared = try await wallet.previewAnnexCPresentation(
                 parsedRequest: parsed,
                 // The platform-asserted origin is passed through verbatim: it is what the wallet must
@@ -182,9 +162,38 @@ public final class AnnexCPresentationModel: ObservableObject {
         }
     }
 
+    private func startStatusReview(_ wallet: any AnnexCPresentationWallet) async throws {
+        do {
+            let snapshot = try await wallet.cachedCredentialStatuses()
+            try Task.checkCancellation()
+            guard phase != .finished else { return }
+            if let snapshot { installStatuses(snapshot) }
+            else { credentialStatusReadState = .unavailable }
+        } catch is CancellationError { throw CancellationError() }
+        catch {
+            try Task.checkCancellation()
+            guard phase != .finished else { return }
+            credentialStatusReadState = .unavailable
+            statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
+        }
+        statusObservation = Task { [weak self] in
+            do {
+                for try await snapshot in try await wallet.cachedCredentialStatusUpdates() {
+                    try Task.checkCancellation()
+                    self?.installStatuses(snapshot)
+                }
+                if !Task.isCancelled, self?.credentialStatusReadState == .loading { self?.credentialStatusReadState = .unavailable }
+            } catch is CancellationError {} catch {
+                self?.credentialStatusReadState = .unavailable
+                self?.statusReviewNotice = String(localized: "Credential status is unavailable. Previous results are retained.")
+            }
+        }
+    }
+
     /// Runs stage 2: requests the raw request and returns the sealed response to the platform.
     public func submit(reviewedStatus: [String: String]? = nil) async {
         guard phase == .reviewing, let wallet, let preview else { return }
+        guard reviewedStatus != nil || directSubmissionFailure == nil else { return }
         guard hasCompleteSelection else {
             failure = IdentityDocumentSupportFailure.missingCredentialSelection.localizedDescription
             return
@@ -203,13 +212,14 @@ public final class AnnexCPresentationModel: ObservableObject {
                         reviewedStatus: reviewedStatus, requestID: preview.requestID, verifiedOrigin: preview.verifiedOrigin,
                         deviceRequestBase64URL: rawRequest.deviceRequest, encryptionInfoBase64URL: rawRequest.encryptionInfo,
                         selectedCredentialOptions: selections)
-                } else { response = try await wallet.submitAnnexCPresentation(
-                    requestID: preview.requestID,
-                    verifiedOrigin: preview.verifiedOrigin,
-                    deviceRequestBase64URL: rawRequest.deviceRequest,
-                    encryptionInfoBase64URL: rawRequest.encryptionInfo,
-                    selectedCredentialOptions: selections
-                )
+                } else {
+                    response = try await wallet.submitAnnexCPresentation(
+                        requestID: preview.requestID,
+                        verifiedOrigin: preview.verifiedOrigin,
+                        deviceRequestBase64URL: rawRequest.deviceRequest,
+                        encryptionInfoBase64URL: rawRequest.encryptionInfo,
+                        selectedCredentialOptions: selections
+                    )
                 }
                 return try encryptedResponseData(fromResponseJSON: response.dataJSON)
             }
@@ -227,10 +237,22 @@ public final class AnnexCPresentationModel: ObservableObject {
             statusReviewNotice = credentialStatusAvailable ? WalletError.credentialStatusReviewChanged.localizedDescription
                 : String(localized: "Status changed, but its latest details are unavailable. Try again.")
             phase = .reviewing
+        } catch is CancellationError {
+            phase = .reviewing
+            cancel()
         } catch {
             log.error("Annex C response failed: \(error.localizedDescription, privacy: .public)")
-            failure = error.localizedDescription
             phase = .reviewing
+            if reviewedStatus == nil {
+                directSubmissionFailure = error.localizedDescription
+                // A failed direct attempt opens interactive review. Load the evidence that review needs.
+                if statusObservation == nil {
+                    do { try await startStatusReview(wallet) }
+                    catch { cancel() }
+                }
+            } else {
+                failure = error.localizedDescription
+            }
         }
     }
 

@@ -27,7 +27,7 @@ internal fun CredentialStatusIcon(
 ) {
     val dark = isSystemInDarkTheme()
     val color = when {
-        status.red -> MaterialTheme.colorScheme.error
+        status.red -> if (dark) Color(0xFFFF4245) else MaterialTheme.colorScheme.error
         status.positive -> if (dark) Color(0xFF81C995) else Color(0xFF216E39)
         status.hasIssue -> if (dark) Color(0xFFFFCC80) else Color(0xFF946000)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
