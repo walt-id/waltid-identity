@@ -23,6 +23,8 @@ import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.publicOnly
+import id.walt.crypto2.keys.requirePointOnCurve
+import id.walt.crypto2.keys.requireUncompressedPointOnCurve
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.serialization.BinaryData
 import kotlinx.serialization.encodeToString
@@ -173,6 +175,7 @@ object Hpke {
         require(encoded.size == 65 && encoded.first() == 0x04.toByte()) {
             "P-256 HPKE encapsulated key must be an uncompressed 65-byte point"
         }
+        EcCurve.P256.requireUncompressedPointOnCurve(encoded)
         val publicKey = provider.get(ECDH)
             .publicKeyDecoder(EC.Curve.P256)
             .decodeFromByteArray(EC.PublicKey.Format.RAW, encoded)
@@ -200,6 +203,7 @@ object Hpke {
         }
         val x = decodeCoordinate(parsed, "x")
         val y = decodeCoordinate(parsed, "y")
+        EcCurve.P256.requirePointOnCurve(x, y)
         return byteArrayOf(0x04) + x + y
     }
 

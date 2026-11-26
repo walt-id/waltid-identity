@@ -692,6 +692,8 @@ private sealed interface AgreementMaterial {
             peerPublicKey: EncodedKey,
         ): ByteArray {
             val jwk = peerPublicKey.toPublicJwk(spec, provider)
+            // Checks that the peer point lies on our curve before the provider decodes it.
+            require(jwk.inferKeySpec() == spec) { "ECDH peer public key does not match the key specification" }
             val peer = provider.get(ECDH).publicKeyDecoder(curve)
                 .decodeFromByteArray(EC.PublicKey.Format.JWK, jwk.data.toByteArray())
             return privateKey.sharedSecretGenerator().generateSharedSecretToByteArray(peer)

@@ -80,8 +80,7 @@ internal fun JsonObject.inferKeySpec(): KeySpec = when (requiredString("kty")) {
             else -> throw IllegalArgumentException("Unsupported JWK EC curve: $name")
         }
         val size = curve.publicValueSize()
-        requiredBase64Url("x", size)
-        requiredBase64Url("y", size)
+        curve.requirePointOnCurve(requiredBase64Url("x", size), requiredBase64Url("y", size))
         if ("d" in this) requiredBase64Url("d", size)
         KeySpec.Ec(curve)
     }

@@ -9,6 +9,7 @@ import dev.whyoleg.cryptography.algorithms.RSA
 import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.algorithms.XDH
 import id.walt.crypto2.serialization.BinaryData
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -20,7 +21,7 @@ suspend fun EncodedKey.toPublicJwk(
 ): EncodedKey.Jwk {
     if (this is EncodedKey.Jwk) return publicOnly()
     val encoded = when (spec) {
-        is KeySpec.Ec -> convertEcPublic(provider, EC.Curve(spec.curve.name), EC.PublicKey.Format.JWK)
+        is KeySpec.Ec -> convertEcPublic(provider, spec.curve, EC.PublicKey.Format.JWK)
         is KeySpec.Edwards -> decodeEdPublic(provider, spec).encodeToByteArray(EdDSA.PublicKey.Format.JWK)
         is KeySpec.Montgomery -> decodeXdhPublic(provider, spec).encodeToByteArray(XDH.PublicKey.Format.JWK)
         is KeySpec.Rsa -> convertRsaPublic(provider, RSA.PublicKey.Format.JWK)
@@ -56,7 +57,7 @@ suspend fun EncodedKey.toSpkiDer(
 ): EncodedKey.SpkiDer {
     if (this is EncodedKey.SpkiDer) return this
     val encoded = when (spec) {
-        is KeySpec.Ec -> convertEcPublic(provider, EC.Curve(spec.curve.name), EC.PublicKey.Format.DER)
+        is KeySpec.Ec -> convertEcPublic(provider, spec.curve, EC.PublicKey.Format.DER)
         is KeySpec.Edwards -> decodeEdPublic(provider, spec).encodeToByteArray(EdDSA.PublicKey.Format.DER)
         is KeySpec.Montgomery -> decodeXdhPublic(provider, spec).encodeToByteArray(XDH.PublicKey.Format.DER)
         is KeySpec.Rsa -> convertRsaPublic(provider, RSA.PublicKey.Format.DER)
@@ -177,7 +178,7 @@ private suspend fun EncodedKey.decodeXdhPrivate(
 
 private suspend fun EncodedKey.convertEcPublic(
     provider: CryptographyProvider,
-    curve: EC.Curve,
+    curve: EcCurve,
     output: EC.PublicKey.Format,
 ): ByteArray {
     provider.getOrNull(ECDSA)?.let { return convertEcPublic(it, curve, output) }
@@ -198,18 +199,45 @@ private suspend fun EncodedKey.convertEcPrivate(
 private suspend fun <PublicK : EC.PublicKey, PrivateK : EC.PrivateKey<PublicK>, PairK : EC.KeyPair<PublicK, PrivateK>>
     EncodedKey.convertEcPublic(
         algorithm: EC<PublicK, PrivateK, PairK>,
-        curve: EC.Curve,
+        curve: EcCurve,
         output: EC.PublicKey.Format,
     ): ByteArray {
+    val providerCurve = EC.Curve(curve.name)
     val key = when (this) {
-        is EncodedKey.Jwk -> algorithm.publicKeyDecoder(curve)
-            .decodeFromByteArray(EC.PublicKey.Format.JWK, publicOnly().data.toByteArray())
-        is EncodedKey.SpkiDer -> algorithm.publicKeyDecoder(curve)
-            .decodeFromByteArray(EC.PublicKey.Format.DER, data.toByteArray())
-        is EncodedKey.Pkcs8Der -> algorithm.privateKeyDecoder(curve)
+        is EncodedKey.Jwk -> decodePublicKey(curve) {
+            algorithm.publicKeyDecoder(providerCurve)
+                .decodeFromByteArray(EC.PublicKey.Format.JWK, publicOnly().data.toByteArray())
+        }
+        is EncodedKey.SpkiDer -> decodePublicKey(curve) {
+            algorithm.publicKeyDecoder(providerCurve).decodeFromByteArray(EC.PublicKey.Format.DER, data.toByteArray())
+        }
+        is EncodedKey.Pkcs8Der -> algorithm.privateKeyDecoder(providerCurve)
             .decodeFromByteArray(EC.PrivateKey.Format.DER, data.toByteArray()).getPublicKey()
     }
-    return key.encodeToByteArray(output)
+    // The JDK decodes off-curve points without complaint, so check what the provider decoded on every platform. The
+    // JWK coordinates are used because OpenSSL keeps a compressed point compressed in its RAW encoding.
+    val jwk = key.encodeToByteArray(EC.PublicKey.Format.JWK)
+    require(EncodedKey.Jwk(BinaryData(jwk), privateMaterial = false).inferKeySpec() == KeySpec.Ec(curve)) {
+        "Decoded EC public key does not use curve ${curve.name}"
+    }
+    return if (output == EC.PublicKey.Format.JWK) jwk else key.encodeToByteArray(output)
+}
+
+/**
+ * Decodes public key material, reporting a provider's refusal as [IllegalArgumentException]: WebCrypto rejects an
+ * off-curve or malformed point with a DOMException and OpenSSL with an [IllegalStateException], where the JVM needs
+ * crypto2's own on-curve check to notice at all.
+ */
+private inline fun <K> decodePublicKey(curve: EcCurve, decode: () -> K): K = try {
+    decode()
+} catch (cause: IllegalArgumentException) {
+    throw cause
+} catch (cause: CancellationException) {
+    throw cause
+} catch (cause: Error) {
+    throw cause
+} catch (cause: Throwable) {
+    throw IllegalArgumentException("Invalid ${curve.name} public key", cause)
 }
 
 private suspend fun <PublicK : EC.PublicKey, PrivateK : EC.PrivateKey<PublicK>, PairK : EC.KeyPair<PublicK, PrivateK>>
