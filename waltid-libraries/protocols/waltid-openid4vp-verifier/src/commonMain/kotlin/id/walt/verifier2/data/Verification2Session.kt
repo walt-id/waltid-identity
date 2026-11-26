@@ -159,6 +159,10 @@ data class Verification2Session(
     @SerialName("response_code")
     var responseCode: String? = null,
 
+    /** Short-lived completion capability, independent of result retention. */
+    @SerialName("response_code_expires_at")
+    var responseCodeExpiresAt: Instant? = null,
+
     /**
      * Structured failure detail. Populated when the session ends in [VerificationSessionStatus.FAILED]
      * (presentation validation, DCQL fulfillment, VC policy violations, or an OID4VP §8.5 wallet
@@ -223,6 +227,8 @@ data class Verification2Session(
 
 
     fun deletePII() {
+        responseCode = null
+        responseCodeExpiresAt = null
         setup = setup.publicView()
         notifications = notifications?.withoutCredentials()
         ephemeralDecryptionKey = null
@@ -258,9 +264,12 @@ data class Verification2Session(
     fun publicView(): Verification2Session = publicView(includeSameDeviceResult = false)
 
     /** Release a same-device outcome only to the browser carrying the wallet redirect code. */
-    fun completionView(responseCode: String?): Verification2Session {
+    fun completionView(responseCode: String?): Verification2Session = completionView(responseCode, Clock.System.now())
+
+    internal fun completionView(responseCode: String?, now: Instant): Verification2Session {
         if (setup is SameDeviceFlowSetup && status == VerificationSessionStatus.SUCCESSFUL) {
             require(responseCode != null && responseCode == this.responseCode) { "A valid response_code is required to retrieve the same-device result." }
+            require(responseCodeExpiresAt?.let { now < it } == true) { "The same-device completion code has expired." }
             return publicView(includeSameDeviceResult = true)
         }
         return publicView()
@@ -281,6 +290,7 @@ data class Verification2Session(
         ephemeralDecryptionKey = null,
         crypto2EphemeralDecryptionKey = null,
         responseCode = null,
+        responseCodeExpiresAt = null,
     ).let { view ->
         if (setup !is SameDeviceFlowSetup || includeSameDeviceResult) view else view.copy(
             presentedRawData = null,
