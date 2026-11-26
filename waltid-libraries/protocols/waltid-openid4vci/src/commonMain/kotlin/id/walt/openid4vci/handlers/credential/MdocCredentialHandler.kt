@@ -18,7 +18,6 @@ import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigning
 import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
-import id.walt.mdoc.issuance.MdlAge
 import id.walt.mdoc.issuance.roundedMdocValidity
 import id.walt.mdoc.issuance.truncateMdocTDate
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
@@ -29,17 +28,13 @@ import id.walt.openid4vci.proofs.invalidCredentialProof
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.sdjwt.SDMap
 import id.walt.credentials.issuance.IssuanceClock
+import id.walt.credentials.issuance.MdocDataMapping
 import id.walt.credentials.issuance.InstantClock
-import id.walt.credentials.issuance.dataFunctionsFor
-import id.walt.credentials.issuance.CredentialDataMergeUtils.mdocNamespaceMapping
-import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeMdocPayloadWithMapping
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
@@ -204,41 +199,19 @@ class MdocCredentialHandler(
         issuedAt: Instant,
         docType: String,
         validFrom: Instant,
-    ): JsonObject {
-        if (dataMapping.isNullOrEmpty()) return credentialData
-        val namespaceMapping = dataMapping.mdocNamespaceMapping(credentialData) ?: return credentialData
-        val mdlMapping = namespaceMapping[MdlAge.NAMESPACE] as? JsonObject
-        val deriveAge = docType == MdlAge.DOC_TYPE &&
-            mdlMapping?.get(MdlAge.AGE_IN_YEARS) == JsonPrimitive(MdlAge.AGE_MAPPING)
-        val mapping = if (deriveAge) {
-            JsonObject(namespaceMapping + (MdlAge.NAMESPACE to JsonObject(mdlMapping.orEmpty() - MdlAge.AGE_IN_YEARS)))
-        } else {
-            namespaceMapping
-        }
-        val mappedData = credentialData.mergeMdocPayloadWithMapping(
-            mapping = mapping,
-            context = mdocMappingContext(issuerId, display, verifiedBinding?.holderDid),
-            data = dataFunctionsFor(InstantClock(issuedAt)),
-        )
-        if (!deriveAge) return mappedData
-
-        // Derive the age after namespace mappings have supplied the final birth date.
-        val mdlData = mappedData.getValue(MdlAge.NAMESPACE).jsonObject
-        val birthDatePath = "credentialData.${MdlAge.NAMESPACE}.${MdlAge.BIRTH_DATE}"
-        val birthDate = MdlAge.parseBirthDate(mdlData[MdlAge.BIRTH_DATE], birthDatePath)
-        val age = MdlAge.completedYears(birthDate, validFrom, birthDatePath)
-        val mdlDataWithAge = JsonObject(mdlData + (MdlAge.AGE_IN_YEARS to JsonPrimitive(age)))
-        return JsonObject(mappedData + (MdlAge.NAMESPACE to mdlDataWithAge))
-    }
-
-    private fun mdocMappingContext(
-        issuerId: String,
-        display: List<CredentialDisplay>?,
-        subjectDid: String?,
-    ): Map<String, JsonElement> = issuanceTemplateContext(
-        issuerId = issuerId,
-        subjectDid = subjectDid?.takeIf { it.isNotBlank() },
-        display = display?.let { Json.encodeToJsonElement(it).jsonArray },
+    ): JsonObject = MdocDataMapping.resolve(
+        credentialData = credentialData,
+        dataMapping = dataMapping,
+        docType = docType,
+        validFrom = validFrom,
+        clock = InstantClock(issuedAt),
+        context = {
+            issuanceTemplateContext(
+                issuerId = issuerId,
+                subjectDid = verifiedBinding?.holderDid?.takeIf { it.isNotBlank() },
+                display = display?.let { Json.encodeToJsonElement(it).jsonArray },
+            )
+        },
     )
 
     @OptIn(ExperimentalSerializationApi::class)
