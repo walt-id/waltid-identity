@@ -41,26 +41,27 @@ foreground/manual triggers and preferences. Cancel stream tasks with their UI ow
 [credential-status guide](Sources/WalletSDK/Documentation.docc/CheckingCredentialStatus.md) for semantics,
 reviewed sharing, persistence and lifecycle examples.
 
+## Choosing Swift package products
+
+| App configuration | Products and Xcode settings |
+| --- | --- |
+| One executable | Link `WalletSDK`. For optional signing-key recovery or enterprise custody, add `WalletSDKKeychainRecoveryStatic` or `WalletSDKEnterpriseCustodyStatic`. Select one linkage per adapter. The existing dynamic products use the same imports and registration calls. |
+| App and credential-provider extension | Link `WalletSDKShared` in both targets and select it in their supporting packages. Choose **Embed & Sign** in the containing app and **Do Not Embed** in the extension. Add `@executable_path/../../Frameworks` to the extension’s **Runpath Search Paths**. Both targets can use `import WalletSDK`. |
+
+Xcode can place the implementation in `WalletSDK.framework` when another package product depends on
+it. From the Swift package directory, check that both executables can find one copy in the
+containing app’s `Frameworks` directory.
+
+```sh
+python3 scripts/check-shared-runtime.py App.app App.app/Extensions/Provider.appex
+```
+
+For an app-hosted XCTest target that imports `WalletCore` directly, add
+`-Xfrontend -disable-autolink-framework -Xfrontend WalletCore` to **Other Swift Flags**.
+This makes the test use the host’s Kotlin runtime. The checker also inspects hosted test bundles in
+a build for testing.
+
 ## Local Build
-
-Use the `WalletSDK` product for an app with one executable. For an app and a credential-provider
-extension, link `WalletSDKShared` in both targets and choose **Embed & Sign** in the containing app.
-Select that product in Swift packages shared by these targets as well. Mixing the automatic and
-shared products can make Xcode embed an additional framework with Swift compiler metadata.
-The extension loads its frameworks from `@executable_path/../../Frameworks`. Swift source can
-continue to use `import WalletSDK`. Xcode may also embed `WalletSDK.framework` when an adapter
-depends on the SDK. Check the archived application and extension together with
-`python3 scripts/check-shared-runtime.py <path/to/App.app> <path/to/Provider.appex>` from this package.
-
-An app-hosted XCTest bundle that imports `WalletCore` directly can also link a static copy of the
-Kotlin runtime. For that test target, add `-Xfrontend -disable-autolink-framework -Xfrontend WalletCore`
-to **Other Swift Flags** so the bundle uses the framework loaded by its host. The same packaging
-check on a build for testing inspects the embedded test bundles.
-
-For a single-executable app using Keychain recovery or enterprise custody, select
-`WalletSDKKeychainRecoveryStatic` or `WalletSDKEnterpriseCustodyStatic` to link the adapter
-into the executable. Use one product per adapter. The imports and provider registration calls
-are identical to those for the existing dynamic products.
 
 Generate the KMP core XCFramework before building an iOS consumer:
 

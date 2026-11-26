@@ -8,30 +8,51 @@ import re
 import subprocess
 
 
-def linked_wallet_frameworks(image):
-    output = subprocess.check_output(["xcrun", "otool", "-L", str(image)], text=True)
-    paths = (line.strip().split(" (", 1)[0] for line in output.splitlines()[1:])
-    return {Path(path.removeprefix("@rpath/")) for path in paths if path.startswith("@rpath/WalletSDK")}
+def image_linkage(image, bundle):
+    output = subprocess.check_output(["xcrun", "otool", "-l", str(image)], text=True)
+    commands = re.findall(
+        r"^\s*cmd (LC_[A-Z_]+)\n\s*cmdsize \d+\n\s*(?:name|path) (.+?) \(offset \d+\)$",
+        output, re.MULTILINE,
+    )
+    anchors = {"@executable_path": bundle, "@loader_path": image.parent}
+    paths, dependencies = [], []
+    for command, value in commands:
+        anchor, _, suffix = value.partition("/")
+        if command == "LC_RPATH" and anchor in anchors:
+            paths.append((anchors[anchor] / suffix).resolve())
+        elif command != "LC_ID_DYLIB" and anchor == "@rpath" and command.endswith("_DYLIB"):
+            dependencies.append(Path(suffix))
+    return paths, dependencies
 
 
-def executable_images(bundle):
+def bundle_executable(bundle):
     with (bundle / "Info.plist").open("rb") as info:
-        executable = plistlib.load(info)["CFBundleExecutable"]
-    # Xcode can put the executable's code and dependencies in a sibling dylib in Debug.
-    return [bundle / executable, *bundle.glob(f"{executable}.debug.dylib")]
+        return bundle / plistlib.load(info)["CFBundleExecutable"]
 
 
-def wallet_runtime(bundle, frameworks):
-    images = executable_images(bundle)
-    loaded = set()
-    while images:
-        for dependency in linked_wallet_frameworks(images.pop()) - loaded:
-            image = frameworks / dependency
-            if not image.is_file():
-                raise SystemExit(f"{bundle.name} requires a missing embedded framework: {image}")
-            loaded.add(dependency)
-            images.append(image)
-    return loaded
+def loaded_images(bundle, frameworks):
+    executable = bundle_executable(bundle)
+    pending = [(executable, [])]
+    visited = set()
+    while pending:
+        image, inherited = pending.pop()
+        if image in visited:
+            continue
+        visited.add(image)
+        paths, dependencies = image_linkage(image, bundle)
+        # An embedded image inherits the runpaths of the images that loaded it.
+        paths.extend(inherited)
+        for relative in dependencies:
+            expected = frameworks / relative
+            if relative == Path(f"{executable.name}.debug.dylib"):
+                expected = bundle / relative
+            elif not expected.is_file() and not relative.parts[0].startswith("WalletSDK"):
+                continue
+            resolved = next((path / relative for path in paths if (path / relative).is_file()), None)
+            if resolved != expected:
+                raise SystemExit(f"{bundle.name}: {image.name} cannot resolve @rpath/{relative} to {expected}")
+            pending.append((resolved, paths))
+    return visited
 
 
 def defines_wallet_core(image):
@@ -45,29 +66,29 @@ def main():
     parser.add_argument("app", type=Path)
     parser.add_argument("extension", type=Path)
     args = parser.parse_args()
-    frameworks = args.app / "Frameworks"
-    if any((args.extension / "Frameworks").glob("WalletSDK*.framework")):
-        raise SystemExit(f"{args.extension.name} embeds a second copy of a wallet framework")
-    # Xcode may put the implementation in WalletSDK.framework when an adapter also uses it.
-    runtime = Path("WalletSDK.framework/WalletSDK")
-    if not (frameworks / runtime).is_file():
-        runtime = Path("WalletSDKShared.framework/WalletSDKShared")
-    runtime_image = frameworks / runtime
-    consumer_images = set()
-    for bundle in (args.app, args.extension):
-        dependencies = wallet_runtime(bundle, frameworks)
-        if runtime not in dependencies:
-            raise SystemExit(f"{bundle.name} does not load the shared runtime {runtime}")
-        consumer_images.update(executable_images(bundle))
-        consumer_images.update(frameworks / path for path in dependencies)
-    for test_bundle in (args.app / "PlugIns").glob("*.xctest"):
-        consumer_images.update(executable_images(test_bundle))
-    if not defines_wallet_core(runtime_image):
-        raise SystemExit(f"{runtime_image} does not contain WalletCore")
-    for image in sorted(consumer_images - {runtime_image}):
-        if defines_wallet_core(image):
-            raise SystemExit(f"{image} links a second copy of WalletCore alongside {runtime}")
-    print(f"{args.app.name} and {args.extension.name} load {runtime}")
+    app = args.app.resolve()
+    extension = args.extension.resolve()
+    frameworks = app / "Frameworks"
+    if app not in extension.parents:
+        raise SystemExit(f"{extension} is outside {app}")
+    if any((extension / "Frameworks").glob("WalletSDK*.framework")):
+        raise SystemExit(f"{extension.name} embeds a second copy of a wallet framework")
+    app_images = loaded_images(app, frameworks)
+    extension_images = loaded_images(extension, frameworks)
+    consumer_images = app_images | extension_images
+    consumer_images.update(bundle_executable(framework) for framework in frameworks.glob("WalletSDK*.framework"))
+    for test_bundle in (app / "PlugIns").glob("*.xctest"):
+        test = bundle_executable(test_bundle)
+        consumer_images.add(test)
+        consumer_images.update(test_bundle.glob(f"{test.name}.debug.dylib"))
+    owners = sorted(image for image in consumer_images if defines_wallet_core(image))
+    if len(owners) != 1:
+        names = ", ".join(str(image.relative_to(app)) for image in owners) or "none"
+        raise SystemExit(f"Expected one image defining WalletCore in {app.name}, found {names}")
+    runtime = owners[0]
+    if runtime.parent.parent != frameworks or runtime not in app_images & extension_images:
+        raise SystemExit(f"{app.name} and {extension.name} must both load {runtime} from {frameworks}")
+    print(f"{app.name} and {extension.name} load {runtime.relative_to(frameworks)}")
 
 
 if __name__ == "__main__":
