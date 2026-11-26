@@ -51,7 +51,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * retains the consent state. [submit] verifies that the post-consent request is the one consented to,
  * builds the selected documents, and HPKE-encrypts the `DeviceResponse`.
  */
-internal class MobileWalletAnnexCEngine(
+internal class AnnexCPresentationEngine(
     private val wallet: Wallet,
     private val readerTrustEvaluator: ReaderTrustEvaluator,
     private val registryRecords: suspend () -> List<RegistryEntry>,

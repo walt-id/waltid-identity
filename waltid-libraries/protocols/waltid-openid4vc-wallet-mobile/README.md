@@ -1,7 +1,7 @@
 <div align="center">
 <h1>walt.id OpenID4VC Wallet Mobile</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Mobile facade for Android and iOS wallet SDK integrations.</p>
+ <p>Kotlin wallet SDK for Android and iOS.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -20,7 +20,7 @@
 
 ## Overview
 
-Mobile facade for the walt.id wallet SDK. This module exposes the Android/iOS-facing wallet API used by the native demo apps while delegating protocol behavior to [waltid-openid4vc-wallet](../waltid-openid4vc-wallet/README.md) and persistence to [waltid-openid4vc-wallet-persistence-mobile](../waltid-openid4vc-wallet-persistence-mobile/README.md).
+Android and iOS apps use this Kotlin API to open a wallet, receive credentials and share them with a verifier. The SDK delegates protocol behavior to [waltid-openid4vc-wallet](../waltid-openid4vc-wallet/README.md) and persistence to [waltid-openid4vc-wallet-persistence-mobile](../waltid-openid4vc-wallet-persistence-mobile/README.md).
 
 Native iOS apps should consume the Swift [WalletSDK](../waltid-wallet-sdk-ios/README.md) package, which wraps this KMP module behind Swift-owned types, `async`/`await`, and DocC documentation.
 
@@ -28,8 +28,8 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 ## Package map
 
-Open [WalletFactory](src/commonMain/kotlin/id/walt/wallet2/mobile/WalletFactory.kt)
-with a [WalletConfiguration](src/commonMain/kotlin/id/walt/wallet2/mobile/WalletConfiguration.kt).
+Call `open()` on [WalletFactory](src/commonMain/kotlin/id/walt/wallet2/mobile/WalletFactory.kt).
+Pass a [WalletConfiguration](src/commonMain/kotlin/id/walt/wallet2/mobile/WalletConfiguration.kt) to customize it.
 The returned [Wallet](src/commonMain/kotlin/id/walt/wallet2/mobile/Wallet.kt) owns the
 session and its lifecycle. Import feature types from these packages under `id.walt.wallet2.mobile`.
 
@@ -39,7 +39,7 @@ session and its lifecycle. Import feature types from these packages under `id.wa
 | [credentials](src/commonMain/kotlin/id/walt/wallet2/mobile/credentials) | Stored credentials, status reads and local persistence settings |
 | [issuance](src/commonMain/kotlin/id/walt/wallet2/mobile/issuance) | Offers, holder bindings, accepted credentials and attestation settings |
 | [presentation](src/commonMain/kotlin/id/walt/wallet2/mobile/presentation) | Verifier requests, disclosure choices, consent and response delivery |
-| [proximity](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity) | Nearby transport, reader trust, approval and session state |
+| [proximity](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity) | Nearby transport, approval and session state |
 | [proximity.trust](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity/trust) | Reader trust, revocation policies and saved trust settings |
 | [digitalcredentials](src/commonMain/kotlin/id/walt/wallet2/mobile/digitalcredentials) | OS registration, digital credential requests and Annex C responses |
 

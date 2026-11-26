@@ -231,7 +231,7 @@ class WalletSdkBridgeTest {
                         assertEquals("https://issuer.example", expectedCredentialIssuer)
                     }
                 },
-            ).toMobileWalletConfig()
+            ).toWalletConfiguration()
 
             val signer = requireNotNull(configured.issuance.metadataTrustResolver).verify(
                 "signed-metadata-jwt",
@@ -335,7 +335,7 @@ class WalletSdkBridgeTest {
 
     @Test
     @OptIn(ExperimentalSerializationApi::class)
-    fun factoryMapsSwiftFriendlyConfigurationToMobileWalletConfig() = runTest {
+    fun factoryMapsSwiftFriendlyConfigurationToWalletConfiguration() = runTest {
         var capturedConfig: WalletConfiguration? = null
         val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
             capturedConfig = config
@@ -407,7 +407,7 @@ class WalletSdkBridgeTest {
     }
 
     @Test
-    fun factoryMapsProvidedDatabaseKeyProviderToMobileWalletConfig() = runTest {
+    fun factoryMapsProvidedDatabaseKeyProviderToWalletConfiguration() = runTest {
         var capturedConfig: WalletConfiguration? = null
         val bridgeKeyProvider = RecordingBridgeDatabaseKeyProvider(
             WalletBridgeDatabaseEncryptionKey(
@@ -441,7 +441,7 @@ class WalletSdkBridgeTest {
     }
 
     @Test
-    fun factoryMapsSwiftCredentialStoreOverrideToMobileWalletConfig() = runTest {
+    fun factoryMapsSwiftCredentialStoreOverrideToWalletConfiguration() = runTest {
         var capturedConfig: WalletConfiguration? = null
         val bridgeCredentialStore = RecordingBridgeCredentialStore()
         val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
@@ -509,7 +509,7 @@ class WalletSdkBridgeTest {
     }
 
     @Test
-    fun factoryMapsSwiftDidStoreOverrideToMobileWalletConfig() = runTest {
+    fun factoryMapsSwiftDidStoreOverrideToWalletConfiguration() = runTest {
         var capturedConfig: WalletConfiguration? = null
         val bridgeDidStore = RecordingBridgeDidStore(
             WalletBridgeStoredDid(
@@ -587,7 +587,7 @@ class WalletSdkBridgeTest {
 
     @Test
     fun factoryUsesStableSwiftSdkDefaults() {
-        val config = WalletBridgeConfiguration().toMobileWalletConfig()
+        val config = WalletBridgeConfiguration().toWalletConfiguration()
 
         assertEquals("default", config.walletId)
         assertEquals(null, config.issuance.attestation)
@@ -656,7 +656,7 @@ class WalletSdkBridgeTest {
     }
 
     @Test
-    fun bridgeExposesCommonMobileWalletEvents() = runTest {
+    fun bridgeExposesCommonWalletEvents() = runTest {
         val events = MutableSharedFlow<WalletEvent>(replay = 1)
         val bridge = WalletSdkBridge.forOperations(
             operations = FakeWalletSdkBridgeOperations(),

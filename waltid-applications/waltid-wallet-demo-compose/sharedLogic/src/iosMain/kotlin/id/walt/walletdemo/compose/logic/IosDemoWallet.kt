@@ -33,7 +33,7 @@ fun createIosDemoWallet(
 
     return LazyProximityDemoWallet {
         val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
-        MobileDemoWallet(
+        SdkDemoWallet(
             WalletFactory(nfcHostPlatformAdapter).open(
                 WalletConfiguration(
                     walletId = config.walletId,

@@ -9,8 +9,8 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.mobile.MobileWalletStoreAdapter
-import id.walt.wallet2.mobile.MobileWalletStoreOwner
+import id.walt.wallet2.mobile.WalletStoreAdapter
+import id.walt.wallet2.mobile.WalletStoreOwner
 import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
 import id.walt.wallet2.mobile.credentials.WalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
@@ -163,15 +163,15 @@ public interface WalletBridgeDidStore {
     public suspend fun removeDid(did: String): Boolean
 }
 
-internal fun WalletBridgePersistence.toMobileWalletPersistence(
+internal fun WalletBridgePersistence.toWalletPersistence(
     databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
 ): WalletPersistence = WalletPersistence(
-    databaseKey = databaseKey.toMobileWalletDatabaseKey(databaseKeyProvider),
+    databaseKey = databaseKey.toWalletDatabaseKey(databaseKeyProvider),
     credentialStore = credentialStore?.let(::BridgeCredentialStore),
     didStore = didStore?.let(::BridgeDidStore),
 )
 
-private fun WalletBridgeDatabaseKeyConfiguration.toMobileWalletDatabaseKey(
+private fun WalletBridgeDatabaseKeyConfiguration.toWalletDatabaseKey(
     databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
 ): WalletDatabaseKey = when (this) {
     WalletBridgeDatabaseKeyConfiguration.Managed ->
@@ -204,8 +204,8 @@ private class BridgeDatabaseEncryptionKeyProvider(
 
 private class BridgeCredentialStore(
     private val bridgeStore: WalletBridgeCredentialStore,
-) : WalletCredentialStore, MobileWalletStoreAdapter {
-    override val storeOwner = MobileWalletStoreOwner(bridgeStore, (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwnerId)
+) : WalletCredentialStore, WalletStoreAdapter {
+    override val storeOwner = WalletStoreOwner(bridgeStore, (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwnerId)
 
     override suspend fun getCredential(id: String): StoredCredential? =
         bridgeStore.getCredential(id)?.toStoredCredential()
@@ -223,8 +223,8 @@ private class BridgeCredentialStore(
 
 private class BridgeDidStore(
     private val bridgeStore: WalletBridgeDidStore,
-) : WalletDidStore, MobileWalletStoreAdapter {
-    override val storeOwner = MobileWalletStoreOwner(bridgeStore, (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwnerId)
+) : WalletDidStore, WalletStoreAdapter {
+    override val storeOwner = WalletStoreOwner(bridgeStore, (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwnerId)
 
     override suspend fun getDid(did: String): WalletDidEntry? =
         bridgeStore.getDid(did)?.toWalletDidEntry()

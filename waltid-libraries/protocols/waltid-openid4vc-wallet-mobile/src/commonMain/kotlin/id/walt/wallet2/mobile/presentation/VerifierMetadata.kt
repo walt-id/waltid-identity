@@ -78,7 +78,7 @@ public sealed interface PresentationResponseEncryption {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-internal fun ClientMetadata.toMobileVerifierMetadata(
+internal fun ClientMetadata.toVerifierMetadata(
     preferredLocales: List<String>,
 ): VerifierMetadata {
     val name = selectLocalizedValue(clientName, clientNameI18n, preferredLocales)
@@ -100,7 +100,7 @@ internal fun ClientMetadata.toMobileVerifierMetadata(
     )
 }
 
-internal fun ResponseEncryption.Metadata?.toMobileResponseEncryption(): PresentationResponseEncryption =
+internal fun ResponseEncryption.Metadata?.toPresentationResponseEncryption(): PresentationResponseEncryption =
     this?.let {
         PresentationResponseEncryption.Required(
             keyManagementAlgorithm = keyManagementAlgorithm,

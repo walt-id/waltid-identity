@@ -5,7 +5,7 @@ import id.walt.crypto2.keys.EdwardsCurve
 import id.walt.crypto2.keys.KeySpec
 
 /**
- * Key algorithms supported by the mobile wallet bootstrap flow.
+ * Key algorithms supported when creating the wallet’s signing identity.
  */
 public enum class WalletKeyType {
     /** Ed25519 signing key. */

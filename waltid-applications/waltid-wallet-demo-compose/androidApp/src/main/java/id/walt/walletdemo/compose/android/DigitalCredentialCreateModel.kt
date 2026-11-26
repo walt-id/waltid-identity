@@ -25,7 +25,7 @@ internal class DigitalCredentialCreateModel(
     client: DigitalCredentialCreateClient? = null,
 ) : DigitalCredentialActivityModel() {
     private val context = context.applicationContext
-    private val client = client ?: MobileDigitalCredentialCreateClient(context, ::interactionActivity)
+    private val client = client ?: WalletDigitalCredentialCreateClient(context, ::interactionActivity)
     private var session: WalletDemoIssuanceSession? = null
     private var holder: WalletDemoHolderBinding? = null
     private var protocol: String? = null

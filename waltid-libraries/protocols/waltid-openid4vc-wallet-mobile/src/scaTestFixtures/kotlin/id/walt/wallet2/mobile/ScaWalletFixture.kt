@@ -127,7 +127,7 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
         }) })
     }
     val backingStore = InMemoryKeyStore().also { it.addCrypto2Key(key) }
-    val keys = object : MobileWalletKeyStore, WalletKeyStore by backingStore {
+    val keys = object : PolicyAwareWalletKeyStore, WalletKeyStore by backingStore {
         override suspend fun keyUseAuthorizationPolicy(keyId: String): KeyUseAuthorizationPolicy? =
             (backingStore.getKeyMaterial(keyId)?.crypto2Key as? ManagedKey)?.let {
                 provider.keyUseAuthorizationPolicy(it.storedKey)

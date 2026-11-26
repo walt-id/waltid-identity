@@ -42,10 +42,6 @@ abstract interface id.walt.wallet2.persistence.encryption/DatabaseEncryptionKeyP
     abstract suspend fun getOrCreateKey(kotlin/String, kotlin/String): id.walt.wallet2.persistence.encryption/DatabaseEncryptionKey // id.walt.wallet2.persistence.encryption/DatabaseEncryptionKeyProvider.getOrCreateKey|getOrCreateKey(kotlin.String;kotlin.String){}[0]
 }
 
-abstract interface id.walt.wallet2.persistence.keys/MobileWalletKeyStore : id.walt.wallet2.data/WalletKeyStore { // id.walt.wallet2.persistence.keys/MobileWalletKeyStore|null[0]
-    abstract suspend fun keyUseAuthorizationPolicy(kotlin/String): id.walt.crypto2.keys/KeyUseAuthorizationPolicy? // id.walt.wallet2.persistence.keys/MobileWalletKeyStore.keyUseAuthorizationPolicy|keyUseAuthorizationPolicy(kotlin.String){}[0]
-}
-
 abstract interface id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider { // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider|null[0]
     abstract fun keyUseAuthorizationPolicy(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/KeyUseAuthorizationPolicy // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.keyUseAuthorizationPolicy|keyUseAuthorizationPolicy(id.walt.crypto2.keys.StoredKey.Managed){}[0]
     abstract suspend fun deleteManagedKey(id.walt.crypto2.keys/StoredKey.Managed) // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.deleteManagedKey|deleteManagedKey(id.walt.crypto2.keys.StoredKey.Managed){}[0]
@@ -57,6 +53,10 @@ abstract interface id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider {
     open suspend fun deleteUncommittedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest, kotlin/Boolean) // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.deleteUncommittedKey|deleteUncommittedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest;kotlin.Boolean){}[0]
     open suspend fun importManagedKey(id.walt.wallet2.persistence.keys/WalletKeyCreationRequest, id.walt.crypto2.keys/EncodedKey.Jwk): id.walt.crypto2.keys/ManagedKey // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.importManagedKey|importManagedKey(id.walt.wallet2.persistence.keys.WalletKeyCreationRequest;id.walt.crypto2.keys.EncodedKey.Jwk){}[0]
     open suspend fun keyFacts(id.walt.crypto2.keys/StoredKey.Managed): id.walt.crypto2.keys/PlatformKeyFacts // id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider.keyFacts|keyFacts(id.walt.crypto2.keys.StoredKey.Managed){}[0]
+}
+
+abstract interface id.walt.wallet2.persistence.keys/PolicyAwareWalletKeyStore : id.walt.wallet2.data/WalletKeyStore { // id.walt.wallet2.persistence.keys/PolicyAwareWalletKeyStore|null[0]
+    abstract suspend fun keyUseAuthorizationPolicy(kotlin/String): id.walt.crypto2.keys/KeyUseAuthorizationPolicy? // id.walt.wallet2.persistence.keys/PolicyAwareWalletKeyStore.keyUseAuthorizationPolicy|keyUseAuthorizationPolicy(kotlin.String){}[0]
 }
 
 sealed interface id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration { // id.walt.wallet2.persistence.keys/PlatformManagedKeyRestoration|null[0]
@@ -598,7 +598,7 @@ final class id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore : 
     final suspend fun remove(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightIssuanceSessionStore.remove|remove(kotlin.String){}[0]
 }
 
-final class id.walt.wallet2.persistence.stores/SqlDelightKeyStore : id.walt.wallet2.persistence.keys/MobileWalletKeyStore { // id.walt.wallet2.persistence.stores/SqlDelightKeyStore|null[0]
+final class id.walt.wallet2.persistence.stores/SqlDelightKeyStore : id.walt.wallet2.persistence.keys/PolicyAwareWalletKeyStore { // id.walt.wallet2.persistence.stores/SqlDelightKeyStore|null[0]
     constructor <init>(id.walt.wallet2.persistence.keys/PlatformManagedKeyProvider, id.walt.wallet2.persistence.db/WalletPersistenceQueries, kotlin/String = ...) // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.<init>|<init>(id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider;id.walt.wallet2.persistence.db.WalletPersistenceQueries;kotlin.String){}[0]
 
     final fun storedKey(kotlin/String): id.walt.crypto2.keys/StoredKey? // id.walt.wallet2.persistence.stores/SqlDelightKeyStore.storedKey|storedKey(kotlin.String){}[0]

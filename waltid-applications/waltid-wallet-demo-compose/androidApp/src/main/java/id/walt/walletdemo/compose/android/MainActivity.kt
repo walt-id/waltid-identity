@@ -19,9 +19,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.logic.WalletAuthState
-import id.walt.walletdemo.compose.ui.MobileWalletDemoApp
-import kotlinx.coroutines.launch
+import id.walt.walletdemo.compose.ui.WalletDemoHost
 
 const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
     "id.walt.walletdemo.compose.android.WALLET_SIGNING_PROTECTION_MODE"
@@ -77,7 +75,7 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
+            WalletDemoHost(controller, proximityController, readerTrustSettingsController)
         }
     }
 

@@ -148,13 +148,13 @@ internal fun WalletBridgeClientIdTrustConfiguration.toClientIdTrustConfiguration
         },
     )
 
-internal fun WalletBridgeConfiguration.toMobileWalletConfig(): WalletConfiguration {
+internal fun WalletBridgeConfiguration.toWalletConfiguration(): WalletConfiguration {
     require((appGroupIdentifier == null) == (keychainAccessGroup == null)) {
         "App Group and Keychain access group must be configured together"
     }
     return WalletConfiguration(
         walletId = walletId,
-        persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
+        persistence = persistence.toWalletPersistence(databaseKeyProvider),
         keyAuthorization = WalletKeyAuthorization(
             policy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
             prompt = keyUseAuthorizationPrompt,

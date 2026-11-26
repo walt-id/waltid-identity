@@ -32,7 +32,7 @@ public data class WalletCredential(
     public val metadataJson: String? = null,
 )
 
-internal fun StoredCredential.toMobileWalletCredential(): WalletCredential {
+internal fun StoredCredential.toWalletCredential(): WalletCredential {
     val meta = toMetadata()
     return WalletCredential(id = meta.id, format = meta.format, issuer = meta.issuer,
         subject = meta.subject, label = meta.label, addedAt = meta.addedAt?.toString(),

@@ -32,7 +32,7 @@ internal interface DigitalCredentialCreateClient {
 }
 
 @OptIn(ExperimentalDigitalCredentialApi::class)
-internal class MobileDigitalCredentialCreateClient(
+internal class WalletDigitalCredentialCreateClient(
     private val context: Context,
     private val activity: () -> FragmentActivity?,
 ) : DigitalCredentialCreateClient {
@@ -43,7 +43,7 @@ internal class MobileDigitalCredentialCreateClient(
         val allowlist = context.assets.open("privileged_apps.json").bufferedReader().use { it.readText() }
         val input = AndroidDigitalCredentialCreateProvider.extract(intent, allowlist)
         val config = demoWalletConfig()
-        val created = createAndroidDemoMobileWallet(context, config, activity)
+        val created = openAndroidDemoWallet(context, config, activity)
         wallet = created.wallet
         currentCoroutineContext().ensureActive()
         val identity = created.bootstrap(config.selectedSigningProtection(context))
@@ -56,10 +56,10 @@ internal class MobileDigitalCredentialCreateClient(
 
     override suspend fun accept(id: String, code: String?, selections: List<WalletDemoCredentialSelection>) =
         (requireNotNull(wallet().resumeIssuance(IssuanceSessionId(id))) as IssuanceSession.PreAuthorized)
-            .accept(code, selections.toMobileSelections(), clientId = "eudiw-abca").toDemoIssuanceOutcome()
+            .accept(code, selections.toIssuanceSelections(), clientId = "eudiw-abca").toDemoIssuanceOutcome()
     override suspend fun authorize(id: String, selections: List<WalletDemoCredentialSelection>) =
         (requireNotNull(wallet().resumeIssuance(IssuanceSessionId(id))) as IssuanceSession.AuthorizationCode)
-            .beginAuthorization(IssuanceClientRegistration("eudiw-abca", DigitalCredentialCreateAuthHandoff.REDIRECT_URI), selections.toMobileSelections()).request
+            .beginAuthorization(IssuanceClientRegistration("eudiw-abca", DigitalCredentialCreateAuthHandoff.REDIRECT_URI), selections.toIssuanceSelections()).request
     override suspend fun continueAuthorization(id: String, callback: String) =
         wallet().completeAuthorization(IssuanceAuthorizationId(id), callback).toDemoIssuanceOutcome()
     override suspend fun cancel(id: String) { wallet().cancelIssuance(IssuanceSessionId(id)) }

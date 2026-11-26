@@ -16,7 +16,7 @@ public class WalletSdkBridgeFactory private constructor(
     /** Opens the platform wallet with the optional app-owned NFC host adapter. */
     public constructor(nfcHostPlatformAdapter: NfcHostPlatformAdapter? = null) : this({ config ->
         val wallet = WalletFactory(nfcHostPlatformAdapter).open(config)
-        WalletSdkBridgeDependencies(MobileWalletSdkBridgeOperations(wallet), wallet.events)
+        WalletSdkBridgeDependencies(DefaultWalletSdkBridgeOperations(wallet), wallet.events)
     })
 
     /**
@@ -26,7 +26,7 @@ public class WalletSdkBridgeFactory private constructor(
         configuration: WalletBridgeConfiguration = WalletBridgeConfiguration(),
     ): WalletBridgeResult<WalletSdkBridge> =
         walletBridgeCall {
-            val dependencies = createDependencies(configuration.toMobileWalletConfig())
+            val dependencies = createDependencies(configuration.toWalletConfiguration())
             WalletSdkBridge.forOperations(dependencies.operations, dependencies.eventFlow)
         }
 

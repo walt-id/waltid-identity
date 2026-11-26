@@ -32,7 +32,7 @@ public enum class WalletEventStatus {
 }
 
 /**
- * Observable mobile wallet session event.
+ * An event reported by the wallet session.
  *
  * [identifier] is the stable event name emitted by the underlying wallet flow.
  *
@@ -63,7 +63,7 @@ public enum class WalletEvent(
     PresentationFailed("presentation_failed", WalletEventPhase.Presentation, WalletEventStatus.Failed),
 }
 
-internal class MobileWalletEventStream(
+internal class WalletEventStream(
     replay: Int = 10,
     extraBufferCapacity: Int = 32,
 ) {
@@ -78,7 +78,7 @@ internal class MobileWalletEventStream(
     val events: Flow<WalletEvent> = mutableEvents.asSharedFlow()
 }
 
-internal fun WalletSessionEvent.toMobileWalletEvent(): WalletEvent =
+internal fun WalletSessionEvent.toWalletEvent(): WalletEvent =
     when (this) {
         WalletSessionEvent.issuance_offer_resolved -> WalletEvent.IssuanceOfferResolved
         WalletSessionEvent.issuance_attestation_obtained -> WalletEvent.IssuanceAttestationObtained

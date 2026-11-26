@@ -85,7 +85,7 @@ not bind submission to a protocol revision. Request expiry, wallet ownership, ca
 consumption follow the existing preview session. Prepare claim review and payment consent sequentially
 for the same choices; they share the preview's exclusive lease. Review never extends its lifetime.
 
-The mobile facade exposes string-based claim JSON and typed path JSON via `reviewPresentation` and
+The wallet SDK exposes string-based claim JSON and typed path JSON via `reviewPresentation` and
 `reviewDigitalCredentialPresentation`. Submit through the existing `submitPresentation` or
 `submitDigitalCredentialPresentation` methods. Payment consent retains its separate revision checks.
 The stateless HTTP preview contract is unchanged. A reliable projection must be available for the

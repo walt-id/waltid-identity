@@ -28,7 +28,7 @@ import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.mobile.MobileWalletLifecycle
+import id.walt.wallet2.mobile.WalletLifecycle
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
@@ -65,7 +65,7 @@ public class SigningIdentityManager internal constructor(
     queries: WalletPersistenceQueries,
     private val didService: Crypto2DidService,
     private val onActive: suspend () -> Unit,
-    private val lifecycle: MobileWalletLifecycle = MobileWalletLifecycle(),
+    private val lifecycle: WalletLifecycle = WalletLifecycle(),
 ) {
     /** Offers only complete choices compatible with the host policy and current native/provider prerequisites. */
     public suspend fun creationOptions(intent: SigningIdentityIntent = SigningIdentityIntent.WithoutRecovery,
@@ -120,7 +120,7 @@ public class SigningIdentityManager internal constructor(
         journal.reserve(preparing)
         try {
             val key = createKey(preparing, material)
-            MobileDidSupport.ensureInitialized()
+            WalletDidSupport.ensureInitialized()
             val registered = didService.registerByKey("jwk", key, DidJwkCreateOptions())
             val publicJwk = publicJwk(key)
             val recovery = material?.let { RecoveryRecord(
@@ -598,7 +598,7 @@ public class SigningIdentityManager internal constructor(
         if (!did.startsWith("did:jwk:") && !did.startsWith("did:key:")) return false
         requirePublicJwk(publicJwk)
         if (did.startsWith("did:jwk:")) requirePublicJwk(recoveryBase64.decode(did.removePrefix("did:jwk:")).decodeToString())
-        MobileDidSupport.ensureInitialized()
+        WalletDidSupport.ensureInitialized()
         val expected = EncodedKey.Jwk(BinaryData(publicJwk.encodeToByteArray()), false).toSpkiDer(spec)
         return didService.resolveToKeys(did).getOrThrow().any { key ->
             key.capabilities.publicKeyExporter?.exportPublicKey()?.toSpkiDer(key.spec) == expected
