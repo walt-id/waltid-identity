@@ -32,10 +32,10 @@ protocol WalletClient {
     func credentials() async throws -> [Credential]
     func listDeferredIssuance() async throws -> [DeferredCredential]
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
-    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
-    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
+    func beginAuthorizationIssuance(sessionID: AuthorizationIssuanceID, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization
+    func continuePreAuthorizedIssuance(sessionID: PreAuthorizedIssuanceID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
+    func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome
+    func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome
     func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
     func preparePaymentConsent(
@@ -108,6 +108,10 @@ extension WalletClient {
 }
 
 final class SDKWalletClient: WalletClient {
+    init(configuration: WalletConfiguration) {
+        self.configuration = configuration
+    }
+
     func submit(_ review: PresentationReview) async throws -> PresentationResult { try await wallet().submitPresentation(review) }
 
     var supportsClaimReview: Bool { true }
@@ -160,10 +164,23 @@ final class SDKWalletClient: WalletClient {
 
     func listDeferredIssuance() async throws -> [DeferredCredential] { try await wallet().listDeferredIssuance() }
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession { try await wallet().startIssuance(request) }
-    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization { try await wallet().beginAuthorization(.init(rawValue: sessionID), registration: .init(clientID: "eudiw-abca", redirectURI: URL(string: "openid://")!), credentials: credentials).request }
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome { try await wallet().accept(.init(rawValue: sessionID), transactionCode: transactionCode, credentials: credentials, clientID: "eudiw-abca") }
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome { try await wallet().continueAuthorizationIssuance(sessionID: .init(rawValue: sessionID), callbackURI: callbackURI) }
-    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { try await wallet().cancelIssuance(sessionID: .init(rawValue: sessionID)) }
+    func beginAuthorizationIssuance(sessionID: AuthorizationIssuanceID, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+        let registration = IssuanceClientRegistration(clientID: "eudiw-abca", redirectURI: URL(string: "openid://")!)
+        return try await wallet().beginAuthorization(sessionID, registration: registration, credentials: credentials).request
+    }
+
+    func continuePreAuthorizedIssuance(sessionID: PreAuthorizedIssuanceID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+        try await wallet().accept(sessionID, transactionCode: transactionCode, credentials: credentials, clientID: "eudiw-abca")
+    }
+
+    func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome {
+        try await wallet().continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI)
+    }
+
+    func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome {
+        try await wallet().cancelIssuance(sessionID: sessionID)
+    }
+
     func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome { try await wallet().resumeDeferredIssuance(continuation) }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
@@ -186,6 +203,9 @@ final class SDKWalletClient: WalletClient {
         try await wallet().deleteLocalData()
         cachedWallet = nil
     }
+
+    private let configuration: WalletConfiguration
+    private var cachedWallet: Wallet?
 
     private func wallet() async throws -> Wallet {
         if let cachedWallet {

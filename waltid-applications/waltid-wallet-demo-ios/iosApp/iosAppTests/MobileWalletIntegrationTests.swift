@@ -161,7 +161,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
         transactionCode: String? = nil
     ) async throws -> [String] {
         let session = try await startIssuance(wallet: wallet, offerURL: offerURL)
-        let outcome = try await wallet.accept(.init(rawValue: session.id.rawValue), transactionCode: transactionCode, clientID: "eudiw-abca")
+        guard case .preAuthorized(let grantID) = session.grant else {
+            throw WalletError.invalidInput("Unexpected grant for this test offer")
+        }
+        let outcome = try await wallet.accept(grantID, transactionCode: transactionCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
@@ -383,7 +386,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
             !$0.configurationID.isEmpty && !$0.format.isEmpty
         })
         XCTAssertNotNil(session.offer.transactionCode, "EUDI offer should require a transaction code")
-        let outcome = try await wallet.accept(.init(rawValue: session.id.rawValue), transactionCode: offer.txCode, clientID: "eudiw-abca")
+        guard case .preAuthorized(let grantID) = session.grant else {
+            throw WalletError.invalidInput("Unexpected grant for this test offer")
+        }
+        let outcome = try await wallet.accept(grantID, transactionCode: offer.txCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
@@ -446,7 +452,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertNotNil(issuerProvenance.keyID)
         XCTAssertEqual(.trustedIssuer, issuerProvenance.trustType)
 
-        let outcome = try await wallet.accept(.init(rawValue: issuanceSession.id.rawValue), transactionCode: offer.txCode, clientID: "eudiw-abca")
+        guard case .preAuthorized(let grantID) = issuanceSession.grant else {
+            throw WalletError.invalidInput("Unexpected grant for this test offer")
+        }
+        let outcome = try await wallet.accept(grantID, transactionCode: offer.txCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
@@ -471,11 +480,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertNotNil(keyID)
         XCTAssertEqual(.preRegistered, clientIDScheme)
 
-        let result = try await wallet.submitPresentation(try await wallet.reviewPresentation(
+        let review = try await wallet.reviewPresentation(
             previewHandle: preview.previewHandle,
             selection: .init(credentials: preview.credentialOptions.map(\.selection)),
             did: bootstrap.did
-        ))
+        )
+        let result = try await wallet.submitPresentation(review)
         assertTransmittedSuccess(result, "Signed public demo presentation should succeed")
         try await DemoBackend.shared.waitForVerifierSuccess(
             sessionID: signedSession.sessionID,
@@ -638,11 +648,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
             return XCTFail("Expected a presentation preview for the issued credential")
         }
         let selection = try XCTUnwrap(preview.credentialOptions.first { credentialIDs.contains($0.credentialID) }).selection
-        let presentResult = try await wallet2.submitPresentation(
+        let review = try await wallet2.reviewPresentation(
             previewHandle: preview.previewHandle,
             selection: .init(credentials: [selection]),
             did: did
         )
+        let presentResult = try await wallet2.submitPresentation(review)
 
         assertTransmittedSuccess(
             presentResult,
@@ -679,11 +690,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
             return XCTFail("Expected a presentation preview for the issued credential")
         }
         let selection = try XCTUnwrap(preview.credentialOptions.first { credentialIDs.contains($0.credentialID) }).selection
-        let result = try await wallet.submitPresentation(try await wallet.reviewPresentation(
+        let review = try await wallet.reviewPresentation(
             previewHandle: preview.previewHandle,
             selection: .init(credentials: [selection]),
             did: bootstrapResult.did
-        ))
+        )
+        let result = try await wallet.submitPresentation(review)
         assertTransmittedSuccess(
             result,
             "EUDI presentation should succeed for \(credentialID). Credentials: \(credentials), Result: \(result)"
@@ -726,11 +738,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
             return XCTFail("EUDI verifier should request an encrypted response: \(preview)")
         }
 
-        let result = try await wallet.submitPresentation(try await wallet.reviewPresentation(
+        let review = try await wallet.reviewPresentation(
             previewHandle: preview.previewHandle,
             selection: .init(credentials: preview.credentialOptions.map(\.selection)),
             did: bootstrapResult.did
-        ))
+        )
+        let result = try await wallet.submitPresentation(review)
         assertTransmittedSuccess(
             result,
             "EUDI stepwise presentation should succeed for \(credentialID). Preview: \(preview), Result: \(result)"
@@ -771,11 +784,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
             "Preview should only offer credentials received in this test. Received: \(credentialIDs), Preview: \(preview)"
         )
 
-        let result = try await wallet.submitPresentation(try await wallet.reviewPresentation(
+        let review = try await wallet.reviewPresentation(
             previewHandle: preview.previewHandle,
             selection: .init(credentials: preview.credentialOptions.map(\.selection)),
             did: did
-        ))
+        )
+        let result = try await wallet.submitPresentation(review)
 
         assertTransmittedSuccess(
             result,
@@ -882,11 +896,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
             return XCTFail("Expected a presentation preview for the issued credential")
         }
         let selection = try XCTUnwrap(preview.credentialOptions.first { credentialIDs.contains($0.credentialID) }).selection
-        let presentResult = try await wallet.submitPresentation(try await wallet.reviewPresentation(
+        let review = try await wallet.reviewPresentation(
             previewHandle: preview.previewHandle,
             selection: .init(credentials: [selection]),
             did: did
-        ))
+        )
+        let presentResult = try await wallet.submitPresentation(review)
 
         assertTransmittedSuccess(
             presentResult,

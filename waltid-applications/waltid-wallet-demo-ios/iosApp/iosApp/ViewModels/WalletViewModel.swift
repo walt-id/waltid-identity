@@ -1283,7 +1283,7 @@ class WalletViewModel: ObservableObject {
                 newSession = session
                 try Task.checkCancellation()
                 guard isCurrent(request) else {
-                    _ = try? await walletClient.cancelIssuance(sessionID: session.id.rawValue)
+                    _ = try? await walletClient.cancelIssuance(sessionID: session.id)
                     return
                 }
                 issuanceSession = session
@@ -1298,12 +1298,12 @@ class WalletViewModel: ObservableObject {
                 }
             } catch is CancellationError {
                 if let newSession {
-                    _ = try? await walletClient.cancelIssuance(sessionID: newSession.id.rawValue)
+                    _ = try? await walletClient.cancelIssuance(sessionID: newSession.id)
                 }
                 return
             } catch {
                 if let newSession {
-                    _ = try? await walletClient.cancelIssuance(sessionID: newSession.id.rawValue)
+                    _ = try? await walletClient.cancelIssuance(sessionID: newSession.id)
                 }
                 if isCurrent(request) {
                     setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
@@ -1348,19 +1348,19 @@ class WalletViewModel: ObservableObject {
                 let selections = try issuanceSelections(session.offer)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
-                switch session.offer.grant {
-                case .preAuthorizedCode:
+                switch session.grant {
+                case .preAuthorized(let grantID):
                     try await completeIssuanceOutcome(
                         try await walletClient.continuePreAuthorizedIssuance(
-                            sessionID: session.id.rawValue,
+                            sessionID: grantID,
                             transactionCode: trimmedTxCode,
                             credentials: selections
                         ),
                         previousCredentials: previousCredentials,
                         request: request
                     )
-                case .authorizationCode:
-                    let authorization = try await walletClient.beginAuthorizationIssuance(sessionID: session.id.rawValue, credentials: selections)
+                case .authorizationCode(let grantID):
+                    let authorization = try await walletClient.beginAuthorizationIssuance(sessionID: grantID, credentials: selections)
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
                     authorizationRequestURL = authorization.url
@@ -1378,7 +1378,7 @@ class WalletViewModel: ObservableObject {
 
     func declineOffer() {
         receiveTask?.cancel()
-        let sessionID = issuanceSession?.id.rawValue
+        let sessionID = issuanceSession?.id
         issuanceSession = nil
         offerPreview = nil
         authorizationRequestURL = nil
@@ -1408,8 +1408,8 @@ class WalletViewModel: ObservableObject {
             return
         }
         guard let session = issuanceSession,
-              let preview = offerPreview,
-              preview.grant == .authorizationCode else { return }
+              offerPreview != nil,
+              case .authorizationCode(let grantID) = session.grant else { return }
         let request = ReceiveRequest(
             offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines),
             navigationResetKey: receiveNavigationResetKey
@@ -1420,7 +1420,7 @@ class WalletViewModel: ObservableObject {
             do {
                 try await completeIssuanceOutcome(
                     try await walletClient.continueAuthorizationIssuance(
-                        sessionID: session.id.rawValue,
+                        sessionID: grantID,
                         callbackURI: callbackURI
                     ),
                     previousCredentials: previousCredentials,
@@ -2023,7 +2023,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private func cancelIssuanceIfPresent() {
-        guard let sessionID = issuanceSession?.id.rawValue else { return }
+        guard let sessionID = issuanceSession?.id else { return }
         issuanceSession = nil
         authorizationRequestURL = nil
         Task { try? await walletClient.cancelIssuance(sessionID: sessionID) }
