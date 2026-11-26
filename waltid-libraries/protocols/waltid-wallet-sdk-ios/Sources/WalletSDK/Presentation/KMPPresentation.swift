@@ -226,20 +226,19 @@ private extension MobileWalletClientIdScheme {
 
 private extension MobileWalletResponseEncryption {
     func toSwiftResponseEncryption() throws -> PresentationResponseEncryption {
-        guard isRequired else { return .notRequired }
-        guard let keyManagementAlgorithm,
-              let contentEncryptionAlgorithm,
-              let verifierKeyThumbprint else {
-            throw WalletError.internalFailure("Required response encryption is missing selected metadata")
+        switch self {
+        case is WalletCore.MobileWalletResponseEncryptionNotRequired:
+            return .notRequired
+        case let encryption as WalletCore.MobileWalletResponseEncryptionRequired:
+            return .required(ResponseEncryptionDetails(
+                keyManagementAlgorithm: encryption.keyManagementAlgorithm,
+                contentEncryptionAlgorithm: encryption.contentEncryptionAlgorithm,
+                verifierKeyID: encryption.verifierKeyId,
+                verifierKeyThumbprint: encryption.verifierKeyThumbprint
+            ))
+        default:
+            throw WalletError.internalFailure("Unsupported presentation response encryption")
         }
-        return .required(
-            ResponseEncryptionDetails(
-                keyManagementAlgorithm: keyManagementAlgorithm,
-                contentEncryptionAlgorithm: contentEncryptionAlgorithm,
-                verifierKeyID: verifierKeyId,
-                verifierKeyThumbprint: verifierKeyThumbprint
-            )
-        )
     }
 }
 
