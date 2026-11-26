@@ -77,11 +77,14 @@ class IssuerCiConfigurationTest {
     fun signingCertificatesMatchKeysAndTheRunnerTrustAnchor() {
         val profiles = fixture("issuer2-profiles-ci.conf").getConfig("profiles")
         val factory = CertificateFactory.getInstance("X.509")
-        val root = requireNotNull(javaClass.getResource("/certs/issuer2-haip-root-ca.pem"))
+        fun readRoot(name: String) = requireNotNull(javaClass.getResource("/certs/$name"))
             .openStream().use { factory.generateCertificate(it) as X509Certificate }
+        val haipRoot = readRoot("issuer2-haip-root-ca.pem")
+        val demoMdlRoot = readRoot("issuer2-demo-mdl-root-ca.pem")
         profiles.root().keys.forEach { name ->
             val profile = profiles.getConfig(name)
-            if (profile.getString("credentialConfigurationId").removeSuffix(".attestation") == "identity_credential") {
+            val configurationId = profile.getString("credentialConfigurationId").removeSuffix(".attestation")
+            if (configurationId == "identity_credential") {
                 // Basic SD-JWT uses its DID; HAIP and mdoc use the certificate chains.
                 assertTrue(profile.getString("issuerDid").startsWith("did:jwk:"))
                 return@forEach
@@ -89,6 +92,7 @@ class IssuerCiConfigurationTest {
             val key = ECKey.parse(profile.getConfig("issuerKey.jwk").root().render(ConfigRenderOptions.concise()))
             val leaf = factory.generateCertificate(profile.getStringList("x5Chain").single().byteInputStream()) as X509Certificate
             assertContentEquals(key.toECPublicKey().encoded, leaf.publicKey.encoded, name)
+            val root = if (configurationId == "org.iso.18013.5.1.mDL") demoMdlRoot else haipRoot
             leaf.verify(root.publicKey)
             leaf.checkValidity()
         }

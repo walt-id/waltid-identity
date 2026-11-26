@@ -1,12 +1,16 @@
 package id.walt.issuer2.profile
 
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
+import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile
+import id.walt.certificate.x509.validation.X509SingleCertificateValidator
 import id.walt.commons.config.ConfigManager
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
+import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.testsupport.MetadataCertificateFixture
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
-import id.walt.issuer2.testsupport.loadIssuer2ConfigFiles
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningMethod
 import id.walt.openid4vci.metadata.issuer.signing.SignedMetadataConfig
 import java.io.ByteArrayInputStream
@@ -30,6 +34,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -131,29 +136,45 @@ class Issuer2CertificateFixtureTest {
     }
 
     @Test
-    fun `issuer2 certificate fixtures use purpose-specific AT leaves`() {
-        loadIssuer2ConfigFiles(baseUrlOverride = null)
-        val profilesConfig = ConfigManager.getConfig<Issuer2ProfilesConfig>()
-        val conformanceCertificateDir = conformanceCertificateDir()
-        val root = readCertificate(
-            Files.readString(conformanceCertificateDir.resolve("issuer2-haip-root-ca.pem")),
+    fun `issuer2 certificate fixtures use purpose-specific AT leaves`() = runTest {
+        clearIssuer2TestEnvironment()
+        registerIssuer2ConfigDecoders()
+
+        val repoRoot = repositoryRoot()
+        val runnerResources = repoRoot.resolve("waltid-services/waltid-openid4vp-conformance-runners/src/test/resources")
+        val profilesConfig = loadProfiles(repoRoot.resolve("waltid-services/waltid-issuer-api2/config/issuer2-profiles.conf"))
+        val mdocChain = profilesConfig.defaultMdocIssuerX5chain
+        val signerPem = mdocChain.single()
+        val documentSigner = X509CertificateUtil.parseCertificatePem(signerPem)
+        val validation = X509SingleCertificateValidator(listOf(IsoDocumentSignerX509CertificateProfile))
+            .validate(documentSigner)
+        assertTrue(validation.valid, "defaultMdocIssuerX5chain: ${validation.errorLog.map { it.message }}")
+        assertEquals(
+            false,
+            documentSigner.data.extensionBasicConstraints?.critical,
+            "defaultMdocIssuerX5chain must explicitly include noncritical Basic Constraints",
         )
 
-        assertTrue(root.subjectX500Principal.name.contains("C=AT"))
-        assertEquals(0, root.basicConstraints)
-        assertTrue(assertNotNull(root.keyUsage)[5], "IACA must allow certificate signing")
-        assertTrue(assertNotNull(root.keyUsage)[6], "IACA must allow CRL signing")
+        val root = readCertificate(Files.readString(runnerResources.resolve("certs/issuer2-haip-root-ca.pem")))
+        val demoMdlRoot = readCertificate(Files.readString(runnerResources.resolve("certs/issuer2-demo-mdl-root-ca.pem")))
+
+        for (iaca in listOf(root, demoMdlRoot)) {
+            assertTrue(iaca.subjectX500Principal.name.contains("C=AT"))
+            assertEquals(0, iaca.basicConstraints)
+            assertTrue(assertNotNull(iaca.keyUsage)[5], "IACA must allow certificate signing")
+            assertTrue(assertNotNull(iaca.keyUsage)[6], "IACA must allow CRL signing")
+        }
 
         assertEquals(
-            Files.readString(conformanceCertificateDir.resolve("issuer2-haip-leaf.pem")).trim(),
+            Files.readString(runnerResources.resolve("certs/issuer2-haip-leaf.pem")).trim(),
             profilesConfig.defaultHaipIssuerX5chain.single().trim(),
             "The conformance runner leaf must match issuer2's HAIP SD-JWT leaf",
         )
 
         assertLeaf(
-            profilesConfig.defaultMdocIssuerX5chain.single(),
+            signerPem,
             "defaultMdocIssuerX5chain",
-            root,
+            demoMdlRoot,
             expectedX = DEFAULT_KEY_X,
             expectedY = DEFAULT_KEY_Y,
             mdoc = true,
@@ -182,6 +203,22 @@ class Issuer2CertificateFixtureTest {
             expectedY = HAIP_KEY_Y,
             mdoc = false,
         )
+
+        val mdlProfileId = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
+        for (file in listOf(
+            repoRoot.resolve("docker-compose/issuer-api2/config/issuer2-profiles.conf"),
+            runnerResources.resolve("issuer2/issuer2-profiles-ci.conf"),
+        )) {
+            val config = loadProfiles(file)
+            assertEquals(mdocChain, config.defaultMdocIssuerX5chain, "$file default mdoc chain")
+            assertEquals(mdocChain, config.profiles.getValue(mdlProfileId).x5Chain, "$file mDL profile")
+        }
+    }
+
+    private fun loadProfiles(file: Path): Issuer2ProfilesConfig {
+        val config = ConfigManager.ConfigData("issuer2-profiles", Issuer2ProfilesConfig::class)
+        System.setProperty("config.file.${config.id}", file.toString())
+        return ConfigManager.loadConfig(config, emptyArray()).getOrThrow() as Issuer2ProfilesConfig
     }
 
     private fun assertLeaf(
@@ -230,20 +267,17 @@ class Issuer2CertificateFixtureTest {
         CertificateFactory.getInstance("X.509")
             .generateCertificate(ByteArrayInputStream(pem.toByteArray())) as X509Certificate
 
-    private fun java.math.BigInteger.toBase64Url(size: Int): String {
+    private fun BigInteger.toBase64Url(size: Int): String {
         val unsigned = toByteArray().let { if (it.size > size) it.copyOfRange(it.size - size, it.size) else it }
         val padded = ByteArray(size)
         unsigned.copyInto(padded, destinationOffset = size - unsigned.size)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(padded)
     }
 
-    private fun conformanceCertificateDir(): Path = listOf(
-        Path.of("../waltid-openid4vp-conformance-runners/src/test/resources/certs"),
-        Path.of("waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs"),
-        Path.of("waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/resources/certs"),
-    ).map { it.toAbsolutePath().normalize() }
-        .firstOrNull { Files.isRegularFile(it.resolve("issuer2-haip-root-ca.pem")) }
-        ?: error("Could not locate issuer2 HAIP conformance certificates")
+    private fun repositoryRoot(): Path = listOf(Path.of("../.."), Path.of("."), Path.of("waltid-identity"))
+        .map { it.toAbsolutePath().normalize() }
+        .firstOrNull { Files.isDirectory(it.resolve("waltid-services/waltid-issuer-api2")) }
+        ?: error("Could not locate the Identity repository")
 
     private companion object {
         const val DEFAULT_KEY_X = "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM"
