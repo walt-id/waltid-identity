@@ -168,7 +168,7 @@ actor MockWalletClient: WalletClient {
     func startIssuance(_ request: IssuanceRequest) async throws -> ReviewedIssuanceOffer {
         try await delayOperation()
         return ReviewedIssuanceOffer(
-            id: .init(rawValue: "mock-session"),
+            id: IssuanceSessionID(rawValue: "mock-session")!,
             offer: .init(
                 grant: issuanceGrant,
                 issuer: .init(
@@ -192,7 +192,10 @@ actor MockWalletClient: WalletClient {
         guard issuanceGrant == .authorizationCode else {
             throw WalletError.internalFailure("Mock issuance session is not authorization-code based")
         }
-        return .init(id: .init(rawValue: sessionID.rawValue), request: IssuanceAuthorization(
+        guard let authorizationID = IssuanceAuthorizationID(rawValue: sessionID.rawValue) else {
+            throw WalletError.invalidInput("Invalid issuance authorization ID")
+        }
+        return .init(id: authorizationID, request: IssuanceAuthorization(
             url: URL(string: "https://issuer.example/authorize")!,
             state: "mock-state",
             redirectURI: URL(string: "openid://")!,
@@ -205,7 +208,7 @@ actor MockWalletClient: WalletClient {
         try await finishIssuance(sessionID.rawValue)
     }
 
-    func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome {
+    func continueAuthorizationIssuance(sessionID: IssuanceAuthorizationID, callbackURI: URL) async throws -> IssuanceOutcome {
         try await finishIssuance(sessionID.rawValue)
     }
 

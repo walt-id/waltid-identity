@@ -7,7 +7,7 @@ struct ReviewedIssuanceOffer: Sendable {
 }
 
 struct BrowserIssuanceRequest: Sendable {
-    let id: AuthorizationIssuanceID
+    let id: IssuanceAuthorizationID
     let request: IssuanceAuthorization
 }
 
@@ -45,7 +45,7 @@ protocol WalletClient {
     func startIssuance(_ request: IssuanceRequest) async throws -> ReviewedIssuanceOffer
     func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest
     func continuePreAuthorizedIssuance(sessionID: IssuanceSessionID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
-    func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome
+    func continueAuthorizationIssuance(sessionID: IssuanceAuthorizationID, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome
     func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
@@ -195,8 +195,8 @@ final class SDKWalletClient: WalletClient {
                                       clientID: offer.clientIdentification == .clientIDRequired ? "eudiw-abca" : nil)
     }
 
-    func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome {
-        try await wallet().continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI)
+    func continueAuthorizationIssuance(sessionID: IssuanceAuthorizationID, callbackURI: URL) async throws -> IssuanceOutcome {
+        try await wallet().completeAuthorization(sessionID, callback: callbackURI)
     }
 
     func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome {

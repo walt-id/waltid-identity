@@ -1086,7 +1086,7 @@ private actor TransactionCodeWalletClient: WalletClient {
             try? await Task.sleep(nanoseconds: issuanceStartDelayNanoseconds)
         }
         return ReviewedIssuanceOffer(
-            id: .init(rawValue: "transaction-code-session"),
+            id: IssuanceSessionID(rawValue: "transaction-code-session")!,
             offer: IssuanceOfferPreview(
                 grant: issuanceGrant,
                 issuer: IssuanceIssuerPreview(
@@ -1107,7 +1107,10 @@ private actor TransactionCodeWalletClient: WalletClient {
 
     func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest {
         receivedIssuanceSelections.append(credentials)
-        return .init(id: .init(rawValue: sessionID.rawValue), request: IssuanceAuthorization(
+        guard let authorizationID = IssuanceAuthorizationID(rawValue: sessionID.rawValue) else {
+            throw WalletError.invalidInput("Invalid issuance authorization ID")
+        }
+        return .init(id: authorizationID, request: IssuanceAuthorization(
             url: URL(string: "https://issuer.example/authorize")!,
             state: "test-state",
             redirectURI: URL(string: "openid://")!,
@@ -1120,7 +1123,7 @@ private actor TransactionCodeWalletClient: WalletClient {
         try await finishIssuance(sessionID.rawValue, transactionCode: transactionCode, credentials: credentials)
     }
 
-    func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome {
+    func continueAuthorizationIssuance(sessionID: IssuanceAuthorizationID, callbackURI: URL) async throws -> IssuanceOutcome {
         try await finishIssuance(sessionID.rawValue, transactionCode: nil, credentials: nil)
     }
 

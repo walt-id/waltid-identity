@@ -168,15 +168,15 @@ public actor Wallet {
     /// Reopens an offer in the same wallet, returning nil when the offer is no longer available.
     /// - Parameter id: Session reference saved while reviewing the offer.
     public func resumeIssuance(_ id: IssuanceSessionID) async throws -> IssuanceSession? {
-        try await bridge.resumeIssuance(id: id).map { IssuanceSession($0, wallet: self) }
+        try await bridge.resumeIssuance(id: id).map { try IssuanceSession($0, wallet: self) }
     }
 
     /// Delivers a callback with its saved browser reference after reopening the wallet.
     /// - Parameters:
-    ///   - sessionID: Browser continuation saved before leaving the wallet.
-    ///   - callbackURI: Exact URI returned to the application.
-    public func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome {
-        try await bridge.continueAuthorizationIssuance(sessionID: sessionID.rawValue, callbackURI: callbackURI)
+    ///   - id: Browser continuation saved before leaving the wallet.
+    ///   - callback: Exact URI returned to the application.
+    public func completeAuthorization(_ id: IssuanceAuthorizationID, callback: URL) async throws -> IssuanceOutcome {
+        try await bridge.continueAuthorizationIssuance(sessionID: id.rawValue, callbackURI: callback)
     }
 
     /// Cancels the retained offer and discards its authorization material.
@@ -387,7 +387,7 @@ extension Wallet {
         let request = try await bridge.beginAuthorizationIssuance(
             sessionID: session.rawValue, registration: registration, credentials: credentials
         )
-        return PendingIssuanceAuthorization(id: .init(rawValue: session.rawValue), request: request, wallet: self)
+        return PendingIssuanceAuthorization(id: .init(session: session), request: request, wallet: self)
     }
 
     /// Accepts the pre-authorized grant. Supply a client identity when the authorization server requires one.
