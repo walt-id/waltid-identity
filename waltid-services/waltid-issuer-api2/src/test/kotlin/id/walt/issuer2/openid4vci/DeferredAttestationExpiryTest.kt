@@ -346,7 +346,10 @@ class DeferredAttestationExpiryTest {
             assertTrue(transaction.denied)
             assertFalse(transaction.consumed)
             if (scenario in setOf("checkpoint", "saved-result")) assertNotNull(transaction.response) else assertNull(transaction.response)
-            notificationServer.awaitEvent(offer.offerId, IssuanceSessionEvent.CREDENTIAL_REQUEST_SD_JWT_VC_FAILED)
+            notificationServer.awaitEvent(
+                offer.offerId, IssuanceSessionEvent.CREDENTIAL_REQUEST_SD_JWT_VC_FAILED,
+                error = "credential_request_denied",
+            )
             assertEquals(1, notificationServer.getReceivedUpdates().count {
                 it.target == offer.offerId && it.event == IssuanceSessionEvent.CREDENTIAL_REQUEST_SD_JWT_VC_FAILED.value &&
                     it.error == "credential_request_denied"

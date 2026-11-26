@@ -94,11 +94,14 @@ class Issuer2TestNotificationServer {
         sessionId: String,
         event: IssuanceSessionEvent,
         timeoutMillis: Long = 5_000,
+        error: String? = null,
     ): KtorSessionUpdate {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {
-            receivedUpdates.firstOrNull { it.update.target == sessionId && it.update.event == event.value }
-                ?.let { return it.update }
+            receivedUpdates.firstOrNull {
+                it.update.target == sessionId && it.update.event == event.value &&
+                    (error == null || it.update.error == error)
+            }?.let { return it.update }
             Thread.sleep(50)
         }
         throw AssertionError(
