@@ -139,26 +139,6 @@ public class IosIdentityDocumentRegistry(
         )
     }
 
-    private val ios26Available: Boolean
-        get() = NSProcessInfo.processInfo.operatingSystemVersion.useContents { majorVersion >= 26 }
-
-    private val registrationStatus: IosIdentityDocumentRegistrationStatus?
-        get() = appGroupIdentifier
-            ?.let { NSUserDefaults(suiteName = it) }
-            ?.stringForKey(REGISTRATION_STATUS_KEY)
-            ?.let(IosIdentityDocumentRegistrationStatus::fromStoredValue)
-
-    private val unavailableReason: String?
-        get() = when {
-            !ios26Available -> "IdentityDocumentServices requires iOS/iPadOS 26"
-            appGroupIdentifier == null -> "An App Group is required"
-            registrationStatus == null -> "IdentityDocumentServices runtime status has not been reported"
-            registrationStatus == IosIdentityDocumentRegistrationStatus.NOT_SUPPORTED -> "IdentityDocumentServices is not supported on this device"
-            registrationStatus == IosIdentityDocumentRegistrationStatus.NOT_AUTHORIZED -> "IdentityDocumentServices registration is not authorized"
-            registrationStatus == IosIdentityDocumentRegistrationStatus.NOT_DETERMINED -> "IdentityDocumentServices registration authorization is not determined"
-            else -> null
-        }
-
     override val capabilities: MobileWalletDigitalCredentialCapabilities
         get() {
             val status = registrationStatus
@@ -254,6 +234,26 @@ public class IosIdentityDocumentRegistry(
             )
         }
     }
+
+    private val ios26Available: Boolean
+        get() = NSProcessInfo.processInfo.operatingSystemVersion.useContents { majorVersion >= 26 }
+
+    private val registrationStatus: IosIdentityDocumentRegistrationStatus?
+        get() = appGroupIdentifier
+            ?.let { NSUserDefaults(suiteName = it) }
+            ?.stringForKey(REGISTRATION_STATUS_KEY)
+            ?.let(IosIdentityDocumentRegistrationStatus::fromStoredValue)
+
+    private val unavailableReason: String?
+        get() = when {
+            !ios26Available -> "IdentityDocumentServices requires iOS/iPadOS 26"
+            appGroupIdentifier == null -> "An App Group is required"
+            registrationStatus == null -> "IdentityDocumentServices runtime status has not been reported"
+            registrationStatus == IosIdentityDocumentRegistrationStatus.NOT_SUPPORTED -> "IdentityDocumentServices is not supported on this device"
+            registrationStatus == IosIdentityDocumentRegistrationStatus.NOT_AUTHORIZED -> "IdentityDocumentServices registration is not authorized"
+            registrationStatus == IosIdentityDocumentRegistrationStatus.NOT_DETERMINED -> "IdentityDocumentServices registration authorization is not determined"
+            else -> null
+        }
 
     private fun writeProjection(
         group: String,

@@ -16,9 +16,10 @@ public data class MobileWalletCredentialRead(
     /** ISO-8601 time used to evaluate this presentation. */
     public val evaluatedAt: String,
 ) {
-    private val assessment = status.assess(Instant.parse(evaluatedAt))
     /** Shared display meaning, freshness, coverage and semantic revision. */
     public val presentation: CredentialStatusPresentation get() = assessment.presentation
+
+    private val assessment = status.assess(Instant.parse(evaluatedAt))
 }
 
 /** Wire representation for native adapters; status values are interpreted in shared Kotlin. */

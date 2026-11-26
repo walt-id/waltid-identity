@@ -13,7 +13,7 @@ public struct ProximityReaderTrustAnchor: Sendable, Equatable {
     ///   - displayName: Optional display-safe authority label.
     public init(certificateDER: Data, displayName: String? = nil) throws {
         try requireProximityInput(isProximityX509Certificate(certificateDER))
-        try requireProximityInput(displayName == nil || isProximityNonBlank(displayName!))
+        try requireProximityInput(displayName.map(isProximityNonBlank) ?? true)
         self.certificateDER = certificateDER
         self.displayName = displayName
     }
@@ -21,9 +21,12 @@ public struct ProximityReaderTrustAnchor: Sendable, Equatable {
 
 /// Immutable result from an application-owned certificate-status source.
 public struct ProximityCertificateRevocationResult: Sendable, Equatable {
+    /// The configured source established that the certificate is not revoked.
+    public static let good = Self(storage: .good)
+
     /// The configured source established that the certificate is revoked.
     public static func revoked(reason: String? = nil) throws -> Self {
-        try requireProximityInput(reason == nil || isProximityNonBlank(reason!))
+        try requireProximityInput(reason.map(isProximityNonBlank) ?? true)
         return Self(storage: .revoked(reason: reason))
     }
 
@@ -40,9 +43,6 @@ public struct ProximityCertificateRevocationResult: Sendable, Equatable {
     }
 
     let storage: Storage
-
-    /// The configured source established that the certificate is not revoked.
-    public static let good = Self(storage: .good)
 }
 
 /// Application boundary for OCSP, CRL, or another reader-certificate status source.

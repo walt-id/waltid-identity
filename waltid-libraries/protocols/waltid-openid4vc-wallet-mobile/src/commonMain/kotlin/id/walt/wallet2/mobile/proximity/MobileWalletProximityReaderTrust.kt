@@ -347,10 +347,10 @@ public class ProximityConfiguredReaderTrustEvaluator internal constructor(
         )
     }
 
-    private val ownedConfiguration = configuration.snapshot()
-
     /** Detached view of the application-provisioned trust policy retained by this instance. */
     public val configuration: ProximityReaderTrustConfiguration get() = ownedConfiguration.snapshot()
+
+    private val ownedConfiguration = configuration.snapshot()
 
     private val readerAuthenticationTrustEvaluator = MdocReaderAuthenticationTrustEvaluator(clock)
 

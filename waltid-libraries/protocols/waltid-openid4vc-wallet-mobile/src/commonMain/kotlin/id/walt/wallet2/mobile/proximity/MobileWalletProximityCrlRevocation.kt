@@ -71,15 +71,6 @@ public class ProximityCrlRevocationEvaluator internal constructor(
     private val fetcher: ProximityCrlFetcher,
     private val now: () -> Instant,
 ) : ProximityReaderRevocationEvaluator {
-    private val issuers: List<X509Certificate>
-    private val verifier = CertificateRevocationListVerifier()
-
-    init {
-        require(issuerCertificatesDerBase64Url.size in 1..MAX_CHAIN_LENGTH)
-        issuers = issuerCertificatesDerBase64Url.toList().map(::parseCrlCertificate)
-            .distinctBy { it.encodedDer }
-    }
-
     @Throws(IllegalArgumentException::class)
     public constructor(
         issuerCertificatesDerBase64Url: List<String>,
@@ -95,6 +86,15 @@ public class ProximityCrlRevocationEvaluator internal constructor(
         evidence: ProximityReaderEvidence,
         path: List<X509Certificate>,
     ): ProximityCertificateRevocationResult = evaluatePath(evidence, path)
+
+    private val issuers: List<X509Certificate>
+    private val verifier = CertificateRevocationListVerifier()
+
+    init {
+        require(issuerCertificatesDerBase64Url.size in 1..MAX_CHAIN_LENGTH)
+        issuers = issuerCertificatesDerBase64Url.toList().map(::parseCrlCertificate)
+            .distinctBy { it.encodedDer }
+    }
 
     private suspend fun evaluatePath(
         evidence: ProximityReaderEvidence,

@@ -30,12 +30,12 @@ public data class ProximityRequestedElement(
  * @param documents Requested documents in their original order, including repeated document types.
  */
 public class ProximityUnsatisfiedRequest(documents: List<ProximityUnsatisfiedDocument>) {
+    /** Requested documents. The returned collection can be changed without altering this summary. */
+    public val documents: List<ProximityUnsatisfiedDocument> get() = ownedDocuments.toList()
+
     private val ownedDocuments = documents.toList()
 
     init { require(ownedDocuments.isNotEmpty()) }
-
-    /** Requested documents. The returned collection can be changed without altering this summary. */
-    public val documents: List<ProximityUnsatisfiedDocument> get() = ownedDocuments.toList()
 }
 
 /**
@@ -50,6 +50,9 @@ public class ProximityUnsatisfiedDocument(
     public val docType: String,
     requestedElements: List<ProximityRequestedElement>,
 ) {
+    /** Original requested elements. The returned collection does not expose owned mutable state. */
+    public val requestedElements: List<ProximityRequestedElement> get() = ownedElements.toList()
+
     private val ownedElements = requestedElements.map { it.copy(satisfiesRequestedElements = it.satisfiesRequestedElements.toList()) }
 
     init {
@@ -59,9 +62,6 @@ public class ProximityUnsatisfiedDocument(
             "An unsatisfied request contains original requested elements, not disclosure alternatives"
         }
     }
-
-    /** Original requested elements. The returned collection does not expose owned mutable state. */
-    public val requestedElements: List<ProximityRequestedElement> get() = ownedElements.toList()
 }
 
 /**
