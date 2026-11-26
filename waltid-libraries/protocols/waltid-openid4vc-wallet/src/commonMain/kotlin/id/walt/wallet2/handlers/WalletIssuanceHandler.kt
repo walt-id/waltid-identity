@@ -1334,7 +1334,6 @@ object WalletIssuanceHandler {
         val tokenBuilder = TokenRequestBuilder(clientConfig, httpClient)
 
         // 1. Resolve the offer source, or use the exact resolution selected by its preview handle.
-        log.trace { "Parsing offer string: ${request.getEffectiveOfferString().take(120)}..." }
         val effectiveResolvedOffer = resolvedOffer ?: resolveIssuanceOffer(
             request.toResolveOfferRequest(),
             httpClient,
