@@ -18,7 +18,9 @@ import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigning
 import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
-import id.walt.openid4vci.mdoc.MdlAge
+import id.walt.mdoc.issuance.MdlAge
+import id.walt.mdoc.issuance.roundedMdocValidity
+import id.walt.mdoc.issuance.truncateMdocTDate
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.proofs.VerifiedCredentialBinding
@@ -269,9 +271,9 @@ class MdocCredentialHandler(
         val roundedValidity = if (roundValidityToTwelveHours) {
             roundedMdocValidity(issuedAt, certificates.first().data.validity, validFrom, validUntil)
         } else null
-        val signedAt = (roundedValidity?.signed ?: issuedAt).asTDate()
-        val effectiveValidFrom = (roundedValidity?.validFrom ?: validFrom)?.asTDate()
-        val effectiveValidUntil = (roundedValidity?.validUntil ?: (validUntil ?: issuedAt.plus(365.days))).asTDate()
+        val signedAt = truncateMdocTDate(roundedValidity?.signed ?: issuedAt)
+        val effectiveValidFrom = (roundedValidity?.validFrom ?: validFrom)?.let(::truncateMdocTDate)
+        val effectiveValidUntil = truncateMdocTDate(roundedValidity?.validUntil ?: validUntil ?: issuedAt.plus(365.days))
         return issuanceBatch.signEach { instance ->
             val credentialData = instance.input.credentialData
             val namespaceIdentifiers = credentialData.keys

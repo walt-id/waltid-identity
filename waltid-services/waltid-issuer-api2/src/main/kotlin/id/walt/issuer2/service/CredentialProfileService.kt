@@ -6,8 +6,8 @@ import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.CredentialStatusConfiguration
 import id.walt.openid4vci.CredentialFormat
-import id.walt.openid4vci.mdoc.MdlAge
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.mdoc.issuance.MdlAge
+import id.walt.mdoc.issuance.MsoData
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

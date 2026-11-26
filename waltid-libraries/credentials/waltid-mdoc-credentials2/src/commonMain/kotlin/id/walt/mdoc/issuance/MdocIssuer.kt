@@ -157,12 +157,12 @@ object MdocIssuer {
                 ValueDigest.fromIssuerSignedItem(issuerSignedItem, namespace, digestAlgorithm)
             })
         }
-        val signedTimestamp = Instant.fromEpochSeconds((signedAt ?: Clock.System.now()).epochSeconds)
+        val signedTimestamp = truncateMdocTDate(signedAt ?: Clock.System.now())
         val validityInfo = ValidityInfo(
             signed = signedTimestamp,
-            validFrom = Instant.fromEpochSeconds((validFrom ?: signedTimestamp).epochSeconds),
-            validUntil = Instant.fromEpochSeconds(validUntil.epochSeconds),
-            expectedUpdate = expectedUpdate?.let { Instant.fromEpochSeconds(it.epochSeconds) },
+            validFrom = truncateMdocTDate(validFrom ?: signedTimestamp),
+            validUntil = truncateMdocTDate(validUntil),
+            expectedUpdate = expectedUpdate?.let(::truncateMdocTDate),
         )
         try {
             validityInfo.precheck()

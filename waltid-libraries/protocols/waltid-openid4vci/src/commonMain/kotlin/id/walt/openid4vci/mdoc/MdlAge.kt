@@ -1,35 +1,20 @@
 package id.walt.openid4vci.mdoc
 
+import id.walt.mdoc.issuance.MdlAge as MdocMdlAge
 import kotlinx.datetime.LocalDate
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlinx.datetime.yearsUntil
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Instant
 
+@Deprecated("Use id.walt.mdoc.issuance.MdlAge", ReplaceWith("MdlAge", "id.walt.mdoc.issuance.MdlAge"))
 object MdlAge {
-    const val DOC_TYPE = "org.iso.18013.5.1.mDL"
-    const val NAMESPACE = "org.iso.18013.5.1"
-    const val BIRTH_DATE = "birth_date"
-    const val AGE_IN_YEARS = "age_in_years"
-    const val AGE_MAPPING = "<age-in-years>"
+    const val DOC_TYPE = MdocMdlAge.DOC_TYPE
+    const val NAMESPACE = MdocMdlAge.NAMESPACE
+    const val BIRTH_DATE = MdocMdlAge.BIRTH_DATE
+    const val AGE_IN_YEARS = MdocMdlAge.AGE_IN_YEARS
+    const val AGE_MAPPING = MdocMdlAge.AGE_MAPPING
 
-    private val fullDate = Regex("""[0-9]{4}-[0-9]{2}-[0-9]{2}""")
+    fun parseBirthDate(value: JsonElement?, path: String): LocalDate = MdocMdlAge.parseBirthDate(value, path)
 
-    fun parseBirthDate(value: JsonElement?, path: String): LocalDate {
-        val text = (value as? JsonPrimitive)?.takeIf { it.isString }?.content
-        require(text != null && fullDate.matches(text)) { "$path must be an ISO date (YYYY-MM-DD)" }
-        return try {
-            LocalDate.parse(text)
-        } catch (e: IllegalArgumentException) {
-            throw IllegalArgumentException("$path must be a valid ISO date (YYYY-MM-DD)", e)
-        }
-    }
-
-    fun completedYears(birthDate: LocalDate, validFrom: Instant, birthDatePath: String): Int {
-        val validityDate = validFrom.toLocalDateTime(TimeZone.UTC).date
-        require(birthDate <= validityDate) { "$birthDatePath must be on or before the UTC date of MSO validFrom" }
-        return birthDate.yearsUntil(validityDate)
-    }
+    fun completedYears(birthDate: LocalDate, validFrom: Instant, birthDatePath: String): Int =
+        MdocMdlAge.completedYears(birthDate, validFrom, birthDatePath)
 }

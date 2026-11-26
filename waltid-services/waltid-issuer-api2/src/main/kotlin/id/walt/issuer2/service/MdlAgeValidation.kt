@@ -3,7 +3,7 @@ package id.walt.issuer2.service
 import com.jayway.jsonpath.InvalidPathException
 import com.jayway.jsonpath.JsonPath
 import id.walt.credentials.issuance.CredentialDataMergeUtils.isTemplate
-import id.walt.openid4vci.mdoc.MdlAge
+import id.walt.mdoc.issuance.MdlAge
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -49,10 +49,13 @@ internal object MdlAgeValidation {
         }
         val credentialAge = namespace?.get(MdlAge.AGE_IN_YEARS)
         val mappedAge = namespaceMapping?.get(MdlAge.AGE_IN_YEARS)
-        if (credentialAge != null || mappedAge != null) {
-            require(birthDate != null || mappedBirthDate != null || birthDateFromClaims) {
-                "$BIRTH_DATE_FIELD is required when age_in_years is configured; supply it in the profile or runtime overrides"
-            }
+        require(
+            MdlAge.hasRequiredBirthDateSource(
+                ageConfigured = credentialAge != null || mappedAge != null,
+                birthDateSourceAvailable = birthDate != null || mappedBirthDate != null || birthDateFromClaims,
+            )
+        ) {
+            "$BIRTH_DATE_FIELD is required when age_in_years is configured; supply it in the profile or runtime overrides"
         }
         credentialAge?.let { validateLiteralAge(it, "credentialData", expectedAge) }
         mappedAge?.takeUnless(::isDataFunction)?.let { validateLiteralAge(it, "mapping", expectedAge) }

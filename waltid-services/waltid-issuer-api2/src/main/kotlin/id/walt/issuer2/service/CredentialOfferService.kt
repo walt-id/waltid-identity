@@ -16,7 +16,7 @@ import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.openid4vci.CredentialFormat
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.mdoc.issuance.MsoData
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.AuthenticationMethod

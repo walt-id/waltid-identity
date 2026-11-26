@@ -51,9 +51,6 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
-            implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
-            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
-            implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
         }
     }
 }

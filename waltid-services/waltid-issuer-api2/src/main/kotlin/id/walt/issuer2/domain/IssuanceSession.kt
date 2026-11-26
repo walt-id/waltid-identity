@@ -2,7 +2,7 @@ package id.walt.issuer2.domain
 
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.mdoc.issuance.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.requests.notification.IssuedCredentialNotification

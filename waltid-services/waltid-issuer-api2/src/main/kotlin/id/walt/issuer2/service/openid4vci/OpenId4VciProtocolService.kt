@@ -46,7 +46,7 @@ import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
-import id.walt.openid4vci.mdoc.MsoValidityResolver
+import id.walt.credentials.issuance.MsoDataMapping
 import id.walt.credentials.issuance.InstantClock
 import id.walt.credentials.issuance.IssuanceClock
 import id.walt.openid4vci.core.OAuth2Provider
@@ -1321,7 +1321,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             var proofPublicKeyJwks: List<JsonObject>? = null
             val issuedAt = currentCoroutineContext()[IssuanceClock]?.clock?.now() ?: Clock.System.now()
             val resolvedMsoValidity = if (configuration.format == CredentialFormat.MSO_MDOC) {
-                MsoValidityResolver.resolve(
+                MsoDataMapping.resolve(
                     issuanceRequest.msoData,
                     signed = issuedAt,
                     clock = InstantClock(issuedAt),

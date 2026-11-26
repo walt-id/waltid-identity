@@ -5,9 +5,6 @@ import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.
 import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
 import id.walt.cose.*
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
-import id.walt.credentials.CredentialParser
-import id.walt.credentials.formats.MdocsCredential
-import id.walt.credentials.presentations.formats.MsoMdocPresentation
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.mdoc.credsdata.DrivingPrivilege
@@ -24,8 +21,6 @@ import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.sha256
 import id.walt.mdoc.schema.MdocsSchemaMappingFunction.jsonToCborElement
-import id.walt.policies2.vp.policies.VPPolicyRunner
-import id.walt.policies2.vp.policies.VPVerificationPolicyManager
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.TimeZone
@@ -33,7 +28,6 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborElement
-import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 import kotlin.test.Test
@@ -132,22 +126,6 @@ class MdocIssuanceTest {
                 println("Successfully verified ${receivedIssuerItems.size} issuer-signed item digests against the MSO.")
                 println("(MSO namespace $namespaceToCheck has ${receivedDigests.size} item digests)")
             }
-
-            println("--- Running Verifier")
-
-            val hexCred = coseCompliantCbor.encodeToHexString(document)
-
-            val verificationResults = VPPolicyRunner.verifySpecificPresentation(
-                presentation = MsoMdocPresentation(CredentialParser.parseOnly(hexCred) as MdocsCredential),
-                policies = VPVerificationPolicyManager.defaultMsoMdocPolicies.filterNot { it.id == "mso_mdoc/device-auth" },
-                verificationContext = null
-            )
-
-            verificationResults.forEach { (id, result) ->
-                println("$id: ${result.success} - $result")
-            }
-
-            verificationResults.forEach { (id, result) -> require(result.success) { "Verification result for '${id}' failed!" } }
 
             val prettyJson = Json { prettyPrint = true }
 

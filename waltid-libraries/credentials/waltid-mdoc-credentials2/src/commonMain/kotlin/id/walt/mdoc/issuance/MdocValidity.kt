@@ -1,11 +1,11 @@
-package id.walt.openid4vci.handlers.credential
+package id.walt.mdoc.issuance
 
 import id.walt.certificate.x509.X509Certificate
 import id.walt.mdoc.objects.mso.ValidityInfo
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
-internal fun roundedMdocValidity(
+fun roundedMdocValidity(
     now: Instant,
     certificateValidity: X509Certificate.Validity,
     validFrom: Instant?,
@@ -15,16 +15,16 @@ internal fun roundedMdocValidity(
     val windowSeconds = 43_200L
     val base = Instant.fromEpochSeconds(now.epochSeconds.floorDiv(windowSeconds) * windowSeconds)
     // A newly valid certificate must not appear to have signed before its validity began.
-    val signed = maxOf(base, certificateValidity.notBefore.ceilToSecond()).asTDate()
+    val signed = truncateMdocTDate(maxOf(base, certificateValidity.notBefore.ceilToSecond()))
     return ValidityInfo(
         signed = signed,
         // ISO mdoc tdates are whole UTC seconds; truncate before the issuer encodes the MSO.
-        validFrom = (validFrom ?: signed).asTDate(),
-        validUntil = (validUntil ?: (base + 365.days)).asTDate(),
+        validFrom = truncateMdocTDate(validFrom ?: signed),
+        validUntil = truncateMdocTDate(validUntil ?: (base + 365.days)),
     )
 }
 
-internal fun Instant.asTDate(): Instant = Instant.fromEpochSeconds(epochSeconds)
+fun truncateMdocTDate(instant: Instant): Instant = Instant.fromEpochSeconds(instant.epochSeconds)
 
 private fun Instant.ceilToSecond(): Instant =
     Instant.fromEpochSeconds(epochSeconds + if (nanosecondsOfSecond == 0) 0L else 1L)
