@@ -188,7 +188,7 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: AuthorizationIssuanceID, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
         guard issuanceGrant == .authorizationCode else {
             throw WalletError.internalFailure("Mock issuance session is not authorization-code based")
         }
@@ -201,20 +201,17 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
-        try await delayOperation()
-        storedCredentials = [mdocMetadata ? Self.photoIDCredential : sampleCredential]
-        return .stored(sessionID: sessionID, credentialIDs: storedCredentials.map(\.id))
+    func continuePreAuthorizedIssuance(sessionID: PreAuthorizedIssuanceID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+        try await finishIssuance(sessionID.rawValue)
     }
 
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
-        try await continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: nil, credentials: nil)
+    func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome {
+        try await finishIssuance(sessionID.rawValue)
     }
 
-    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { .cancelled(sessionID: sessionID) }
+    func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome { .cancelled(sessionID: sessionID.rawValue) }
 
     func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome {
-        let deferredCredentialID = continuation.id
         .failed(
             sessionID: "mock-session",
             error: .init(code: .invalidSession, message: "No mock deferred credential"),
@@ -302,6 +299,12 @@ actor MockWalletClient: WalletClient {
             continuation.onTermination = { [weak self] _ in Task { await self?.removeStatusCollector(id) } }
         }
     }
+    private func finishIssuance(_ sessionID: String) async throws -> IssuanceOutcome {
+        try await delayOperation()
+        storedCredentials = [mdocMetadata ? Self.photoIDCredential : sampleCredential]
+        return .stored(sessionID: sessionID, credentialIDs: storedCredentials.map(\.id))
+    }
+
     private func removeStatusCollector(_ id: UUID) { statusCollectors.removeValue(forKey: id) }
     func setCredentialStatusSnapshot(_ snapshot: CredentialStatusSnapshot) {
         statusSnapshot = snapshot

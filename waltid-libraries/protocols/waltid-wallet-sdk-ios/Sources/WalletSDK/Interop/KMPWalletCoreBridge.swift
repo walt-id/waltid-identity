@@ -264,7 +264,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
                 })
         })
         let statuses = try decodeCredentialStatusSnapshot(value.statusJson).credentials
-        return PresentationReview(claims: claims, statuses: statuses, payment: try value.payment?.toSwiftPaymentConsent(), owner: owner) { [self] in
+        return PresentationReview(claims: claims, statuses: statuses, payment: value.payment?.toSwiftPaymentConsent(), owner: owner) { [self] in
             let result = try await bridge.submitReviewedPresentation(review: value)
             return try Self.successValue(result, as: MobileWalletPresentationResult.self, operation: "submit reviewed presentation").toSwiftPresentationResult()
         }

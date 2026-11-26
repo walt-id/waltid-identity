@@ -1105,7 +1105,7 @@ private actor TransactionCodeWalletClient: WalletClient {
         )
     }
 
-    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: AuthorizationIssuanceID, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
         receivedIssuanceSelections.append(credentials)
         return IssuanceAuthorization(
             url: URL(string: "https://issuer.example/authorize")!,
@@ -1116,36 +1116,17 @@ private actor TransactionCodeWalletClient: WalletClient {
         )
     }
 
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
-        issuanceContinuationCalls += 1
-        receivedIssuanceSelections.append(credentials)
-        receivedTxCodes.append(transactionCode ?? "")
-        if let failure = firstAcceptanceFailure {
-            firstAcceptanceFailure = nil
-            return .failed(sessionID: sessionID, error: failure, storedCredentialIDs: [], deferredCredentials: [])
-        }
-        credentialIssued = true
-        deletedCredentialIDs.remove(Self.credential.id)
-        if deferWithProgress {
-            return .deferred(sessionID: sessionID, storedCredentialIDs: [Self.credential.id],
-                credentials: try await listDeferredIssuance())
-        }
-        if failWithProgress {
-            return .failed(sessionID: sessionID, error: .init(code: .network, message: "Later target failed",
-                targetFailure: .init(target: .init(configurationID: "ExampleCredential", credentialIdentifier: "second"),
-                    stage: .request, notAttempted: [.init(configurationID: "OtherCredential"), .init(configurationID: "AnotherCredential")])), storedCredentialIDs: [Self.credential.id],
-                deferredCredentials: try await listDeferredIssuance())
-        }
-        return .stored(sessionID: sessionID, credentialIDs: storedCredentialIDs)
+    func continuePreAuthorizedIssuance(sessionID: PreAuthorizedIssuanceID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+        try await finishIssuance(sessionID.rawValue, transactionCode: transactionCode, credentials: credentials)
     }
 
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
-        try await continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: nil, credentials: nil)
+    func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome {
+        try await finishIssuance(sessionID.rawValue, transactionCode: nil, credentials: nil)
     }
 
-    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
-        cancelledIssuanceSessionIDs.append(sessionID)
-        return .cancelled(sessionID: sessionID)
+    func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome {
+        cancelledIssuanceSessionIDs.append(sessionID.rawValue)
+        return .cancelled(sessionID: sessionID.rawValue)
     }
 
     func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome {
@@ -1235,6 +1216,29 @@ private actor TransactionCodeWalletClient: WalletClient {
         deleteLocalDataCalls += 1
         credentialIssued = false
         deletedCredentialIDs.insert(Self.credential.id)
+    }
+
+    private func finishIssuance(_ sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+        issuanceContinuationCalls += 1
+        receivedIssuanceSelections.append(credentials)
+        receivedTxCodes.append(transactionCode ?? "")
+        if let failure = firstAcceptanceFailure {
+            firstAcceptanceFailure = nil
+            return .failed(sessionID: sessionID, error: failure, storedCredentialIDs: [], deferredCredentials: [])
+        }
+        credentialIssued = true
+        deletedCredentialIDs.remove(Self.credential.id)
+        if deferWithProgress {
+            return .deferred(sessionID: sessionID, storedCredentialIDs: [Self.credential.id],
+                credentials: try await listDeferredIssuance())
+        }
+        if failWithProgress {
+            return .failed(sessionID: sessionID, error: .init(code: .network, message: "Later target failed",
+                targetFailure: .init(target: .init(configurationID: "ExampleCredential", credentialIdentifier: "second"),
+                    stage: .request, notAttempted: [.init(configurationID: "OtherCredential"), .init(configurationID: "AnotherCredential")])), storedCredentialIDs: [Self.credential.id],
+                deferredCredentials: try await listDeferredIssuance())
+        }
+        return .stored(sessionID: sessionID, credentialIDs: storedCredentialIDs)
     }
 
     private var deletedCredentialIDs: Set<String> = []
