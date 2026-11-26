@@ -101,4 +101,6 @@ let wallet = try await Wallet(
 ```
 <!-- doc-snippet:end swift-combined-persistence -->
 
-Call `try await wallet.deleteLocalData()` to remove local material for that wallet. The active credential and DID stores receive their remove calls; the SDK removes platform-managed signing keys, encrypted database files and sidecars, plus the configured database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
+Call `try await wallet.deleteLocalData()` on an opened wallet to erase its managed signing keys, database files, sidecars and database key. The active credential and DID stores receive the corresponding removal requests. Close other wallets using the same storage and coordinate app and extension processes before erasure.
+
+If opening fails, restore the matching key and encrypted database using the host’s recovery mechanism. If the user chooses to discard the wallet, use the host’s reset procedure for its app-group container, Keychain entries and custom stores. An app reinstall can leave Keychain items or shared-container data in place.

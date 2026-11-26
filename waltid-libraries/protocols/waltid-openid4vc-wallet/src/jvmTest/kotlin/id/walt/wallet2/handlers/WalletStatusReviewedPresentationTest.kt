@@ -129,6 +129,10 @@ class WalletStatusReviewedPresentationTest {
                 assertFailsWith<IllegalArgumentException> {
                     WalletPresentationHandler.submitReviewedPresentation(fixture.wallet.copy(), latest, registry, null)
                 }
+                val other = fixture.wallet.copy()
+                assertFailsWith<IllegalArgumentException> { WalletPresentationHandler.discardInstancePreview(other, preview.handle) }
+                assertFailsWith<IllegalArgumentException> { WalletPresentationHandler.rejectInstancePresentation(other, RejectPresentationRequest(preview.handle)) }
+                WalletPresentationHandler.closeInstancePreviews(other)
                 latest
             } else null
             val result = async {

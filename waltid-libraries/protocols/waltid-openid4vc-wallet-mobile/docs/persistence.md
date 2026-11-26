@@ -94,4 +94,6 @@ val config = MobileWalletConfig(
 
 Call `MobileWallet.deleteWallet()` to delete local wallet material for a wallet: stored key descriptors, credentials, DIDs, platform signing keys, encrypted database files and sidecars, and the configured database key. Credential and DID custom stores receive the corresponding remove calls.
 
-If a local development build has an old plaintext database or a database restored without its matching key, opening the wallet can fail with a typed storage error. Reset local state by calling `deleteWallet()`, uninstalling the app, or deleting the app's local wallet data. WAL-1085 does not perform plaintext-to-encrypted migration.
+Close every in-process wallet using the database, its managed key or a shared credential or DID store before erasing it. If an app and extension share storage, the host must coordinate both processes before erasure.
+
+If opening fails, restore the matching database key and encrypted database from the host’s recovery source. If recovery is unavailable and the user chooses to discard the wallet, use the host’s reset procedure for the database, key provider and custom stores. A disposable Android development installation can clear app storage. The SDK does not migrate plaintext databases.

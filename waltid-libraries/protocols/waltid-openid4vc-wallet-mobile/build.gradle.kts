@@ -65,6 +65,8 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(identityLibs.ktor.serialization.kotlinx.json)
+            implementation(identityLibs.ktor.client.content.negotiation)
             implementation(identityLibs.whyoleg.cryptography.random)
             implementation(identityLibs.signum.indispensable)
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
@@ -93,8 +95,6 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.ktor.client.mock)
-            implementation(identityLibs.ktor.client.content.negotiation)
-            implementation(identityLibs.ktor.serialization.kotlinx.json)
             implementation(identityLibs.kotlinx.serialization.json)
         }
         if (enableAndroidBuild) {
@@ -163,8 +163,6 @@ kotlin {
                     implementation(identityLibs.androidx.test.uiautomator)
                     implementation(identityLibs.ktor.client.android)
                     implementation(identityLibs.ktor.client.mock)
-                    implementation(identityLibs.ktor.client.content.negotiation)
-                    implementation(identityLibs.ktor.serialization.kotlinx.json)
                     implementation(identityLibs.oshai.kotlinlogging)
                 }
             }

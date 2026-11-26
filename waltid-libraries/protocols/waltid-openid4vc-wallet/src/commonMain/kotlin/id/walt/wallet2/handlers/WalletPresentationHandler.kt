@@ -1364,8 +1364,23 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: RejectPresentationRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    ): WalletPresentResult = rejectPreview(wallet, request, onEvent) {}
+
+    /** Rejects a preview issued by this exact open wallet instance. */
+    suspend fun rejectInstancePresentation(
+        wallet: Wallet,
+        request: RejectPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    ): WalletPresentResult = rejectPreview(wallet, request, onEvent) { require(it.owner === wallet) { "Preview belongs to another wallet instance" } }
+
+    private suspend fun rejectPreview(
+        wallet: Wallet,
+        request: RejectPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit,
+        validateOwner: (PreviewedPresentation) -> Unit,
     ): WalletPresentResult {
         val preview = consumePreviewedAuthorizationRequest(wallet, request.previewHandle) { cached ->
+            validateOwner(cached)
             val detectedCode = (cached as? PreviewedPresentation.Invalid)?.error?.code?.code
             require(detectedCode == null || request.errorCode == null || request.errorCode == detectedCode) {
                 "The error code for an invalid presentation request is determined by the wallet"
@@ -2396,7 +2411,12 @@ object WalletPresentationHandler {
         previewedAuthorizationRequests.discard(walletId = wallet.id, id = handle.value)
     }
 
-    /** Clears every presentation preview and tombstone owned by [wallet] during wallet deletion. */
+    /** Discards only a preview issued by this exact open wallet instance. */
+    suspend fun discardInstancePreview(wallet: Wallet, handle: PresentationPreviewHandle) {
+        previewedAuthorizationRequests.discard(wallet.id, handle.value) { require(it.owner === wallet) { "Preview belongs to another wallet instance" } }
+    }
+
+    /** Releases the previews belonging to one closing wallet instance. */
     suspend fun closeInstancePreviews(wallet: Wallet) {
         previewedAuthorizationRequests.clearInstance(wallet.id) { it.owner === wallet }
         previewedDcApiRequests.clearInstance(wallet.id) { it.owner === wallet }

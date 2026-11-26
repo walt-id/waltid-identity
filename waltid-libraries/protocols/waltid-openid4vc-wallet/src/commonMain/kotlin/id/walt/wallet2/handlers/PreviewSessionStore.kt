@@ -249,10 +249,11 @@ public class PreviewSessionStore<T>(
     }
 
     /** Explicitly discards a preview after local dismissal. */
-    suspend fun discard(walletId: String, id: String) = mutex.withLock {
+    suspend fun discard(walletId: String, id: String, validate: (T) -> Unit = {}) = mutex.withLock {
         val currentTime = now()
         cleanupExpired(currentTime)
         val entry = lookup(walletId, id, currentTime)
+        validate(entry.value)
         if (entry.inUse) {
             entry.discardRequested = true
             entry.operation?.cancel()

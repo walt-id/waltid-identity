@@ -109,6 +109,22 @@ class MobileWalletFactoryTest {
     }
 
     @Test
+    fun aClosedHandleCannotEraseStorageUsedByItsSuccessor() = runTest {
+        database().use { db ->
+            val config = MobileWalletConfig(walletId = "successor")
+            val keys = FakePlatformManagedKeyProvider()
+            val first = encryptedWallet(config, db, keys, onClose = {})
+            first.close()
+            val successor = encryptedWallet(config, db, keys, onClose = {})
+            assertFailsWith<IllegalStateException> { first.deleteWallet() }
+            assertTrue(successor.credentials().isEmpty())
+            successor.close()
+            first.deleteWallet()
+            first.deleteWallet()
+        }
+    }
+
+    @Test
     fun cancellationDuringDriverCreationDisposesTheUnpublishedDriver() = runTest {
         database().use { db ->
             var closed = 0
