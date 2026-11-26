@@ -115,7 +115,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         )
         val registration = registry.replace(registryId, listOf(record, record.copy(type = parent)))
         assertTrue("Registry unavailable: ${registration.reason}", registration.available)
-        assertEquals(1, registration.registeredEntryCount)
+        assertEquals(1, registration.entryCount)
         val requestJson = buildJsonObject {
             put("requests", buildJsonArray { add(buildJsonObject {
                 put("protocol", "openid4vp-v1-unsigned")
@@ -161,7 +161,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         )
         assertTrue(
             "Credential Manager registered no credentials in the platform smoke",
-            registration.registeredEntryCount > 0,
+            registration.entryCount > 0,
         )
 
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
@@ -328,7 +328,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         try {
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertTrue("Payment registration unavailable: ${registration.reason}", registration.available)
-            assertEquals(issuedCredentialIds.size + paymentIds.size, registration.registeredEntryCount)
+            assertEquals(issuedCredentialIds.size + paymentIds.size, registration.entryCount)
             for (showPreview in listOf(true, false)) {
                 createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(showPreview)
                 val session = DemoTestBackend.createDcApiVerifierSession(
@@ -384,7 +384,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             paymentIds.forEach { id -> check(wallet.deleteCredential(id)) { "Failed to delete temporary payment credential $id" } }
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertTrue("Credential registration was unavailable after payment cleanup", registration.available)
-            assertEquals(issuedCredentialIds.size, registration.registeredEntryCount)
+            assertEquals(issuedCredentialIds.size, registration.entryCount)
         }
     }
 
@@ -425,7 +425,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             val ageCredentialId = ageCredentialIds.single()
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertTrue("Temporary SCA/age registration was unavailable: ${registration.reason}", registration.available)
-            assertEquals(4, registration.registeredEntryCount)
+            assertEquals(4, registration.entryCount)
 
             val transactionData = DemoTestBackend.scaPaymentTransactionData(credentialId = SCA_CREDENTIAL_QUERY_ID)
             val session = DemoTestBackend.createDcApiVerifierSession(
@@ -523,7 +523,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertEquals(issuedCredentialIds, wallet.credentials().map { it.id }.toSet())
             assertTrue("Baseline registration became unavailable: ${registration.reason}", registration.available)
-            assertEquals(2, registration.registeredEntryCount)
+            assertEquals(2, registration.entryCount)
         }
     }
 
@@ -1077,7 +1077,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     emptyRegistration.reason,
                 emptyRegistration.available,
             )
-            assertEquals(0, emptyRegistration.registeredEntryCount)
+            assertEquals(0, emptyRegistration.entryCount)
 
             val mdlScenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
             val sdJwtScenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-sdjwt" }
@@ -1111,7 +1111,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     registration.reason,
                 registration.available,
             )
-            assertEquals(2, registration.registeredEntryCount)
+            assertEquals(2, registration.entryCount)
         }
 
     }

@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile.digitalcredentials
 
+import id.walt.wallet2.mobile.credentials.MobileWalletCredential
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
@@ -102,7 +103,7 @@ internal class MobileWalletAnnexCEngine(
                 parsedRequest = validated.parsedRequest,
                 verifiedOrigin = validated.origin,
                 rawRequest = validated.rawRequest,
-                allowedCredentialIds = options.mapTo(mutableSetOf()) { it.credentialId },
+                allowedCredentialIds = options.mapTo(mutableSetOf()) { it.credential.id },
             ),
         )
         return MobileWalletAnnexCPreview(
@@ -550,15 +551,17 @@ internal class MobileWalletAnnexCEngine(
         val metadata = toMetadata()
         return MobileWalletPresentationCredentialOption(
             queryId = annexCQueryId(index, request.docType),
-            credentialId = id,
+            credential = MobileWalletCredential(
+                id = id,
+                format = metadata.format,
+                credentialDataJson = Json.encodeToString(JsonObject.serializer(), mdoc.credentialData),
+                issuer = metadata.issuer,
+                subject = metadata.subject,
+                label = metadata.label,
+                metadataJson = this.metadata?.let { Json.encodeToString(JsonObject.serializer(), it) },
+            ),
             multiple = false,
-            format = metadata.format,
-            issuer = metadata.issuer,
-            subject = metadata.subject,
-            label = metadata.label,
-            credentialDataJson = Json.encodeToString(JsonObject.serializer(), mdoc.credentialData),
             disclosures = disclosures,
-            metadataJson = this.metadata?.let { Json.encodeToString(JsonObject.serializer(), it) },
         )
     }
 

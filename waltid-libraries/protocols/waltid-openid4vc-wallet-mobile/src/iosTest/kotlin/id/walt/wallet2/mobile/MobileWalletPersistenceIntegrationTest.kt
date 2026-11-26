@@ -80,7 +80,7 @@ class MobileWalletPersistenceIntegrationTest {
             ): MobileWalletCredentialRegistrationResult {
                 published.clear()
                 published.addAll(records)
-                return MobileWalletCredentialRegistrationResult(true, records.size)
+                return MobileWalletCredentialRegistrationResult.Applied(records.size)
             }
         }
         val credentials = listOf(
@@ -110,7 +110,7 @@ class MobileWalletPersistenceIntegrationTest {
         )
         val wallet = MobileWalletFactory().create(registryConfig(registry, credentials))
         try {
-            assertEquals(2, wallet.refreshDigitalCredentialRegistration().registeredEntryCount)
+            assertEquals(2, wallet.refreshDigitalCredentialRegistration().entryCount)
             assertEquals(setOf("mdl-1", "pid-1"), published.map { it.credentialId }.toSet())
             assertTrue(published.all { it.fields.single().valueJson == "\"Ada\"" && it.display.name.isNotBlank() })
         } finally {

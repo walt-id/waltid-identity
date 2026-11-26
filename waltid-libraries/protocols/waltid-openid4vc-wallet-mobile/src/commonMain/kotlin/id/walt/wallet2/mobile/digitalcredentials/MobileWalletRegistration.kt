@@ -28,11 +28,7 @@ internal class MobileWalletRegistration(
             else wallet.registryRecords(preferredLocales, registrationProjection)
         } catch (failure: Exception) {
             if (failure is CancellationException) throw failure
-            lastRegistrationResult.value = MobileWalletCredentialRegistrationResult(
-                available = false,
-                registeredEntryCount = 0,
-                reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
-            )
+            lastRegistrationResult.value = MobileWalletCredentialRegistrationResult.Unavailable(failure.message ?: failure::class.simpleName ?: "Credential registration failed")
             throw failure
         }
         currentCoroutineContext().ensureActive()
@@ -40,11 +36,7 @@ internal class MobileWalletRegistration(
             credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
             if (failure is CancellationException) throw failure
-            MobileWalletCredentialRegistrationResult(
-                available = false,
-                registeredEntryCount = 0,
-                reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
-            )
+            MobileWalletCredentialRegistrationResult.Unavailable(failure.message ?: failure::class.simpleName ?: "Credential registration failed")
         }
         // A completed presentation replacement remains observable if creation is cancelled.
         lastRegistrationResult.value = presentationResult

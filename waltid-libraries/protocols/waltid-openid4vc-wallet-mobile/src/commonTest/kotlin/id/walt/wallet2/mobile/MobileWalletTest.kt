@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.credentials.MobileWalletCredential
 import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialsConfig
 import id.walt.wallet2.mobile.issuance.MobileWalletHolderBinding
@@ -697,14 +698,14 @@ class MobileWalletTest {
     fun walletSessionEventsMapExhaustivelyToMobileWalletEvents() {
         assertEquals(WalletSessionEvent.entries.size, MobileWalletEvent.entries.size)
         WalletSessionEvent.entries.forEach { event ->
-            assertEquals(event.name, event.toMobileWalletEvent().name)
+            assertEquals(event.name, event.toMobileWalletEvent().identifier)
         }
 
-        assertEquals(MobileWalletEventPhase.issuance, MobileWalletEvent.issuance_offer_resolved.phase)
-        assertEquals(MobileWalletEventStatus.progress, MobileWalletEvent.issuance_offer_resolved.status)
-        assertEquals(MobileWalletEventPhase.presentation, MobileWalletEvent.presentation_completed.phase)
-        assertEquals(MobileWalletEventStatus.completed, MobileWalletEvent.presentation_completed.status)
-        assertEquals(MobileWalletEventStatus.failed, MobileWalletEvent.issuance_failed.status)
+        assertEquals(MobileWalletEventPhase.Issuance, MobileWalletEvent.IssuanceOfferResolved.phase)
+        assertEquals(MobileWalletEventStatus.Progress, MobileWalletEvent.IssuanceOfferResolved.status)
+        assertEquals(MobileWalletEventPhase.Presentation, MobileWalletEvent.PresentationCompleted.phase)
+        assertEquals(MobileWalletEventStatus.Completed, MobileWalletEvent.PresentationCompleted.status)
+        assertEquals(MobileWalletEventStatus.Failed, MobileWalletEvent.IssuanceFailed.status)
     }
 
     @Test
@@ -725,12 +726,11 @@ class MobileWalletTest {
         assertFailsWith<IllegalArgumentException> {
             MobileWalletPresentationCredentialOption(
                 queryId = " ",
-                credentialId = "credential-1",
-                format = "vc+sd-jwt",
-                issuer = null,
-                subject = null,
-                label = null,
-                credentialDataJson = "{}",
+                credential = MobileWalletCredential(
+                    id = "credential-1",
+                    format = "vc+sd-jwt",
+                    credentialDataJson = "{}",
+                ),
             )
         }
         assertFailsWith<IllegalArgumentException> {
@@ -928,13 +928,15 @@ class MobileWalletTest {
             credentialOptions = listOf(
                 MobileWalletPresentationCredentialOption(
                     queryId = "pid",
-                    credentialId = "credential-1",
+                    credential = MobileWalletCredential(
+                        id = "credential-1",
+                        format = "vc+sd-jwt",
+                        credentialDataJson = """{"given_name":"Ada"}""",
+                        issuer = "https://issuer.example",
+                        subject = "did:key:subject",
+                        label = "PID",
+                    ),
                     multiple = true,
-                    format = "vc+sd-jwt",
-                    issuer = "https://issuer.example",
-                    subject = "did:key:subject",
-                    label = "PID",
-                    credentialDataJson = """{"given_name":"Ada"}""",
                     disclosures = listOf(
                         MobileWalletPresentationDisclosure(
                             path = "$.given_name",
@@ -1035,9 +1037,9 @@ class MobileWalletTest {
         gate.complete(Unit)
         first.await()
         assertTrue(deletion.await())
-        assertEquals(0, next.await().registeredEntryCount)
+        assertEquals(0, next.await().entryCount)
         assertEquals(listOf(1, 0, 0), published.replacements.map { it.second.size })
-        assertEquals(0, wallet.digitalCredentialRegistration.value?.registeredEntryCount)
+        assertEquals(0, wallet.digitalCredentialRegistration.value?.entryCount)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -1054,7 +1056,7 @@ class MobileWalletTest {
             }
             override suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult {
                 creationCalls++
-                return MobileWalletCredentialRegistrationResult(true, 1)
+                return MobileWalletCredentialRegistrationResult.Applied(1)
             }
         }
         val wallet = MobileWallet(walletId = "cancelled-registration", keyStore = InMemoryMobileWalletKeyStore(),
@@ -1065,10 +1067,10 @@ class MobileWalletTest {
         gate.complete(Unit)
         first.join()
         assertTrue(first.isCancelled)
-        assertEquals(MobileWalletCredentialRegistrationResult(true, 0), wallet.digitalCredentialRegistration.value)
+        assertEquals(MobileWalletCredentialRegistrationResult.Applied(0), wallet.digitalCredentialRegistration.value)
         assertEquals(0, creationCalls)
         wallet.deleteWallet()
-        assertEquals(0, wallet.digitalCredentialRegistration.value?.registeredEntryCount)
+        assertEquals(0, wallet.digitalCredentialRegistration.value?.entryCount)
     }
 
     @Test
@@ -1102,7 +1104,7 @@ class MobileWalletTest {
         )
         val first = launch { wallet.refreshDigitalCredentialRegistration() }
         creating.await()
-        val expected = MobileWalletCredentialRegistrationResult(available = true, registeredEntryCount = 0)
+        val expected = MobileWalletCredentialRegistrationResult.Applied(0)
         assertEquals(expected, wallet.digitalCredentialRegistration.value)
         first.cancelAndJoin()
         assertEquals(expected, wallet.digitalCredentialRegistration.value)
@@ -1580,7 +1582,7 @@ class MobileWalletTest {
         val published = RecordingMetadataRegistry()
         val registry = object : MobileWalletCredentialRegistry by published {
             override suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult =
-                MobileWalletCredentialRegistrationResult(false, 0, "Creation unavailable")
+                MobileWalletCredentialRegistrationResult.Unavailable("Creation unavailable")
         }
         var notified = false
         val store = InMemoryCredentialStore()
@@ -1600,7 +1602,7 @@ class MobileWalletTest {
         assertTrue(wallet.deleteCredential("pid-1"))
         assertTrue(notified)
         assertTrue(assertNotNull(wallet.digitalCredentialRegistration.value).available)
-        assertEquals(0, wallet.refreshDigitalCredentialRegistration().registeredEntryCount)
+        assertEquals(0, wallet.refreshDigitalCredentialRegistration().entryCount)
     }
 
     @Test
@@ -2302,7 +2304,7 @@ class MobileWalletTest {
         runCurrent()
 
         repeat(100) { index ->
-            val emitted = stream.tryEmit(MobileWalletEvent.issuance_offer_resolved)
+            val emitted = stream.tryEmit(MobileWalletEvent.IssuanceOfferResolved)
 
             assertTrue(emitted, "Progress event $index should not suspend or fail when the buffer is full")
         }
@@ -2654,7 +2656,7 @@ class MobileWalletTest {
             records: List<MobileWalletCredentialRegistryRecord>,
         ): MobileWalletCredentialRegistrationResult {
             replacements += registryId to records
-            return MobileWalletCredentialRegistrationResult(true, records.size)
+            return MobileWalletCredentialRegistrationResult.Applied(records.size)
         }
     }
 
@@ -2669,11 +2671,7 @@ class MobileWalletTest {
         ): MobileWalletCredentialRegistrationResult {
             replaceCalls++
             failure?.let { throw it }
-            return MobileWalletCredentialRegistrationResult(
-                available = false,
-                registeredEntryCount = 0,
-                reason = "Registry is unavailable",
-            )
+            return MobileWalletCredentialRegistrationResult.Unavailable("Registry is unavailable")
         }
     }
 

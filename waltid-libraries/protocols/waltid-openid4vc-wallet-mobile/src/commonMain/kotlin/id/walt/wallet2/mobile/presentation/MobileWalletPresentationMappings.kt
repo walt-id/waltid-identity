@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.mobile.presentation
 
+import id.walt.wallet2.mobile.credentials.MobileWalletCredential
 import id.walt.openid4vp.clientidprefix.prefixes.ClientId
 import id.walt.openid4vp.clientidprefix.prefixes.DecentralizedIdentifier
 import id.walt.openid4vp.clientidprefix.prefixes.OpenIdFederation
@@ -35,13 +36,16 @@ import kotlinx.serialization.json.contentOrNull
 internal fun PresentationCredentialOption.toMobileCredentialOption(): MobileWalletPresentationCredentialOption =
     MobileWalletPresentationCredentialOption(
         queryId = queryId,
-        credentialId = credentialId,
+        credential = MobileWalletCredential(
+            id = credentialId,
+            format = format,
+            credentialDataJson = credentialData.encodeJsonObject(),
+            issuer = issuer,
+            subject = subject,
+            label = label,
+            metadataJson = metadata?.encodeJsonObject(),
+        ),
         multiple = multiple,
-        format = format,
-        issuer = issuer,
-        subject = subject,
-        label = label,
-        credentialDataJson = credentialData.encodeJsonObject(),
         disclosures = disclosures.map { disclosure ->
             MobileWalletPresentationDisclosure(
                 path = disclosure.path,
@@ -51,7 +55,6 @@ internal fun PresentationCredentialOption.toMobileCredentialOption(): MobileWall
                 disposition = disclosureDisposition(disclosure.selectivelyDisclosable, disclosure.required, disclosure.selectable, disclosure.requested),
             )
         },
-        metadataJson = metadata?.encodeJsonObject(),
     )
 
 internal fun PresentationCredentialRequirement.toMobileCredentialRequirement(): MobileWalletPresentationCredentialRequirement =

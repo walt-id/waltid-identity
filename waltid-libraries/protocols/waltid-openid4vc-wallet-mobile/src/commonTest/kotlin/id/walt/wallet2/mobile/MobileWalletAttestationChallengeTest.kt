@@ -119,7 +119,7 @@ class MobileWalletAttestationChallengeTest {
                     val authorization = (session as MobileWalletIssuanceSession.AuthorizationCode).beginAuthorization(IssuanceClientRegistration("wallet", "openid://callback"))
                     assertNotNull(Url(authorization.request.url).parameters["request_uri"])
                     // A new SDK object must recover freshness and PKCE from the persisted session.
-                    openWallet().continueAuthorizationIssuance(authorization.id, "openid://callback?code=code&state=${authorization.request.state}")
+                    openWallet().completeAuthorization(authorization.id, "openid://callback?code=code&state=${authorization.request.state}")
                 } else (session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "wallet")
                 assertIs<WalletIssuanceOutcome.Deferred>(outcome)
                 assertEquals(if (discovery) iteration + 1 else 0, discoveries)

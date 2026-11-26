@@ -88,7 +88,7 @@ class MobileWalletMetadataChainTest {
             override val capabilities = MobileWalletDigitalCredentialCapabilities("test", true, "test", true, emptyList())
             override suspend fun replace(registryId: String, records: List<MobileWalletCredentialRegistryRecord>): MobileWalletCredentialRegistrationResult {
                 publishedRecords = records.toList()
-                return MobileWalletCredentialRegistrationResult(true, records.map { it.credentialId }.distinct().size)
+                return MobileWalletCredentialRegistrationResult.Applied(records.map { it.credentialId }.distinct().size)
             }
         }
         fun wallet(store: InMemoryCredentialStore) = MobileWallet(

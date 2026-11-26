@@ -1293,7 +1293,7 @@ class MobileWalletDigitalCredentialPresentationTest {
             records: List<MobileWalletCredentialRegistryRecord>,
         ): MobileWalletCredentialRegistrationResult {
             this.records = records
-            return MobileWalletCredentialRegistrationResult(available = true, registeredEntryCount = records.size)
+            return MobileWalletCredentialRegistrationResult.Applied(records.size)
         }
     }
 

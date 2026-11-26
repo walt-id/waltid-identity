@@ -99,7 +99,7 @@ class EnterpriseMobileWalletIntegrationTest {
                         }
                     }
                     assertTrue(callback.startsWith("$redirect?"))
-                    reopened.continueAuthorizationIssuance(authorization.id, callback)
+                    reopened.completeAuthorization(authorization.id, callback)
                 } else (session as MobileWalletIssuanceSession.PreAuthorized).accept(offer.txCode, clientId = "wallet-client")
                 val stored = assertIs<WalletIssuanceOutcome.Stored>(outcome)
                 assertEquals(1, stored.credentialIds.size)
@@ -250,7 +250,7 @@ class EnterpriseMobileWalletIntegrationTest {
             BatchAuthorizationTestActivity.callback.await()
         }
         val stored = assertIs<WalletIssuanceOutcome.Stored>(
-            reopened.continueAuthorizationIssuance(authorization.id, callback))
+            reopened.completeAuthorization(authorization.id, callback))
         assertEquals(2, stored.credentialIds.toSet().size)
         assertCopiesPresentAfterRecreation(walletId, stored.credentialIds, fixture, scenario)
     }

@@ -28,51 +28,30 @@ public class MobileWalletPresentationSelection(
 }
 
 /**
- * A wallet credential that satisfies one DCQL credential query in the presentation request.
- *
- * @property queryId DCQL credential query identifier this credential can satisfy.
- * @property credentialId Wallet-local credential identifier to submit when this option is selected.
- * @property format Credential format, such as `jwt_vc_json`, `vc+sd-jwt`, or `mso_mdoc`.
- * @property credentialDataJson Parsed credential data encoded as JSON for app-side display.
- * @property multiple Whether the DCQL credential query allows sharing multiple matching credentials.
- * @property issuer Issuer identifier extracted from the credential when available.
- * @property subject Subject identifier extracted from the credential when available.
- * @property label Optional display label stored with the credential.
- * @property disclosures Claim values requested by the verifier for this credential option.
- * @property metadataJson Optional stored display metadata encoded as JSON, including issuer and
- *   credential card art.
+ * A wallet credential matching one DCQL query and the disclosures available for that match.
+ * @property queryId Matched credential query.
+ * @property credential Credential and its stored display metadata.
+ * @property multiple Whether the query accepts multiple credentials.
  */
-@ConsistentCopyVisibility
-public data class MobileWalletPresentationCredentialOption internal constructor(
-    val queryId: String,
-    val credentialId: String,
-    val format: String,
-    val credentialDataJson: String,
-    val multiple: Boolean = false,
-    val issuer: String? = null,
-    val subject: String? = null,
-    val label: String? = null,
-    val disclosures: List<MobileWalletPresentationDisclosure> = emptyList(),
-    val metadataJson: String? = null,
+public class MobileWalletPresentationCredentialOption(
+    public val queryId: String,
+    public val credential: MobileWalletCredential,
+    public val multiple: Boolean = false,
+    disclosures: List<MobileWalletPresentationDisclosure> = emptyList(),
 ) {
-    /** Creates an option from a wallet credential and the review facts for this query. */
-    public constructor(
-        queryId: String,
-        credential: MobileWalletCredential,
-        multiple: Boolean = false,
-        disclosures: List<MobileWalletPresentationDisclosure> = emptyList(),
-    ) : this(queryId, credential.id, credential.format, credential.credentialDataJson, multiple,
-        credential.issuer, credential.subject, credential.label, buildList { addAll(disclosures) }, credential.metadataJson)
+    /** Claims available for review for this match. */
+    public val disclosures: List<MobileWalletPresentationDisclosure> = buildList { addAll(disclosures) }
 
-    /** Identifies this exact credential in its query when the holder selects it. */
+    /** Identifies this exact credential in its query. */
     public val selection: MobileWalletPresentationCredentialSelection
-        get() = MobileWalletPresentationCredentialSelection(queryId, credentialId)
+        get() = MobileWalletPresentationCredentialSelection(queryId, credential.id)
 
-    init {
-        require(queryId.isNotBlank()) {
-            "A presentation credential option query ID must not be blank."
-        }
-    }
+    init { require(queryId.isNotBlank()) { "A presentation credential option query ID must not be blank." } }
+
+    override fun equals(other: Any?): Boolean = other is MobileWalletPresentationCredentialOption &&
+        queryId == other.queryId && credential == other.credential && multiple == other.multiple && disclosures == other.disclosures
+
+    override fun hashCode(): Int = 31 * (31 * (31 * queryId.hashCode() + credential.hashCode()) + multiple.hashCode()) + disclosures.hashCode()
 }
 
 /**

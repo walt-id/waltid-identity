@@ -1,8 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.issuance.DeferredIssuanceId
 import id.walt.wallet2.handlers.IssuanceClientIdentification
 import id.walt.wallet2.handlers.PresentationReviewChangedException
-import id.walt.wallet2.handlers.WalletIssuanceContinuation
 import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
 import id.walt.wallet2.mobile.issuance.MobileWalletAuthorizationId
 import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSessionId
@@ -302,13 +302,13 @@ internal class MobileDemoWallet(
         sessionId: String,
         callbackUri: String,
     ): WalletDemoIssuanceOutcome =
-        mobileWallet.continueAuthorizationIssuance(MobileWalletAuthorizationId(sessionId), callbackUri).toDemoIssuanceOutcome()
+        mobileWallet.completeAuthorization(MobileWalletAuthorizationId(sessionId), callbackUri).toDemoIssuanceOutcome()
 
     override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome =
         mobileWallet.cancelIssuance(MobileWalletIssuanceSessionId(sessionId)).toDemoIssuanceOutcome()
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome =
-        mobileWallet.resumeDeferredIssuance(WalletIssuanceContinuation(deferredCredentialId)).toDemoIssuanceOutcome()
+        mobileWallet.resumeDeferredIssuance(DeferredIssuanceId(deferredCredentialId)).toDemoIssuanceOutcome()
 
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
         when (val result = mobileWallet.previewPresentation(requestUrl)) {

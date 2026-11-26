@@ -116,23 +116,23 @@ private fun MobileWalletReaderAuthentication.toDemoReaderTrust(trust: ReaderTrus
 private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): WalletDemoPresentationCredentialOption =
     WalletDemoPresentationCredentialOption(
         queryId = queryId,
-        credentialId = credentialId,
+        credentialId = credential.id,
         multiple = multiple,
         label = resolveCardTitle(
-            format = format,
-            credentialDataJson = credentialDataJson,
+            format = credential.format,
+            credentialDataJson = credential.credentialDataJson,
             displayName = presentationDisplayName(
-                format = format,
-                metadataJson = metadataJson,
-                storedLabel = label,
+                format = credential.format,
+                metadataJson = credential.metadataJson,
+                storedLabel = credential.label,
             ),
-            fallback = format,
+            fallback = credential.format,
         ),
-        issuer = issuer,
-        subject = subject,
-        format = format,
-        credentialDataJson = credentialDataJson,
-        metadataJson = metadataJson,
+        issuer = credential.issuer,
+        subject = credential.subject,
+        format = credential.format,
+        credentialDataJson = credential.credentialDataJson,
+        metadataJson = credential.metadataJson,
         disclosures = disclosures.map { disclosure ->
             WalletDemoPresentationDisclosure(
                 label = CredentialDisplayVocabulary.disclosureLabel(disclosure.name, disclosure.path),

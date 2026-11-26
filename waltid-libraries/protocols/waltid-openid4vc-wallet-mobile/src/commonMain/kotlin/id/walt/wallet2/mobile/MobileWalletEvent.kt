@@ -11,10 +11,10 @@ import kotlinx.coroutines.flow.asSharedFlow
  */
 public enum class MobileWalletEventPhase {
     /** Credential issuance flow. */
-    issuance,
+    Issuance,
 
     /** Credential presentation flow. */
-    presentation,
+    Presentation,
 }
 
 /**
@@ -22,43 +22,45 @@ public enum class MobileWalletEventPhase {
  */
 public enum class MobileWalletEventStatus {
     /** The flow is still running. */
-    progress,
+    Progress,
 
     /** The flow completed successfully. */
-    completed,
+    Completed,
 
     /** The flow failed. */
-    failed,
+    Failed,
 }
 
 /**
  * Observable mobile wallet session event.
  *
- * The enum name is the stable event name emitted by the underlying wallet flow.
+ * [identifier] is the stable event name emitted by the underlying wallet flow.
  *
  * @property phase Issuance or presentation flow that emitted the event.
  * @property status Current progress state for the event.
  */
 public enum class MobileWalletEvent(
+    /** Stable event identifier for logging and persistence. */
+    public val identifier: String,
     public val phase: MobileWalletEventPhase,
     public val status: MobileWalletEventStatus,
 ) {
-    issuance_offer_resolved(MobileWalletEventPhase.issuance, MobileWalletEventStatus.progress),
-    issuance_attestation_obtained(MobileWalletEventPhase.issuance, MobileWalletEventStatus.progress),
-    issuance_token_obtained(MobileWalletEventPhase.issuance, MobileWalletEventStatus.progress),
-    issuance_proof_signed(MobileWalletEventPhase.issuance, MobileWalletEventStatus.progress),
-    issuance_credential_received(MobileWalletEventPhase.issuance, MobileWalletEventStatus.progress),
-    issuance_deferred(MobileWalletEventPhase.issuance, MobileWalletEventStatus.progress),
-    issuance_credential_stored(MobileWalletEventPhase.issuance, MobileWalletEventStatus.progress),
-    issuance_completed(MobileWalletEventPhase.issuance, MobileWalletEventStatus.completed),
-    issuance_failed(MobileWalletEventPhase.issuance, MobileWalletEventStatus.failed),
-    presentation_request_parsed(MobileWalletEventPhase.presentation, MobileWalletEventStatus.progress),
-    presentation_credentials_selected(MobileWalletEventPhase.presentation, MobileWalletEventStatus.progress),
-    presentation_signed(MobileWalletEventPhase.presentation, MobileWalletEventStatus.progress),
-    presentation_response_prepared(MobileWalletEventPhase.presentation, MobileWalletEventStatus.progress),
-    presentation_submitted(MobileWalletEventPhase.presentation, MobileWalletEventStatus.progress),
-    presentation_completed(MobileWalletEventPhase.presentation, MobileWalletEventStatus.completed),
-    presentation_failed(MobileWalletEventPhase.presentation, MobileWalletEventStatus.failed),
+    IssuanceOfferResolved("issuance_offer_resolved", MobileWalletEventPhase.Issuance, MobileWalletEventStatus.Progress),
+    IssuanceAttestationObtained("issuance_attestation_obtained", MobileWalletEventPhase.Issuance, MobileWalletEventStatus.Progress),
+    IssuanceTokenObtained("issuance_token_obtained", MobileWalletEventPhase.Issuance, MobileWalletEventStatus.Progress),
+    IssuanceProofSigned("issuance_proof_signed", MobileWalletEventPhase.Issuance, MobileWalletEventStatus.Progress),
+    IssuanceCredentialReceived("issuance_credential_received", MobileWalletEventPhase.Issuance, MobileWalletEventStatus.Progress),
+    IssuanceDeferred("issuance_deferred", MobileWalletEventPhase.Issuance, MobileWalletEventStatus.Progress),
+    IssuanceCredentialStored("issuance_credential_stored", MobileWalletEventPhase.Issuance, MobileWalletEventStatus.Progress),
+    IssuanceCompleted("issuance_completed", MobileWalletEventPhase.Issuance, MobileWalletEventStatus.Completed),
+    IssuanceFailed("issuance_failed", MobileWalletEventPhase.Issuance, MobileWalletEventStatus.Failed),
+    PresentationRequestParsed("presentation_request_parsed", MobileWalletEventPhase.Presentation, MobileWalletEventStatus.Progress),
+    PresentationCredentialsSelected("presentation_credentials_selected", MobileWalletEventPhase.Presentation, MobileWalletEventStatus.Progress),
+    PresentationSigned("presentation_signed", MobileWalletEventPhase.Presentation, MobileWalletEventStatus.Progress),
+    PresentationResponsePrepared("presentation_response_prepared", MobileWalletEventPhase.Presentation, MobileWalletEventStatus.Progress),
+    PresentationSubmitted("presentation_submitted", MobileWalletEventPhase.Presentation, MobileWalletEventStatus.Progress),
+    PresentationCompleted("presentation_completed", MobileWalletEventPhase.Presentation, MobileWalletEventStatus.Completed),
+    PresentationFailed("presentation_failed", MobileWalletEventPhase.Presentation, MobileWalletEventStatus.Failed),
 }
 
 internal class MobileWalletEventStream(
@@ -78,20 +80,20 @@ internal class MobileWalletEventStream(
 
 internal fun WalletSessionEvent.toMobileWalletEvent(): MobileWalletEvent =
     when (this) {
-        WalletSessionEvent.issuance_offer_resolved -> MobileWalletEvent.issuance_offer_resolved
-        WalletSessionEvent.issuance_attestation_obtained -> MobileWalletEvent.issuance_attestation_obtained
-        WalletSessionEvent.issuance_token_obtained -> MobileWalletEvent.issuance_token_obtained
-        WalletSessionEvent.issuance_proof_signed -> MobileWalletEvent.issuance_proof_signed
-        WalletSessionEvent.issuance_credential_received -> MobileWalletEvent.issuance_credential_received
-        WalletSessionEvent.issuance_deferred -> MobileWalletEvent.issuance_deferred
-        WalletSessionEvent.issuance_credential_stored -> MobileWalletEvent.issuance_credential_stored
-        WalletSessionEvent.issuance_completed -> MobileWalletEvent.issuance_completed
-        WalletSessionEvent.issuance_failed -> MobileWalletEvent.issuance_failed
-        WalletSessionEvent.presentation_request_parsed -> MobileWalletEvent.presentation_request_parsed
-        WalletSessionEvent.presentation_credentials_selected -> MobileWalletEvent.presentation_credentials_selected
-        WalletSessionEvent.presentation_signed -> MobileWalletEvent.presentation_signed
-        WalletSessionEvent.presentation_response_prepared -> MobileWalletEvent.presentation_response_prepared
-        WalletSessionEvent.presentation_submitted -> MobileWalletEvent.presentation_submitted
-        WalletSessionEvent.presentation_completed -> MobileWalletEvent.presentation_completed
-        WalletSessionEvent.presentation_failed -> MobileWalletEvent.presentation_failed
+        WalletSessionEvent.issuance_offer_resolved -> MobileWalletEvent.IssuanceOfferResolved
+        WalletSessionEvent.issuance_attestation_obtained -> MobileWalletEvent.IssuanceAttestationObtained
+        WalletSessionEvent.issuance_token_obtained -> MobileWalletEvent.IssuanceTokenObtained
+        WalletSessionEvent.issuance_proof_signed -> MobileWalletEvent.IssuanceProofSigned
+        WalletSessionEvent.issuance_credential_received -> MobileWalletEvent.IssuanceCredentialReceived
+        WalletSessionEvent.issuance_deferred -> MobileWalletEvent.IssuanceDeferred
+        WalletSessionEvent.issuance_credential_stored -> MobileWalletEvent.IssuanceCredentialStored
+        WalletSessionEvent.issuance_completed -> MobileWalletEvent.IssuanceCompleted
+        WalletSessionEvent.issuance_failed -> MobileWalletEvent.IssuanceFailed
+        WalletSessionEvent.presentation_request_parsed -> MobileWalletEvent.PresentationRequestParsed
+        WalletSessionEvent.presentation_credentials_selected -> MobileWalletEvent.PresentationCredentialsSelected
+        WalletSessionEvent.presentation_signed -> MobileWalletEvent.PresentationSigned
+        WalletSessionEvent.presentation_response_prepared -> MobileWalletEvent.PresentationResponsePrepared
+        WalletSessionEvent.presentation_submitted -> MobileWalletEvent.PresentationSubmitted
+        WalletSessionEvent.presentation_completed -> MobileWalletEvent.PresentationCompleted
+        WalletSessionEvent.presentation_failed -> MobileWalletEvent.PresentationFailed
     }

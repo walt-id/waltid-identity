@@ -33,22 +33,37 @@ public data class MobileWalletCredentialRegistryField(
     public val selectivelyDisclosable: Boolean,
 )
 
-/**
- * Outcome of synchronizing the platform registry with the current wallet credential metadata.
- *
- * A result with [available] false means the platform projection is now out of date, not that the
- * wallet operation which triggered the synchronization failed. Callers that care about the
- * projection should surface the [reason] and retry [MobileWalletCredentialRegistry.replace].
- *
- * @property available Whether registration is available after the attempt.
- * @property registeredEntryCount Number of registered entries.
- * @property reason Optional diagnostic when registration is unavailable.
- */
-public data class MobileWalletCredentialRegistrationResult(
-    public val available: Boolean,
-    public val registeredEntryCount: Int,
-    public val reason: String? = null,
-)
+/** Outcome of replacing operating-system entries or saving a projection for the host to publish. */
+public sealed interface MobileWalletCredentialRegistrationResult {
+    /** Whether the platform can currently accept registrations. */
+    public val available: Boolean
+    /** Entries applied or saved by this attempt. An unavailable attempt acknowledges zero entries. */
+    public val entryCount: Int
+    /** Diagnostic when registration could not complete or the platform is unavailable. */
+    public val reason: String?
+
+    /** The platform accepted the replacement. Zero means its registry was explicitly cleared. */
+    public data class Applied(override val entryCount: Int) : MobileWalletCredentialRegistrationResult {
+        override val available: Boolean get() = true
+        override val reason: String? get() = null
+        init { require(entryCount >= 0) }
+    }
+
+    /** Desired entries were saved. The host still has to publish them to the operating system. */
+    public data class ProjectionSaved(
+        override val entryCount: Int,
+        override val available: Boolean,
+        override val reason: String? = null,
+    ) : MobileWalletCredentialRegistrationResult {
+        init { require(entryCount >= 0) }
+    }
+
+    /** The adapter could not replace or save entries. A previous set may still be in effect. */
+    public data class Unavailable(override val reason: String) : MobileWalletCredentialRegistrationResult {
+        override val available: Boolean get() = false
+        override val entryCount: Int get() = 0
+    }
+}
 
 /** Platform adapter for metadata-only registration. Android framework types never cross this boundary. */
 public interface MobileWalletCredentialRegistry {
@@ -75,10 +90,7 @@ public interface MobileWalletCredentialRegistry {
      * Default is a no-op for platforms without an issuance-provider integration.
      */
     public suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult =
-        MobileWalletCredentialRegistrationResult(
-            available = capabilities.registrationAvailable,
-            registeredEntryCount = 0,
-        )
+        MobileWalletCredentialRegistrationResult.Unavailable("This adapter does not advertise issuance options")
 }
 
 /** Registry used when the current platform or application has no registration integration. */
@@ -96,9 +108,5 @@ public object UnavailableMobileWalletCredentialRegistry : MobileWalletCredential
     override suspend fun replace(
         registryId: String,
         records: List<MobileWalletCredentialRegistryRecord>,
-    ): MobileWalletCredentialRegistrationResult = MobileWalletCredentialRegistrationResult(
-        available = false,
-        registeredEntryCount = 0,
-        reason = "Digital credential registration is unavailable",
-    )
+    ): MobileWalletCredentialRegistrationResult = MobileWalletCredentialRegistrationResult.Unavailable("Digital credential registration is unavailable")
 }
