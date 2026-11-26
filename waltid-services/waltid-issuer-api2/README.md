@@ -76,9 +76,10 @@ Configuration files live in `config/`:
 | `persistence.conf` | In-memory or Redis-backed repository configuration |
 | `authentication-service.conf` | External OAuth login for credential subjects in authorization code flows |
 
-The bundled mDL profiles omit optional `age_in_years`. The Swagger mDL age override
-example supplies the age in completed years for its sample birth date on the current UTC date.
-When the profile and offer omit `msoData.validFrom`, validity starts at the MSO signing timestamp.
+The bundled `isoMdl` profile supplies `age_in_years = 38` for UTC validity start dates from
+August 25, 2026 through August 24, 2027. Update the sample age in the profile or offer
+when issuing outside that range. When the profile and offer omit `msoData.validFrom`,
+validity starts at the MSO signing timestamp.
 
 Set `KEYCLOAK_CLIENT_SECRET` to the Keycloak client secret when using
 external OAuth authentication. The service and Docker Compose configuration files

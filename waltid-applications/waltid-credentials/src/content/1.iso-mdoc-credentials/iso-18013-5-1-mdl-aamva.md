@@ -11,12 +11,15 @@
 
 ## Credential Data
 
+The sample age of 55 applies when the UTC date of MSO `validFrom` falls from 2026-09-01 through 2027-08-31.
+
 ```json
 {
   "org.iso.18013.5.1": {
     "family_name": "Mustermann",
     "given_name": "Erika",
     "birth_date": "1971-09-01",
+    "age_in_years": 55,
     "issue_date": "2024-03-15",
     "expiry_date": "2028-09-01",
     "issuing_country": "US",

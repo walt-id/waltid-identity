@@ -352,6 +352,7 @@ class Issuer2ProfileEndpointTest {
 
         val mdlData = profile.credentialData[ISO_MDL_NAMESPACE_ID]?.jsonObject
         assertEquals(CATALOG_PORTRAIT_BASE64, mdlData?.get("portrait")?.jsonPrimitive?.content)
+        assertEquals(JsonPrimitive(38), mdlData?.get("age_in_years"))
         assertEquals(2, mdlData?.get("driving_privileges")?.jsonArray?.size)
         assertEquals("Mariahilfer Straße 120/8", mdlData?.get("resident_address")?.jsonPrimitive?.content)
         assertEquals(setOf("$.family_name", "$.given_name"), profile.idTokenClaimsMapping?.keys)

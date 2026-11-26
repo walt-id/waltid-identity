@@ -233,7 +233,7 @@ class Issuer2MsoDataWalletFlowTest {
             runtimeOverrides = overrides,
         )
 
-        suspend fun redeem(offer: CredentialOfferCreateResponse, age: Int? = null, validFrom: Instant) {
+        suspend fun redeem(offer: CredentialOfferCreateResponse, age: Int, validFrom: Instant) {
             val resolved = walletFlow.resolve(offer)
             val token = walletFlow.exchangePreAuthorizedCode(resolved, txCode = null)
             val payload = walletFlow.requestCredential(resolved, token.access_token, includeDidInProof = false)
@@ -241,7 +241,7 @@ class Issuer2MsoDataWalletFlowTest {
             assertEquals(validFrom, mdocValidityInfo(payload).validFrom)
             val issuerSigned = decodeIssuerSigned(payload)
             val namespace = issuerSigned.namespacesToJson().getValue(ISO_MDL_NAMESPACE).jsonObject
-            assertEquals(age?.let { JsonPrimitive(it) }, namespace["age_in_years"])
+            assertEquals(JsonPrimitive(age), namespace["age_in_years"])
             assertEquals(JsonPrimitive("AT"), namespace["nationality"])
             val signedElements = assertNotNull(issuerSigned.namespaces?.get(ISO_MDL_NAMESPACE)).entries
             assertTrue(signedElements.none { it.value.elementIdentifier.startsWith("biometric_template_") })
@@ -254,7 +254,7 @@ class Issuer2MsoDataWalletFlowTest {
             msoData = validFrom?.let { MsoData(validFrom = it.toString()) },
         )
         val crossingBirthday = offer(overrides(age = 38))
-        redeem(offer(), validFrom = issuedAt)
+        redeem(offer(), age = 38, validFrom = issuedAt)
         issuedAt = beforeBirthday
         redeem(
             offer(overrides(age = 38, validFrom = beforeBirthday)),

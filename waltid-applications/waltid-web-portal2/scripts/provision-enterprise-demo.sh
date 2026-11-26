@@ -167,6 +167,7 @@ configurations = {
                 claim(["org.iso.18013.5.1", "family_name"], "Family name"),
                 claim(["org.iso.18013.5.1", "given_name"], "Given name"),
                 claim(["org.iso.18013.5.1", "birth_date"], "Birth date"),
+                claim(["org.iso.18013.5.1", "age_in_years"], "Age in years"),
                 claim(["org.iso.18013.5.1", "driving_privileges"], "Driving privileges"),
             ],
         },
@@ -236,7 +237,7 @@ profiles = {
                 "family_name": "Musterfrau",
                 "given_name": "Anna",
                 "birth_date": "1990-01-01",
-                # "age_in_years": 36,  # For UTC validFrom dates 2026-01-01 through 2026-12-31.
+                "age_in_years": 36,  # For UTC validFrom dates 2026-01-01 through 2026-12-31.
                 "issuing_country": "AT",
                 "driving_privileges": [{"vehicle_category_code": "B"}],
             }
