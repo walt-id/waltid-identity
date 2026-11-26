@@ -187,8 +187,7 @@ public data class ProximityConfiguration(
     public val profile: ProximityProfile =
         ProximityProfile.Iso180135Edition2Dis2026,
     public val session: ProximitySessionConfiguration = ProximitySessionConfiguration.Qr(),
-    public val readerPolicy: ProximityReaderPolicy =
-        ProximityReaderPolicy.AllowAnonymousOrUntrusted,
+    public val readerPolicy: ProximityReaderPolicy = profile.defaultReaderPolicy(),
     public val deviceAuthenticationPolicy: ProximityDeviceAuthenticationPolicy =
         ProximityDeviceAuthenticationPolicy.SignatureOnly,
     public val readerTrustEvaluator: ProximityReaderTrustEvaluator =
@@ -201,6 +200,10 @@ public data class ProximityConfiguration(
     /** Explicit holder-approval behavior, independent of engagement and retrieval methods. */
     public val approval: ProximityApproval = ProximityApproval.AskEachTime,
 ) {
+    /** Derives a configuration for [profile], preserving a stronger reader policy already selected by the host. */
+    public fun withProfile(profile: ProximityProfile): ProximityConfiguration =
+        copy(profile = profile, readerPolicy = if (profile == ProximityProfile.EudiArf3Fcaf202608) ProximityReaderPolicy.RequireTrusted else readerPolicy)
+
     init {
         require(maximumMessageBytes in 1..16_777_216) {
             "Maximum proximity message size must be between 1 byte and 16 MiB"
@@ -218,4 +221,9 @@ public data class ProximityConfiguration(
         }
 
     }
+}
+
+private fun ProximityProfile.defaultReaderPolicy() = when (this) {
+    ProximityProfile.EudiArf3Fcaf202608 -> ProximityReaderPolicy.RequireTrusted
+    ProximityProfile.Iso1801352021, ProximityProfile.Iso180135Edition2Dis2026 -> ProximityReaderPolicy.AllowAnonymousOrUntrusted
 }

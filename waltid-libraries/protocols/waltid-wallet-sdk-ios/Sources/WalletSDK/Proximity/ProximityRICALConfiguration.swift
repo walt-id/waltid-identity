@@ -11,9 +11,9 @@ public struct ProximityRICALSignerEvidence: Sendable, Equatable {
     /// - Parameters:
     ///   - providerID: Stable identifier of the configured provider.
     ///   - certificateChainDER: Nonempty DER certificate chain in leaf-first order.
-    public init(providerID: String, certificateChainDER: [Data]) {
-        precondition(isProximityNonBlank(providerID))
-        precondition(!certificateChainDER.isEmpty && certificateChainDER.allSatisfy { !$0.isEmpty })
+    public init(providerID: String, certificateChainDER: [Data]) throws {
+        try requireProximityInput(isProximityNonBlank(providerID))
+        try requireProximityInput(!certificateChainDER.isEmpty && certificateChainDER.allSatisfy { !$0.isEmpty })
         self.providerID = providerID
         self.certificateChainDER = certificateChainDER
     }
@@ -44,8 +44,8 @@ public struct ProximityRICALProviderTrustAnchor: Sendable, Equatable {
 
     /// Creates an explicitly application-provisioned RICAL signer trust anchor.
     /// - Parameter certificateDER: DER-encoded trust-anchor certificate.
-    public init(certificateDER: Data) {
-        precondition(isProximityX509Certificate(certificateDER))
+    public init(certificateDER: Data) throws {
+        try requireProximityInput(isProximityX509Certificate(certificateDER))
         self.certificateDER = certificateDER
     }
 }
@@ -53,20 +53,20 @@ public struct ProximityRICALProviderTrustAnchor: Sendable, Equatable {
 /// Immutable active-RICAL result from an application-owned provider boundary.
 public struct ProximityRICALProviderResult: Sendable, Equatable {
     /// Supplies exact untagged COSE_Sign1 bytes.
-    public static func available(signedRICAL: Data) -> Self {
-        precondition(!signedRICAL.isEmpty)
+    public static func available(signedRICAL: Data) throws -> Self {
+        try requireProximityInput(!signedRICAL.isEmpty)
         return Self(storage: .available(signedRICAL: signedRICAL))
     }
 
     /// No active list is available.
-    public static func unavailable(reason: String) -> Self {
-        precondition(isProximityNonBlank(reason))
+    public static func unavailable(reason: String) throws -> Self {
+        try requireProximityInput(isProximityNonBlank(reason))
         return Self(storage: .unavailable(reason: reason))
     }
 
     /// The application detected conflicting active-list state.
-    public static func conflict(reason: String) -> Self {
-        precondition(isProximityNonBlank(reason))
+    public static func conflict(reason: String) throws -> Self {
+        try requireProximityInput(isProximityNonBlank(reason))
         return Self(storage: .conflict(reason: reason))
     }
 
@@ -93,9 +93,9 @@ public struct ProximityRICALTrustConstraint: Sendable, Equatable {
 
     /// Creates one nonempty ecosystem-specific RICAL trust constraint.
     /// - Parameter valuesCBOR: Constraint names mapped to nonempty CBOR-encoded values.
-    public init(valuesCBOR: [String: Data]) {
-        precondition(!valuesCBOR.isEmpty)
-        precondition(valuesCBOR.allSatisfy { isProximityNonBlank($0.key) && !$0.value.isEmpty })
+    public init(valuesCBOR: [String: Data]) throws {
+        try requireProximityInput(!valuesCBOR.isEmpty)
+        try requireProximityInput(valuesCBOR.allSatisfy { isProximityNonBlank($0.key) && !$0.value.isEmpty })
         self.valuesCBOR = valuesCBOR
     }
 }
@@ -151,14 +151,14 @@ public struct ProximityRICALConfiguration: Sendable {
         signerRevocationPolicy: ProximityRICALSignerRevocationPolicy = .notChecked,
         establishReaderTrust: Bool = false,
         constraintEvaluator: (any ProximityRICALConstraintEvaluator)? = nil
-    ) {
-        precondition(isProximityNonBlank(providerID))
-        precondition(!acceptedTypes.isEmpty && acceptedTypes.allSatisfy(isProximityNonBlank))
-        precondition(
+    ) throws {
+        try requireProximityInput(isProximityNonBlank(providerID))
+        try requireProximityInput(!acceptedTypes.isEmpty && acceptedTypes.allSatisfy(isProximityNonBlank))
+        try requireProximityInput(
             !providerTrustAnchors.isEmpty &&
                 Set(providerTrustAnchors.map(\.certificateDER)).count == providerTrustAnchors.count
         )
-        precondition(
+        try requireProximityInput(
             !acceptedSignerCertificatePolicyOIDs.isEmpty &&
                 acceptedSignerCertificatePolicyOIDs.allSatisfy(isProximityNonBlank)
         )

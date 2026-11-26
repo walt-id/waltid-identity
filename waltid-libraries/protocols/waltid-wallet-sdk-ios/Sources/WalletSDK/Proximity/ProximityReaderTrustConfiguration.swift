@@ -11,9 +11,9 @@ public struct ProximityReaderTrustAnchor: Sendable, Equatable {
     /// - Parameters:
     ///   - certificateDER: DER-encoded Reader CA certificate.
     ///   - displayName: Optional display-safe authority label.
-    public init(certificateDER: Data, displayName: String? = nil) {
-        precondition(isProximityX509Certificate(certificateDER))
-        precondition(displayName == nil || isProximityNonBlank(displayName!))
+    public init(certificateDER: Data, displayName: String? = nil) throws {
+        try requireProximityInput(isProximityX509Certificate(certificateDER))
+        try requireProximityInput(displayName == nil || isProximityNonBlank(displayName!))
         self.certificateDER = certificateDER
         self.displayName = displayName
     }
@@ -22,14 +22,14 @@ public struct ProximityReaderTrustAnchor: Sendable, Equatable {
 /// Immutable result from an application-owned certificate-status source.
 public struct ProximityCertificateRevocationResult: Sendable, Equatable {
     /// The configured source established that the certificate is revoked.
-    public static func revoked(reason: String? = nil) -> Self {
-        precondition(reason == nil || isProximityNonBlank(reason!))
+    public static func revoked(reason: String? = nil) throws -> Self {
+        try requireProximityInput(reason == nil || isProximityNonBlank(reason!))
         return Self(storage: .revoked(reason: reason))
     }
 
     /// The configured source could not establish current revocation status.
-    public static func indeterminate(reason: String) -> Self {
-        precondition(isProximityNonBlank(reason))
+    public static func indeterminate(reason: String) throws -> Self {
+        try requireProximityInput(isProximityNonBlank(reason))
         return Self(storage: .indeterminate(reason: reason))
     }
 
@@ -115,10 +115,10 @@ public struct ProximityReaderTrustConfiguration: Sendable {
         ricalProviders: [ProximityRICALConfiguration] = [],
         revocationPolicy: ProximityReaderRevocationPolicy = .notChecked,
         requiredIACAIssuerCertificateDER: Data? = nil
-    ) {
-        precondition(!trustAnchors.isEmpty || !ricalProviders.isEmpty)
-        precondition(Set(trustAnchors.map(\.certificateDER)).count == trustAnchors.count)
-        precondition(Set(ricalProviders.map(\.providerID)).count == ricalProviders.count)
+    ) throws {
+        try requireProximityInput(!trustAnchors.isEmpty || !ricalProviders.isEmpty)
+        try requireProximityInput(Set(trustAnchors.map(\.certificateDER)).count == trustAnchors.count)
+        try requireProximityInput(Set(ricalProviders.map(\.providerID)).count == ricalProviders.count)
         self.trustAnchors = trustAnchors
         self.ricalProviders = ricalProviders
         self.revocationPolicy = revocationPolicy

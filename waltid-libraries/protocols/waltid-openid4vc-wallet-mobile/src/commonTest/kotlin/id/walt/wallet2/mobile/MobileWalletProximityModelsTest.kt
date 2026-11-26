@@ -83,16 +83,15 @@ class ProximityModelsTest {
 
     @Test
     fun `EUDI profile requires trusted-reader policy`() {
+        val profile = ProximityProfile.EudiArf3Fcaf202608
+        val configuration = ProximityConfiguration(profile = profile)
+        assertEquals(ProximityReaderPolicy.RequireTrusted, configuration.readerPolicy)
+        assertEquals(configuration, ProximityConfiguration().withProfile(profile))
+        assertEquals(ProximityReaderPolicy.RequireTrusted,
+            configuration.withProfile(ProximityProfile.Iso1801352021).readerPolicy)
         assertFailsWith<IllegalArgumentException> {
-            ProximityConfiguration(
-                profile = ProximityProfile.EudiArf3Fcaf202608,
-            )
+            ProximityConfiguration(profile = profile, readerPolicy = ProximityReaderPolicy.AllowAnonymousOrUntrusted)
         }
-
-        ProximityConfiguration(
-            profile = ProximityProfile.EudiArf3Fcaf202608,
-            readerPolicy = ProximityReaderPolicy.RequireTrusted,
-        )
         assertFailsWith<IllegalArgumentException> {
             ProximityConfiguration(
                 profile = ProximityProfile.EudiArf3Fcaf202608,

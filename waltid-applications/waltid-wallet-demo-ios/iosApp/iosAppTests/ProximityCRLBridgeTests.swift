@@ -14,7 +14,7 @@ final class ProximityCRLBridgeTests: XCTestCase {
 
     func testRequiredIacaIssuerRequiresContactThroughSwiftBridge() async throws {
         let root = ProximityCRLFixtures.issuerWithoutCdp
-        let anchor = ProximityReaderTrustAnchor(certificateDER: root)
+        let anchor = try ProximityReaderTrustAnchor(certificateDER: root)
         let fetcher = RecordingCRLFetcher(.available(der: ProximityCRLFixtures.good))
         let crl = try ProximityCRLRevocationEvaluator(issuerCertificatesDER: [root], scope: .validatedPath, fetcher: fetcher)
         let evaluator = ProximityConfiguredReaderTrustEvaluator(configuration: .init(
@@ -33,9 +33,9 @@ final class ProximityCRLBridgeTests: XCTestCase {
             (ProximityCRLFixtures.good, ProximityCRLScope.readerCertificateAndIssuingAuthorities,
              ProximityCertificateRevocationResult.good),
             (ProximityCRLFixtures.readerRevoked, .readerCertificateAndIssuingAuthorities,
-             .revoked(reason: "Reader certificate is revoked")),
+             try .revoked(reason: "Reader certificate is revoked")),
             (ProximityCRLFixtures.authorityRevoked, .readerCertificateAndIssuingAuthorities,
-             .revoked(reason: "Reader certificate authority is revoked")),
+             try .revoked(reason: "Reader certificate authority is revoked")),
             (ProximityCRLFixtures.authorityRevoked, .readerCertificate, .good),
         ] {
             let fetcher = RecordingCRLFetcher(.available(der: der))
@@ -54,7 +54,7 @@ final class ProximityCRLBridgeTests: XCTestCase {
                          .available(der: Data(count: 2_097_153)), .available(der: badSignature)] {
             let evaluator = try makeEvaluator(fetcher: RecordingCRLFetcher(response))
             let result = try await evaluator.evaluate(evidence)
-            XCTAssertEqual(result, .indeterminate(reason: "Reader certificate CRL status could not be established"))
+            XCTAssertEqual(result, try .indeterminate(reason: "Reader certificate CRL status could not be established"))
         }
     }
 
