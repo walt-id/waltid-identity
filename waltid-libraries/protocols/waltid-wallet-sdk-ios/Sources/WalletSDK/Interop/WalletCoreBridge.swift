@@ -187,6 +187,12 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
 
 @available(macOS 10.15, *)
 extension WalletCoreBridge {
+    func credentialStatusMaintenanceEnrollment() async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func setCredentialStatusMaintenance(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func reconcileCredentialStatusMaintenance(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func invalidateCredentialStatusSnapshot() async throws {}
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {}
+
     var signingIdentityCore: any SigningIdentityCore { UnavailableSigningIdentityCore() }
 }
 

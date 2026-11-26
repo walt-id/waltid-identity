@@ -457,6 +457,7 @@ final class AnnexCPresentationModelTests: XCTestCase {
 
         func submitAnnexCPresentation(_ submission: AnnexCSubmission) async throws -> DigitalCredentialResponse {
             lock.withLock { ordinaryCount += 1 }
+            if let directSubmitFailure { throw directSubmitFailure }
             return try seal(requestID: submission.requestID, verifiedOrigin: submission.verifiedOrigin,
                 deviceRequestBase64URL: submission.deviceRequestBase64URL, encryptionInfoBase64URL: submission.encryptionInfoBase64URL,
                 selectedCredentialOptions: submission.selectedCredentialOptions)
