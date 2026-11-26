@@ -95,11 +95,11 @@ internal class DefaultWalletSdkBridgeOperations(
     ): WalletIssuanceOutcome =
         wallet.continuePreAuthorizedIssuance(sessionId, transactionCode, credentials, clientId)
 
-    override suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    override suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
     ): WalletIssuanceOutcome =
-        wallet.completeAuthorization(IssuanceAuthorizationId(sessionId), callbackUri)
+        wallet.completeAuthorization(IssuanceAuthorizationId(authorizationId), callbackUri)
 
     override suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome =
         wallet.cancelIssuance(IssuanceSessionId(sessionId))

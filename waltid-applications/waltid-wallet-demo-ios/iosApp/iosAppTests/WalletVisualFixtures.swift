@@ -232,7 +232,7 @@ struct WalletVisualFixtures {
             responseProtection: .encrypted(mechanism: payment ? .dcAPIJWT : .annexCHPKE),
             transactionData: payment ? [ClaimGroup(id: "transaction:0", title: "Payment", items: [], transactionType: "urn:eudi:sca:payment:1")] : []),
             credentialOptions: options,
-            credentialRequirements: Array(Set(options.map(\.queryID))).sorted().map { .init(options: [[$0]]) })
+            credentialRequirements: try Set(options.map(\.queryID)).sorted().map { try .init(options: [[$0]]) })
     }
 
     func payment(localized: Bool = false, recurring: Bool? = nil) throws -> PaymentConsent {

@@ -260,17 +260,17 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(scheduled.fields.filter { $0.group == .timing }.map(\.paymentPath), [["execution_date"]])
     }
 
-    func testSoleRequiredMatchesHaveNoSelectionControlButAlternativesRemainSelectable() {
+    func testSoleRequiredMatchesHaveNoSelectionControlButAlternativesRemainSelectable() throws {
         let identity = option(queryID: "pid", credentialID: "one")
         let address = option(queryID: "address", credentialID: "two")
         let request = SharingRequest(requester: nil)
         XCTAssertFalse(SharingReviewModel(request: request, credentialOptions: [identity]).allowsCredentialSelection(identity))
         let both = SharingReviewModel(request: request, credentialOptions: [identity, address],
-            credentialRequirements: [.init(options: [["pid", "address"]])])
+            credentialRequirements: [try .init(options: [["pid", "address"]])])
         XCTAssertFalse(both.allowsCredentialSelection(identity))
         XCTAssertFalse(both.allowsCredentialSelection(address))
         let either = SharingReviewModel(request: request, credentialOptions: [identity, address],
-            credentialRequirements: [.init(options: [["pid"], ["address"]])])
+            credentialRequirements: [try .init(options: [["pid"], ["address"]])])
         XCTAssertTrue(either.allowsCredentialSelection(identity))
         XCTAssertTrue(either.allowsCredentialSelection(address))
         let alternatives = SharingReviewModel(request: request,
@@ -280,8 +280,8 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Requester identity
 
-    func testNormalOpenIDReviewIsHeadedByVerifierMetadataAndNotByAVerifiedOrigin() {
-        let review = openIDPreview(
+    func testNormalOpenIDReviewIsHeadedByVerifierMetadataAndNotByAVerifiedOrigin() throws {
+        let review = try openIDPreview(
             verifierMetadata: VerifierMetadata(
                 display: MetadataDisplay(name: "Example Verifier", locale: "en", logoURI: nil, logoAltText: nil),
                 clientURI: "https://verifier.example",
@@ -304,8 +304,8 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(requester?.details.first { $0.label == "Privacy policy" }?.linkURI, "https://verifier.example/privacy")
     }
 
-    func testARequestWithoutVerifierMetadataGetsNoRequesterSection() {
-        let review = openIDPreview(verifierMetadata: nil).sharingReview()
+    func testARequestWithoutVerifierMetadataGetsNoRequesterSection() throws {
+        let review = try openIDPreview(verifierMetadata: nil).sharingReview()
 
         XCTAssertNil(
             review.request.requester,
@@ -313,8 +313,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testVerifierMetadataCarryingNothingUsableIsTreatedAsAbsent() {
-        let review = openIDPreview(
+    func testVerifierMetadataCarryingNothingUsableIsTreatedAsAbsent() throws {
+        let review = try openIDPreview(
             verifierMetadata: VerifierMetadata(
                 display: MetadataDisplay(name: "   ", locale: nil, logoURI: nil, logoAltText: nil),
                 clientURI: nil,
@@ -393,9 +393,9 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Reader trust
 
-    func testAProtocolWithoutReaderAuthenticationGetsNoReaderTrustState() {
+    func testAProtocolWithoutReaderAuthenticationGetsNoReaderTrustState() throws {
         XCTAssertNil(
-            openIDPreview().sharingReview().request.readerTrust,
+            try openIDPreview().sharingReview().request.readerTrust,
             "OpenID4VP has no reader to be trusted or untrusted, so any state here would describe something the request does not contain"
         )
         XCTAssertNil(
@@ -459,12 +459,12 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Response protection
 
-    func testAnUnencryptedOpenIDResponseIsReportedAsUnencryptedRatherThanAsUnknown() {
-        XCTAssertEqual(openIDPreview().sharingReview().request.responseProtection, SharingResponseProtection.none)
+    func testAnUnencryptedOpenIDResponseIsReportedAsUnencryptedRatherThanAsUnknown() throws {
+        XCTAssertEqual(try openIDPreview().sharingReview().request.responseProtection, SharingResponseProtection.none)
     }
 
-    func testAnEncryptedOpenIDResponseReportsTheJWEAlgorithmsAndVerifierKey() {
-        let review = openIDPreview(
+    func testAnEncryptedOpenIDResponseReportsTheJWEAlgorithmsAndVerifierKey() throws {
+        let review = try openIDPreview(
             responseEncryption: .required(
                 ResponseEncryptionDetails(
                     keyManagementAlgorithm: "ECDH-ES",
@@ -505,8 +505,8 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Transaction data and technical details
 
-    func testTransactionDataIsGroupedForReviewOnTheNormalOpenIDPath() {
-        let review = openIDPreview(transactionData: [
+    func testTransactionDataIsGroupedForReviewOnTheNormalOpenIDPath() throws {
+        let review = try openIDPreview(transactionData: [
             PresentationTransactionData(
                 type: "urn:test:payment",
                 displayName: "Payment authorization",
@@ -536,7 +536,7 @@ final class SharingReviewModelTests: XCTestCase {
 
     func testPaymentDisplayUsesKnownTypesAndNeverSubstitutesForRequiredConsent() throws {
         for type in ["urn:eudi:sca:payment:1", "org.waltid.transaction-data.payment-authorization"] {
-            let review = openIDPreview(transactionData: [PresentationTransactionData(
+            let review = try openIDPreview(transactionData: [PresentationTransactionData(
                 type: type, displayName: "Localized profile title", credentialQueryIDs: ["pid"], supportedFields: [],
                 rawJSON: #"{"amount":"42.00","currency":"EUR","payee":{"name":"Store"}}"#,
                 detailsJSON: #"{"amount":"42.00","currency":"EUR","payee":{"name":"Store"}}"#
@@ -613,8 +613,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testNormalOpenIDExposesTheProtocolParametersBehindTechnicalDetails() {
-        let review = openIDPreview().sharingReview()
+    func testNormalOpenIDExposesTheProtocolParametersBehindTechnicalDetails() throws {
+        let review = try openIDPreview().sharingReview()
 
         XCTAssertEqual(
             review.request.technicalDetails.map(\.label),
@@ -624,8 +624,8 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(review.request.technicalDetails.first { $0.label == "Nonce" }?.value, "nonce-456")
     }
 
-    func testARejectedRequestStillDescribesWhoAskedSoTheUserCanDecideWhetherToNotifyThem() {
-        let request = PartialPresentationRequest(
+    func testARejectedRequestStillDescribesWhoAskedSoTheUserCanDecideWhetherToNotifyThem() throws {
+        let request = try PartialPresentationRequest(
             clientID: "https://verifier.example",
             requestAuthentication: .unauthenticated,
             responseEncryption: .notRequired,
@@ -701,8 +701,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testDeselectingACredentialDropsTheDisclosuresApprovedForIt() {
-        let review = openIDPreview().sharingReview()
+    func testDeselectingACredentialDropsTheDisclosuresApprovedForIt() throws {
+        let review = try openIDPreview().sharingReview()
         let credential = review.credentialOptions[0].selection
         let disclosure = PresentationDisclosureSelection(
             queryID: credential.queryID,
@@ -727,8 +727,8 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Action availability
 
-    func testShareStaysUnavailableUntilTheRequestIsSatisfied() {
-        let review = openIDPreview().sharingReview()
+    func testShareStaysUnavailableUntilTheRequestIsSatisfied() throws {
+        let review = try openIDPreview().sharingReview()
 
         XCTAssertFalse(
             review.hasCompleteCredentialSelection([]),
@@ -877,9 +877,9 @@ final class SharingReviewModelTests: XCTestCase {
         ),
         responseEncryption: PresentationResponseEncryption = .notRequired,
         transactionData: [PresentationTransactionData] = []
-    ) -> PresentationPreview {
-        PresentationPreview(
-            previewHandle: try! PresentationPreviewHandle(value: "preview"),
+    ) throws -> PresentationPreview {
+        try PresentationPreview(
+            previewHandle: PresentationPreviewHandle(value: "preview"),
             request: PresentationRequest(
                 clientID: "https://verifier.example",
                 requestAuthentication: .unauthenticated,

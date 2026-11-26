@@ -82,8 +82,8 @@ internal interface WalletSdkBridgeOperations {
         clientId: String?,
     ): WalletIssuanceOutcome
 
-    suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
     ): WalletIssuanceOutcome
 

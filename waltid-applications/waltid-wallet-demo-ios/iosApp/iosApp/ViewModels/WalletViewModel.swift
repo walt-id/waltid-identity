@@ -1414,7 +1414,7 @@ class WalletViewModel: ObservableObject {
             }
             return
         }
-        guard offerPreview != nil, let grantID = pendingAuthorizationID else { return }
+        guard offerPreview != nil, let authorizationID = pendingAuthorizationID else { return }
         let request = ReceiveRequest(
             offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines),
             navigationResetKey: receiveNavigationResetKey
@@ -1424,9 +1424,9 @@ class WalletViewModel: ObservableObject {
         receiveTask = Task {
             do {
                 try await completeIssuanceOutcome(
-                    try await walletClient.continueAuthorizationIssuance(
-                        sessionID: grantID,
-                        callbackURI: callbackURI
+                    try await walletClient.completeAuthorization(
+                        authorizationID,
+                        callback: callbackURI
                     ),
                     previousCredentials: previousCredentials,
                     request: request
@@ -1575,7 +1575,7 @@ class WalletViewModel: ObservableObject {
         setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
-                let outcome = try await refreshContinuations(walletClient.resumeDeferredIssuance(credential), resumingID: credential.id)
+                let outcome = try await refreshContinuations(walletClient.resumeDeferredIssuance(credential.id), resumingID: credential.id)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
                 switch outcome {

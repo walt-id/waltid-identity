@@ -1470,9 +1470,9 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return issuanceOutcomeResult
     }
 
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
+    func completeAuthorization(_ authorizationID: String, callback: URL) async throws -> IssuanceOutcome {
         if let error { throw error }
-        authorizationIssuanceCalls.append((sessionID, callbackURI))
+        authorizationIssuanceCalls.append((authorizationID, callback))
         return issuanceOutcomeResult
     }
 

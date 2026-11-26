@@ -143,15 +143,15 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return try Self.issuanceOutcome(result, operation: "continue pre-authorized issuance")
     }
 
-    func continueAuthorizationIssuance(
-        sessionID: String,
-        callbackURI: URL
+    func completeAuthorization(
+        _ authorizationID: String,
+        callback: URL
     ) async throws -> IssuanceOutcome {
-        let result = try await bridge.continueAuthorizationIssuance(
-            sessionId: sessionID,
-            callbackUri: callbackURI.absoluteString
+        let result = try await bridge.completeAuthorization(
+            authorizationId: authorizationID,
+            callbackUri: callback.absoluteString
         )
-        return try Self.issuanceOutcome(result, operation: "continue authorization issuance")
+        return try Self.issuanceOutcome(result, operation: "complete issuance authorization")
     }
 
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {

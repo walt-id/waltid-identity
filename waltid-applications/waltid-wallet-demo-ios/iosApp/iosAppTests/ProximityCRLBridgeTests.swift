@@ -40,7 +40,7 @@ final class ProximityCRLBridgeTests: XCTestCase {
         ] {
             let fetcher = RecordingCRLFetcher(.available(der: der))
             let evaluator = try makeEvaluator(fetcher: fetcher, scope: scope)
-            let result = try await evaluator.evaluate(evidence)
+            let result = try await evaluator.evaluate(makeEvidence())
             XCTAssertEqual(result, expected)
             let requests = await fetcher.requests
             XCTAssertEqual(requests, [.init(url: "https://crl.example.test/swift.crl", maximumBytes: 2_097_152)])
@@ -53,7 +53,7 @@ final class ProximityCRLBridgeTests: XCTestCase {
         for response in [ProximityCRLFetchResult.unavailable, .available(der: Data([0x30, 0])),
                          .available(der: Data(count: 2_097_153)), .available(der: badSignature)] {
             let evaluator = try makeEvaluator(fetcher: RecordingCRLFetcher(response))
-            let result = try await evaluator.evaluate(evidence)
+            let result = try await evaluator.evaluate(makeEvidence())
             XCTAssertEqual(result, try .indeterminate(reason: "Reader certificate CRL status could not be established"))
         }
     }
@@ -75,7 +75,7 @@ final class ProximityCRLBridgeTests: XCTestCase {
     func testCancellationSurvivesTheAsynchronousFetcherBridge() async throws {
         let fetcher = SuspendedCRLFetcher()
         let evaluator = try makeEvaluator(fetcher: fetcher)
-        let evidence = evidence
+        let evidence = try makeEvidence()
         let evaluation = Task { try await evaluator.evaluate(evidence) }
         await fetcher.waitUntilRequested()
         evaluation.cancel()
@@ -87,8 +87,8 @@ final class ProximityCRLBridgeTests: XCTestCase {
         }
     }
 
-    private var evidence: ProximityReaderEvidence {
-        .init(scope: .wholeRequest, certificateChainDER: [ProximityCRLFixtures.reader])
+    private func makeEvidence() throws -> ProximityReaderEvidence {
+        try .init(scope: .wholeRequest, certificateChainDER: [ProximityCRLFixtures.reader])
     }
 
     private func makeEvaluator(

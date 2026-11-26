@@ -184,7 +184,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let previewHandle = try! PresentationPreviewHandle(value: "invalid-presentation-preview")
         let previewError = PresentationPreviewError(
             previewHandle: previewHandle,
-            request: PartialPresentationRequest(
+            request: try PartialPresentationRequest(
                 clientID: "https://verifier.example",
                 requestAuthentication: .unauthenticated,
                 responseEncryption: .notRequired,

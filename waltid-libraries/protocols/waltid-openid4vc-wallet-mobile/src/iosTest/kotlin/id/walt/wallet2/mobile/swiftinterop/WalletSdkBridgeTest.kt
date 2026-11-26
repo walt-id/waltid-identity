@@ -725,8 +725,8 @@ class WalletSdkBridgeTest {
             clientId: String?,
         ) = error("Not used by this test fake")
 
-        override suspend fun continueAuthorizationIssuance(
-            sessionId: String,
+        override suspend fun completeAuthorization(
+            authorizationId: String,
             callbackUri: String,
         ) = error("Not used by this test fake")
 
