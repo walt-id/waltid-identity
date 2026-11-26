@@ -385,7 +385,7 @@ object CredentialParser {
                         originalCredentialData = payload,
 
                         issuer = getJwtHeaderOrDataIssuer(payload),
-                        subject = getCredentialDataSubject(payload)
+                        subject = getCredentialDataSubject(w3cPayload)
                     )
 
                     W3CSubType.W3C_2 -> W3C2(
@@ -398,7 +398,7 @@ object CredentialParser {
                         originalCredentialData = payload,
 
                         issuer = getJwtHeaderOrDataIssuer(payload),
-                        subject = getCredentialDataSubject(payload)
+                        subject = getCredentialDataSubject(w3cPayload)
                     )
                 }
                 detectedSdjwtSigned(CredentialPrimaryDataType.W3C, w3cModelVersion) to credential
