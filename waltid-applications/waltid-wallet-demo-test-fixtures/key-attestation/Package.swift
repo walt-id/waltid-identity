@@ -15,7 +15,7 @@ let package = Package(
     targets: [
         .target(
             name: "WalletDemoKeyAttestation",
-            dependencies: [.product(name: "WalletSDK", package: "waltid-wallet-sdk-ios")],
+            dependencies: [.product(name: "WalletSDKShared", package: "waltid-wallet-sdk-ios")],
             path: ".",
             exclude: ["kotlin", "sources.gradle.kts", "README.md"],
             sources: ["swift"],
