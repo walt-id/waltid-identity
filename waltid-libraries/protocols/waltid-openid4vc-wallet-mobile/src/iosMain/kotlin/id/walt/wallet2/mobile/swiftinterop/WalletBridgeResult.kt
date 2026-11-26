@@ -28,23 +28,8 @@ public enum class WalletBridgeErrorCategory {
     /** Request validation failed and its error response could not be sent safely. */
     presentationValidation,
 
-    /** Network communication failed. */
-    network,
-
-    /** Issuer-side processing failed. */
-    issuer,
-
-    /** Verifier-side processing failed. */
-    verifier,
-
     /** Wallet storage access failed. */
     storage,
-
-    /** Cryptographic operation failed. */
-    crypto,
-
-    /** Requested credential could not be found. */
-    credentialNotFound,
 
     /** The operation was cancelled. */
     cancelled,

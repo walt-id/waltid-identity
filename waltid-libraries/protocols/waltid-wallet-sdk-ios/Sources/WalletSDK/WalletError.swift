@@ -16,29 +16,14 @@ public enum WalletError: Error, Equatable, Sendable {
     ///   - responseSafetyFailure: The reason the error response was not sent.
     case presentationValidation(code: PresentationErrorCode, message: String, responseSafetyFailure: String)
 
-    /// Network communication with an issuer, verifier, or wallet backend failed.
-    case network(String)
-
-    /// Issuer-side credential issuance failed.
-    case issuer(String)
-
-    /// Verifier-side presentation handling failed.
-    case verifier(String)
-
     /// Local wallet storage failed.
     case storage(String)
-
-    /// Key management, signing, or cryptographic processing failed.
-    case crypto(String)
 
     /// A protected wallet-key request failed for a stable, actionable reason.
     case keyUseAuthorization(WalletKeyUseAuthorizationFailure)
 
     /// Payment review or authorization failed for a stable reason.
     case paymentConsent(PaymentConsentFailure, message: String)
-
-    /// The requested credential was not found in the wallet.
-    case credentialNotFound(String)
 
     /// The operation was cancelled.
     case cancelled
@@ -76,12 +61,7 @@ extension WalletError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .invalidInput(let message),
-             .network(let message),
-             .issuer(let message),
-             .verifier(let message),
              .storage(let message),
-             .crypto(let message),
-             .credentialNotFound(let message),
              .internalFailure(let message):
             return message
         case .presentationValidation(let code, let message, let responseSafetyFailure):

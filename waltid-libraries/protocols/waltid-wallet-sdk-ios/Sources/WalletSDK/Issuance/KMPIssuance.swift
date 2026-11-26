@@ -199,7 +199,7 @@ private extension Waltid_openid4vc_walletWalletIssuanceContinuationStatus {
         case .awaitingLocalSave: return .awaitingLocalSave
         case .remoteOutcomeUncertain: return .remoteOutcomeUncertain
         case .storageOutcomeUncertain: return .storageOutcomeUncertain
-        default: return .unresolved
+        case .unresolved: return .unresolved
         }
     }
 }

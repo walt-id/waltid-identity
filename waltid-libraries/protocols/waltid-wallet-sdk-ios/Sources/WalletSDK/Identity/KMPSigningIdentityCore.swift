@@ -27,7 +27,12 @@ struct KMPSigningIdentityCore: SigningIdentityCore, @unchecked Sendable {
             guard (1...128).contains(challenge.count) else { throw WalletError.invalidInput("Native attestation challenge must contain 1 to 128 bytes") }
             request = WalletCore.SigningIdentityAttestationRequestNative(challenge: Waltid_crypto2BinaryData(bytes: challenge.toKotlinByteArray()))
         }
-        let options = try value(await bridge.signingIdentityCreationOptions(intent: intent == .withoutRecovery ? .withoutRecovery : .recoverable,
+        let coreIntent: WalletCore.SigningIdentityIntent
+        switch intent {
+        case .withoutRecovery: coreIntent = .withoutRecovery
+        case .recoverable: coreIntent = .recoverable
+        }
+        let options = try value(await bridge.signingIdentityCreationOptions(intent: coreIntent,
                                                                      attestation: request),
                                 as: (any WalletCore.SigningIdentityCreationOptions).self)
         switch onEnum(of: options) {
@@ -51,7 +56,7 @@ struct KMPSigningIdentityCore: SigningIdentityCore, @unchecked Sendable {
     func deleteRecovery(_ candidate: SigningIdentityRecoveryCandidate) async throws -> WalletRecoveryReceipt {
         let receipt = try value(await bridge.deleteSigningIdentityRecovery(candidate: handle(candidate.handle, as: WalletCore.SigningIdentityRecoveryCandidate.self)),
                                 as: WalletCore.RecoveryReceipt.self)
-        return receipt == .acceptedLocally ? .acceptedLocally : .confirmedByProvider
+        return receipt.toSwiftReceipt()
     }
     func resumePending(identityID: String) async throws -> SigningIdentityOperationResult {
         try operation(value(await bridge.resumeSigningIdentity(identityId: identityID), as: (any WalletCore.SigningIdentityOperationResult).self))
@@ -123,8 +128,13 @@ struct KMPSigningIdentityCore: SigningIdentityCore, @unchecked Sendable {
         case .failed(let failed): return .failed(failure(failed.reason))
         }
     }
-    fileprivate static func identity(_ value: WalletCore.SigningIdentity) -> SigningIdentity {
-        let origin: KeyOrigin = value.keyFacts.origin == .generated ? .generated : value.keyFacts.origin == .imported ? .imported : .unknown
+    static func identity(_ value: WalletCore.SigningIdentity) -> SigningIdentity {
+        let origin: KeyOrigin
+        switch value.keyFacts.origin {
+        case .generated: origin = .generated
+        case .imported: origin = .imported
+        case .unknown: origin = .unknown
+        }
         let level: KeySecurityLevel
         switch value.keyFacts.securityLevel {
         case .software: level = .software
@@ -143,9 +153,9 @@ struct KMPSigningIdentityCore: SigningIdentityCore, @unchecked Sendable {
         switch onEnum(of: value.recovery) {
         case .disabled: recovery = .disabled
         case .removalRequested(let removed): recovery = .removalRequested(reference: reference(removed.reference),
-            receipt: removed.receipt == .acceptedLocally ? .acceptedLocally : .confirmedByProvider)
+            receipt: removed.receipt.toSwiftReceipt())
         case .submitted(let submitted): recovery = .submitted(reference: reference(submitted.reference),
-            receipt: submitted.receipt == .acceptedLocally ? .acceptedLocally : .confirmedByProvider)
+            receipt: submitted.receipt.toSwiftReceipt())
         case .recovered(let restored): recovery = .recovered(reference: reference(restored.reference))
         }
         return .init(id: value.id, keyID: value.keyId, did: value.did, publicJWK: value.publicJwk,
@@ -250,11 +260,21 @@ extension SigningIdentityConfiguration {
             }
             platform = Waltid_crypto2PlatformKeyConfigurationIosKeychain(accessibility: accessibility, accessGroup: keychain.accessGroup)
         } else { platform = Waltid_crypto2PlatformKeyConfigurationDefault.shared }
+        let confirmation: WalletCore.RecoveryConfirmation
+        switch recoveryConfirmation {
+        case .localAcceptance: confirmation = .localAcceptance
+        case .providerConfirmation: confirmation = .providerConfirmation
+        }
+        let retention: WalletCore.LocalRecoveryMaterialRetention
+        switch localRecoveryMaterial {
+        case .retain: retention = .retain
+        case .discardAfterConfirmation: retention = .discardAfterConfirmation
+        }
         return WalletCore.SigningIdentityConfiguration(recoveryProviders: recoveryProviders.map(KMPRecoveryProvider.init), keyCustodians: keyCustodians.map(KMPCustodian.init), authorization: authorization,
                                                 policy: policy, platform: platform,
                                                 alternativeAuthorizations: try alternativeAuthorizations.map { try $0.toKMPNativeAuthorization() },
-                                                recoveryConfirmation: recoveryConfirmation == .localAcceptance ? .localAcceptance : .providerConfirmation,
-                                                localRecoveryMaterial: localRecoveryMaterial == .retain ? .retain : .discardAfterConfirmation)
+                                                recoveryConfirmation: confirmation,
+                                                localRecoveryMaterial: retention)
     }
 }
 
@@ -284,72 +304,5 @@ private extension WalletKeyUseAuthorizationPolicy {
             return Waltid_crypto2KeyUseAuthorizationPolicyBiometricOrDeviceCredential(timeoutSeconds: try checkedAuthorizationSeconds(seconds, minimum: 0))
         }
     }
-}
-
-private func identityProviderCall<T>(_ operation: () async throws -> T) async throws -> T {
-    do { return try await operation() }
-    catch let error as IdentityProviderError {
-        let failure: WalletCore.IdentityProviderFailure
-        switch error {
-        case .temporarilyUnavailable: failure = .temporarilyUnavailable
-        case .interactionRequired: failure = .interactionRequired
-        case .rejected: failure = .rejected
-        case .conflict: failure = .conflict
-        case .confirmationPending: failure = .confirmationPending
-        }
-        try WalletCore.WalletIdentityProviderErrors.shared.raise(failure: failure)
-        // Kotlin Nothing is not imported as Swift Never.
-        throw error
-    }
-}
-
-private final class KMPRecoveryProvider: WalletCore.IdentityRecoveryProvider, @unchecked Sendable {
-    init(_ provider: any IdentityRecoveryProvider) { self.provider = provider }
-    var id: String { provider.id }
-    var displayName: String { provider.displayName }
-    func __availability() async throws -> any WalletCore.RecoveryAvailability {
-        switch try await identityProviderCall({ try await provider.availability() }) {
-        case .unavailable(let reason): return WalletCore.RecoveryAvailabilityUnavailable(reason: reason)
-        case .available(let protection, let scope):
-            let coreProtection: WalletCore.RecoveryProtection
-            switch protection {
-            case .operatingSystemProtected: coreProtection = .operatingSystemProtected
-            case .operatingSystemEndToEnd: coreProtection = .operatingSystemEndToEnd
-            case .applicationEncrypted: coreProtection = .applicationEncrypted
-            }
-            let coreScope: WalletCore.RecoveryScope
-            switch scope { case .cloud: coreScope = .cloud; case .deviceTransfer: coreScope = .deviceTransfer; case .custom: coreScope = .custom }
-            return WalletCore.RecoveryAvailabilityAvailable(protection: coreProtection, scope: coreScope)
-        }
-    }
-    func __list() async throws -> [String] { try await identityProviderCall { try await provider.list() } }
-    func __store(recordId: String, record: WalletCore.IdentityRecoveryData) async throws -> WalletCore.RecoveryReceipt {
-        let bytes = record.doCopyBytes()
-        let data = Data((0..<bytes.size).map { UInt8(bitPattern: bytes.get(index: $0)) })
-        return try await identityProviderCall { try await provider.store(recordID: recordId, data: data) } == .acceptedLocally ? .acceptedLocally : .confirmedByProvider
-    }
-    func __retrieve(recordId: String) async throws -> WalletCore.IdentityRecoveryData? {
-        guard let data = try await identityProviderCall({ try await provider.retrieve(recordID: recordId) }) else { return nil }
-        guard (1...4096).contains(data.count) else { throw WalletError.internalFailure("Invalid recovery record size") }
-        return WalletCore.IdentityRecoveryData(bytes: data.toKotlinByteArray())
-    }
-    func __delete(recordId: String) async throws -> WalletCore.RecoveryReceipt {
-        try await identityProviderCall { try await provider.delete(recordID: recordId) } == .acceptedLocally ? .acceptedLocally : .confirmedByProvider
-    }
-    private let provider: any IdentityRecoveryProvider
-}
-private final class KMPCustodian: WalletCore.IdentityKeyCustodian, @unchecked Sendable {
-    init(_ custodian: any IdentityKeyCustodian) { self.custodian = custodian }
-    var id: String { custodian.id }
-    var displayName: String { custodian.displayName }
-    func __importKey(identity: WalletCore.SigningIdentity, privateKey: Waltid_crypto2EncodedKeyJwk) async throws -> WalletCore.IdentityCustodyReceipt {
-        let bytes = privateKey.data.toByteArray()
-        let data = Data((0..<bytes.size).map { UInt8(bitPattern: bytes.get(index: $0)) })
-        let receipt = try await identityProviderCall {
-            try await custodian.importKey(identity: KMPSigningIdentityCore.identity(identity), privateJWK: data)
-        }
-        return .init(keyReference: receipt.keyReference, publicJwk: receipt.publicJWK)
-    }
-    private let custodian: any IdentityKeyCustodian
 }
 #endif

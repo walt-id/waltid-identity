@@ -43,18 +43,8 @@ extension WalletBridgeError {
             )
         case .invalidInput:
             return .invalidInput(message)
-        case .network:
-            return .network(message)
-        case .issuer:
-            return .issuer(message)
-        case .verifier:
-            return .verifier(message)
         case .storage:
             return .storage(message)
-        case .crypto:
-            return .crypto(message)
-        case .credentialNotFound:
-            return .credentialNotFound(message)
         case .paymentConsent:
             guard let paymentConsentFailure else {
                 return .internalFailure("Payment consent error did not include a failure reason")

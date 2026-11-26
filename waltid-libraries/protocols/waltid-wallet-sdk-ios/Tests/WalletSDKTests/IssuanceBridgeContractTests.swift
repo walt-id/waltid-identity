@@ -4,6 +4,11 @@ import XCTest
 @testable import WalletSDK
 
 final class IssuanceBridgeContractTests: XCTestCase {
+    func testRequiredBridgeCollectionsRejectAnyIncompatibleElement() throws {
+        XCTAssertEqual(try requiredBridgeArray(["one", "two"], of: String.self), ["one", "two"])
+        XCTAssertThrowsError(try requiredBridgeArray(["one", 2] as [Any], of: String.self))
+    }
+
     func testExplicitSelectionPreservesDatasetAndEveryHolderBinding() throws {
         let selection = try IssuanceCredentialSelection(
             configurationID: "identity",
