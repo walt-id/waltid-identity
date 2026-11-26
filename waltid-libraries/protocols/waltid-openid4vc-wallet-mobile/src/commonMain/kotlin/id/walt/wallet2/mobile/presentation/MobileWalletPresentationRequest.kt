@@ -44,7 +44,9 @@ public data class MobileWalletPresentationRequestContext(
 public class MobileWalletPresentationCredentialRequirement(options: List<List<String>>) {
     public val options: List<List<String>> = buildList { options.forEach { option -> add(buildList { addAll(option) }) } }
 
+    /** Compares the captured alternatives in their declared order. */
     public override fun equals(other: Any?): Boolean = other is MobileWalletPresentationCredentialRequirement && options == other.options
+    /** Hash of the captured query alternatives. */
     public override fun hashCode(): Int = options.hashCode()
 
     init {

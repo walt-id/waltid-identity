@@ -14,7 +14,8 @@ import id.walt.wallet2.mobile.MobileWallet
  */
 public data class MobileWalletIssuanceSessionId(public val value: String) {
     init { require(value.isNotBlank()) }
-    override fun toString(): String = "MobileWalletIssuanceSessionId(redacted)"
+    /** Diagnostic form that omits the durable reference. */
+    public override fun toString(): String = "MobileWalletIssuanceSessionId(redacted)"
 }
 
 /** Durable reference saved alongside a browser launch for callback delivery after restart.
@@ -22,7 +23,8 @@ public data class MobileWalletIssuanceSessionId(public val value: String) {
  */
 public data class MobileWalletAuthorizationId(public val value: String) {
     init { require(value.isNotBlank()) }
-    override fun toString(): String = "MobileWalletAuthorizationId(redacted)"
+    /** Diagnostic form that omits the durable reference. */
+    public override fun toString(): String = "MobileWalletAuthorizationId(redacted)"
 }
 
 /** Reviewed offer with the one grant the wallet selected during discovery. */
