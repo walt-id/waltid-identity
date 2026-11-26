@@ -1486,7 +1486,12 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             }
             credentialProofKeyCommitment?.let { commitment ->
                 val committed = try {
-                    commitment.commit(session, requireNotNull(proofPublicKeyJwks))
+                    val keys = requireNotNull(proofPublicKeyJwks)
+                    if (commitment is IssuedCredentialCommitment) {
+                        commitment.commit(session, keys, requireNotNull(credentialResponse.credentials))
+                    } else {
+                        commitment.commit(session, keys)
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: CredentialProofKeyAcceptanceException) {
