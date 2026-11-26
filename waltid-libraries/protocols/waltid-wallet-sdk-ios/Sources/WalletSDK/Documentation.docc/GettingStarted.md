@@ -17,10 +17,12 @@ import WalletSDK
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
-        defaultKeyUseAuthorizationPolicy: .biometricCurrentSet,
-        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
-            message: "Authorize wallet signing",
-            cancelText: "Cancel"
+        keyAuthorization: .init(
+            policy: .biometricCurrentSet,
+            prompt: WalletKeyUseAuthorizationPrompt(
+                message: "Authorize wallet signing",
+                cancelText: "Cancel"
+            )
         )
     )
 )
