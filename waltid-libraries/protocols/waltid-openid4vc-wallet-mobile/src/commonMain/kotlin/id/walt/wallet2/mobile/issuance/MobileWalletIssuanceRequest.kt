@@ -16,6 +16,8 @@ public sealed interface MobileWalletCredentialOffer {
      * @property value Non-blank credential offer URI.
      */
     public data class Uri(public val value: String) : MobileWalletCredentialOffer {
+        public override fun toString(): String = "Uri(<redacted>)"
+
         init {
             require(value.trim().isNotEmpty()) { "Credential offer URI must not be blank" }
         }
@@ -27,6 +29,8 @@ public sealed interface MobileWalletCredentialOffer {
      * @property value Non-blank Credential Offer JSON object.
      */
     public data class InlineJson(public val value: String) : MobileWalletCredentialOffer {
+        public override fun toString(): String = "InlineJson(<redacted>)"
+
         init {
             require(value.trim().isNotEmpty()) { "Inline credential offer JSON must not be blank" }
         }

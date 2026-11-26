@@ -17,7 +17,7 @@ final class WalletAPITests: XCTestCase {
     func testEffectiveReviewPreservesTypedPathsAndUsesOrdinarySubmission() async throws {
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
-        let handle = PresentationPreviewHandle(value: "review-handle")
+        let handle = try! PresentationPreviewHandle(value: "review-handle")
         let credentials: [PresentationCredentialSelection] = [.init(queryID: "q", credentialID: "credential")]
         let disclosures: [PresentationDisclosureSelection] = [.init(queryID: "q", credentialID: "credential", path: #""items".1"#)]
         bridge.effectiveReview = .init(credentials: [.init(queryID: "q", credentialID: "credential",
@@ -326,7 +326,7 @@ final class WalletAPITests: XCTestCase {
 
     func testPresentationPreviewModelsAreValueTypesAndEquatable() {
         let preview = PresentationPreview(
-            previewHandle: PresentationPreviewHandle(value: "presentation-preview-1"),
+            previewHandle: try! PresentationPreviewHandle(value: "presentation-preview-1"),
             request: .init(
                 clientID: "https://verifier.example",
                 requestAuthentication: .unauthenticated,
@@ -349,10 +349,10 @@ final class WalletAPITests: XCTestCase {
                     disclosures: [
                         .init(
                             path: "$.given_name",
-                            name: "given_name",
                             valueJSON: #""Ada""#,
-                            displayValue: "Ada",
-                            selectivelyDisclosable: true
+                            disposition: .selectable,
+                            name: "given_name",
+                            displayValue: "Ada"
                         )
                     ]
                 )
@@ -553,9 +553,9 @@ final class WalletAPITests: XCTestCase {
         ].joined()
         let trustAnchor = try XCTUnwrap(Data(base64Encoded: trustAnchorBase64))
         let evaluator = ProximityConfiguredReaderTrustEvaluator(
-            configuration: ProximityReaderTrustConfiguration(
+            configuration: try ProximityReaderTrustConfiguration(
                 trustAnchors: [
-                    ProximityReaderTrustAnchor(certificateDER: trustAnchor)
+                    try ProximityReaderTrustAnchor(certificateDER: trustAnchor)
                 ]
             )
         )
@@ -841,7 +841,7 @@ final class WalletAPITests: XCTestCase {
         let bridge = FakeWalletCoreBridge()
         bridge.previewResult = .ready(
             .init(
-                previewHandle: PresentationPreviewHandle(value: "presentation-preview-1"),
+                previewHandle: try! PresentationPreviewHandle(value: "presentation-preview-1"),
                 request: .init(
                     clientID: "https://verifier.example",
                     requestAuthentication: .unauthenticated,
@@ -908,7 +908,7 @@ final class WalletAPITests: XCTestCase {
         let bridge = FakeWalletCoreBridge()
         bridge.previewResult = .invalid(
             .init(
-                previewHandle: PresentationPreviewHandle(value: "invalid-presentation-preview"),
+                previewHandle: try! PresentationPreviewHandle(value: "invalid-presentation-preview"),
                 request: requestInfo,
                 code: .invalidTransactionData,
                 message: "Unsupported transaction_data type"
@@ -921,7 +921,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(
             result,
             .invalid(.init(
-                previewHandle: PresentationPreviewHandle(value: "invalid-presentation-preview"),
+                previewHandle: try! PresentationPreviewHandle(value: "invalid-presentation-preview"),
                 request: requestInfo,
                 code: .invalidTransactionData,
                 message: "Unsupported transaction_data type"
@@ -931,7 +931,7 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testSubmitPresentationForwardsSelectionAndReturnsResult() async throws {
-        let previewHandle = PresentationPreviewHandle(value: "presentation-preview-1")
+        let previewHandle = try! PresentationPreviewHandle(value: "presentation-preview-1")
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
 
@@ -986,7 +986,7 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testRejectPresentationForwardsErrorDetailsAndReturnsResult() async throws {
-        let handle = PresentationPreviewHandle(value: "presentation-preview-1")
+        let handle = try! PresentationPreviewHandle(value: "presentation-preview-1")
         let bridge = FakeWalletCoreBridge()
         let responseURL = URL(string: "https://verifier.example/callback?error=access_denied")!
         bridge.rejectResult = .prepared(.openURL(responseURL))
@@ -1006,7 +1006,7 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testRejectPresentationForwardsTypedHandle() async throws {
-        let handle = PresentationPreviewHandle(value: "presentation-preview-1")
+        let handle = try! PresentationPreviewHandle(value: "presentation-preview-1")
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
 
@@ -1114,6 +1114,14 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNil(WalletEvent(name: "presentation_request_resolved"))
     }
 
+    func testFormattingIssuanceInputsAndReferencesOmitsTheirValues() throws {
+        let token = "private-example"
+        let url = try XCTUnwrap(URL(string: "https://issuer.example/offer/" + token))
+        XCTAssertFalse(String(describing: IssuanceRequest(offer: url)).contains(token))
+        XCTAssertFalse(String(describing: IssuanceSessionID(rawValue: token)).contains(token))
+        XCTAssertFalse(String(describing: AuthorizationIssuanceID(rawValue: token)).contains(token))
+    }
+
     func testPresentationModelValidationRejectsInvalidStates() {
         XCTAssertFalse(PresentationRequestContext.hasValidClientID(" "))
         XCTAssertTrue(PresentationRequestContext.hasValidClientID("https://verifier.example"))
@@ -1127,27 +1135,10 @@ final class WalletAPITests: XCTestCase {
         XCTAssertFalse(PresentationRequestInfo.hasRequiredFields(clientID: "client", nonce: " "))
         XCTAssertTrue(PresentationRequestInfo.hasRequiredFields(clientID: "client", nonce: "nonce"))
 
-        XCTAssertFalse(
-            PresentationDisclosure.hasValidSelectionState(
-                selectivelyDisclosable: false,
-                required: false,
-                selectable: true
-            )
-        )
-        XCTAssertFalse(
-            PresentationDisclosure.hasValidSelectionState(
-                selectivelyDisclosable: true,
-                required: true,
-                selectable: true
-            )
-        )
-        XCTAssertTrue(
-            PresentationDisclosure.hasValidSelectionState(
-                selectivelyDisclosable: true,
-                required: false,
-                selectable: true
-            )
-        )
+        XCTAssertTrue(DisclosureDisposition.selectable.selectivelyDisclosable)
+        XCTAssertFalse(DisclosureDisposition.fixedSelective.selectable)
+        XCTAssertTrue(DisclosureDisposition.requiredSelective.required)
+        XCTAssertFalse(DisclosureDisposition.additionalCleartext.requested)
     }
 
     private func acceptsSendable<T: Sendable>(_ value: T) {
@@ -1330,7 +1321,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var credentialsResult: [Credential] = []
     var previewResult = PresentationPreviewResult.ready(
         PresentationPreview(
-            previewHandle: PresentationPreviewHandle(value: "fake-presentation-preview"),
+            previewHandle: try! PresentationPreviewHandle(value: "fake-presentation-preview"),
             request: .init(
                 clientID: "https://verifier.example",
                 requestAuthentication: .unauthenticated,

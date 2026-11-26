@@ -1,7 +1,10 @@
 import Foundation
 
 /// Input used to start either OpenID4VCI issuance grant.
-public struct IssuanceRequest: Equatable, Sendable {
+public struct IssuanceRequest: Equatable, Sendable, CustomStringConvertible {
+    /// Printable form for diagnostics that omits the credential offer.
+    public var description: String { "IssuanceRequest(<redacted>)" }
+
     /// Credential-offer URL to resolve.
     public let offer: URL
 

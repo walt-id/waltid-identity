@@ -33,6 +33,7 @@ Existing fixed providers use the default resolver implementation.
 
 Start with the offer URL. Show its issuer and credential metadata, then handle the grant the wallet returned. The host supplies the confirmation UI, a registered browser client and the callback URL. An identified pre-authorized client can pass `clientID` to acceptance.
 
+Look up your registration using the grant’s `authorizationServer`. The pre-authorized offer exposes its effective client-identification requirement and transaction-code prompt.
 
 ```swift
 let session = try await wallet.startIssuance(.init(offer: offerURL))
@@ -45,10 +46,10 @@ switch session.grant {
 case .preAuthorized(let grant):
     var code: String?
     if let requirement = grant.transactionCode { code = await ui.code(requirement) }
-    let clientID = grant.clientIdentification == .clientIDRequired ? registration.clientID : nil
+    let clientID = grant.clientIdentification == .clientIDRequired ? try registrationFor(grant.authorizationServer).clientID : nil
     outcome = try await grant.accept(transactionCode: code, clientID: clientID)
 case .authorizationCode(let grant):
-    let authorization = try await grant.beginAuthorization(using: registration)
+    let authorization = try await grant.beginAuthorization(using: registrationFor(grant.authorizationServer))
     if let callback = try await ui.browser(authorization.request.url) {
         outcome = try await authorization.complete(callback)
     } else {
@@ -57,8 +58,6 @@ case .authorizationCode(let grant):
 }
 ui.received(outcome)
 ```
-
-Select the app registration using the offer’s `authorizationServer`. A pre-authorized offer exposes the effective client identification and transaction-code prompt.
 
 Save the session ID during offer review. After reopening the same wallet, call `resumeIssuance(_:)` to redisplay the offer while it is still available.
 
