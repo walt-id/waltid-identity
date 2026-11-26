@@ -249,19 +249,7 @@ public class PreviewSessionStore<T>(
     }
 
     /** Explicitly discards a preview after local dismissal. */
-    suspend fun discard(walletId: String, id: String, validate: (T) -> Unit = {}) = mutex.withLock {
-        val currentTime = now()
-        cleanupExpired(currentTime)
-        val entry = lookup(walletId, id, currentTime)
-        validate(entry.value)
-        if (entry.inUse) {
-            entry.discardRequested = true
-            entry.operation?.cancel()
-            return@withLock
-        }
-        entries.remove(id)
-        rememberTermination(id, entry.walletId, PreviewSessionFailureReason.DISCARDED, currentTime)
-    }
+    suspend fun discard(walletId: String, id: String): Unit = discard(walletId, id) {}
 
     /** Drops the previews created by one closed wallet instance, including when another instance shares its storage. */
     suspend fun clearInstance(walletId: String, owns: (T) -> Boolean) = mutex.withLock {
@@ -282,6 +270,20 @@ public class PreviewSessionStore<T>(
         val removableIds = ownedIds.keys.toList()
         removableIds.forEach(entries::remove)
         tombstones.entries.removeAll { (_, tombstone) -> tombstone.walletId == walletId }
+    }
+
+    internal suspend fun discard(walletId: String, id: String, validate: (T) -> Unit) = mutex.withLock {
+        val currentTime = now()
+        cleanupExpired(currentTime)
+        val entry = lookup(walletId, id, currentTime)
+        validate(entry.value)
+        if (entry.inUse) {
+            entry.discardRequested = true
+            entry.operation?.cancel()
+            return@withLock
+        }
+        entries.remove(id)
+        rememberTermination(id, entry.walletId, PreviewSessionFailureReason.DISCARDED, currentTime)
     }
 
     internal suspend fun activeIds(): List<String> = mutex.withLock {
