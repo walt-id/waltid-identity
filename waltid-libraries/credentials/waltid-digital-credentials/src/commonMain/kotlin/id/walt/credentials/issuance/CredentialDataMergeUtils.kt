@@ -1,5 +1,6 @@
 package id.walt.credentials.issuance
 
+import id.walt.credentials.mapping.JsonCredentialMapping
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -24,10 +25,7 @@ object CredentialDataMergeUtils {
 
     private val log = KotlinLogging.logger { }
 
-    fun JsonPrimitive.isTemplate(): Boolean {
-        val content = this.content
-        return content.length > 2 && content.first() == '<' && content.last() == '>' && !content.contains(' ')
-    }
+    fun JsonPrimitive.isTemplate(): Boolean = JsonCredentialMapping.isTemplate(content)
 
     @JvmBlocking
     @JvmAsync
@@ -107,50 +105,17 @@ object CredentialDataMergeUtils {
 
         suspend fun evaluate(functionCall: String): JsonElement = getTemplateData(functionCall, functions, context, history)
 
-        private suspend fun template(value: JsonPrimitive): JsonElement =
-            if (value.isString && value.isTemplate()) evaluate(value.content) else value
+        private val mapping = JsonCredentialMapping(
+            appendArrays = policy.appendArrays,
+            evaluateTemplatesInArrays = policy.evaluateTemplatesInArrays,
+            objectReplacesNonObject = policy.objectReplacesNonObject,
+            emptyObjectSetsKey = policy.emptyObjectSetsKey,
+            evaluate = ::evaluate,
+        )
 
-        /** Writes the [mapping] of [key] into [data]. */
-        suspend fun into(data: MutableMap<String, JsonElement>, key: String, mapping: JsonElement) {
-            when (mapping) {
-                is JsonPrimitive -> data[key] = template(mapping)
+        suspend fun into(data: MutableMap<String, JsonElement>, key: String, value: JsonElement) =
+            mapping.mergeInto(data, key, value)
 
-                is JsonObject -> {
-                    if (mapping.isEmpty() && !policy.emptyObjectSetsKey) return
-                    val existing = data[key]
-                    val target = when {
-                        existing == null -> mutableMapOf()
-                        existing is JsonObject -> existing.toMutableMap()
-                        policy.objectReplacesNonObject -> mutableMapOf()
-                        else -> {
-                            val cause = runCatching { existing.jsonObject }.exceptionOrNull()
-                            throw IllegalArgumentException(
-                                "Invalid mapping for credential, when processing \"$key\": ${cause?.message}",
-                                cause
-                            )
-                        }
-                    }
-                    mapping.forEach { (childKey, childMapping) -> into(target, childKey, childMapping) }
-                    data[key] = JsonObject(target)
-                }
-
-                is JsonArray -> {
-                    val items = if (policy.evaluateTemplatesInArrays) evaluated(mapping) else mapping
-                    val existing = data[key]
-                    data[key] = if (policy.appendArrays && existing is JsonArray) JsonArray(existing + items) else items
-                }
-            }
-        }
-
-        private suspend fun evaluated(mapping: JsonArray): JsonArray = JsonArray(mapping.map { item ->
-            when (item) {
-                is JsonPrimitive -> template(item)
-                is JsonObject -> JsonObject(mutableMapOf<String, JsonElement>().also { target ->
-                    item.forEach { (k, v) -> into(target, k, v) }
-                })
-                is JsonArray -> evaluated(item)
-            }
-        })
     }
 
 

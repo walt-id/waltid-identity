@@ -31,6 +31,7 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // walt.id
+            implementation(project(":waltid-libraries:credentials:waltid-credential-mapping"))
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
             api(project(":waltid-libraries:crypto:waltid-jose"))
