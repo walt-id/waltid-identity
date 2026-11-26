@@ -463,6 +463,17 @@ public final class id/walt/wallet2/mobile/digitalcredentials/MobileWalletAnnexCS
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class id/walt/wallet2/mobile/digitalcredentials/MobileWalletCardArt {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/lang/String;[B)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/lang/String;[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBackgroundColor ()Ljava/lang/String;
+	public final fun getFallbackPng ()[B
+	public final fun getImageUris ()Ljava/util/List;
+	public fun hashCode ()I
+}
+
 public final class id/walt/wallet2/mobile/digitalcredentials/MobileWalletCredentialRegistrationResult {
 	public fun <init> (ZILjava/lang/String;)V
 	public synthetic fun <init> (ZILjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -505,32 +516,21 @@ public final class id/walt/wallet2/mobile/digitalcredentials/MobileWalletCredent
 }
 
 public final class id/walt/wallet2/mobile/digitalcredentials/MobileWalletCredentialRegistryRecord {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletDigitalCredentialFormat;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;[BLjava/util/List;Ljava/lang/String;[B)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletDigitalCredentialFormat;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;[BLjava/util/List;Ljava/lang/String;[BILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletDigitalCredentialFormat;Ljava/lang/String;Ljava/util/List;Lid/walt/wallet2/mobile/digitalcredentials/RegistryEntryDisplay;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun component10 ()Ljava/lang/String;
-	public final fun component11 ()[B
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletDigitalCredentialFormat;
 	public final fun component4 ()Ljava/lang/String;
 	public final fun component5 ()Ljava/util/List;
-	public final fun component6 ()Ljava/lang/String;
-	public final fun component7 ()Ljava/lang/String;
-	public final fun component8 ()[B
-	public final fun component9 ()Ljava/util/List;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletDigitalCredentialFormat;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;[BLjava/util/List;Ljava/lang/String;[B)Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletCredentialRegistryRecord;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletCredentialRegistryRecord;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletDigitalCredentialFormat;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;[BLjava/util/List;Ljava/lang/String;[BILjava/lang/Object;)Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletCredentialRegistryRecord;
+	public final fun component6 ()Lid/walt/wallet2/mobile/digitalcredentials/RegistryEntryDisplay;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletDigitalCredentialFormat;Ljava/lang/String;Ljava/util/List;Lid/walt/wallet2/mobile/digitalcredentials/RegistryEntryDisplay;)Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletCredentialRegistryRecord;
+	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletCredentialRegistryRecord;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletDigitalCredentialFormat;Ljava/lang/String;Ljava/util/List;Lid/walt/wallet2/mobile/digitalcredentials/RegistryEntryDisplay;ILjava/lang/Object;)Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletCredentialRegistryRecord;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCardArtBackgroundColor ()Ljava/lang/String;
-	public final fun getCardArtFallbackPng ()[B
-	public final fun getCardArtImageUris ()Ljava/util/List;
 	public final fun getCredentialId ()Ljava/lang/String;
-	public final fun getDisplayName ()Ljava/lang/String;
+	public final fun getDisplay ()Lid/walt/wallet2/mobile/digitalcredentials/RegistryEntryDisplay;
 	public final fun getFields ()Ljava/util/List;
 	public final fun getFormat ()Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletDigitalCredentialFormat;
-	public final fun getIconPng ()[B
 	public final fun getRegistryEntryId ()Ljava/lang/String;
-	public final fun getSubtitle ()Ljava/lang/String;
 	public final fun getType ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -737,6 +737,17 @@ public final class id/walt/wallet2/mobile/digitalcredentials/MobileWalletReaderA
 public final class id/walt/wallet2/mobile/digitalcredentials/MobileWalletStaleRegistryEntryException : java/lang/IllegalArgumentException {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun getRegistryEntryId ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/mobile/digitalcredentials/RegistryEntryDisplay {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;[BLid/walt/wallet2/mobile/digitalcredentials/MobileWalletCardArt;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;[BLid/walt/wallet2/mobile/digitalcredentials/MobileWalletCardArt;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCardArt ()Lid/walt/wallet2/mobile/digitalcredentials/MobileWalletCardArt;
+	public final fun getIconPng ()[B
+	public final fun getName ()Ljava/lang/String;
+	public final fun getSubtitle ()Ljava/lang/String;
+	public fun hashCode ()I
 }
 
 public final class id/walt/wallet2/mobile/digitalcredentials/UnavailableMobileWalletCredentialRegistry : id/walt/wallet2/mobile/digitalcredentials/MobileWalletCredentialRegistry {
@@ -1651,6 +1662,7 @@ public final class id/walt/wallet2/mobile/issuance/MobileWalletIssuanceRequest {
 }
 
 public abstract class id/walt/wallet2/mobile/issuance/MobileWalletIssuanceSession {
+	public final fun getAuthorizationServer ()Ljava/lang/String;
 	public final fun getBatchSize ()Ljava/lang/Integer;
 	public final fun getCredentialDisplayMetadata ()Ljava/util/Map;
 	public final fun getId ()Lid/walt/wallet2/mobile/issuance/MobileWalletIssuanceSessionId;
@@ -1665,6 +1677,8 @@ public final class id/walt/wallet2/mobile/issuance/MobileWalletIssuanceSession$A
 public final class id/walt/wallet2/mobile/issuance/MobileWalletIssuanceSession$PreAuthorized : id/walt/wallet2/mobile/issuance/MobileWalletIssuanceSession {
 	public final fun accept (Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun accept$default (Lid/walt/wallet2/mobile/issuance/MobileWalletIssuanceSession$PreAuthorized;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun getClientIdentification ()Lid/walt/wallet2/handlers/IssuanceClientIdentification;
+	public final fun getTransactionCode ()Lid/walt/wallet2/handlers/WalletIssuanceTransactionCode;
 }
 
 public final class id/walt/wallet2/mobile/issuance/MobileWalletIssuanceSessionId {
@@ -1725,6 +1739,22 @@ public final class id/walt/wallet2/mobile/issuance/WalletProviderConfig$Composit
 	public static fun values ()[Lid/walt/wallet2/mobile/issuance/WalletProviderConfig$Composition;
 }
 
+public final class id/walt/wallet2/mobile/presentation/DisclosureDisposition : java/lang/Enum {
+	public static final field AdditionalCleartext Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
+	public static final field FixedSelective Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
+	public static final field OptionalCleartext Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
+	public static final field RequiredCleartext Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
+	public static final field RequiredSelective Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
+	public static final field Selectable Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getRequested ()Z
+	public final fun getRequired ()Z
+	public final fun getSelectable ()Z
+	public final fun getSelectivelyDisclosable ()Z
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
+	public static fun values ()[Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
+}
+
 public final class id/walt/wallet2/mobile/presentation/MobileWalletClientIdScheme : java/lang/Enum {
 	public static final field DECENTRALIZED_IDENTIFIER Lid/walt/wallet2/mobile/presentation/MobileWalletClientIdScheme;
 	public static final field OPENID_FEDERATION Lid/walt/wallet2/mobile/presentation/MobileWalletClientIdScheme;
@@ -1739,6 +1769,7 @@ public final class id/walt/wallet2/mobile/presentation/MobileWalletClientIdSchem
 }
 
 public final class id/walt/wallet2/mobile/presentation/MobileWalletMetadataDisplay {
+	public fun <init> ()V
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
@@ -1826,8 +1857,8 @@ public final class id/walt/wallet2/mobile/presentation/MobileWalletPresentationC
 }
 
 public final class id/walt/wallet2/mobile/presentation/MobileWalletPresentationCredentialOption {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Lid/walt/wallet2/mobile/credentials/MobileWalletCredential;ZLjava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Lid/walt/wallet2/mobile/credentials/MobileWalletCredential;ZLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component10 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
@@ -1838,8 +1869,6 @@ public final class id/walt/wallet2/mobile/presentation/MobileWalletPresentationC
 	public final fun component7 ()Ljava/lang/String;
 	public final fun component8 ()Ljava/lang/String;
 	public final fun component9 ()Ljava/util/List;
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationCredentialOption;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationCredentialOption;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationCredentialOption;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCredentialDataJson ()Ljava/lang/String;
 	public final fun getCredentialId ()Ljava/lang/String;
@@ -1858,13 +1887,9 @@ public final class id/walt/wallet2/mobile/presentation/MobileWalletPresentationC
 
 public final class id/walt/wallet2/mobile/presentation/MobileWalletPresentationCredentialRequirement {
 	public fun <init> (Ljava/util/List;)V
-	public final fun component1 ()Ljava/util/List;
-	public final fun copy (Ljava/util/List;)Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationCredentialRequirement;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationCredentialRequirement;Ljava/util/List;ILjava/lang/Object;)Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationCredentialRequirement;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getOptions ()Ljava/util/List;
 	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
 }
 
 public final class id/walt/wallet2/mobile/presentation/MobileWalletPresentationCredentialSelection {
@@ -1881,20 +1906,18 @@ public final class id/walt/wallet2/mobile/presentation/MobileWalletPresentationC
 }
 
 public final class id/walt/wallet2/mobile/presentation/MobileWalletPresentationDisclosure {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZ)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Ljava/lang/String;
+	public final fun component3 ()Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
 	public final fun component4 ()Ljava/lang/String;
-	public final fun component5 ()Z
-	public final fun component6 ()Z
-	public final fun component7 ()Z
-	public final fun component8 ()Z
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZ)Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationDisclosure;
-	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationDisclosure;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZZZILjava/lang/Object;)Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationDisclosure;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;Ljava/lang/String;Ljava/lang/String;)Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationDisclosure;
+	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationDisclosure;Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lid/walt/wallet2/mobile/presentation/MobileWalletPresentationDisclosure;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDisplayValue ()Ljava/lang/String;
+	public final fun getDisposition ()Lid/walt/wallet2/mobile/presentation/DisclosureDisposition;
 	public final fun getName ()Ljava/lang/String;
 	public final fun getPath ()Ljava/lang/String;
 	public final fun getRequested ()Z
@@ -2615,6 +2638,7 @@ public final class id/walt/wallet2/mobile/proximity/ProximityConfiguration {
 	public final fun getSession ()Lid/walt/wallet2/mobile/proximity/ProximitySessionConfiguration;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+	public final fun withProfile (Lid/walt/wallet2/mobile/proximity/ProximityProfile;)Lid/walt/wallet2/mobile/proximity/ProximityConfiguration;
 }
 
 public final class id/walt/wallet2/mobile/proximity/ProximityConfiguredReaderTrustEvaluator : id/walt/wallet2/mobile/proximity/ProximityReaderTrustEvaluator {

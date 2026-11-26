@@ -16,6 +16,7 @@ public sealed interface MobileWalletCredentialOffer {
      * @property value Non-blank credential offer URI.
      */
     public data class Uri(public val value: String) : MobileWalletCredentialOffer {
+        /** Diagnostic form that omits the credential offer URI. */
         public override fun toString(): String = "Uri(<redacted>)"
 
         init {
@@ -29,6 +30,7 @@ public sealed interface MobileWalletCredentialOffer {
      * @property value Non-blank Credential Offer JSON object.
      */
     public data class InlineJson(public val value: String) : MobileWalletCredentialOffer {
+        /** Diagnostic form that omits the inline credential offer. */
         public override fun toString(): String = "InlineJson(<redacted>)"
 
         init {

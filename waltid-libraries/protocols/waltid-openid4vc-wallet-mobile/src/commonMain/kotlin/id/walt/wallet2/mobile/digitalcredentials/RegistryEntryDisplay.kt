@@ -16,9 +16,11 @@ public class RegistryEntryDisplay(
     /** A copy of the resolved picker thumbnail. */
     public val iconPng: ByteArray? get() = icon?.copyOf()
 
+    /** Compares picker text and artwork, including image bytes. */
     public override fun equals(other: Any?): Boolean = other is RegistryEntryDisplay &&
         name == other.name && subtitle == other.subtitle && icon.contentEquals(other.icon) && cardArt == other.cardArt
 
+    /** Hash consistent with content-based artwork equality. */
     public override fun hashCode(): Int = ((name.hashCode() * 31 + subtitle.hashCode()) * 31 + icon.contentHashCode()) * 31 + cardArt.hashCode()
 
     internal fun withIcon(png: ByteArray) = RegistryEntryDisplay(name, subtitle, png, cardArt)
@@ -42,9 +44,11 @@ public class MobileWalletCardArt(
     /** A copy of the local fallback thumbnail. */
     public val fallbackPng: ByteArray? get() = fallback?.copyOf()
 
+    /** Compares image candidates, background color and fallback bytes. */
     public override fun equals(other: Any?): Boolean = other is MobileWalletCardArt &&
         imageUris == other.imageUris && backgroundColor == other.backgroundColor && fallback.contentEquals(other.fallback)
 
+    /** Hash consistent with content-based artwork equality. */
     public override fun hashCode(): Int = (imageUris.hashCode() * 31 + backgroundColor.hashCode()) * 31 + fallback.contentHashCode()
 
     private val fallback = fallbackPng?.copyOf()
