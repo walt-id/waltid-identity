@@ -3,8 +3,10 @@ package id.walt.wallet2.handlers
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
+import id.waltid.openid4vci.wallet.metadata.AuthorizationServerIssuerMismatchException
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.ResolvedAuthorizationServerMetadata
+import kotlinx.coroutines.CancellationException
 
 internal data class ResolvedIssuanceGrant(
     val grant: WalletIssuanceGrant,
@@ -24,12 +26,23 @@ internal suspend fun IssuerMetadataResolver.resolveIssuanceGrant(
         if (GrantType.PreAuthorizedCode in offered) add(WalletIssuanceGrant.PRE_AUTHORIZED_CODE)
     }.sortedBy { it != preferred }
     val servers = mutableMapOf<String, ResolvedAuthorizationServerMetadata>()
+    val failures = mutableMapOf<String, Exception>()
     for (grant in candidates) {
         if (required != null && required != grant) continue
         val browser = grant == WalletIssuanceGrant.AUTHORIZATION_CODE
         val wireGrant = if (browser) GrantType.AuthorizationCode.value else GrantType.PreAuthorizedCode.value
         for (server in grantServers(offer, grant, issuer)) {
-            val resolution = servers.getOrPut(server) { resolveDeclaredServer(server) }
+            if (server in failures) continue
+            val resolution = try {
+                servers.getOrPut(server) { resolveDeclaredServer(server) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: AuthorizationServerIssuerMismatchException) {
+                throw error
+            } catch (error: Exception) {
+                failures[server] = error
+                continue
+            }
             val metadata = resolution.metadata
             if (metadata.tokenEndpoint.isNullOrBlank() || (browser && metadata.authorizationEndpoint.isNullOrBlank())) continue
             // Explicit offers supply the pre-authorized code even when the server omits its optional grant list.
@@ -37,6 +50,7 @@ internal suspend fun IssuerMetadataResolver.resolveIssuanceGrant(
             return ResolvedIssuanceGrant(grant, resolution)
         }
     }
+    failures.values.firstOrNull()?.let { throw it }
     error("No usable issuance grant is supported by the advertised authorization servers")
 }
 
@@ -64,9 +78,8 @@ internal suspend fun IssuerMetadataResolver.resolveTokenServer(
     issuer: CredentialIssuerMetadata,
     tokenEndpoint: String,
 ): ResolvedAuthorizationServerMetadata {
-    for (server in issuer.authorizationServerIssuers()) {
-        val resolution = resolveDeclaredServer(server)
-        if (resolution.metadata.tokenEndpoint == tokenEndpoint) return resolution
-    }
-    error("Token endpoint does not match any declared authorization server")
+    val matches = issuer.authorizationServerIssuers().distinct().map { resolveDeclaredServer(it) }
+        .filter { it.metadata.tokenEndpoint == tokenEndpoint }
+    require(matches.size <= 1) { "Several authorization servers share this token endpoint. Use a retained issuance session." }
+    return matches.singleOrNull() ?: error("Token endpoint does not match any declared authorization server")
 }

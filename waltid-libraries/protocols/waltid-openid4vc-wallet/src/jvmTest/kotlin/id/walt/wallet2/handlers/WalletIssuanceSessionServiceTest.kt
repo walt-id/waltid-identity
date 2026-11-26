@@ -219,6 +219,23 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun anUnhintedBrowserOfferCanUseTheNextDeclaredServer() = runTest {
+        val next = "https://next.example"
+        val sessions = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false).replace(
+                    "\"credential_endpoint\":", "\"authorization_servers\":[\"$ISSUER\",\"$next\"],\"credential_endpoint\":"
+                ))
+                AS_METADATA, "$ISSUER/.well-known/openid-configuration" -> jsonResponse("{}")
+                "$next/.well-known/oauth-authorization-server" -> jsonResponse(authorizationServerMetadata().replace(ISSUER, next))
+                else -> error("Unexpected metadata URL")
+            }
+        }
+        val offer = sessions.start(authRequest())
+        assertEquals(Url(next).host, Url(sessions.beginAuthorization(offer.id).url).host)
+    }
+
+    @Test
     fun aSoleOfferedGrantCannotOverrideAnExplicitlyConflictingCapability() = runTest {
         val sessions = service { request ->
             when (request.url.toString()) {
