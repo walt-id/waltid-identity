@@ -16,6 +16,8 @@ import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -96,6 +98,7 @@ class SameDeviceFlowTest {
         ).apply {
             status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
             responseCode = "wallet-browser-secret"
+            responseCodeExpiresAt = Clock.System.now() + 5.minutes
             statusReason = "private outcome detail"
         }
         val restored = Json.decodeFromString<Verification2Session>(Json.encodeToString(session))
@@ -119,6 +122,7 @@ class SameDeviceFlowTest {
         ).apply {
             status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
             responseCode = "completion-code"
+            responseCodeExpiresAt = Clock.System.now() + 5.minutes
             policyResults = Verifier2PolicyResults(emptyMap(), listOf(result), mapOf("requested" to listOf(result)))
         }
         val restored = Json.decodeFromString<Verification2Session>(Json.encodeToString(session))
@@ -131,6 +135,31 @@ class SameDeviceFlowTest {
         assertEquals(JsonPrimitive("accepted"), completed.policyResults!!.vcPolicies.single().result)
         assertEquals(JsonPrimitive("accepted"), completed.policyResults!!.specificVcPolicies.getValue("requested").single().result)
         assertEquals(webhook, restored.policyResults!!.vcPolicies.single().policy)
+    }
+
+    @Test
+    fun `completion expiry survives restart and is independent of record retention`() = runTest {
+        val now = Clock.System.now()
+        val session = VerificationSessionCreator.createVerificationSession(
+            SameDeviceFlowSetup(GeneralFlowConfig(), redirects = redirects), clientId = null,
+            urlPrefix = "https://verifier.example/verification-session", urlHost = "openid4vp://authorize",
+        ).apply {
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
+            responseCode = "short-lived-code"
+            responseCodeExpiresAt = now + 5.minutes
+        }
+        val restored = Json.decodeFromString<Verification2Session>(Json.encodeToString(session))
+        repeat(2) { assertEquals(restored.status, restored.completionView("short-lived-code", now).status) }
+        assertFailsWith<IllegalArgumentException> { restored.completionView("short-lived-code", now + 5.minutes) }
+        assertFailsWith<IllegalArgumentException> { restored.completionView("short-lived-code", now + 6.minutes) }
+        assertNotNull(restored.retentionDate)
+        assertNull(restored.publicView().responseCodeExpiresAt)
+        assertEquals("short-lived-code", restored.responseCode)
+        restored.responseCodeExpiresAt = null
+        assertFailsWith<IllegalArgumentException> { restored.completionView("short-lived-code", now) }
+        restored.deletePII()
+        assertNull(restored.responseCode)
+        assertNull(restored.responseCodeExpiresAt)
     }
 
     @Test
