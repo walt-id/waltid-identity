@@ -156,21 +156,21 @@ extension MobileWalletPresentationResult {
 
 private extension MobileWalletPresentationRequestContext {
     func toSwiftRequestContext() throws -> PresentationRequestContext {
-        PresentationRequestContext(
+        try PresentationRequestContext(
             clientID: clientId,
             requestAuthentication: try requestAuthentication.toSwiftRequestAuthentication(),
+            responseEncryption: try responseEncryption.toSwiftResponseEncryption(),
             verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
-            nonce: nonce,
-            responseEncryption: try responseEncryption.toSwiftResponseEncryption()
+            nonce: nonce
         )
     }
 }
 
 private extension MobileWalletPresentationRequestInfo {
     func toSwiftRequestInfo() throws -> PresentationRequestInfo {
-        PresentationRequestInfo(
+        try PresentationRequestInfo(
             clientID: clientId,
             requestAuthentication: try requestAuthentication.toSwiftRequestAuthentication(),
             nonce: nonce,
@@ -272,7 +272,7 @@ private extension MobileWalletPresentationCredentialRequirement {
     func toSwiftCredentialRequirement() throws -> PresentationCredentialRequirement {
         let options = try requiredBridgeArray(options, of: [String].self)
         guard PresentationCredentialRequirement.hasValidOptions(options) else { throw WalletError.internalFailure("Invalid credential requirement") }
-        return PresentationCredentialRequirement(options: options)
+        return try PresentationCredentialRequirement(options: options)
     }
 }
 
@@ -299,7 +299,7 @@ private extension MobileWalletPresentationDisclosure {
 
 private extension MobileWalletTransactionDataItem {
     func toSwiftTransactionData() throws -> PresentationTransactionData {
-        PresentationTransactionData(
+        try PresentationTransactionData(
             type: type,
             displayName: displayName,
             credentialQueryIDs: try requiredBridgeArray(credentialQueryIds, of: String.self),

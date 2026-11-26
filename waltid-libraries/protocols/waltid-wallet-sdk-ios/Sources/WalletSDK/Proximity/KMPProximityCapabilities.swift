@@ -3,10 +3,10 @@ import Foundation
 @preconcurrency import WalletCore
 
 extension WalletCore.ProximityCapabilities {
-    func toSwiftCapabilities() -> ProximityCapabilities {
+    func toSwiftCapabilities() throws -> ProximityCapabilities {
         ProximityCapabilities(
             profile: profile.toSwiftProfile(),
-            session: swiftSession(session),
+            session: try swiftSession(session),
             qrEngagement: qrEngagement.toSwiftCapability(),
             nfcEngagement: nfcEngagement.toSwiftCapability(),
             bluetoothLowEnergy: bluetoothLowEnergy.toSwiftCapability(),

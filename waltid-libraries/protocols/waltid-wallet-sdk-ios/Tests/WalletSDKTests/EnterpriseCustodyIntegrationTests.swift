@@ -17,7 +17,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
         for (scenario, expected) in cases {
             let configuration = URLSessionConfiguration.ephemeral
             configuration.protocolClasses = [CustodyProtocolFixture.self]
-            let adapter = EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
+            let adapter = try EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
                 configuration: configuration) { request in
                     XCTAssertNil(request.httpBody)
                     var request = request
@@ -40,7 +40,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
     func testOptionalAdapterImportsOriginalIdentityAndPreservesRecoveryState() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [CustodyProtocolFixture.self]
-        let adapter = EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
+        let adapter = try EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
             configuration: configuration) { request in
                 XCTAssertNil(request.httpBody, "Authentication callback must not receive the private key")
                 var authorized = request
@@ -73,10 +73,10 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
     func testAdapterFailuresReachTheSharedCustodyResult() async throws {
         let cases: [(String, SigningIdentityFailure)] = [("401", .providerInteractionRequired), ("409", .providerConflict),
             ("503", .providerUnavailable), ("malformed", .providerRejected), ("oversized", .providerRejected), ("mismatch", .providerConflict)]
-        let adapters = cases.map { scenario, _ in
+        let adapters = try cases.map { scenario, _ in
             let configuration = URLSessionConfiguration.ephemeral
             configuration.protocolClasses = [CustodyProtocolFixture.self]
-            return EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
+            return try EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
                 id: scenario, displayName: scenario,
                 configuration: configuration) { request in
                     var authorized = request

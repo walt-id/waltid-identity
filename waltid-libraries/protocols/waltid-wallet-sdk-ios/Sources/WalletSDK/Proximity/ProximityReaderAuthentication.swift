@@ -9,21 +9,26 @@ public enum ProximityReaderAuthenticationScope: Sendable, Equatable {
 
     /// Creates a document scope after validating its zero-based index.
     /// - Parameter index: Nonnegative document-request index.
-    public static func document(index: Int) -> Self { .document(ProximityDocumentRequestIndex(index)) }
+    public static func document(index: Int) throws -> Self { .document(try ProximityDocumentRequestIndex(index)) }
 
     /// Document index carried by this scope, if it is document-scoped.
     public var documentRequestIndex: Int? {
-        if case let .document(index) = self { index.value } else { nil }
+        if case let .document(index) = self { Int(index.value) } else { nil }
     }
 }
 
 /// Validated zero-based index used by document-scoped reader authentication.
 public struct ProximityDocumentRequestIndex: Sendable, Equatable {
     /// Nonnegative document-request index.
-    public let value: Int
+    public let value: Int32
     /// Creates a validated index.
     /// - Parameter value: Nonnegative document-request index.
-    public init(_ value: Int) { precondition(value >= 0); self.value = value }
+    public init(_ value: Int) throws {
+        guard value >= 0, let index = Int32(exactly: value) else {
+            throw WalletError.invalidInput("Document request index must fit a nonnegative 32-bit integer")
+        }
+        self.value = index
+    }
 }
 
 /// Structural and cryptographic validity of reader authentication.
@@ -93,7 +98,7 @@ public struct ProximityReaderEvidence: Sendable, Equatable {
     /// Portion of the request authenticated by this evidence.
     public let scope: ProximityReaderAuthenticationScope
     /// Zero-based statement index within the authentication scope.
-    public let authenticationIndex: Int
+    public let authenticationIndex: Int32
     /// DER certificates in leaf-first order.
     public let certificateChainDER: [Data]
 
@@ -106,14 +111,15 @@ public struct ProximityReaderEvidence: Sendable, Equatable {
         scope: ProximityReaderAuthenticationScope,
         certificateChainDER: [Data],
         authenticationIndex: Int = 0
-    ) {
-        precondition(
-            !certificateChainDER.isEmpty && certificateChainDER.allSatisfy { !$0.isEmpty },
-            "Verified reader evidence requires nonempty certificates"
-        )
-        precondition(authenticationIndex >= 0)
+    ) throws {
+        guard !certificateChainDER.isEmpty && certificateChainDER.allSatisfy({ !$0.isEmpty }) else {
+            throw WalletError.invalidInput("Verified reader evidence requires nonempty certificates")
+        }
+        guard authenticationIndex >= 0, let index = Int32(exactly: authenticationIndex) else {
+            throw WalletError.invalidInput("Authentication index must fit a nonnegative 32-bit integer")
+        }
         self.scope = scope
-        self.authenticationIndex = authenticationIndex
+        self.authenticationIndex = index
         self.certificateChainDER = certificateChainDER
     }
 }

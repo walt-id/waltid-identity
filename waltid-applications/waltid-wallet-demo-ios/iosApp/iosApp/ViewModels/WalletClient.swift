@@ -119,7 +119,7 @@ extension WalletClient {
 }
 
 final class SDKWalletClient: WalletClient {
-    init(configuration: WalletConfiguration) {
+    init(configuration: Result<WalletConfiguration, Error>) {
         self.configuration = configuration
     }
 
@@ -203,7 +203,7 @@ final class SDKWalletClient: WalletClient {
         try await wallet().cancelIssuance(sessionID: sessionID)
     }
 
-    func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome { try await wallet().resumeDeferredIssuance(continuation) }
+    func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome { try await wallet().resumeDeferredIssuance(continuation.id) }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await wallet().previewPresentation(request: request)
@@ -226,7 +226,7 @@ final class SDKWalletClient: WalletClient {
         cachedWallet = nil
     }
 
-    private let configuration: WalletConfiguration
+    private let configuration: Result<WalletConfiguration, Error>
     private var cachedWallet: Wallet?
 
     private func wallet() async throws -> Wallet {
@@ -234,7 +234,7 @@ final class SDKWalletClient: WalletClient {
             return cachedWallet
         }
 
-        let wallet = try await Wallet(configuration: configuration)
+        let wallet = try await Wallet(configuration: configuration.get())
         cachedWallet = wallet
         return wallet
     }

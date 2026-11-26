@@ -393,14 +393,14 @@ private extension ProximityReaderEvidence {
         WalletCore.ProximityReaderEvidence(
             scope: scope.toKMPScope(),
             certificateChainDerBase64Url: certificateChainDER.map { $0.base64URLEncodedString() },
-            authenticationIndex: Int32(authenticationIndex)
+            authenticationIndex: authenticationIndex
         )
     }
 }
 
 private extension WalletCore.ProximityReaderEvidence {
     func toSwiftEvidence() throws -> ProximityReaderEvidence {
-        ProximityReaderEvidence(
+        try ProximityReaderEvidence(
             scope: scope.toSwiftScope(),
             certificateChainDER: try certificateChainDerBase64Url.map {
                 try decodedBase64URL($0, context: "reader certificate evidence")

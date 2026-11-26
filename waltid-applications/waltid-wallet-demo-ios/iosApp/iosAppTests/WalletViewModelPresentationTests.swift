@@ -187,6 +187,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
             request: PresentationRequestContext(
                 clientID: "https://verifier.example",
                 requestAuthentication: .unauthenticated,
+                responseEncryption: .notRequired,
                 verifierMetadata: VerifierMetadata(
                     display: MetadataDisplay(
                         name: "Example Verifier",
@@ -197,8 +198,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     clientURI: nil,
                     policyURI: nil,
                     termsOfServiceURI: nil
-                ),
-                responseEncryption: .notRequired
+                )
             ),
             code: .invalidTransactionData,
             message: "Unsupported transaction data type"

@@ -6,7 +6,7 @@ import XCTest
 final class ProximityBridgeContractTests: XCTestCase {
     func testAggregateRoutesAndRemediationOrderMatchKMP() throws {
         let ble = WalletSDK.ProximityRetrievalOptions()
-        let wifi = WalletSDK.ProximityRetrievalOptions(bluetoothLowEnergy: nil, wifiAware: true)
+        let wifi = try WalletSDK.ProximityRetrievalOptions(bluetoothLowEnergy: nil, wifiAware: true)
         let cases: [(WalletSDK.ProximitySessionConfiguration, [Bool])] = [
             (.qr(ble), [true, false, true, false, false, false]),
             (.nfc(.init(handover: .negotiatedHandover, retrieval: ble, qrFallback: wifi)),
@@ -35,7 +35,7 @@ final class ProximityBridgeContractTests: XCTestCase {
                     qrEngagement: observations[0], nfcEngagement: observations[1],
                     bluetoothLowEnergy: observations[2], nfcRetrieval: observations[3],
                     nfcV2Retrieval: observations[4], wifiAwareRetrieval: observations[5])
-                let swift = core.toSwiftCapabilities()
+                let swift = try core.toSwiftCapabilities()
                 XCTAssertEqual(swift.mayStart, core.mayStart)
                 XCTAssertEqual(swift.qrMayStart, core.qrMayStart)
                 XCTAssertEqual(swift.nfcMayStart, core.nfcMayStart)

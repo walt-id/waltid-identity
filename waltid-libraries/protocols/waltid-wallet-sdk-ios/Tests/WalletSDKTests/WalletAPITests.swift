@@ -185,6 +185,8 @@ final class WalletAPITests: XCTestCase {
         let decoder = JSONDecoder()
         let encoder = JSONEncoder()
         let blank = try encoder.encode("  ")
+        XCTAssertNil(DeferredIssuanceID(rawValue: ""))
+        XCTAssertThrowsError(try decoder.decode(DeferredIssuanceID.self, from: blank))
         XCTAssertNil(IssuanceSessionID(rawValue: ""))
         XCTAssertNil(IssuanceAuthorizationID(rawValue: "  "))
         XCTAssertThrowsError(try decoder.decode(IssuanceSessionID.self, from: blank))
@@ -194,7 +196,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(try encoder.encode(id), saved)
     }
 
-    func testIssuancePreviewTypePayloadDrivesFriendlyTitle() {
+    func testIssuancePreviewResolvesItsTypedDocumentTitle() {
         let preview = IssuanceCredentialPreview(
             configurationID: "org.iso.18013.5.1.mDL",
             format: "mso_mdoc",
@@ -202,11 +204,7 @@ final class WalletAPITests: XCTestCase {
         )
 
         XCTAssertEqual(
-            CredentialTitles.displayName(
-                format: preview.format,
-                credentialDataJSON: preview.typePayloadJSON,
-                fallback: preview.format
-            ),
+            CredentialTitles.displayName(for: preview),
             "Mobile Driving Licence"
         )
     }
@@ -337,10 +335,10 @@ final class WalletAPITests: XCTestCase {
         )
     }
 
-    func testPresentationPreviewModelsAreValueTypesAndEquatable() {
+    func testPresentationPreviewModelsAreValueTypesAndEquatable() throws {
         let preview = PresentationPreview(
             previewHandle: try! PresentationPreviewHandle(value: "presentation-preview-1"),
-            request: .init(
+            request: try .init(
                 clientID: "https://verifier.example",
                 requestAuthentication: .unauthenticated,
                 nonce: "nonce-1",
@@ -371,7 +369,7 @@ final class WalletAPITests: XCTestCase {
                 )
             ],
             credentialRequirements: [
-                PresentationCredentialRequirement(options: [["pid"]])
+                try PresentationCredentialRequirement(options: [["pid"]])
             ]
         )
 
@@ -442,11 +440,11 @@ final class WalletAPITests: XCTestCase {
 
     func testProximityConfigurationRepresentsCombinedNFCSessionPrecisely() throws {
         let ble = ProximityBLEConfiguration(roles: .peripheralServer, bearerPolicy: .gattOnly)
-        let qr = ProximityRetrievalOptions(
+        let qr = try ProximityRetrievalOptions(
             bluetoothLowEnergy: ble,
             nfc: .init(maximumCommandDataLength: 4_095, maximumResponseDataLength: 4_096)
         )
-        let session = ProximitySessionConfiguration.provisionalNFCV2(.init(
+        let session = ProximitySessionConfiguration.provisionalNFCV2(try .init(
             maximumCommandDataLength: 4_096, bluetoothLowEnergy: ble, qrFallback: qr
         ))
         let configuration = try ProximityConfiguration(session: session)
@@ -456,19 +454,19 @@ final class WalletAPITests: XCTestCase {
 
     func testProximitySessionConfigurationMatrix() throws {
         let ble = ProximityRetrievalOptions()
-        let nfc = ProximityRetrievalOptions(bluetoothLowEnergy: nil, nfc: .init())
-        let plans = [ble, nfc, .init(nfc: .init())]
+        let nfc = try ProximityRetrievalOptions(bluetoothLowEnergy: nil, nfc: .init())
+        let plans = [ble, nfc, try .init(nfc: .init())]
         for retrieval in plans {
             XCTAssertEqual(try ProximityConfiguration(session: .qr(retrieval)).session, .qr(retrieval))
             for handover in [ProximityNFCHandover.staticHandover, .negotiatedHandover] {
                 for qr in [nil] + plans.map(Optional.some) {
-                    let session = ProximitySessionConfiguration.nfc(.init(
+                    let session = ProximitySessionConfiguration.nfc(try .init(
                         handover: handover, retrieval: retrieval, qrFallback: qr
                     ))
                     XCTAssertEqual(try ProximityConfiguration(session: session).session.qrRetrieval, qr)
                 }
             }
-            let session = ProximitySessionConfiguration.provisionalNFCV2(.init(qrFallback: retrieval))
+            let session = ProximitySessionConfiguration.provisionalNFCV2(try .init(qrFallback: retrieval))
             XCTAssertEqual(try ProximityConfiguration(session: session).session.qrRetrieval, retrieval)
         }
     }
@@ -486,13 +484,13 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(updated.maximumMessageBytes, configuration.maximumMessageBytes)
     }
 
-    func testProximityConfigurationRepresentsWifiAwareWithoutEnablingBLE() {
+    func testProximityConfigurationRepresentsWifiAwareWithoutEnablingBLE() throws {
         let wifiAware = true
-        let conventional = ProximityRetrievalOptions(
+        let conventional = try ProximityRetrievalOptions(
             bluetoothLowEnergy: nil,
             wifiAware: wifiAware
         )
-        let provisionalNFCV2 = ProximityNFCV2SessionConfiguration(
+        let provisionalNFCV2 = try ProximityNFCV2SessionConfiguration(
             wifiAware: wifiAware
         )
 
@@ -514,8 +512,8 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(unavailable.remediationActions, remediations)
     }
 
-    func testWifiOnlyQRFallbackAndNFCV2DeriveIndependentViableRoutes() {
-        let wifiOnly = ProximityRetrievalOptions(bluetoothLowEnergy: nil, wifiAware: true)
+    func testWifiOnlyQRFallbackAndNFCV2DeriveIndependentViableRoutes() throws {
+        let wifiOnly = try ProximityRetrievalOptions(bluetoothLowEnergy: nil, wifiAware: true)
         for nfcAvailable in [false, true] {
             for wifiAvailable in [false, true] {
                 func capability(_ available: Bool, selected: Bool) -> ProximityTransportCapability {
@@ -526,7 +524,7 @@ final class WalletAPITests: XCTestCase {
                 }
                 let result = ProximityCapabilities(
                     profile: .iso180135Edition2DIS2026,
-                    session: .provisionalNFCV2(.init(qrFallback: wifiOnly, wifiAware: true)),
+                    session: .provisionalNFCV2(try .init(qrFallback: wifiOnly, wifiAware: true)),
                     qrEngagement: capability(true, selected: true),
                     nfcEngagement: capability(nfcAvailable, selected: true),
                     bluetoothLowEnergy: capability(false, selected: false),
@@ -540,8 +538,8 @@ final class WalletAPITests: XCTestCase {
         }
     }
 
-    func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() {
-        let evidence = ProximityReaderEvidence(
+    func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() throws {
+        let evidence = try ProximityReaderEvidence(
             scope: .wholeRequest,
             certificateChainDER: [Data([0x30, 0x00])],
             authenticationIndex: 1
@@ -649,7 +647,7 @@ final class WalletAPITests: XCTestCase {
         )
         let capabilities = ProximityCapabilities(
             profile: .iso180135Edition2DIS2026,
-            session: .nfc(.init(handover: .staticHandover, retrieval: .init(), qrFallback: .init())),
+            session: .nfc(try .init(handover: .staticHandover, retrieval: .init(), qrFallback: .init())),
             qrEngagement: available,
             nfcEngagement: unavailable,
             bluetoothLowEnergy: available,
@@ -664,7 +662,7 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testProximityScopeOutcomeAndRuntimeFactsAreIndependent() throws {
-        let evidence = ProximityReaderEvidence(
+        let evidence = try ProximityReaderEvidence(
             scope: .document(index: 2),
             certificateChainDER: [Data([0x30, 0x00])],
             authenticationIndex: 0
@@ -703,7 +701,7 @@ final class WalletAPITests: XCTestCase {
         await session.close()
     }
 
-    func testProximityCapabilitiesDoNotBorrowBearersFromAnotherRoute() {
+    func testProximityCapabilitiesDoNotBorrowBearersFromAnotherRoute() throws {
         let available = ProximityTransportCapability(
             implemented: true, profilePermitted: true, runtime: .available, selected: true
         )
@@ -711,11 +709,11 @@ final class WalletAPITests: XCTestCase {
             implemented: true, profilePermitted: true, runtime: .notChecked, selected: true
         )
         for session in [
-            ProximitySessionConfiguration.nfc(.init(
+            ProximitySessionConfiguration.nfc(try .init(
                 handover: .staticHandover, retrieval: .init(),
-                qrFallback: .init(bluetoothLowEnergy: nil, nfc: .init())
+                qrFallback: try .init(bluetoothLowEnergy: nil, nfc: .init())
             )),
-            .provisionalNFCV2(.init(qrFallback: .init(bluetoothLowEnergy: nil, nfc: .init())))
+            .provisionalNFCV2(try .init(qrFallback: try .init(bluetoothLowEnergy: nil, nfc: .init())))
         ] {
             let capabilities = ProximityCapabilities(
                 profile: .iso180135Edition2DIS2026,
@@ -763,7 +761,7 @@ final class WalletAPITests: XCTestCase {
         let callbackURL = URL(string: "wallet.example:/callback?code=authorization-code")!
         let authorizationOutcome = try await wallet.completeAuthorization(authorization.id, callback: callbackURL)
         let cancellationOutcome = try await wallet.cancelIssuance(sessionID: session.id)
-        let deferredOutcome = try await wallet.resumeDeferredIssuance(.init(id: "deferred-1", credentialConfigurationID: nil, intervalSeconds: nil))
+        let deferredOutcome = try await wallet.resumeDeferredIssuance(.init(rawValue: "deferred-1")!)
 
         XCTAssertEqual(authorization.id.rawValue, browserSession.id.rawValue)
         XCTAssertEqual(authorization.request.url.absoluteString, "https://issuer.example/authorize")
@@ -788,7 +786,7 @@ final class WalletAPITests: XCTestCase {
 
     func testIssuanceFailureKeepsStoredAndDeferredProgressAndRecoveryListing() async throws {
         let bridge = FakeWalletCoreBridge()
-        let pending = DeferredCredential(id: "handle", credentialConfigurationID: "identity", intervalSeconds: 5,
+        let pending = DeferredCredential(id: .init(rawValue: "handle")!, credentialConfigurationID: "identity", intervalSeconds: 5,
             credentialIdentifier: "dataset-a")
         let failure = IssuanceFailure(code: .network, message: "Issuer unavailable",
             targetFailure: IssuanceTargetFailure(target: .init(configurationID: "identity", credentialIdentifier: "dataset-b"),
@@ -852,7 +850,7 @@ final class WalletAPITests: XCTestCase {
         bridge.previewResult = .ready(
             .init(
                 previewHandle: try! PresentationPreviewHandle(value: "presentation-preview-1"),
-                request: .init(
+                request: try .init(
                     clientID: "https://verifier.example",
                     requestAuthentication: .unauthenticated,
                     nonce: "nonce-1",
@@ -909,11 +907,11 @@ final class WalletAPITests: XCTestCase {
 
     func testPreviewPresentationReturnsTypedProtocolError() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
-        let requestInfo = PresentationRequestContext(
+        let requestInfo = try PresentationRequestContext(
             clientID: "https://verifier.example",
             requestAuthentication: .unauthenticated,
-            verifierMetadata: testVerifierMetadata,
-            responseEncryption: .notRequired
+            responseEncryption: .notRequired,
+            verifierMetadata: testVerifierMetadata
         )
         let bridge = FakeWalletCoreBridge()
         bridge.previewResult = .invalid(
@@ -1329,7 +1327,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     )
     var issuanceOutcomeResult = IssuanceOutcome.stored(sessionID: "issuance-session-1", credentialIDs: [])
     var credentialsResult: [Credential] = []
-    var previewResult = PresentationPreviewResult.ready(
+    var previewResult = try! PresentationPreviewResult.ready(
         PresentationPreview(
             previewHandle: try! PresentationPreviewHandle(value: "fake-presentation-preview"),
             request: .init(

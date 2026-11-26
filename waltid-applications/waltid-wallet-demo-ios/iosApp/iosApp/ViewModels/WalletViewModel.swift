@@ -971,31 +971,34 @@ class WalletViewModel: ObservableObject {
                 )
             ]
         )
-        let configuration = WalletConfiguration(
-            walletID: walletID,
-            keyAuthorization: .init(
-                policy: signingProtectionMode.defaultSelection.authorizationPolicy,
-                prompt: WalletKeyUseAuthorizationPrompt(
-                    message: "Authorize wallet signing",
-                    cancelText: "Cancel"
-                )
-            ),
-            signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.alternativeAuthorizations,
-                keychain: .init(accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup),
-                recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
-                    accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)]),
-            issuance: .init(
-                attestation: Self.attestationConfiguration(
-                    baseUrl: attestationBaseUrl,
-                    attesterPath: attestationAttesterPath,
-                    bearerToken: attestationBearerToken,
-                    hostHeader: attestationHostHeader
+        let configuration = Result {
+            let access = try Self.crossProcessAccessConfiguration()
+            return try WalletConfiguration(
+                walletID: walletID,
+                keyAuthorization: .init(
+                    policy: signingProtectionMode.defaultSelection.authorizationPolicy,
+                    prompt: WalletKeyUseAuthorizationPrompt(
+                        message: "Authorize wallet signing",
+                        cancelText: "Cancel"
+                    )
                 ),
-                keyAttestationProvider: DemoKeyAttestationProviders()
-            ),
-            presentation: presentation,
-            crossProcessAccess: Self.crossProcessAccessConfiguration()
-        )
+                signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.alternativeAuthorizations,
+                    keychain: .init(accessGroup: access.keychainAccessGroup),
+                    recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
+                        accessGroup: access.keychainAccessGroup)]),
+                issuance: .init(
+                    attestation: Self.attestationConfiguration(
+                        baseUrl: attestationBaseUrl,
+                        attesterPath: attestationAttesterPath,
+                        bearerToken: attestationBearerToken,
+                        hostHeader: attestationHostHeader
+                    ),
+                    keyAttestationProvider: DemoKeyAttestationProviders()
+                ),
+                presentation: presentation,
+                crossProcessAccess: access
+            )
+        }
         let resolvedWalletClient = walletClient ?? SDKWalletClient(configuration: configuration)
         self.signingProtectionMode = signingProtectionMode
         selectedSigningProtection = selectedProtection
@@ -1644,7 +1647,7 @@ class WalletViewModel: ObservableObject {
         }
     }
 
-    private func refreshContinuations(_ outcome: IssuanceOutcome, resumingID: String? = nil) async throws -> IssuanceOutcome {
+    private func refreshContinuations(_ outcome: IssuanceOutcome, resumingID: DeferredIssuanceID? = nil) async throws -> IssuanceOutcome {
         guard outcome.hasPendingCredentials else { return outcome }
         do { return outcome.withContinuations(try await walletClient.listDeferredIssuance(), resumingID: resumingID) }
         catch is CancellationError { throw CancellationError() }
@@ -2258,14 +2261,10 @@ class WalletViewModel: ObservableObject {
     /// back to process-local storage looks healthy while being invisible to that extension. The
     /// symptom would be a failed presentation on a device, so the misconfiguration - an Info.plist key
     /// the build did not expand - has to stop the app at launch instead.
-    private static func crossProcessAccessConfiguration() -> WalletCrossProcessAccess {
+    private static func crossProcessAccessConfiguration() throws -> WalletCrossProcessAccess {
         guard let keychainAccessGroup = IdentityDocumentSharedConfiguration.keychainAccessGroup,
-              !keychainAccessGroup.isEmpty else {
-            fatalError(
-                IdentityDocumentSupportFailure
-                    .unresolvedKeychainAccessGroup(IdentityDocumentNamespace.keychainAccessGroupInfoKey)
-                    .localizedDescription
-            )
+              !keychainAccessGroup.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw IdentityDocumentSupportFailure.unresolvedKeychainAccessGroup(IdentityDocumentNamespace.keychainAccessGroupInfoKey)
         }
         return WalletCrossProcessAccess(
             appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier,

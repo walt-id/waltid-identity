@@ -138,7 +138,7 @@ struct WalletVisualFixtures {
     func partialResultStatus() throws -> String { try text(object(root, "batchOutcome"), "status") }
     func deferredCredential() throws -> DeferredCredential {
         let value = try object(root, "batchOutcome")
-        return DeferredCredential(id: try text(value, "pendingId"),
+        return DeferredCredential(id: try XCTUnwrap(DeferredIssuanceID(rawValue: text(value, "pendingId"))),
             credentialConfigurationID: try text(value, "pendingConfigurationId"), intervalSeconds: 5,
             status: .awaitingIssuer, displayMetadataJSON: try json(object(value, "pendingMetadata")))
     }

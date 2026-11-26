@@ -628,13 +628,13 @@ final class SharingReviewModelTests: XCTestCase {
         let request = PresentationRequestContext(
             clientID: "https://verifier.example",
             requestAuthentication: .unauthenticated,
+            responseEncryption: .notRequired,
             verifierMetadata: VerifierMetadata(
                 display: MetadataDisplay(name: "Example Verifier", locale: "en", logoURI: nil, logoAltText: nil),
                 clientURI: nil,
                 policyURI: nil,
                 termsOfServiceURI: nil
-            ),
-            responseEncryption: .notRequired
+            )
         ).sharingRequest()
 
         XCTAssertEqual(request.requester?.display?.name, "Example Verifier")

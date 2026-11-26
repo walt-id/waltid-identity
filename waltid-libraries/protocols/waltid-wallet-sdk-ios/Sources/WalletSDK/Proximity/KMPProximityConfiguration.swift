@@ -81,17 +81,17 @@ extension ProximitySessionConfiguration {
     }
 }
 
-func swiftSession(_ session: any WalletCore.ProximitySessionConfiguration) -> ProximitySessionConfiguration {
+func swiftSession(_ session: any WalletCore.ProximitySessionConfiguration) throws -> ProximitySessionConfiguration {
     switch onEnum(of: session) {
-    case let .qr(value): return .qr(value.retrieval.toSwiftConfiguration())
+    case let .qr(value): return try .qr(value.retrieval.toSwiftConfiguration())
     case let .conventionalNfc(value):
-        return .nfc(.init(
+        return try .nfc(.init(
             handover: value.handover == .static ? .staticHandover : .negotiatedHandover,
             retrieval: value.retrieval.toSwiftConfiguration(),
             qrFallback: value.qrFallback?.toSwiftConfiguration()
         ))
     case let .provisionalNfcV2(value):
-        return .provisionalNFCV2(.init(
+        return try .provisionalNFCV2(.init(
             maximumCommandDataLength: Int(value.maximumCommandDataLength),
             bluetoothLowEnergy: value.bluetoothLowEnergy?.toSwiftConfiguration(),
             qrFallback: value.qrFallback?.toSwiftConfiguration(),
@@ -121,9 +121,9 @@ extension ProximityDeviceAuthenticationPolicy {
 }
 
 extension WalletCore.ProximityReaderAuthenticationScope {
-    func toSwiftScope() -> ProximityReaderAuthenticationScope {
+    func toSwiftScope() throws -> ProximityReaderAuthenticationScope {
         switch onEnum(of: self) {
-        case let .document(value): return .document(index: Int(value.index))
+        case let .document(value): return try .document(index: Int(value.index))
         case .wholeRequest: return .wholeRequest
         }
     }
@@ -132,7 +132,7 @@ extension WalletCore.ProximityReaderAuthenticationScope {
 extension ProximityReaderAuthenticationScope {
     func toKMPScope() -> WalletCore.ProximityReaderAuthenticationScope {
         switch self {
-        case .document(let index): return WalletCore.ProximityReaderAuthenticationScopeDocument(index: Int32(index.value))
+        case .document(let index): return WalletCore.ProximityReaderAuthenticationScopeDocument(index: index.value)
         case .wholeRequest: return WalletCore.ProximityReaderAuthenticationScopeWholeRequest.shared
         }
     }
@@ -203,10 +203,10 @@ private extension WalletCore.ProximityBleConfiguration {
 }
 
 private extension WalletCore.ProximityRetrievalOptions {
-    func toSwiftConfiguration() -> ProximityRetrievalOptions {
-        ProximityRetrievalOptions(
+    func toSwiftConfiguration() throws -> ProximityRetrievalOptions {
+        try ProximityRetrievalOptions(
             bluetoothLowEnergy: bluetoothLowEnergy?.toSwiftConfiguration(),
-            nfc: nfc.map { ProximityNFCRetrievalConfiguration(
+            nfc: nfc.map { try ProximityNFCRetrievalConfiguration(
                 maximumCommandDataLength: Int($0.maximumCommandDataLength),
                 maximumResponseDataLength: Int($0.maximumResponseDataLength)
             ) },

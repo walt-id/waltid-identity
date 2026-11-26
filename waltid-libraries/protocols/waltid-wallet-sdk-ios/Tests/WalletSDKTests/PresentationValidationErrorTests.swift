@@ -17,7 +17,7 @@ final class PresentationValidationErrorTests: XCTestCase {
 
 #if canImport(WalletCore) && os(iOS)
     func testInvalidPlatformConfigurationIsRecoverableBeforeStorage() async throws {
-        let provider = KeychainIdentityRecovery(namespace: "validation")
+        let provider = try KeychainIdentityRecovery(namespace: "validation")
         let base = WalletConfiguration(persistence: .init(databaseKey: .provided(UnusedDatabaseKeyProvider())))
         let invalid: [(inout WalletConfiguration) -> Void] = [
             { $0.keyAuthorization.policy = .biometricTimedReuse(timeoutSeconds: 0) },

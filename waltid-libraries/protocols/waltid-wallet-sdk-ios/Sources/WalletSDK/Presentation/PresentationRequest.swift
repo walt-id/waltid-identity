@@ -41,16 +41,15 @@ public struct PresentationRequestContext: Equatable, Sendable {
     public init(
         clientID: String,
         requestAuthentication: PresentationRequestAuthentication,
+        responseEncryption: PresentationResponseEncryption,
         verifierMetadata: VerifierMetadata? = nil,
         responseURI: URL? = nil,
         state: String? = nil,
-        nonce: String? = nil,
-        responseEncryption: PresentationResponseEncryption
-    ) {
-        precondition(
-            Self.hasValidClientID(clientID),
-            "A reportable presentation request must contain a non-blank client ID."
-        )
+        nonce: String? = nil
+    ) throws {
+        guard Self.hasValidClientID(clientID) else {
+            throw WalletError.invalidInput("A reportable presentation request must contain a non-blank client ID.")
+        }
         self.clientID = clientID
         self.verifierMetadata = verifierMetadata
         self.requestAuthentication = requestAuthentication
@@ -192,11 +191,10 @@ public struct PresentationRequestInfo: Equatable, Sendable {
         state: String? = nil,
         responseMode: String? = nil,
         transactionData: [PresentationTransactionData] = []
-    ) {
-        precondition(
-            Self.hasRequiredFields(clientID: clientID, nonce: nonce),
-            "A presentation request must contain non-blank client ID and nonce values."
-        )
+    ) throws {
+        guard Self.hasRequiredFields(clientID: clientID, nonce: nonce) else {
+            throw WalletError.invalidInput("A presentation request must contain non-blank client ID and nonce values.")
+        }
         self.clientID = clientID
         self.verifierMetadata = verifierMetadata
         self.requestAuthentication = requestAuthentication

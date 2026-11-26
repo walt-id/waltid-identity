@@ -56,7 +56,7 @@ extension WalletCore.ProximityState {
     func toSwiftState() throws -> ProximityState {
         switch onEnum(of: self) {
         case let .checkingPrerequisites(value):
-            return .checkingPrerequisites(value.capabilities.toSwiftCapabilities())
+            return try .checkingPrerequisites(value.capabilities.toSwiftCapabilities())
         case let .preparing(value):
             return .preparing(profile: value.profile.toSwiftProfile())
         case let .engagementReady(value):
@@ -182,7 +182,7 @@ extension WalletCore.ProximityReaderAuthentication {
             ))
         }
         return ProximityReaderAuthentication(
-            scope: scope.toSwiftScope(),
+            scope: try scope.toSwiftScope(),
             outcome: result,
             authenticationIndex: Int(authenticationIndex)
         )

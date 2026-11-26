@@ -40,12 +40,7 @@ public struct CredentialCardSummary {
 
     public static func offered(from credential: IssuanceCredentialPreview, issuer: String = "") -> CredentialCardSummary {
         CredentialCardSummary(
-            title: CredentialTitles.displayName(
-                format: credential.format,
-                credentialDataJSON: credential.typePayloadJSON,
-                displayName: credential.display.name,
-                fallback: credential.format
-            ),
+            title: CredentialTitles.displayName(for: credential),
             issuer: issuer,
             backgroundColor: credential.display.backgroundColor,
             backgroundImageURI: credential.display.backgroundImageURI,
