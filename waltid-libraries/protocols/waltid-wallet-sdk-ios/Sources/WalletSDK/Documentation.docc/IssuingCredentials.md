@@ -50,6 +50,7 @@ case .preAuthorized(let grant):
     outcome = try await grant.accept(transactionCode: code, clientID: clientID)
 case .authorizationCode(let grant):
     let authorization = try await grant.beginAuthorization(using: registrationFor(grant.authorizationServer))
+    try await ui.saveAuthorization(authorization.id)
     if let callback = try await ui.browser(authorization.request.url) {
         outcome = try await authorization.complete(callback)
     } else {
@@ -61,7 +62,14 @@ ui.received(outcome)
 
 Save the session ID during offer review. After reopening the same wallet, call `resumeIssuance(_:)` to redisplay the offer while it is still available.
 
-The browser authorization ID can be saved before opening the browser and restored for `completeAuthorization(_:callback:)` after reopening the wallet. Supply the exact callback URI registered with the authorization server.
+Persist ``IssuanceAuthorizationID/rawValue`` together with the owning wallet’s identity before opening the browser. If the callback arrives after a restart, reopen that wallet and pass the restored ID and callback URL to ``Wallet/completeAuthorization(_:callback:)``.
+
+```swift
+guard let id = IssuanceAuthorizationID(rawValue: savedID) else {
+    throw WalletError.invalidInput("Invalid saved authorization ID")
+}
+let outcome = try await wallet.completeAuthorization(id, callback: callback)
+```
 
 ### Select configurations and copies
 
@@ -101,7 +109,7 @@ case .cancelled:
 ```
 
 After recreating the wallet, recover pending work with ``Wallet/listDeferredIssuance()``.
-Wait at least ``DeferredCredential/intervalSeconds`` before polling with
+Wait at least ``DeferredCredential/intervalSeconds`` before passing its ``DeferredCredential/id`` to
 ``Wallet/resumeDeferredIssuance(_:)``. A still-pending outcome retains
 the handle and updates the interval. The wallet persists the earliest permitted poll time
 across restarts. An early resume returns a deferred outcome with the rounded-up remaining
