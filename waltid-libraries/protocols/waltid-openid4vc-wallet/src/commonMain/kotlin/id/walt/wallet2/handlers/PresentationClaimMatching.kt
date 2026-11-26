@@ -1,5 +1,3 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.DigitalCredential
@@ -9,8 +7,6 @@ import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
-import id.walt.wallet2.consent.*
-import io.ktor.http.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull

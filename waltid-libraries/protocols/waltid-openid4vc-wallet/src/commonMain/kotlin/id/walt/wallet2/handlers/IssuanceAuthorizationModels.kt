@@ -1,15 +1,8 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-
 package id.walt.wallet2.handlers
 
-import id.walt.wallet2.data.*
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.http.Url
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class GenerateAuthorizationUrlRequest(

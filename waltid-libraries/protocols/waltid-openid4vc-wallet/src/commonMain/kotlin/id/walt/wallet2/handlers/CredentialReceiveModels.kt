@@ -1,18 +1,12 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-
 package id.walt.wallet2.handlers
 
 import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.wallet2.data.*
+import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
 import id.waltid.openid4vci.wallet.credential.CredentialIssuanceTarget
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.http.Url
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Input for the full pre-authorized-code issuance flow.

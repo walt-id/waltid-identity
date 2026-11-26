@@ -1,9 +1,5 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-
 package id.walt.wallet2.handlers
 
-import id.walt.wallet2.consent.*
-import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

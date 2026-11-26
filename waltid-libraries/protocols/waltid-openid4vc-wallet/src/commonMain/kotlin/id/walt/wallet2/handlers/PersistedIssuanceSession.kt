@@ -1,17 +1,15 @@
 package id.walt.wallet2.handlers
 
-import id.walt.wallet2.data.*
+import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.handlers.WalletIssuanceSessionService.DeferredResponseValidation
 import id.walt.wallet2.handlers.WalletIssuanceSessionService.SessionState
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
 
 @Serializable
 @SerialName("id.walt.wallet2.handlers.WalletIssuanceSessionService.PersistedHolderBinding")
@@ -119,11 +117,11 @@ internal data class PersistedDeferredRecord(
 @SerialName("id.walt.wallet2.handlers.WalletIssuanceSessionService.PersistedDeferredContent")
 internal sealed interface PersistedDeferredContent {
     @Serializable
-    @kotlinx.serialization.SerialName("remote")
+    @SerialName("remote")
     data class Remote(val request: PersistedDeferredRequest) : PersistedDeferredContent
 
     @Serializable
-    @kotlinx.serialization.SerialName("received")
+    @SerialName("received")
     data class Received(val credentials: List<StoredCredential>) : PersistedDeferredContent {
         init { require(credentials.isNotEmpty()) }
     }

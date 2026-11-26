@@ -1,22 +1,16 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-
 package id.walt.wallet2.handlers
 
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
-import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.WalletIssuanceHandler.resolveOffer
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.http.Headers
+import io.ktor.http.Url
 import kotlin.jvm.JvmInline
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Common contract for request types that carry a credential offer, either as a URL
@@ -135,7 +129,7 @@ internal class ResolvedIssuanceOffer(
     val offer: CredentialOffer,
     val resolvedIssuerMetadata: ResolvedCredentialIssuerMetadata,
     val authorizationServerMetadata: AuthorizationServerMetadata,
-    val authorizationServerHeaders: io.ktor.http.Headers,
+    val authorizationServerHeaders: Headers,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
 ) {
     val preAuthorizedGrant get() = offer.grants?.preAuthorizedCode?.takeIf { grant == WalletIssuanceGrant.PRE_AUTHORIZED_CODE }

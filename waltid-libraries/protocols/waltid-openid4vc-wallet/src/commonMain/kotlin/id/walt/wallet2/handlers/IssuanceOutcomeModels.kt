@@ -1,15 +1,9 @@
 package id.walt.wallet2.handlers
 
-import id.walt.wallet2.data.*
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
 
 /** Reference returned by either a deferred outcome or the retained continuation listing. */
 sealed interface WalletDeferredIssuanceReference {
@@ -17,13 +11,13 @@ sealed interface WalletDeferredIssuanceReference {
 }
 
 /** Released public reference for a credential with a known requested configuration. */
-@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class WalletDeferredCredential(
     override val id: String,
     val credentialConfigurationId: String,
     val intervalSeconds: Long?,
-    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
     val credentialIdentifier: String? = null,
 ) : WalletDeferredIssuanceReference {
     constructor(id: String, credentialConfigurationId: String, intervalSeconds: Long?) :
@@ -45,7 +39,7 @@ data class WalletDeferredCredential(
 }
 
 /** Retained issuance work, including local-save recovery whose original configuration may be unknown. */
-@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class WalletIssuanceContinuation(
     override val id: String,
@@ -53,10 +47,10 @@ data class WalletIssuanceContinuation(
     val intervalSeconds: Long? = null,
     val credentialIdentifier: String? = null,
     /** Current retained state when returned by [WalletIssuanceSessionService.listIssuanceContinuations]. */
-    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
     val status: WalletIssuanceContinuationStatus = WalletIssuanceContinuationStatus.UNRESOLVED,
     /** Issuer display metadata only; never credential values or protocol continuation secrets. */
-    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
     val displayMetadataJson: String? = null,
 ) : WalletDeferredIssuanceReference {
     constructor(deferred: WalletDeferredCredential) : this(
@@ -135,14 +129,14 @@ sealed interface WalletIssuanceOutcome {
     val sessionId: String
 
     @Serializable
-    @kotlinx.serialization.SerialName("stored")
+    @SerialName("stored")
     data class Stored(
         override val sessionId: String,
         val credentialIds: List<String>,
     ) : WalletIssuanceOutcome
 
     @Serializable
-    @kotlinx.serialization.SerialName("deferred")
+    @SerialName("deferred")
     data class Deferred(
         override val sessionId: String,
         val storedCredentialIds: List<String>,
@@ -150,13 +144,13 @@ sealed interface WalletIssuanceOutcome {
     ) : WalletIssuanceOutcome
 
     @Serializable
-    @kotlinx.serialization.SerialName("cancelled")
+    @SerialName("cancelled")
     data class Cancelled(
         override val sessionId: String,
     ) : WalletIssuanceOutcome
 
     @Serializable
-    @kotlinx.serialization.SerialName("failed")
+    @SerialName("failed")
     data class Failed(
         override val sessionId: String,
         val error: WalletIssuanceError,
