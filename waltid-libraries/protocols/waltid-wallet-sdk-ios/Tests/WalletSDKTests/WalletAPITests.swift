@@ -2,6 +2,18 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
+    func testEmptyOfferFailsBeforeCrossingTheNativeBoundary() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        let offer = try XCTUnwrap(URLComponents().url)
+        let request = IssuanceRequest(offer: offer)
+        do {
+            _ = try await wallet.startIssuance(request)
+            XCTFail("Expected invalidInput")
+        } catch WalletError.invalidInput { }
+        XCTAssertTrue(bridge.issuanceRequests.isEmpty)
+    }
+
     func testEffectiveReviewPreservesTypedPathsAndUsesOrdinarySubmission() async throws {
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
@@ -12,19 +24,27 @@ final class WalletAPITests: XCTestCase {
             format: "dc+sd-jwt", claimsJSON: #"{"items":[false]}"#, wholeCredential: false, locations: [
                 .init(sourcePathJSON: #"["items",1]"#, receivedPathJSON: #"["items",0]"#,
                       sharedBy: [#""items".1"#], alwaysCarried: false)])])
-        let review = try await wallet.reviewPresentation(previewHandle: handle, selectedCredentialOptions: credentials,
-            selectedDisclosureOptions: disclosures, did: "did:example:holder")
-        XCTAssertEqual(review, bridge.effectiveReview)
+        let review = try await wallet.reviewPresentation(
+            previewHandle: handle,
+            selection: .init(credentials: credentials, disclosures: disclosures),
+            did: "did:example:holder"
+        )
+        XCTAssertEqual(review.claims, bridge.effectiveReview)
         XCTAssertEqual(bridge.effectiveReviewArguments?.0, handle)
         XCTAssertEqual(bridge.effectiveReviewArguments?.1, credentials)
         XCTAssertEqual(bridge.effectiveReviewArguments?.2, disclosures)
         XCTAssertEqual(bridge.effectiveReviewArguments?.3, "did:example:holder")
-        _ = try await wallet.submitPresentation(previewHandle: handle, selectedCredentialOptions: credentials,
-            selectedDisclosureOptions: disclosures, did: "did:example:holder", paymentConsentRevision: "payment")
-        XCTAssertEqual(bridge.submitCalls.last?.paymentConsentRevision, "payment")
+        _ = try await wallet.submitPresentation(review)
+        XCTAssertEqual(bridge.submitCalls.last?.selectedCredentialOptions, credentials)
+        let other = Wallet(bridge: bridge)
+        do { _ = try await other.submitPresentation(review); XCTFail("A second wallet accepted this review") }
+        catch let error as WalletError { XCTAssertEqual(error, .invalidInput("Review belongs to another wallet")) }
         bridge.error = .invalidInput("Stale review")
         do {
-            _ = try await wallet.reviewPresentation(previewHandle: handle, selectedCredentialOptions: credentials)
+            _ = try await wallet.reviewPresentation(
+                previewHandle: handle,
+                selection: .init(credentials: credentials)
+            )
             XCTFail("Expected typed error")
         } catch let error as WalletError { XCTAssertEqual(error, .invalidInput("Stale review")) }
     }
@@ -52,8 +72,12 @@ final class WalletAPITests: XCTestCase {
         let wallet = Wallet(bridge: bridge)
         bridge.error = .paymentConsent(.missingTranslation, message: "Payment instructions unavailable")
         do {
-            _ = try await wallet.submitPresentation(previewHandle: .init(value: "preview"),
-                selectedCredentialOptions: [.init(queryID: "payment", credentialID: "card")])
+            _ = try await wallet.reviewPresentation(
+                previewHandle: .init(value: "preview"),
+                selection: .init(
+                    credentials: [.init(queryID: "payment", credentialID: "card")]
+                )
+            )
             XCTFail("Expected typed refusal")
         } catch let error as WalletError {
             XCTAssertEqual(error, .paymentConsent(.missingTranslation, message: "Payment instructions unavailable"))
@@ -92,6 +116,24 @@ final class WalletAPITests: XCTestCase {
         }
     }
 
+    func testDerivedPresentationRulesAndRedactedServiceDescriptions() {
+        let first = WalletConfiguration(presentation: .init(transactionDataProfiles: [.init(type: "original")]))
+        var derived = first
+        derived.presentation = .init(transactionDataProfiles: [.init(type: "changed")])
+        XCTAssertEqual(first.presentation.transactionDataProfiles.map(\.type), ["original"])
+        let provider = WalletProviderConfiguration(baseURL: "https://provider.example", servicePath: "org.service",
+            bearerToken: "sentinel", composition: .key)
+        let attester = WalletAttestationConfiguration(baseURL: "https://issuer.example", attesterPath: "attest", bearerToken: "sentinel")
+        XCTAssertFalse(String(reflecting: provider).contains("sentinel"))
+        XCTAssertFalse(String(describing: attester).contains("sentinel"))
+        XCTAssertFalse(String(reflecting: WalletConfiguration(
+            issuance: .init(
+                attestation: attester,
+                walletProvider: provider
+            )
+        )).contains("sentinel"))
+    }
+
     func testParsesKotlinInstantTimestampsWithOptionalFractionalSeconds() throws {
         let wholeSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00Z"))
         let fractionalSeconds = try XCTUnwrap(parseWalletISO8601Date("2026-07-21T17:20:00.123456Z"))
@@ -108,12 +150,14 @@ final class WalletAPITests: XCTestCase {
 
         acceptsSendable(configuration)
         XCTAssertEqual(configuration.walletID, "default")
+        XCTAssertTrue(configuration.registersDigitalCredentials)
+        XCTAssertFalse(WalletConfiguration(registersDigitalCredentials: false).registersDigitalCredentials)
         XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
         XCTAssertNil(configuration.persistence.credentialStore)
         XCTAssertNil(configuration.persistence.didStore)
-        XCTAssertNil(configuration.attestation)
-        XCTAssertNil(configuration.keyAttestationProvider)
-        XCTAssertTrue(configuration.transactionDataProfiles.isEmpty)
+        XCTAssertNil(configuration.issuance.attestation)
+        XCTAssertNil(configuration.issuance.keyAttestationProvider)
+        XCTAssertTrue(configuration.presentation.transactionDataProfiles.isEmpty)
         XCTAssertEqual(configuration.preferredLocales, Locale.preferredLanguages)
     }
 
@@ -121,28 +165,26 @@ final class WalletAPITests: XCTestCase {
         let preview = IssuanceCredentialPreview(
             configurationID: "mdl",
             format: "mso_mdoc",
-            name: "Mobile Driving Licence",
-            descriptionText: nil,
-            logoURI: URL(string: "https://issuer.example/mdl.png"),
-            logoAltText: "Driving licence logo",
-            backgroundColor: "#12107c",
-            backgroundImageURI: URL(string: "https://issuer.example/mdl-bg.png"),
-            textColor: "#FFFFFF"
+            display: .init(
+                name: "Mobile Driving Licence",
+                logoURI: "https://issuer.example/mdl.png",
+                logoAltText: "Driving licence logo",
+                backgroundColor: "#12107c",
+                backgroundImageURI: "https://issuer.example/mdl-bg.png",
+                textColor: "#FFFFFF"
+            )
         )
 
-        XCTAssertEqual(preview.logoAltText, "Driving licence logo")
-        XCTAssertEqual(preview.backgroundColor, "#12107c")
-        XCTAssertEqual(preview.backgroundImageURI, URL(string: "https://issuer.example/mdl-bg.png"))
-        XCTAssertEqual(preview.textColor, "#FFFFFF")
+        XCTAssertEqual(preview.display.logoAltText, "Driving licence logo")
+        XCTAssertEqual(preview.display.backgroundColor, "#12107c")
+        XCTAssertEqual(preview.display.backgroundImageURI, "https://issuer.example/mdl-bg.png")
+        XCTAssertEqual(preview.display.textColor, "#FFFFFF")
     }
 
     func testIssuancePreviewTypePayloadDrivesFriendlyTitle() {
         let preview = IssuanceCredentialPreview(
             configurationID: "org.iso.18013.5.1.mDL",
             format: "mso_mdoc",
-            name: nil,
-            descriptionText: nil,
-            logoURI: nil,
             doctype: "org.iso.18013.5.1.mDL"
         )
 
@@ -230,11 +272,11 @@ final class WalletAPITests: XCTestCase {
         let credential = Credential(
             id: "credential-1",
             format: "vc+sd-jwt",
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
             issuer: "https://issuer.example",
             subject: "did:key:subject",
             label: "PID",
-            addedAt: nil,
-            credentialDataJSON: #"{"given_name":"Ada"}"#
+            addedAt: nil
         )
 
         acceptsSendable(credential)
@@ -287,23 +329,23 @@ final class WalletAPITests: XCTestCase {
             previewHandle: PresentationPreviewHandle(value: "presentation-preview-1"),
             request: .init(
                 clientID: "https://verifier.example",
-                verifierMetadata: testVerifierMetadata,
                 requestAuthentication: .unauthenticated,
-                responseURI: URL(string: "https://verifier.example/direct-post"),
-                state: "state-1",
                 nonce: "nonce-1",
-                responseEncryption: .notRequired
+                responseEncryption: .notRequired,
+                verifierMetadata: testVerifierMetadata,
+                responseURI: URL(string: "https://verifier.example/direct-post"),
+                state: "state-1"
             ),
             credentialOptions: [
                 .init(
                     queryID: "pid",
                     credentialID: "credential-1",
-                    multiple: true,
                     format: "vc+sd-jwt",
+                    credentialDataJSON: #"{"given_name":"Ada"}"#,
+                    multiple: true,
                     issuer: "https://issuer.example",
                     subject: "did:key:subject",
                     label: "PID",
-                    credentialDataJSON: #"{"given_name":"Ada"}"#,
                     disclosures: [
                         .init(
                             path: "$.given_name",
@@ -488,8 +530,8 @@ final class WalletAPITests: XCTestCase {
     func testProximityReaderEvidenceRetainsAuthenticationStatementIndex() {
         let evidence = ProximityReaderEvidence(
             scope: .wholeRequest,
-            authenticationIndex: 1,
-            certificateChainDER: [Data([0x30, 0x00])]
+            certificateChainDER: [Data([0x30, 0x00])],
+            authenticationIndex: 1
         )
 
         XCTAssertEqual(evidence.authenticationIndex, 1)
@@ -610,10 +652,12 @@ final class WalletAPITests: XCTestCase {
 
     func testProximityScopeOutcomeAndRuntimeFactsAreIndependent() throws {
         let evidence = ProximityReaderEvidence(
-            scope: .document(index: 2), authenticationIndex: 0, certificateChainDER: [Data([0x30, 0x00])]
+            scope: .document(index: 2),
+            certificateChainDER: [Data([0x30, 0x00])],
+            authenticationIndex: 0
         )
         XCTAssertEqual(evidence.scope.documentRequestIndex, 2)
-        let absent = ProximityReaderAuthentication(scope: .wholeRequest, authenticationIndex: 0, outcome: .absent)
+        let absent = ProximityReaderAuthentication(scope: .wholeRequest, outcome: .absent, authenticationIndex: 0)
         XCTAssertEqual(absent.validity, .absent)
         XCTAssertEqual(absent.trust, .notEvaluated)
         let capability = ProximityTransportCapability(
@@ -685,8 +729,6 @@ final class WalletAPITests: XCTestCase {
         let wallet = Wallet(bridge: bridge)
         let request = IssuanceRequest(
             offer: URL(string: "openid-credential-offer://issuer.example")!,
-            clientID: "ios-client",
-            redirectURI: URL(string: "wallet.example:/callback")!,
             keyID: "key-1",
             did: "did:key:holder"
         )
@@ -694,38 +736,35 @@ final class WalletAPITests: XCTestCase {
         let selections = [try IssuanceCredentialSelection(configurationID: "identity", holders: .existing(bindings))]
 
         let session = try await wallet.startIssuance(request)
-        let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id, credentials: selections)
-        let preAuthorizedOutcome = try await wallet.continuePreAuthorizedIssuance(
-            sessionID: session.id,
-            transactionCode: "1234",
-            credentials: selections
-        )
+        let authorization = try await wallet.beginAuthorization(.init(rawValue: session.id.rawValue), registration: .init(clientID: "ios-client", redirectURI: URL(string: "wallet.example:/callback")!), credentials: selections)
+        let preAuthorizedOutcome = try await wallet.accept(.init(rawValue: session.id.rawValue), transactionCode: "1234",
+            credentials: selections, clientID: "ios-client")
         let callbackURL = URL(string: "wallet.example:/callback?code=authorization-code")!
         let authorizationOutcome = try await wallet.continueAuthorizationIssuance(
-            sessionID: session.id,
+            sessionID: authorization.id,
             callbackURI: callbackURL
         )
         let cancellationOutcome = try await wallet.cancelIssuance(sessionID: session.id)
-        let deferredOutcome = try await wallet.resumeDeferredIssuance(deferredCredentialID: "deferred-1")
+        let deferredOutcome = try await wallet.resumeDeferredIssuance(.init(id: "deferred-1", credentialConfigurationID: nil, intervalSeconds: nil))
 
         XCTAssertEqual(session, bridge.issuanceSessionResult)
-        XCTAssertEqual(authorization.url.absoluteString, "https://issuer.example/authorize")
+        XCTAssertEqual(authorization.request.url.absoluteString, "https://issuer.example/authorize")
         XCTAssertEqual(preAuthorizedOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(authorizationOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(cancellationOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(deferredOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(bridge.issuanceRequests, [request])
-        XCTAssertEqual(bridge.authorizationStartSessionIDs, [session.id])
+        XCTAssertEqual(bridge.authorizationStartSessionIDs, [session.id.rawValue])
         XCTAssertEqual(bridge.createdHolderKeyCounts, [2])
         XCTAssertEqual(bridge.authorizationSelections, [selections])
         XCTAssertEqual(bridge.preAuthorizedSelections, [selections])
         XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.count, 1)
-        XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.0, session.id)
+        XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.0, session.id.rawValue)
         XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.1, "1234")
         XCTAssertEqual(bridge.authorizationIssuanceCalls.count, 1)
-        XCTAssertEqual(bridge.authorizationIssuanceCalls.first?.0, session.id)
+        XCTAssertEqual(bridge.authorizationIssuanceCalls.first?.0, session.id.rawValue)
         XCTAssertEqual(bridge.authorizationIssuanceCalls.first?.1, callbackURL)
-        XCTAssertEqual(bridge.cancelledIssuanceSessionIDs, [session.id])
+        XCTAssertEqual(bridge.cancelledIssuanceSessionIDs, [session.id.rawValue])
         XCTAssertEqual(bridge.resumedDeferredCredentialIDs, ["deferred-1"])
     }
 
@@ -740,7 +779,7 @@ final class WalletAPITests: XCTestCase {
             storedCredentialIDs: ["stored"], deferredCredentials: [pending])
         bridge.deferredCredentialsResult = [pending]
         let wallet = Wallet(bridge: bridge)
-        let result = try await wallet.continuePreAuthorizedIssuance(sessionID: "session")
+        let result = try await wallet.accept(.init(rawValue: "session"), clientID: "ios-client")
         XCTAssertEqual(result, bridge.issuanceOutcomeResult)
         let recovered = try await wallet.listDeferredIssuance()
         XCTAssertEqual(recovered, [pending])
@@ -751,11 +790,11 @@ final class WalletAPITests: XCTestCase {
         let credential = Credential(
             id: "credential-1",
             format: "vc+sd-jwt",
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
             issuer: "https://issuer.example",
             subject: "did:key:subject",
             label: "PID",
-            addedAt: Date(timeIntervalSince1970: 1_700_000_000),
-            credentialDataJSON: #"{"given_name":"Ada"}"#
+            addedAt: Date(timeIntervalSince1970: 1_700_000_000)
         )
         let bridge = FakeWalletCoreBridge()
         bridge.credentialsResult = [credential]
@@ -787,39 +826,6 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.deleteCredentialCalls, ["cred-1"])
     }
 
-    func testPresentForwardsRequestAndReturnsPresentationResult() async throws {
-        let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
-        let redirectURL = URL(string: "https://verifier.example/continue")!
-        let bridge = FakeWalletCoreBridge()
-        bridge.presentResult = .transmitted(
-            .succeeded(
-                verifierResponseJSON: #"{"status":"ok"}"#,
-                redirectURL: redirectURL
-            )
-        )
-        let wallet = Wallet(bridge: bridge)
-
-        let result = try await wallet.present(
-            request: request,
-            did: "did:key:wallet",
-            runPolicies: true
-        )
-
-        XCTAssertEqual(
-            result,
-            .transmitted(
-                .succeeded(
-                    verifierResponseJSON: #"{"status":"ok"}"#,
-                    redirectURL: redirectURL
-                )
-            )
-        )
-        XCTAssertEqual(bridge.presentCalls.count, 1)
-        XCTAssertEqual(bridge.presentCalls.first?.request, request)
-        XCTAssertEqual(bridge.presentCalls.first?.did, "did:key:wallet")
-        XCTAssertEqual(bridge.presentCalls.first?.runPolicies, true)
-    }
-
     func testPreviewPresentationForwardsRequestAndReturnsPreview() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let bridge = FakeWalletCoreBridge()
@@ -828,10 +834,7 @@ final class WalletAPITests: XCTestCase {
                 previewHandle: PresentationPreviewHandle(value: "presentation-preview-1"),
                 request: .init(
                     clientID: "https://verifier.example",
-                    verifierMetadata: testVerifierMetadata,
                     requestAuthentication: .unauthenticated,
-                    responseURI: nil,
-                    state: nil,
                     nonce: "nonce-1",
                     responseEncryption: .required(
                         ResponseEncryptionDetails(
@@ -840,18 +843,21 @@ final class WalletAPITests: XCTestCase {
                             verifierKeyID: "verifier-key-1",
                             verifierKeyThumbprint: "thumbprint-1"
                         )
-                    )
+                    ),
+                    verifierMetadata: testVerifierMetadata,
+                    responseURI: nil,
+                    state: nil
                 ),
                 credentialOptions: [
                     .init(
                         queryID: "pid",
                         credentialID: "credential-1",
-                        multiple: true,
                         format: "vc+sd-jwt",
+                        credentialDataJSON: "{}",
+                        multiple: true,
                         issuer: nil,
                         subject: nil,
                         label: "PID",
-                        credentialDataJSON: "{}",
                         disclosures: []
                     )
                 ]
@@ -885,8 +891,8 @@ final class WalletAPITests: XCTestCase {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let requestInfo = PresentationRequestContext(
             clientID: "https://verifier.example",
-            verifierMetadata: testVerifierMetadata,
             requestAuthentication: .unauthenticated,
+            verifierMetadata: testVerifierMetadata,
             responseEncryption: .notRequired
         )
         let bridge = FakeWalletCoreBridge()
@@ -919,22 +925,21 @@ final class WalletAPITests: XCTestCase {
         let bridge = FakeWalletCoreBridge()
         let wallet = Wallet(bridge: bridge)
 
-        _ = try await wallet.submitPresentation(
+        let review = try await wallet.reviewPresentation(
             previewHandle: previewHandle,
-            selectedCredentialOptions: [PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1")],
-            selectedDisclosureOptions: [PresentationDisclosureSelection(queryID: "pid", credentialID: "credential-1", path: "$.given_name")],
-            did: "did:key:wallet",
-            runPolicies: false,
-            paymentConsentRevision: "reviewed-revision"
+            selection: .init(
+                credentials: [PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1")],
+                disclosures: [PresentationDisclosureSelection(queryID: "pid", credentialID: "credential-1", path: "$.given_name")]
+            ),
+            did: "did:key:wallet"
         )
 
-        XCTAssertEqual(bridge.submitCalls.first?.paymentConsentRevision, "reviewed-revision")
+        _ = try await wallet.submitPresentation(review)
         XCTAssertEqual(bridge.submitCalls.count, 1)
         XCTAssertEqual(bridge.submitCalls.first?.previewHandle, previewHandle)
         XCTAssertEqual(bridge.submitCalls.first?.selectedCredentialOptions, [PresentationCredentialSelection(queryID: "pid", credentialID: "credential-1")])
         XCTAssertEqual(bridge.submitCalls.first?.selectedDisclosureOptions, [PresentationDisclosureSelection(queryID: "pid", credentialID: "credential-1", path: "$.given_name")])
         XCTAssertEqual(bridge.submitCalls.first?.did, "did:key:wallet")
-        XCTAssertEqual(bridge.submitCalls.first?.runPolicies, false)
     }
 
     func testPresentationErrorCodesMatchOpenID4VPValues() {
@@ -1001,23 +1006,6 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(String(describing: handle), "PresentationPreviewHandle(<redacted>)")
     }
 
-    func testRejectIssuedCredentialForwardsNotificationTarget() async throws {
-        let bridge = FakeWalletCoreBridge()
-        let wallet = Wallet(bridge: bridge)
-        let issuer = URL(string: "https://issuer.example")!
-
-        try await wallet.rejectIssuedCredential(
-            notificationID: "notification-id",
-            accessToken: "access-token",
-            credentialIssuerBaseURL: issuer
-        )
-
-        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.count, 1)
-        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.first?.notificationID, "notification-id")
-        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.first?.accessToken, "access-token")
-        XCTAssertEqual(bridge.rejectedIssuedCredentialCalls.first?.credentialIssuerBaseURL, issuer)
-    }
-
     func testDigitalCredentialCapabilitiesReflectBridgeRuntimeSupport() async {
         let bridge = FakeWalletCoreBridge()
         bridge.digitalCredentialCapabilitiesResult = .init(
@@ -1053,13 +1041,12 @@ final class WalletAPITests: XCTestCase {
             verifiedOrigin: "https://verifier.example",
             selectedRegistryEntryIDs: ["opaque-entry"]
         )
-        let response = try await wallet.submitAnnexCPresentation(
-            requestID: preview.requestID,
-            verifiedOrigin: preview.verifiedOrigin,
+        let response = try await wallet.submitAnnexCPresentation(AnnexCSubmission(
+            preview: preview,
             deviceRequestBase64URL: "device-request",
             encryptionInfoBase64URL: "encryption-info",
             selectedCredentialOptions: []
-        )
+        ))
 
         XCTAssertEqual(bridge.annexCPreviewCalls.single?.selectedRegistryEntryIDs, ["opaque-entry"])
         XCTAssertEqual(bridge.annexCSubmitCalls.single?.deviceRequestBase64URL, "device-request")
@@ -1071,8 +1058,7 @@ final class WalletAPITests: XCTestCase {
         bridge.error = .invalidInput("missing offer")
         let wallet = Wallet(bridge: bridge)
         let request = IssuanceRequest(
-            offer: URL(string: "openid-credential-offer://issuer.example")!,
-            redirectURI: URL(string: "wallet.example:/callback")!
+            offer: URL(string: "openid-credential-offer://issuer.example")!
         )
 
         do {
@@ -1273,18 +1259,11 @@ private func makeTestProximityCapabilities() -> ProximityCapabilities {
 
 private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
 
-    struct PresentCall {
-        let request: URL
-        let did: String?
-        let runPolicies: Bool?
-    }
-
     struct SubmitCall {
         let previewHandle: PresentationPreviewHandle
         let selectedCredentialOptions: [PresentationCredentialSelection]
         let selectedDisclosureOptions: [PresentationDisclosureSelection]?
         let did: String?
-        let runPolicies: Bool?
         let paymentConsentRevision: String?
     }
 
@@ -1292,14 +1271,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         let previewHandle: PresentationPreviewHandle
         let error: PresentationErrorCode?
         let errorDescription: String?
-    }
-
-    struct RejectIssuedCredentialCall {
-        let notificationID: String
-        let accessToken: String
-        let credentialIssuerBaseURL: URL?
-        let notificationEndpoint: URL?
-        let eventDescription: String?
     }
 
     struct AnnexCPreviewCall {
@@ -1338,10 +1309,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             grant: .preAuthorizedCode,
             issuer: .init(
                 identifier: "https://issuer.example",
-                name: nil,
-                locale: nil,
-                logoURI: nil,
-                logoAltText: nil,
                 metadataProvenance: .unsigned
             ),
             credentials: [],
@@ -1350,7 +1317,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     )
     var issuanceOutcomeResult = IssuanceOutcome.stored(sessionID: "issuance-session-1", credentialIDs: [])
     var credentialsResult: [Credential] = []
-    var presentResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var previewResult = PresentationPreviewResult.ready(
         PresentationPreview(
             previewHandle: PresentationPreviewHandle(value: "fake-presentation-preview"),
@@ -1391,13 +1357,11 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var preAuthorizedIssuanceCalls: [(String, String?)] = []
     private(set) var authorizationIssuanceCalls: [(String, URL)] = []
     private(set) var cancelledIssuanceSessionIDs: [String] = []
-    private(set) var rejectedIssuedCredentialCalls: [RejectIssuedCredentialCall] = []
     private(set) var resumedDeferredCredentialIDs: [String] = []
     private(set) var credentialsCallCount = 0
     private(set) var deleteLocalDataCallCount = 0
     private(set) var deleteCredentialCalls: [String] = []
     var deleteCredentialResult = true
-    private(set) var presentCalls: [PresentCall] = []
     private(set) var previewCalls: [URL] = []
     private(set) var submitCalls: [SubmitCall] = []
     private(set) var rejectCalls: [RejectCall] = []
@@ -1457,7 +1421,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return issuanceSessionResult
     }
 
-    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: String, registration: IssuanceClientRegistration, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
         if let error { throw error }
         authorizationStartSessionIDs.append(sessionID)
         authorizationSelections.append(credentials)
@@ -1470,7 +1434,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         )
     }
 
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?, clientID: String?) async throws -> IssuanceOutcome {
         if let error { throw error }
         preAuthorizedIssuanceCalls.append((sessionID, transactionCode))
         preAuthorizedSelections.append(credentials)
@@ -1487,25 +1451,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         if let error { throw error }
         cancelledIssuanceSessionIDs.append(sessionID)
         return issuanceOutcomeResult
-    }
-
-    func rejectIssuedCredential(
-        notificationID: String,
-        accessToken: String,
-        credentialIssuerBaseURL: URL?,
-        notificationEndpoint: URL?,
-        eventDescription: String?
-    ) async throws {
-        if let error { throw error }
-        rejectedIssuedCredentialCalls.append(
-            RejectIssuedCredentialCall(
-                notificationID: notificationID,
-                accessToken: accessToken,
-                credentialIssuerBaseURL: credentialIssuerBaseURL,
-                notificationEndpoint: notificationEndpoint,
-                eventDescription: eventDescription
-            )
-        )
     }
 
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
@@ -1540,15 +1485,6 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         deleteLocalDataCallCount += 1
     }
 
-    func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult {
-        if let error {
-            throw error
-        }
-
-        presentCalls.append(.init(request: request, did: did, runPolicies: runPolicies))
-        return presentResult
-    }
-
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         if let error {
             throw error
@@ -1558,25 +1494,22 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return previewResult
     }
 
-    func reviewPresentation(previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
-                            selectedDisclosureOptions: [PresentationDisclosureSelection]?, did: String?) async throws -> PreparedPresentationReview {
+    func retainPresentation(previewHandle: PresentationPreviewHandle, selection: PresentationSelection, did: String?, owner: Wallet) async throws -> PresentationReview {
+        let claims = try await reviewPresentation(previewHandle: previewHandle, selection: selection, did: did)
         if let error { throw error }
-        effectiveReviewArguments = (previewHandle, selectedCredentialOptions, selectedDisclosureOptions, did)
+        return PresentationReview(claims: claims, statuses: [], payment: nil, owner: owner) { [self] in
+            try await submitPresentation(previewHandle: previewHandle, selection: selection, did: did, paymentConsentRevision: nil)
+        }
+    }
+    func reviewPresentation(previewHandle: PresentationPreviewHandle, selection: PresentationSelection, did: String?) async throws -> PreparedPresentationReview {
+        if let error { throw error }
+        effectiveReviewArguments = (previewHandle, selection.credentials, selection.disclosures, did)
         return effectiveReview
     }
-    func preparePaymentConsent(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
-        did: String?
-    ) async throws -> PaymentConsent? { nil }
-
     func submitPresentation(
         previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]?,
+        selection: PresentationSelection,
         did: String?,
-        runPolicies: Bool?,
         paymentConsentRevision: String?
     ) async throws -> PresentationResult {
         if let error {
@@ -1586,10 +1519,9 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         submitCalls.append(
             .init(
                 previewHandle: previewHandle,
-                selectedCredentialOptions: selectedCredentialOptions,
-                selectedDisclosureOptions: selectedDisclosureOptions,
+                selectedCredentialOptions: selection.credentials,
+                selectedDisclosureOptions: selection.disclosures,
                 did: did,
-                runPolicies: runPolicies,
                 paymentConsentRevision: paymentConsentRevision
             )
         )
@@ -1653,20 +1585,14 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return annexCPreviewResult
     }
 
-    func submitAnnexCPresentation(
-        requestID: String,
-        verifiedOrigin: String,
-        deviceRequestBase64URL: String,
-        encryptionInfoBase64URL: String,
-        selectedCredentialOptions: [PresentationCredentialSelection]
-    ) async throws -> DigitalCredentialResponse {
+    func submitAnnexCPresentation(_ submission: AnnexCSubmission) async throws -> DigitalCredentialResponse {
         if let error { throw error }
         annexCSubmitCalls.append(.init(
-            requestID: requestID,
-            verifiedOrigin: verifiedOrigin,
-            deviceRequestBase64URL: deviceRequestBase64URL,
-            encryptionInfoBase64URL: encryptionInfoBase64URL,
-            selectedCredentialOptions: selectedCredentialOptions
+            requestID: submission.requestID,
+            verifiedOrigin: submission.verifiedOrigin,
+            deviceRequestBase64URL: submission.deviceRequestBase64URL,
+            encryptionInfoBase64URL: submission.encryptionInfoBase64URL,
+            selectedCredentialOptions: submission.selectedCredentialOptions
         ))
         return digitalCredentialResponseResult
     }

@@ -8,8 +8,16 @@ import WalletCore
 final class CredentialStatusTests: XCTestCase {
 #if canImport(WalletCore) && os(iOS)
     func testUnreadableAdvisoryCannotHideAReadableCredentialAtTheActualBridgeBoundary() throws {
-        let stored = MobileWalletCredential(id: "identity", format: "dc+sd-jwt", issuer: "https://issuer.example",
-            subject: nil, label: "Resident card", addedAt: nil, credentialDataJson: #"{"name":"Example"}"#, metadataJson: nil)
+        let stored = MobileWalletCredential(
+            id: "identity",
+            format: "dc+sd-jwt",
+            credentialDataJson: #"{"name":"Example"}"#,
+            issuer: "https://issuer.example",
+            subject: nil,
+            label: "Resident card",
+            addedAt: nil,
+            metadataJson: nil
+        )
         let value = WalletBridgeCredentialRead(credential: stored, statusJson: #"{"status":"future-wire-shape"}"#).toSwiftCredential()
         XCTAssertEqual(value.id, "identity")
         XCTAssertEqual(value.label, "Resident card")
