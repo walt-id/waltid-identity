@@ -1,12 +1,12 @@
 package id.walt.wallet2.mobile.issuance
 
 import id.walt.wallet2.handlers.IssuanceClientIdentification
-import id.walt.wallet2.handlers.WalletIssuanceTransactionCode
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
-import id.walt.wallet2.handlers.WalletIssuanceOfferReview
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOfferPreview
+import id.walt.wallet2.handlers.WalletIssuanceOfferReview
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletIssuanceTransactionCode
 import id.walt.wallet2.mobile.MobileWallet
 
 /** Durable reference for reopening or cancelling an issuance offer.

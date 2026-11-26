@@ -1,6 +1,16 @@
 package id.walt.wallet2.mobile.digitalcredentials
 
-/** Matcher-visible credential fields and their platform display. */
+/**
+ * Credential metadata shared with the operating system's out-of-process matcher.
+ * [fields] can contain the holder's personal data. The signed credential and wallet keys stay in the wallet.
+ *
+ * @property registryEntryId Stable platform registry entry identifier.
+ * @property credentialId Wallet-local credential identifier.
+ * @property format Credential format represented by the entry.
+ * @property type Credential type or mdoc document type.
+ * @property fields Decoded claim values available to the platform matcher.
+ * @property display Title and artwork shown in the platform credential picker.
+ */
 public data class MobileWalletCredentialRegistryRecord(
     public val registryEntryId: String,
     public val credentialId: String,
