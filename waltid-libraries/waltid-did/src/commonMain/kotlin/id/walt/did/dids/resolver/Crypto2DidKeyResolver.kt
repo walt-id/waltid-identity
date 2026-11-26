@@ -6,6 +6,10 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.did.dids.document.MultibasePublicKeys
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationshipType
+import id.walt.webdatafetching.removeDotSegments
+import io.ktor.http.URLBuilder
+import io.ktor.http.encodedPath
+import io.ktor.http.takeFrom
 import id.walt.did.utils.KeyMaterial
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
@@ -45,17 +49,30 @@ fun interface Crypto2DidKeyResolver {
 class DidVerificationMethodNotFoundException(keyId: String) :
     IllegalArgumentException("DID document has no verification method matching key ID: $keyId")
 
-class DidDocumentCrypto2KeyResolver(
+class DidDocumentCrypto2KeyResolver private constructor(
     private val resolveDocument: suspend (String) -> Result<JsonObject>,
-    private val runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+    private val runtime: CryptoRuntime,
+    private val verificationRelationship: VerificationRelationshipType?,
 ) : Crypto2DidKeyResolver {
+    constructor(
+        resolveDocument: suspend (String) -> Result<JsonObject>,
+        runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+    ) : this(resolveDocument, runtime, null)
+
+    // Preserve the released JVM constructor and its default-argument bridge for compiled consumers.
     constructor(
         resolver: DidResolver,
         runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
-    ) : this(resolver::resolve, runtime)
+    ) : this(resolver::resolve, runtime, null)
+
+    constructor(
+        resolver: DidResolver,
+        runtime: CryptoRuntime = CryptoRuntime(defaultSoftwareKeyProviders()),
+        verificationRelationship: VerificationRelationshipType?,
+    ) : this(resolver::resolve, runtime, verificationRelationship)
 
     override suspend fun resolveToKeys(did: String): Set<Key> =
-        resolveToKeys(did, keyId = null, relationship = null)
+        resolveToKeys(did, keyId = null, relationship = verificationRelationship)
 
     override suspend fun resolveToKeys(
         did: String,
@@ -71,7 +88,7 @@ class DidDocumentCrypto2KeyResolver(
         val methods = resolveMethods(document, did, relationship)
         val selectedMethods = keyId?.let { selectMethods(methods, did, it) } ?: methods
         val keys = selectedMethods.mapNotNull { method ->
-            restore(method)
+            restore(method, did)
         }.toSet()
         val relationshipDescription = relationship?.let { " for relationship $it" }.orEmpty()
         val keyDescription = keyId?.let { " matching key ID $it" }.orEmpty()
@@ -149,7 +166,7 @@ class DidDocumentCrypto2KeyResolver(
         return fragmentMatches.ifEmpty { throw DidVerificationMethodNotFoundException(keyId) }
     }
 
-    private suspend fun restore(method: JsonObject): Key? {
+    private suspend fun restore(method: JsonObject, did: String): Key? {
         val verificationMethodId = methodId(method) ?: return null
         return try {
             val jwk = (method["publicKeyJwk"] as? JsonObject)
@@ -166,7 +183,7 @@ class DidDocumentCrypto2KeyResolver(
             val stored = EncodedKey.Jwk(
                 BinaryData(Json.encodeToString(jwk).encodeToByteArray()),
                 privateMaterial = false,
-            ).toStoredSoftwareKey(KeyId(verificationMethodId), setOf(KeyUsage.VERIFY))
+            ).toStoredSoftwareKey(KeyId(normalizeDidUrl(did, verificationMethodId)), setOf(KeyUsage.VERIFY))
             runtime.restore(stored)
         } catch (cause: CancellationException) {
             throw cause
@@ -180,16 +197,20 @@ class DidDocumentCrypto2KeyResolver(
 }
 
 /**
- * Normalizes a key ID to a full DID URL.
- *
- * Per DID Core spec, verification methods are typically referenced by fragment.
- * Bare strings without a prefix are treated as fragments (most common case).
- * Explicit path (/), query (?), or fragment (#) prefixes are preserved.
+ * Resolves relative verification-method IDs using DID Core 3.2.2 and RFC 3986.
+ * Absolute URI IDs retain their scheme; relative path, query and fragment IDs remain distinct.
  */
-private fun normalizeDidUrl(did: String, id: String): String = when {
-    id.startsWith("did:") -> id // Already a full DID URL
-    id.startsWith('#') || id.startsWith('/') || id.startsWith('?') -> "$did$id" // Explicit component
-    else -> "$did#$id" // Bare string treated as fragment (most common case)
+fun normalizeDidUrl(did: String, id: String): String {
+    if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(id)) return id
+    // DID Core treats method-name:method-specific-id as the authority for relative resolution.
+    val baseDid = did.substringBefore('/').substringBefore('?').substringBefore('#')
+    if (id.startsWith('#') || id.startsWith('?') || id.isEmpty()) return baseDid + id
+    val resolved = URLBuilder("https://did.invalid/").apply {
+        takeFrom(id)
+        encodedPath = removeDotSegments(encodedPath)
+    }.buildString()
+    return if (resolved.startsWith("https://did.invalid")) baseDid + resolved.removePrefix("https://did.invalid")
+    else "did:" + resolved.substringAfter("://")
 }
 
 private fun idCandidates(id: String): Set<String> =
