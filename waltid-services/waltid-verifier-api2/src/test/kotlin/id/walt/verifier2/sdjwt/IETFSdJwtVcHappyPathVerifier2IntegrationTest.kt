@@ -106,7 +106,7 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                 notifications = notifications,
             ),
             redirects = Verification2Session.VerificationSessionRedirects(
-                successRedirectUri = Url("https://example.com/success"),
+                successRedirectUri = Url("https://example.com/success?transaction=browser-return"),
             ),
         )
 
@@ -244,7 +244,12 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
                     setBody(JsonObject(missingRedirects).toString())
                 }
                 assertEquals(HttpStatusCode.BadRequest, rejected.status)
-                for (redirects in listOf(JsonObject(emptyMap()), JsonObject(mapOf("error_redirect_uri" to JsonPrimitive("https://example.com/error"))))) {
+                for (redirects in listOf(
+                    JsonObject(emptyMap()),
+                    JsonObject(mapOf("error_redirect_uri" to JsonPrimitive("https://example.com/error"))),
+                    JsonObject(mapOf("success_redirect_uri" to JsonPrimitive("https://example.com/success?response_code=configured"))),
+                    JsonObject(mapOf("success_redirect_uri" to JsonPrimitive("https://example.com/success?%72esponse_code="))),
+                )) {
                     val invalid = JsonObject(missingRedirects + ("redirects" to redirects))
                     assertEquals(HttpStatusCode.BadRequest, http.post("/verification-session/create") {
                         contentType(ContentType.Application.Json)
@@ -301,6 +306,8 @@ class IETFSdJwtVcHappyPathVerifier2IntegrationTest {
 
             val redirect = Url(presentationResult.getOrThrow().verifierResponse!!.jsonObject.getValue("redirect_uri").jsonPrimitive.content)
             val completionCode = assertNotNull(redirect.parameters["response_code"])
+            assertEquals(listOf(completionCode), redirect.parameters.getAll("response_code"))
+            assertEquals("browser-return", redirect.parameters["transaction"])
             val infoPath = "/verification-session/$sessionId/info"
             suspend fun getInfo(code: String? = null) = http.get(infoPath) {
                 code?.let { header("X-Response-Code", it) }
