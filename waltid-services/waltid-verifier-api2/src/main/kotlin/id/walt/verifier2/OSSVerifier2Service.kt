@@ -1,6 +1,7 @@
 
 package id.walt.verifier2
 
+import id.walt.commons.web.respondEventStream
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.verifier2.data.externalReaderOutcomeUpdate
@@ -207,9 +208,12 @@ object Verifier2Service {
             }) {
                 if (FeatureManager.isFeatureEnabled(CommonsFeatureCatalog.proximityVerifierFeature)) {
                     post<ExternalReaderDeviceResponse>("proximity/device-response", ExternalReaderDeviceResponseOpenApi.docs) { request ->
+                        // An IllegalArgumentException describes the submission (the setup and reader checks,
+                        // Base64 and CBOR decoding), so its reason is returned. Anything else is not the
+                        // caller's input and is left to StatusPages, which hides its message.
                         val submission = try {
                             request.parse()
-                        } catch (cause: Exception) {
+                        } catch (cause: IllegalArgumentException) {
                             throw BadRequestException("Invalid external-reader submission: ${cause.message}", cause)
                         }
                         val outcome = ExternalReaderVerification.verify(
@@ -300,23 +304,25 @@ object Verifier2Service {
                         summary = "Receive update events via SSE about the verification session"
                         request { pathParameter<String>(VERIFICATION_SESSION) }
                     }) {
-                        sse("events", serialize = { typeInfo, it ->
-                            val serializer = httpJson.serializersModule.serializer(typeInfo.kotlinType!!)
-                            httpJson.encodeToString(serializer, it)
-                        }) {
+                        // Not `sse(...)`: look the session up before the stream starts, so an unknown one is a readable 404.
+                        get("events") {
                             val verifierSession =
                                 repository.get(call.parameters.getOrFail(VERIFICATION_SESSION))?.session
                                     ?: throw VerificationSessionNotFoundException(call.parameters.getOrFail(VERIFICATION_SESSION))
+                            call.respondEventStream(serialize = { typeInfo, it ->
+                                val serializer = httpJson.serializersModule.serializer(typeInfo.kotlinType!!)
+                                httpJson.encodeToString(serializer, it)
+                            }) {
+                                // Get the flow for this specific target.
+                                val sseFlow = SseNotifier.getSseFlow(verifierSession.id)
 
-                            // Get the flow for this specific target.
-                            val sseFlow = SseNotifier.getSseFlow(verifierSession.id)
-
-                            // This will suspend until the client disconnects.
-                            send(JsonObject(emptyMap()))
-                            if (sseFlow.replayCache.isEmpty()) {
-                                verifierSession.externalReaderOutcomeUpdate()?.let { send(it.toKtorSessionUpdate()) }
+                                // This will suspend until the client disconnects.
+                                send(JsonObject(emptyMap()))
+                                if (sseFlow.replayCache.isEmpty()) {
+                                    verifierSession.externalReaderOutcomeUpdate()?.let { send(it.toKtorSessionUpdate()) }
+                                }
+                                sseFlow.collect { event -> send(event) }
                             }
-                            sseFlow.collect { event -> send(event) }
                         }
                     }
                 }

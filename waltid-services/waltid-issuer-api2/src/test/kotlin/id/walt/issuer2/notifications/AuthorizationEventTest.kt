@@ -42,6 +42,8 @@ import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertContains
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -224,7 +226,9 @@ class AuthorizationEventTest {
         assertEquals(session.sessionId, event.target)
         assertEquals(session.sessionId, event.session["sessionId"]?.jsonPrimitive?.content)
         assertEquals(OAuthErrorCodes.INVALID_REQUEST, event.error)
-        assertEquals("Missing state in external authorization request", event.errorDescription)
+        // The external provider's authorization URL comes from configuration, not from the wallet: its parse
+        // failure is reported generically, with the errorId under which it is logged.
+        assertContains(event.errorDescription.orEmpty(), "Authorization request processing failed (errorId=")
     }
 
     @Test
@@ -358,7 +362,10 @@ class AuthorizationEventTest {
             assertEquals(sessionId, event.target)
             assertEquals(sessionId, event.session["sessionId"]?.jsonPrimitive?.content)
             assertEquals(OAuthErrorCodes.SERVER_ERROR, event.error)
-            assertEquals("Authorization code storage failed", event.errorDescription)
+            // The store's own message must reach neither the wallet nor the event.
+            assertFalse("secret-host" in event.errorDescription.orEmpty(), event.errorDescription)
+            assertFalse("secret-host" in response.parameters["error_description"].orEmpty())
+            assertContains(event.errorDescription.orEmpty(), "Authorization request processing failed (errorId=")
         }
     }
 
@@ -619,7 +626,7 @@ class AuthorizationEventTest {
 
     private object FailingAuthorizationCodeRepository : AuthorizationCodeRepository {
         override suspend fun save(record: AuthorizationCodeRecord) {
-            error("Authorization code storage failed")
+            error("redis://secret-host:6379 Authorization code storage failed")
         }
 
         override suspend fun consume(code: String): AuthorizationCodeRecord? = null

@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import id.walt.errors.ClientRequestException
 import id.walt.credentials.formats.W3C11
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.crypto.keys.Key
@@ -315,7 +316,7 @@ class WalletPresentationHandlerRequirementsTest {
         val requestUrl = authorizationRequest.toHttpUrl()
         var resolveCalls = 0
 
-        val error = assertFailsWith<IllegalStateException> {
+        val error = assertFailsWith<ClientRequestException> {
             WalletPresentationHandler.buildVpToken(
                 wallet = wallet,
                 request = BuildVpTokenRequest(
@@ -362,7 +363,7 @@ class WalletPresentationHandlerRequirementsTest {
         val requestUrl = authorizationRequest.toHttpUrl()
         var resolveCalls = 0
 
-        val error = assertFailsWith<IllegalStateException> {
+        val error = assertFailsWith<ClientRequestException> {
             WalletPresentationHandler.sendAuthorizationResponse(
                 wallet = wallet,
                 request = SendAuthorizationResponseRequest(

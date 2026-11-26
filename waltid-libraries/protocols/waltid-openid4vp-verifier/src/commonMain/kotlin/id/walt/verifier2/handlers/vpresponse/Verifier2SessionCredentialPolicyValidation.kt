@@ -2,9 +2,13 @@ package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.CredentialPolicyResult
+import id.walt.policies2.vc.ExpirationDatePolicyException
+import id.walt.policies2.vc.NotBeforePolicyException
+import id.walt.policies2.vc.policies.CredentialVerificationPolicy2
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.verifier2.data.Verification2Session
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -36,22 +40,7 @@ object Verifier2SessionCredentialPolicyValidation {
             credentials.flatMapIndexed { credentialIndex, credential ->
                 policies.vc_policies?.policies.orEmpty().map { policy ->
                     async(Dispatchers.Default) {
-                        log.trace { "Validating '$queryId' credential#$credentialIndex with policy '${policy.id}': $credential" }
-                        val result = runCatching { policy.verify(credential, context) }
-                            .getOrElse { ex ->
-                                log.warn { "Policy '${policy.id}' threw an unexpected exception for '$queryId' credential#$credentialIndex: ${ex.message}" }
-                                Result.failure(ex)
-                            }
-                        log.trace { "'$queryId' credential#$credentialIndex '${policy.id}' result: $result" }
-
-                        CredentialPolicyResult(
-                            policy = policy,
-                            success = result.isSuccess,
-                            result = result.getOrNull(),
-                            error = result.exceptionOrNull()?.message,
-                            queryId = queryId,
-                            credentialIndex = credentialIndex,
-                        )
+                        evaluate(policy, credential, context, queryId, credentialIndex)
                     }
                 }
             }
@@ -64,20 +53,7 @@ object Verifier2SessionCredentialPolicyValidation {
             credentials.flatMapIndexed { credentialIndex, specificCredential ->
                 queryPolicies.policies.map { policy ->
                     async(Dispatchers.Default) {
-                        val result = runCatching { policy.verify(specificCredential, context) }
-                            .getOrElse { ex ->
-                                log.warn { "Specific policy '${policy.id}' threw an unexpected exception for '$queryId' credential#$credentialIndex: ${ex.message}" }
-                                Result.failure(ex)
-                            }
-
-                        queryId to CredentialPolicyResult(
-                            policy = policy,
-                            success = result.isSuccess,
-                            result = result.getOrNull(),
-                            error = result.exceptionOrNull()?.message,
-                            queryId = queryId,
-                            credentialIndex = credentialIndex,
-                        )
+                        queryId to evaluate(policy, specificCredential, context, queryId, credentialIndex)
                     }
                 }
             }
@@ -96,5 +72,31 @@ object Verifier2SessionCredentialPolicyValidation {
             vcPolicies = ArrayList(vcPolicyResults),
             specificVcPolicies = specificVcPolicyResults
         )
+    }
+
+    private suspend fun evaluate(
+        policy: CredentialVerificationPolicy2,
+        credential: DigitalCredential,
+        context: PolicyExecutionContext,
+        queryId: String,
+        credentialIndex: Int,
+    ): CredentialPolicyResult {
+        val result = try {
+            policy.verify(credential, context)
+        } catch (cause: Exception) {
+            Result.failure(cause)
+        }
+        val error = when (val cause = result.exceptionOrNull()) {
+            null -> null
+            is CancellationException -> throw cause
+            is Error -> throw cause
+            is ExpirationDatePolicyException -> "Credential has expired"
+            is NotBeforePolicyException -> "Credential is not yet valid"
+            else -> {
+                log.warn(cause) { "Credential policy '${policy.id}' failed for '$queryId' credential #$credentialIndex" }
+                "Credential did not pass the '${policy.id}' policy"
+            }
+        }
+        return CredentialPolicyResult(policy, result.isSuccess, result.getOrNull(), error, queryId, credentialIndex)
     }
 }

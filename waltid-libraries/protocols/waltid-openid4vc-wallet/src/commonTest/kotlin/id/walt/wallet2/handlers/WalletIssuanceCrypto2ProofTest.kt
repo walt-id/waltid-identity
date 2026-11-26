@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import id.walt.errors.ClientRequestException
 import id.walt.crypto.keys.Key as LegacyKey
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -99,7 +100,7 @@ class WalletIssuanceCrypto2ProofTest {
         val key = FakeSigningKey(KeyId("crypto2-key"))
         val store = Crypto2BackedStore("enterprise.resource.key", key)
 
-        assertFailsWith<IllegalStateException> {
+        assertFailsWith<ClientRequestException> {
             WalletIssuanceHandler.signProof(
                 wallet = Wallet(id = "wallet", keyStores = listOf(store)),
                 request = SignProofRequest(

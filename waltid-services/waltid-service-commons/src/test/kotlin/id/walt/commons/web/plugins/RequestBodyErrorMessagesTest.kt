@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.reflect.typeOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -143,5 +144,33 @@ class RequestBodyErrorMessagesTest {
         assertEquals(HttpStatusCode.InternalServerError, statusCodeForException(RuntimeException("broken")))
         assertEquals(HttpStatusCode.NotFound, statusCodeForException(NotFoundException("absent")))
         assertEquals(HttpStatusCode.BadRequest, statusCodeForException(BadRequestException("bad")))
+    }
+
+
+    @Test
+    fun `5xx hides message, class name and causes`() {
+        val cause = IllegalStateException(
+            "mongo://secret-host:27017 timeout\n\tat id.walt.Foo.bar(Foo.kt:42)",
+            RuntimeException("inner secret"),
+        )
+        val json = exceptionMap(cause, HttpStatusCode.InternalServerError, "fixed-id")
+        val text = json.toString()
+
+        assertEquals("Internal server error", json["message"]!!.jsonPrimitive.content)
+        assertEquals("fixed-id", json["errorId"]!!.jsonPrimitive.content)
+        assertNull(json["id"])
+        listOf("secret-host", "IllegalStateException", "inner secret", "\\tat ", ".kt:")
+            .forEach { assertFalse(it in text, "leaked: $it") }
+    }
+
+    @Test
+    fun `4xx keeps message but drops the cause chain`() {
+        val cause = IllegalArgumentException("wallet id is required", RuntimeException("db detail"))
+        val json = exceptionMap(cause, HttpStatusCode.BadRequest, "fixed-id")
+
+        assertEquals("wallet id is required", json["message"]!!.jsonPrimitive.content)
+        assertEquals("fixed-id", json["errorId"]!!.jsonPrimitive.content)
+        assertTrue(json.keys.none { it.startsWith("cause") })
+        assertFalse("db detail" in json.toString())
     }
 }

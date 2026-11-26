@@ -1,5 +1,7 @@
 package id.walt.wallet2.handlers
 
+import id.walt.errors.ClientFacingError
+import id.walt.errors.HttpStatusError
 import dev.whyoleg.cryptography.random.CryptographyRandom
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.coroutines.NonCancellable
@@ -34,7 +36,14 @@ public enum class PreviewSessionFailureReason {
 public class PreviewSessionException(
     public val reason: PreviewSessionFailureReason,
     message: String,
-) : IllegalStateException(message)
+) : IllegalStateException(message), HttpStatusError, ClientFacingError {
+    override val status: Int
+        get() = when (reason) {
+            PreviewSessionFailureReason.CONSUMED, PreviewSessionFailureReason.IN_USE -> 409
+            PreviewSessionFailureReason.CAPACITY_EXCEEDED -> 503
+            else -> 404
+        }
+}
 
 /**
  * Small process-local storage primitive for resolved previews.

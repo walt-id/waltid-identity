@@ -1,5 +1,6 @@
 package id.walt.openid4vci.proofs.attestation
 
+import id.walt.openid4vci.errors.clientErrorDescription
 import id.walt.openid4vci.attestation.*
 import id.walt.openid4vci.errors.CredentialProtocolException
 import id.walt.crypto2.CryptoRuntime
@@ -135,7 +136,9 @@ class KeyAttestationVerifier(
         val status = try {
             captureAttestationStatus(payload, signer.publicJwk, options.statusPolicy, now())
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (cause: Exception) { throw invalidCredentialProof(cause.message ?: "Invalid key attestation status reference", cause) }
+        catch (cause: Exception) {
+            throw invalidCredentialProof(clientErrorDescription(cause, "Invalid key attestation status reference"), cause)
+        }
         val verified = VerifiedKeyAttestation(jwt, header, payload, signer.key, attestedKeys.map {
             restoreAttestedKey(it as? JsonObject ?: throw invalidCredentialProof("Attested keys must be JWK objects"))
         }, lifetime, status)

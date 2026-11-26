@@ -21,6 +21,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -63,7 +64,7 @@ class SelfIssuedIdTokenValidatorTest {
         )
 
         invalidTokens.forEach { invalid ->
-            assertFailsWith<IllegalArgumentException> {
+            assertFailsWith<SelfIssuedIdTokenValidationException> {
                 SelfIssuedIdTokenValidator.validate(
                     idToken = invalid,
                     expectedNonce = "nonce",
@@ -77,7 +78,7 @@ class SelfIssuedIdTokenValidatorTest {
 
     @Test
     fun `malformed JWS and private sub_jwk fail`() = runTest {
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<SelfIssuedIdTokenValidationException> {
             SelfIssuedIdTokenValidator.validate("not-a-jws", "nonce", "client", clock = clock)
         }
 
@@ -88,7 +89,7 @@ class SelfIssuedIdTokenValidatorTest {
         val payload = claims(subject, privateJwk.toJsonObject(), "nonce", "client", now.epochSeconds + 60)
         val token = CompactJws.sign(Json.encodeToString(payload).encodeToByteArray(), key, JwsAlgorithm.ES256)
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<SelfIssuedIdTokenValidationException> {
             SelfIssuedIdTokenValidator.validate(token, "nonce", "client", clockSkewSeconds = 0, clock = clock)
         }
     }
@@ -128,10 +129,10 @@ class SelfIssuedIdTokenValidatorTest {
             clock = clock,
             didKeyResolver = resolver,
         )
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<SelfIssuedIdTokenValidationException> {
             SelfIssuedIdTokenValidator.validate(token, "nonce", "client", clock = clock)
         }
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<SelfIssuedIdTokenValidationException> {
             SelfIssuedIdTokenValidator.validate(
                 token,
                 "nonce",
@@ -140,6 +141,25 @@ class SelfIssuedIdTokenValidatorTest {
                 didKeyResolver = Crypto2DidKeyResolver { emptySet() },
             )
         }
+    }
+
+    @Test
+    fun `a DID resolution failure is reported without the resolver's message`() = runTest {
+        val key = generateKey()
+        val subject = "did:example:123"
+        val payload = buildJsonObject {
+            put("iss", subject); put("sub", subject); put("aud", "client"); put("nonce", "nonce")
+            put("exp", now.epochSeconds + 60)
+        }
+        val token = CompactJws.sign(Json.encodeToString(payload).encodeToByteArray(), key, JwsAlgorithm.ES256)
+
+        val failure = assertFailsWith<SelfIssuedIdTokenValidationException> {
+            SelfIssuedIdTokenValidator.validate(
+                token, "nonce", "client", clock = clock,
+                didKeyResolver = Crypto2DidKeyResolver { throw RuntimeException("mongo://secret-host:27017 timeout") },
+            )
+        }
+        assertEquals("id_token subject DID could not be resolved", failure.message)
     }
 
     private suspend fun token(

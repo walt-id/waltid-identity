@@ -9,6 +9,8 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.errors.ClientRequestException
+import id.walt.openid4vci.errors.ensureClientInput
 import id.walt.openid4vci.tokens.jwt.JwtHeaderParams
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import io.ktor.http.*
@@ -38,47 +40,47 @@ class DefaultDPoPProofVerifier(
     }
 
     override suspend fun verify(request: DPoPProofVerificationRequest): VerifiedDPoPProof {
-        require(request.proofJwt.isNotBlank()) { "DPoP proof must not be blank" }
+        ensureClientInput(request.proofJwt.isNotBlank()) { "DPoP proof must not be blank" }
         require(request.method.isNotBlank()) { "DPoP request method must not be blank" }
         require(request.targetUri.isNotBlank()) { "DPoP target URI must not be blank" }
 
         val decoded = runCatching { request.proofJwt.decodeJws() }
-            .getOrElse { throw IllegalArgumentException("Invalid DPoP proof JWT", it) }
+            .getOrElse { throw ClientRequestException("Invalid DPoP proof JWT", it) }
         val algorithm = decoded.header.stringValue(JwtHeaderParams.ALGORITHM)
-            ?: throw IllegalArgumentException("DPoP proof is missing ${JwtHeaderParams.ALGORITHM} header")
+            ?: throw ClientRequestException("DPoP proof is missing ${JwtHeaderParams.ALGORITHM} header")
 
-        require(decoded.header.stringValue(JwtHeaderParams.TYPE) == DPoPConstants.JWT_TYPE) {
+        ensureClientInput(decoded.header.stringValue(JwtHeaderParams.TYPE) == DPoPConstants.JWT_TYPE) {
             "DPoP proof ${JwtHeaderParams.TYPE} header must be ${DPoPConstants.JWT_TYPE}"
         }
-        require(algorithm == DPoPConstants.ES256) {
+        ensureClientInput(algorithm == DPoPConstants.ES256) {
             "Unsupported DPoP signing algorithm: $algorithm"
         }
 
         val jwk = decoded.header[JwtHeaderParams.JSON_WEB_KEY] as? JsonObject
-            ?: throw IllegalArgumentException("DPoP proof is missing ${JwtHeaderParams.JSON_WEB_KEY} header")
+            ?: throw ClientRequestException("DPoP proof is missing ${JwtHeaderParams.JSON_WEB_KEY} header")
         jwk.stringValue(JwtHeaderParams.ALGORITHM)?.let { jwkAlgorithm ->
-            require(jwkAlgorithm == algorithm) { "DPoP JWK algorithm does not match the proof algorithm" }
+            ensureClientInput(jwkAlgorithm == algorithm) { "DPoP JWK algorithm does not match the proof algorithm" }
         }
         jwk.stringValue(JWK_USE)?.let { use ->
-            require(use == JWK_SIGNATURE_USE) { "DPoP JWK use must be $JWK_SIGNATURE_USE" }
+            ensureClientInput(use == JWK_SIGNATURE_USE) { "DPoP JWK use must be $JWK_SIGNATURE_USE" }
         }
         jwk[JWK_KEY_OPERATIONS]?.let { value ->
             val operations = value as? JsonArray
-                ?: throw IllegalArgumentException("DPoP JWK $JWK_KEY_OPERATIONS must be an array")
+                ?: throw ClientRequestException("DPoP JWK $JWK_KEY_OPERATIONS must be an array")
             val operationNames = operations.map { operation ->
                 (operation as? JsonPrimitive)
                     ?.takeIf { it.isString && it.content.isNotBlank() }
                     ?.content
-                    ?: throw IllegalArgumentException(
+                    ?: throw ClientRequestException(
                         "DPoP JWK $JWK_KEY_OPERATIONS entries must be non-empty strings",
                     )
             }
-            require(JWK_VERIFY_OPERATION in operationNames) {
+            ensureClientInput(JWK_VERIFY_OPERATION in operationNames) {
                 "DPoP JWK key_ops must allow verification"
             }
         }
 
-        require(!Jwk.containsPrivateMaterial(jwk)) { "DPoP proof JWK must not contain private key material" }
+        ensureClientInput(!Jwk.containsPrivateMaterial(jwk)) { "DPoP proof JWK must not contain private key material" }
         val encodedKey = EncodedKey.Jwk(
             data = BinaryData(Json.encodeToString(JsonObject.serializer(), jwk).encodeToByteArray()),
             privateMaterial = false,
@@ -88,47 +90,53 @@ class DefaultDPoPProofVerifier(
             crypto2Runtime.restore(
                 encodedKey.toStoredSoftwareKey(KeyId(thumbprint), setOf(KeyUsage.VERIFY)),
             )
-        }.getOrElse { throw IllegalArgumentException("DPoP proof contains an invalid JWK", it) }
-        require(verificationKey.spec == KeySpec.Ec(EcCurve.P256)) {
+        }.getOrElse { throw ClientRequestException("DPoP proof contains an invalid JWK", it) }
+        ensureClientInput(verificationKey.spec == KeySpec.Ec(EcCurve.P256)) {
             "DPoP proof key does not match algorithm $algorithm"
         }
 
         val verifiedPayload = runCatching {
             CompactJws.verify(request.proofJwt, verificationKey, setOf(JwsAlgorithm.ES256))
         }.getOrElse {
-            throw IllegalArgumentException("Invalid DPoP proof signature", it)
+            throw ClientRequestException("Invalid DPoP proof signature", it)
         }.payload.decodeToString().let { payload ->
             runCatching { Json.parseToJsonElement(payload) }.getOrNull() as? JsonObject
-                ?: throw IllegalArgumentException("DPoP proof payload must be a JSON object")
+                ?: throw ClientRequestException("DPoP proof payload must be a JSON object")
         }
 
         val jti = verifiedPayload.stringValue(JwtPayloadClaims.JWT_ID)
-            ?: throw IllegalArgumentException("DPoP proof is missing ${JwtPayloadClaims.JWT_ID} claim")
-        require(jti.length <= MAX_JTI_LENGTH) { "DPoP proof ${JwtPayloadClaims.JWT_ID} claim is too long" }
+            ?: throw ClientRequestException("DPoP proof is missing ${JwtPayloadClaims.JWT_ID} claim")
+        ensureClientInput(jti.length <= MAX_JTI_LENGTH) { "DPoP proof ${JwtPayloadClaims.JWT_ID} claim is too long" }
 
         val proofMethod = verifiedPayload.stringValue(DPoPConstants.HTTP_METHOD_CLAIM)
-            ?: throw IllegalArgumentException("DPoP proof is missing ${DPoPConstants.HTTP_METHOD_CLAIM} claim")
-        require(proofMethod == request.method) { "DPoP proof HTTP method does not match the request" }
+            ?: throw ClientRequestException("DPoP proof is missing ${DPoPConstants.HTTP_METHOD_CLAIM} claim")
+        ensureClientInput(proofMethod == request.method) { "DPoP proof HTTP method does not match the request" }
 
         val proofUri = verifiedPayload.stringValue(DPoPConstants.HTTP_URI_CLAIM)
-            ?: throw IllegalArgumentException("DPoP proof is missing ${DPoPConstants.HTTP_URI_CLAIM} claim")
-        require(normalizeTargetUri(proofUri) == normalizeTargetUri(request.targetUri)) {
+            ?: throw ClientRequestException("DPoP proof is missing ${DPoPConstants.HTTP_URI_CLAIM} claim")
+        val proofTarget = try {
+            normalizeTargetUri(proofUri)
+        } catch (cause: IllegalArgumentException) {
+            throw ClientRequestException("DPoP proof ${DPoPConstants.HTTP_URI_CLAIM} claim is not a valid absolute URI", cause)
+        }
+        // The request target comes from issuer configuration, so a failure to parse it is not the client's.
+        ensureClientInput(proofTarget == normalizeTargetUri(request.targetUri)) {
             "DPoP proof target URI does not match the request"
         }
 
         val issuedAt = verifiedPayload.longValue(JwtPayloadClaims.ISSUED_AT)
-            ?: throw IllegalArgumentException("DPoP proof is missing ${JwtPayloadClaims.ISSUED_AT} claim")
+            ?: throw ClientRequestException("DPoP proof is missing ${JwtPayloadClaims.ISSUED_AT} claim")
         val currentTime = now().epochSeconds
         val earliest = currentTime - proofMaxAgeSeconds - clockSkewSeconds
         val latest = currentTime + clockSkewSeconds
-        require(issuedAt in earliest..latest) { "DPoP proof is outside the accepted age window" }
+        ensureClientInput(issuedAt in earliest..latest) { "DPoP proof is outside the accepted age window" }
 
         request.accessToken?.let { accessToken ->
             val accessTokenHash = verifiedPayload.stringValue(DPoPConstants.ACCESS_TOKEN_HASH_CLAIM)
-                ?: throw IllegalArgumentException(
+                ?: throw ClientRequestException(
                     "DPoP proof is missing ${DPoPConstants.ACCESS_TOKEN_HASH_CLAIM} claim",
                 )
-            require(accessTokenHash == ShaUtils.calculateSha256Base64Url(accessToken)) {
+            ensureClientInput(accessTokenHash == ShaUtils.calculateSha256Base64Url(accessToken)) {
                 "DPoP proof access token hash does not match the presented access token"
             }
         }
@@ -137,7 +145,7 @@ class DefaultDPoPProofVerifier(
             tokenProofMutex.withLock {
                 tokenProofs.entries.removeAll { it.value < currentTime }
                 val proofId = thumbprint to jti
-                require(proofId !in tokenProofs) { "DPoP token proof has already been used" }
+                ensureClientInput(proofId !in tokenProofs) { "DPoP token proof has already been used" }
                 tokenProofs[proofId] = issuedAt + proofMaxAgeSeconds + clockSkewSeconds
             }
         }
@@ -186,7 +194,7 @@ class DefaultDPoPProofVerifier(
         return (value as? JsonPrimitive)
             ?.takeIf { it.isString && it.content.isNotBlank() }
             ?.content
-            ?: throw IllegalArgumentException("DPoP value $name must be a non-empty string")
+            ?: throw ClientRequestException("DPoP value $name must be a non-empty string")
     }
 
     private fun JsonObject.longValue(name: String): Long? {
@@ -194,7 +202,7 @@ class DefaultDPoPProofVerifier(
         return (value as? JsonPrimitive)
             ?.takeUnless { it.isString }
             ?.longOrNull
-            ?: throw IllegalArgumentException("DPoP value $name must be an integer")
+            ?: throw ClientRequestException("DPoP value $name must be an integer")
     }
 
     private data class NormalizedTargetUri(

@@ -1,5 +1,7 @@
 package id.walt.wallet2.handlers
 
+import id.walt.errors.ClientStateConflictException
+import id.walt.errors.ClientRequestException
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
@@ -489,7 +491,7 @@ class WalletIssuanceSessionService(
         val keyMaterial = resolveIssuanceKeyMaterial(request.key, request.keyId)
         val resolved = resolve(request, preferredLocales, keyMaterial)
         val grant = resolved.grantType
-            ?: error("Credential offer does not contain a supported grant")
+            ?: throw ClientRequestException("Credential offer does not contain a supported grant")
         val sessionId = Uuid.random().toString()
         val publicSession = WalletIssuanceSession(
             id = sessionId,
@@ -570,19 +572,19 @@ class WalletIssuanceSessionService(
         prepareCredentials: suspend (WalletIssuanceBatchSession, List<WalletCredentialSelection>?) -> List<WalletCredentialSelection>?,
         onCredentialsAccepted: () -> Unit,
     ): WalletIssuanceAuthorization {
-        check(loadActive(sessionId)?.public?.offer?.grant == WalletIssuanceGrant.AUTHORIZATION_CODE) {
-            "Issuance session does not use the authorization-code grant"
+        if (loadActive(sessionId)?.public?.offer?.grant != WalletIssuanceGrant.AUTHORIZATION_CODE) {
+            throw ClientStateConflictException("Issuance session does not use the authorization-code grant")
         }
         val active = beginTransition(sessionId, SessionState.AWAITING_ACCEPTANCE)
-            ?: throw IllegalStateException("Issuance session is not awaiting acceptance")
+            ?: throw ClientStateConflictException("Issuance session is not awaiting acceptance")
         try {
             acceptSelections(active, prepareCredentials(active.toBatchSession(), active.selections?.map { it.selection }))
             onCredentialsAccepted()
             persistActive(active)
             val authorization = buildAuthorization(active)
             mutex.withLock {
-                check(sessions[sessionId] === active && active.state == SessionState.PROCESSING) {
-                    "Issuance session changed while authorization was being built"
+                if (sessions[sessionId] !== active || active.state != SessionState.PROCESSING) {
+                    throw ClientStateConflictException("Issuance session changed while authorization was being built")
                 }
                 active.authorization = authorization
                 active.state = SessionState.AWAITING_CALLBACK
@@ -775,8 +777,8 @@ class WalletIssuanceSessionService(
                     destroyBackingWallet?.invoke()
                     return@withLock
                 }
-                check(pollingDeferred.isEmpty() && sessions.values.none { it.state == SessionState.PROCESSING }) {
-                    "Cannot clear issuance sessions while issuance is in progress"
+                if (pollingDeferred.isNotEmpty() || sessions.values.any { it.state == SessionState.PROCESSING }) {
+                    throw ClientStateConflictException("Cannot clear issuance sessions while issuance is in progress")
                 }
                 destroyBackingWallet?.let { destroy ->
                     destroy()
@@ -1508,7 +1510,7 @@ class WalletIssuanceSessionService(
             grant = when (grant) {
                 is GrantType.AuthorizationCode -> WalletIssuanceGrant.AUTHORIZATION_CODE
                 is GrantType.PreAuthorizedCode -> WalletIssuanceGrant.PRE_AUTHORIZED_CODE
-                else -> error("Unsupported credential offer grant")
+                else -> throw ClientRequestException("Unsupported credential offer grant")
             },
             issuer = WalletIssuanceIssuerPreview(
                 identifier = issuerMetadata.metadata.credentialIssuer,
@@ -2641,7 +2643,7 @@ class WalletIssuanceSessionService(
     ): WalletKeyStoreEntry =
         inlineKey?.key?.let { WalletKeyStoreEntry(it.getKeyId(), it, null) }
             ?: wallet.resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
-            ?: error("No holder key is available for credential issuance")
+            ?: throw WalletSigningKeyUnavailableException("No holder key is available for credential issuance")
 
     private suspend fun WalletKeyStoreEntry.exportPublicJwkObject(): JsonObject {
         crypto2Key?.let { key ->

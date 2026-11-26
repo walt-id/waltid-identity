@@ -2,6 +2,8 @@ package id.walt.openid4vci.tokens.jwt.access
 
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.Key
+import id.walt.errors.ClientRequestException
+import id.walt.openid4vci.errors.ensureClientInput
 import id.walt.openid4vci.tokens.jwt.Crypto2JwtVerificationKey
 import id.walt.openid4vci.tokens.jwt.Crypto2JwtVerificationKeyResolver
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
@@ -41,26 +43,26 @@ class JwtAccessTokenVerifier private constructor(
         val payload = verifier.verify(token, "Access token")
 
         val issuer = payload[JwtPayloadClaims.ISSUER]?.jsonPrimitive?.content
-            ?: throw IllegalArgumentException("Access token is missing issuer claim")
-        require(issuer == expectedIssuer) {
+            ?: throw ClientRequestException("Access token is missing issuer claim")
+        ensureClientInput(issuer == expectedIssuer) {
             "Access token issuer mismatch (expected=$expectedIssuer, got=$issuer)"
         }
 
         val subject = payload[JwtPayloadClaims.SUBJECT]?.jsonPrimitive?.content
-            ?: throw IllegalArgumentException("Access token is missing subject claim")
-        require(subject.isNotBlank()) { "Access token subject claim must not be blank" }
+            ?: throw ClientRequestException("Access token is missing subject claim")
+        ensureClientInput(subject.isNotBlank()) { "Access token subject claim must not be blank" }
 
         if (expectedAudience != null) {
             val audiences = payload.extractAudience()
-            require(expectedAudience in audiences) {
+            ensureClientInput(expectedAudience in audiences) {
                 "Access token audience mismatch (expected=$expectedAudience, got=${audiences.joinToString()})"
             }
         }
 
         val exp = payload[JwtPayloadClaims.EXPIRATION]?.jsonPrimitive?.longOrNull
-            ?: throw IllegalArgumentException("Access token is missing expiration claim")
+            ?: throw ClientRequestException("Access token is missing expiration claim")
         val now = Clock.System.now().epochSeconds
-        require(now < exp) { "Access token expired" }
+        ensureClientInput(now < exp) { "Access token expired" }
 
         return payload
     }

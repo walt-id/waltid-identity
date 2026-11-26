@@ -1,5 +1,6 @@
 package id.walt.wallet2.data
 
+import id.walt.errors.ClientRequestException
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.jose.Jwk
@@ -199,7 +200,7 @@ data class Wallet(
      */
     suspend fun resolveKey(inlineKey: DirectSerializedKey? = null, keyId: String? = null): Key? = when {
         inlineKey != null -> inlineKey.key
-        keyId != null -> findKey(keyId) ?: error("Key '$keyId' not found in any wallet key store")
+        keyId != null -> findKey(keyId) ?: throw ClientRequestException("Key '$keyId' not found in any wallet key store")
         else -> defaultKey()
     }
 
@@ -215,7 +216,7 @@ data class Wallet(
         usages: Set<KeyUsage> = emptySet(),
     ): Crypto2Key? = when {
         keyId != null -> findCrypto2Key(keyId, usages)
-            ?: error("Crypto2 key '$keyId' not found in any wallet key store")
+            ?: throw ClientRequestException("Crypto2 key '$keyId' not found in any wallet key store")
         else -> defaultCrypto2Key(usages)
     }
 

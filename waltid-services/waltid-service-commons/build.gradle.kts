@@ -24,6 +24,7 @@ dependencies {
     api(identityLibs.ktor.server.core)
     api(identityLibs.ktor.server.cio)
     api(identityLibs.ktor.server.status.pages)
+    implementation(identityLibs.ktor.server.sse)
     api(identityLibs.ktor.server.content.negotiation)
     api(identityLibs.ktor.serialization.kotlinx.json)
     implementation(identityLibs.ktor.server.auth)

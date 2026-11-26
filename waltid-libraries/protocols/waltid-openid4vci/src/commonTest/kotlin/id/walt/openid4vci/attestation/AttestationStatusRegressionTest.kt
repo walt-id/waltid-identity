@@ -5,10 +5,12 @@ import id.walt.crypto2.jose.*
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.errors.ClientRequestException
 import id.walt.openid4vci.clientauth.*
 import id.walt.openid4vci.clientauth.attestation.*
 import id.walt.openid4vci.clientauth.attestation.challenge.AttestationChallengeService
 import id.walt.openid4vci.clientauth.attestation.verifier.Crypto2KeyBasedClientAttestationVerifier
+import id.walt.openid4vci.errors.clientErrorDescription
 import id.walt.statuslist.codec.TokenStatusListCodec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -33,6 +35,15 @@ class AttestationStatusRegressionTest {
             putJsonObject("status_list") { put("bits", 8); put("lst", TokenStatusListCodec.encode(byteArrayOf(status))) }
         }.toString().encodeToByteArray(), signer, JwsAlgorithm.ES256, buildJsonObject { put("typ", "statuslist+jwt") },
     )
+
+    @Test fun malformedAttestationStatusKeepsAnActionableClientDescription() {
+        val rejected = assertFailsWith<ClientRequestException> {
+            captureAttestationStatus(
+                buildJsonObject { put("status", JsonPrimitive("invalid")) }, null, AttestationStatusPolicy(), start,
+            )
+        }
+        assertEquals("Attestation status must be an object", clientErrorDescription(rejected, "Invalid attestation"))
+    }
 
     @Test fun allListsMustRemainFreshAfterTheLastLookup() = runTest {
         val signer = key("attester")

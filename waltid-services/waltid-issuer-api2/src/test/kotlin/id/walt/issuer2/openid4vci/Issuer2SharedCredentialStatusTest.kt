@@ -508,9 +508,9 @@ class Issuer2SharedCredentialStatusTest {
         assertEquals(HttpStatusCode.InternalServerError, failed.status)
         val publicError = failed.body<JsonObject>()
         assertEquals("server_error", publicError.getValue("error").jsonPrimitive.content)
-        assertEquals("Credential request processing failed", publicError.getValue("error_description").jsonPrimitive.content)
+        assertGenericServerErrorDescription("Credential request processing failed", publicError.getValue("error_description").jsonPrimitive.content)
         val event = events.replayCache.single { it.target == offer.offerId && it.error == "server_error" }
-        assertEquals("Credential request processing failed", event.errorDescription)
+        assertGenericServerErrorDescription("Credential request processing failed", event.errorDescription)
 
         failReservation = false
         val issued = fixture.issue(resolved, token.access_token, request)
@@ -545,12 +545,12 @@ class Issuer2SharedCredentialStatusTest {
         val failed = fixture.issue(resolved, token.access_token, credentialRequest(configurationId, proofs))
         assertTrue(cleanupFailed, "Capacity rejection must reach the session cleanup")
         assertEquals(HttpStatusCode.InternalServerError, failed.status)
-        assertEquals(buildJsonObject {
-            put("error", "server_error")
-            put("error_description", "Credential request processing failed")
-        }, failed.body<JsonObject>())
+        val publicError = failed.body<JsonObject>()
+        assertEquals(setOf("error", "error_description"), publicError.keys)
+        assertEquals("server_error", publicError.getValue("error").jsonPrimitive.content)
+        assertGenericServerErrorDescription("Credential request processing failed", publicError.getValue("error_description").jsonPrimitive.content)
         val event = events.replayCache.single { it.target == offer.offerId && it.error == "server_error" }
-        assertEquals("Credential request processing failed", event.errorDescription)
+        assertGenericServerErrorDescription("Credential request processing failed", event.errorDescription)
 
         val nextOffer = fixture.wallet.resolve(fixture.client.createCredentialOffer(offerRequest))
         val nextToken = fixture.wallet.exchangePreAuthorizedCode(nextOffer, null)

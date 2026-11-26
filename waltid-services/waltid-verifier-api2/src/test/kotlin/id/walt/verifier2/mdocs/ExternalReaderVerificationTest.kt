@@ -98,6 +98,7 @@ import kotlin.io.encoding.Base64
 import kotlin.io.path.deleteIfExists
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import io.ktor.client.statement.bodyAsText
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -338,6 +339,18 @@ class ExternalReaderVerificationTest {
     }
 
     @Test
+    fun `events for an unknown verification session are a readable 404, not an empty stream`() = testApplication {
+        startup()
+        routes()
+
+        val response = client.get("/verification-session/missing-session/events")
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
+        assertTrue(response.contentType()?.match(ContentType.Text.EventStream) != true, "${response.contentType()}")
+        assertTrue("Verification session 'missing-session' was not found" in response.bodyAsText(), response.bodyAsText())
+    }
+
+    @Test
     fun `malformed responses private reader keys and encrypted SessionData return 400 without sessions`() = testApplication {
         startup()
         val repository = InMemoryVerificationSessionRepository()
@@ -362,6 +375,9 @@ class ExternalReaderVerificationTest {
         for (body in invalid) {
             assertEquals(HttpStatusCode.BadRequest, http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(body) }.status)
         }
+        // A rejection of the submission itself keeps the verifier's reason, so the reader can fix it.
+        val privateKeyRejection = http.post(ENDPOINT) { contentType(ContentType.Application.Json); setBody(invalid[duplicateVersions.size + 3]) }.bodyAsText()
+        assertTrue("eReaderKey must contain public key material only" in privateKeyRejection, privateKeyRejection)
         assertNull(repository.get("must-not-exist"))
         assertEquals(0, repository.size)
     }

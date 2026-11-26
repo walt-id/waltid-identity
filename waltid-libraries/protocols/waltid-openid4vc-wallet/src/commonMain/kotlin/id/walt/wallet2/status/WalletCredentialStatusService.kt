@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.status
 
+import id.walt.errors.ClientStateConflictException
 import id.walt.credentials.status.CheckFailure
 import id.walt.credentials.status.CredentialStatus
 import id.walt.credentials.status.CredentialStatusEntry
@@ -124,7 +125,7 @@ class WalletCredentialStatusService(
         val policy = checkNotNull(trustPolicyId) { "An active review requires a stable trust policy ID" }
         snapshot()
         return mutex.withLock {
-            check(flights.isEmpty()) { "Cannot capture a review while status checks are running" }
+            if (flights.isNotEmpty()) throw ClientStateConflictException("Cannot capture a review while status checks are running")
             val retained = states.mapNotNull { (reference, state) ->
                 val customStoreEvidence = state.store !is CredentialStatusSnapshotStore && state.metadata.entries.any {
                     it.lastObservation() != null || it.lastAttemptAt != null
@@ -150,7 +151,8 @@ class WalletCredentialStatusService(
         }
         matching.forEach { (record, _) -> local(record) }
         mutex.withLock {
-            check(job.isActive && flights.isEmpty()) { "Cannot restore a review while status checks are running" }
+            check(job.isActive) { "Credential status service is closed" }
+            if (flights.isNotEmpty()) throw ClientStateConflictException("Cannot restore a review while status checks are running")
             for ((record, saved) in matching) {
                 val state = states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint } ?: continue
                 val metadata = if (state.persisted == saved.persisted) saved.metadata else reconcile(state.metadata, saved.metadata)

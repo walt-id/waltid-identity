@@ -1,5 +1,7 @@
 package id.walt.openid4vci.proofs
 
+import id.walt.errors.ClientRequestException
+
 import id.walt.crypto2.keys.Key
 import id.walt.openid4vci.proofs.attestation.KeyAttestationVerificationOptions
 import id.walt.openid4vci.proofs.attestation.VerifiedKeyAttestation
@@ -81,7 +83,7 @@ class CredentialProofValidationException(
     val errorCode: String,
     message: String,
     cause: Throwable? = null,
-) : IllegalArgumentException(message, cause)
+) : ClientRequestException(message, cause)
 
 internal fun invalidCredentialProof(message: String, cause: Throwable? = null): CredentialProofValidationException =
     CredentialProofValidationException(CredentialErrorCodes.INVALID_PROOF, message, cause)
