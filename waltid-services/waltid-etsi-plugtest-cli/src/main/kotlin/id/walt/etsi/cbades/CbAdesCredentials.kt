@@ -27,6 +27,7 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.util.Date
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaInstant
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.nist.NISTObjectIdentifiers
@@ -145,7 +146,7 @@ class LocalPlugtestPki(private val dir: File, private val participant: String) {
     }
 
     private fun crl(issuer: Entity): ByteArray {
-        val b = X509v2CRLBuilder(X500Name.getInstance(issuer.cert.subjectX500Principal.encoded), Date.from((now - 1.days).toJavaInstant()))
+        val b = X509v2CRLBuilder(X500Name.getInstance(issuer.cert.subjectX500Principal.encoded), Date.from((now - 1.minutes).toJavaInstant()))
         b.setNextUpdate(Date.from((now + 60.days).toJavaInstant()))
         return b.build(JcaContentSignerBuilder("SHA256withECDSA").build(issuer.keyPair.private)).encoded
     }
