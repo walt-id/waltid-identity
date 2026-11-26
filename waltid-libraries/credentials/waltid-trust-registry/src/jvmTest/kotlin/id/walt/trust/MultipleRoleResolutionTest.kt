@@ -122,6 +122,15 @@ class MultipleRoleResolutionTest {
             }
     }
 
+    /** Without filters too, a source that is not accepted never decides trust, so it cannot make a listing ambiguous. */
+    @Test
+    fun withoutAnExpectedTypeAListingFromAnUnacceptedSourceIsNotAnAmbiguity() = runTest {
+        registry(pidListing.copy(accepted = false), rpListing).assertEachLookup(expectedEntityType = null) { _, decision ->
+            assertEquals(TrustDecisionCode.TRUSTED, decision.decision)
+            assertEquals(RP_ENTITY, decision.matchedEntity?.entityId)
+        }
+    }
+
     @Test
     fun aListingWithoutAServiceDoesNotHaveTheExpectedServiceType() = runTest {
         val revocation = pidListing.copy(
