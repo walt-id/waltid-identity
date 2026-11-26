@@ -291,7 +291,7 @@ private struct StaticProximityRICALProvider: ProximityRICALProvider {
     let signedRICAL: Data
 
     func current() async throws -> ProximityRICALProviderResult {
-        .available(signedRICAL: signedRICAL)
+        try .available(signedRICAL: signedRICAL)
     }
 }
 
@@ -323,23 +323,23 @@ private func configuredReaderTrustEvaluator(
 ) throws -> (any ProximityReaderTrustEvaluator)? {
     guard !settings.trustAnchors.isEmpty || !settings.ricalProviders.isEmpty else { return nil }
     #if canImport(WalletCore) && os(iOS)
-    return try ProximityConfiguredReaderTrustEvaluator(
-        configuration: ProximityReaderTrustConfiguration(
+    return ProximityConfiguredReaderTrustEvaluator(
+        configuration: try ProximityReaderTrustConfiguration(
             trustAnchors: settings.trustAnchors.map {
-                ProximityReaderTrustAnchor(
+                try ProximityReaderTrustAnchor(
                     certificateDER: try validatedBase64URL($0.certificateDERBase64URL),
                     displayName: $0.displayName
                 )
             },
             ricalProviders: settings.ricalProviders.map { provider in
-                ProximityRICALConfiguration(
+                try ProximityRICALConfiguration(
                     providerID: provider.providerID,
                     provider: StaticProximityRICALProvider(
                         signedRICAL: try validatedBase64URL(provider.signedRICALBase64URL)
                     ),
                     acceptedTypes: provider.acceptedTypes,
                     providerTrustAnchors: try provider.providerTrustAnchorsDERBase64URL.map {
-                        ProximityRICALProviderTrustAnchor(certificateDER: try validatedBase64URL($0))
+                        try ProximityRICALProviderTrustAnchor(certificateDER: try validatedBase64URL($0))
                     },
                     acceptedSignerCertificatePolicyOIDs: provider.acceptedSignerCertificatePolicyOIDs,
                     establishReaderTrust: provider.establishesReaderTrust

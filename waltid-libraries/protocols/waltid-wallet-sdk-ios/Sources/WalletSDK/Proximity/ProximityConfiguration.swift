@@ -62,7 +62,7 @@ public struct ProximityConfiguration: Sendable {
     public init(
         profile: ProximityProfile = .iso180135Edition2DIS2026,
         session: ProximitySessionConfiguration = .qr(),
-        readerPolicy: ProximityReaderPolicy = .allowAnonymousOrUntrusted,
+        readerPolicy: ProximityReaderPolicy? = nil,
         deviceAuthenticationPolicy: ProximityDeviceAuthenticationPolicy = .signatureOnly,
         readerTrustEvaluator: (any ProximityReaderTrustEvaluator)? = nil,
         credentialStatusEvaluator: (any ProximityCredentialStatusEvaluator)? = nil,
@@ -70,6 +70,7 @@ public struct ProximityConfiguration: Sendable {
         maximumMessageBytes: Int = 1_048_576,
         approval: ProximityApproval = .askEachTime
     ) throws {
+        let readerPolicy = readerPolicy ?? (profile == .eudiARF3FCAF202608 ? .requireTrusted : .allowAnonymousOrUntrusted)
         try requireProximityInput(maximumMessageBytes > 0 && maximumMessageBytes <= 16_777_216)
         try requireProximityInput(profile != .eudiARF3FCAF202608 || readerPolicy == .requireTrusted)
         try requireProximityInput(profile != .eudiARF3FCAF202608 || deviceAuthenticationPolicy == .signatureOnly)

@@ -83,9 +83,9 @@ public final class ProximityCRLRevocationEvaluator: ProximityReaderRevocationEva
         case .good:
             return .good
         case let .revoked(value):
-            return .revoked(reason: value.reason)
+            return try .revoked(reason: value.reason)
         case let .indeterminate(value):
-            return .indeterminate(reason: value.reason)
+            return try .indeterminate(reason: value.reason)
         }
     }
 
@@ -321,7 +321,7 @@ private final class KMPProximityRICALSignerRevocationEvaluatorAdapter:
         evidence: WalletCore.ProximityRicalSignerEvidence
     ) async throws -> any WalletCore.ProximityCertificateRevocationResult {
         let result = try await evaluator.evaluate(
-            ProximityRICALSignerEvidence(
+            try ProximityRICALSignerEvidence(
                 providerID: evidence.providerId,
                 certificateChainDER: try evidence.certificateChainDerBase64Url.map {
                     try decodedBase64URL($0, context: "RICAL signer certificate evidence")
@@ -376,7 +376,7 @@ private final class KMPProximityRICALConstraintEvaluatorAdapter:
         reader: WalletCore.ProximityReaderEvidence
     ) async throws -> KotlinBoolean {
         let values = try constraints.map { constraint in
-            ProximityRICALTrustConstraint(
+            try ProximityRICALTrustConstraint(
                 valuesCBOR: try constraint.valuesCborBase64Url.mapValues {
                     try decodedBase64URL($0, context: "RICAL trust constraint")
                 }

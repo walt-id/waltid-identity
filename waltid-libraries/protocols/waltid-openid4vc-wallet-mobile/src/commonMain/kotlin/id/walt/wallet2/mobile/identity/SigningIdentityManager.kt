@@ -14,8 +14,6 @@ import id.walt.crypto2.keys.KeyProtectionLevel
 import id.walt.crypto2.keys.KeySecurityLevel
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
-import id.walt.crypto2.keys.KeyUseAuthorizationException
-import id.walt.crypto2.keys.KeyUseAuthorizationFailure
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.crypto2.keys.PlatformKeyConfiguration
@@ -101,8 +99,8 @@ public class SigningIdentityManager internal constructor(
         if (option.owner !== owner) return@updateIdentity failed(SigningIdentityFailure.StaleOption)
         val valid = try { valid(option) }
         catch (cause: CancellationException) { throw cause }
-        catch (cause: IdentityProviderException) { return@updateIdentity failed(providerFailure(cause)) }
-        catch (cause: Exception) { return@updateIdentity failed(classify(cause)) }
+        catch (cause: IdentityProviderException) { return@updateIdentity failed(recoveryProviderFailure(cause)) }
+        catch (cause: Exception) { return@updateIdentity failed(signingIdentityFailure(cause)) }
         if (!valid) return@updateIdentity failed(SigningIdentityFailure.StaleOption)
         if (currentState() !is SigningIdentityState.Absent) return@updateIdentity failed(SigningIdentityFailure.ExistingIdentity)
         val id = Uuid.random().toString()
@@ -114,7 +112,7 @@ public class SigningIdentityManager internal constructor(
                 requireNotNull(generated.capabilities.privateKeyExporter).exportPrivateKey() as EncodedKey.Jwk
             } else null
         } catch (cause: CancellationException) { throw cause }
-        catch (cause: Exception) { return@updateIdentity failed(classify(cause)) }
+        catch (cause: Exception) { return@updateIdentity failed(signingIdentityFailure(cause)) }
         val preparing = IdentityRecord(
             id = id, keyId = keyId, nativeAlias = "$keyId.identity.${Uuid.random()}", phase = IdentityPhase.Preparing, storage = option.storage,
             requirements = requirements(option.storage, option.authorization, option.attestation), policy = configuration.policy,
@@ -142,7 +140,7 @@ public class SigningIdentityManager internal constructor(
             // Once backup submission can have happened, retain the journal for idempotent retry.
             if (journal.read()?.phase == IdentityPhase.Preparing) cleanup(journal.read() ?: preparing, material != null, cause)
             if (cause is CancellationException) throw cause
-            failed(classify(cause))
+            failed(signingIdentityFailure(cause))
         }
     }
 
@@ -159,7 +157,7 @@ public class SigningIdentityManager internal constructor(
                 val key = liveKey(record) ?: return@updateIdentity failed(SigningIdentityFailure.KeyUnavailable)
                 try { proveOriginalKey(key, requireNotNull(record.identity).publicJwk) }
                 catch (cause: CancellationException) { throw cause }
-                catch (cause: Exception) { return@updateIdentity failed(classify(cause)) }
+                catch (cause: Exception) { return@updateIdentity failed(signingIdentityFailure(cause)) }
                 finish(record)
             }
             IdentityPhase.Preparing -> {
@@ -210,7 +208,7 @@ public class SigningIdentityManager internal constructor(
                 recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = requiredConfirmation(record)))
             SigningIdentityOperationResult.Active(updated)
         } catch (cause: CancellationException) { throw cause }
-        catch (cause: Exception) { failed(providerFailure(cause)) }
+        catch (cause: Exception) { failed(recoveryProviderFailure(cause)) }
     }
 
     /** Offers registered custody destinations only when the current policy permits private-key export. */
@@ -243,7 +241,7 @@ public class SigningIdentityManager internal constructor(
             journal.write(record.copy(identity = record.identity.copy(custody = (record.identity.custody + reference).distinct())))
             SigningIdentityCustodyResult.Imported(reference)
         } catch (cause: CancellationException) { throw cause }
-        catch (cause: Exception) { SigningIdentityCustodyResult.Failed(providerFailure(cause)) }
+        catch (cause: Exception) { SigningIdentityCustodyResult.Failed(recoveryProviderFailure(cause)) }
     }
 
     /** Discovers safe references and failures from the same attempt. No secret leaves discovery. */
@@ -262,7 +260,7 @@ public class SigningIdentityManager internal constructor(
                 }
             } catch (cause: CancellationException) { throw cause }
             catch (cause: Exception) {
-                val reason = providerFailure(cause)
+                val reason = recoveryProviderFailure(cause)
                 val message = when (reason) {
                     SigningIdentityFailure.ProviderInteractionRequired -> "Unlock or sign in to this recovery provider, then retry."
                     SigningIdentityFailure.ProviderConflict -> "The provider contains conflicting recovery records."
@@ -320,7 +318,7 @@ public class SigningIdentityManager internal constructor(
             provider.retrieve(option.reference.recordId)?.copyBytes()
                 ?: return@updateIdentity failed(SigningIdentityFailure.ProviderUnavailable)
         } catch (cause: CancellationException) { throw cause }
-        catch (cause: Exception) { return@updateIdentity failed(providerFailure(cause)) }
+        catch (cause: Exception) { return@updateIdentity failed(recoveryProviderFailure(cause)) }
         try {
             if (!fingerprint(bytes).contentEquals(option.fingerprint)) return@updateIdentity failed(SigningIdentityFailure.StaleOption)
             val recovery = decodeRecovery(bytes, option.reference.recordId)
@@ -349,7 +347,7 @@ public class SigningIdentityManager internal constructor(
             } catch (cause: Throwable) {
                 cleanup(journal.read() ?: preparing, imported = true, cause)
                 if (cause is CancellationException) throw cause
-                failed(classify(cause))
+                failed(signingIdentityFailure(cause))
             }
         } catch (cause: CancellationException) { throw cause }
         catch (_: Exception) { failed(SigningIdentityFailure.InvalidRecoveryRecord) }
@@ -557,7 +555,7 @@ public class SigningIdentityManager internal constructor(
                 recovery = SigningIdentityRecoveryState.Submitted(record.backup, receipt))))
         } catch (cause: CancellationException) { throw cause }
         catch (cause: Exception) {
-            val reason = providerFailure(cause)
+            val reason = recoveryProviderFailure(cause)
             journal.write(pending.copy(pendingReason = reason))
             SigningIdentityOperationResult.Pending(record.id, reason)
         }
@@ -679,21 +677,5 @@ public class SigningIdentityManager internal constructor(
         .exportPublicKey().toPublicJwk(key.spec).data.toByteArray().decodeToString()
     private suspend fun fingerprint(bytes: ByteArray): ByteArray = CryptographyProvider.Default.get(SHA256).hasher().hash(bytes)
     private fun failed(reason: SigningIdentityFailure) = SigningIdentityOperationResult.Failed(reason)
-    private fun providerFailure(cause: Exception): SigningIdentityFailure = when ((cause as? IdentityProviderException)?.failure) {
-        IdentityProviderFailure.InteractionRequired -> SigningIdentityFailure.ProviderInteractionRequired
-        IdentityProviderFailure.Rejected -> SigningIdentityFailure.ProviderRejected
-        IdentityProviderFailure.Conflict -> SigningIdentityFailure.ProviderConflict
-        IdentityProviderFailure.ConfirmationPending -> SigningIdentityFailure.ProviderConfirmationPending
-        IdentityProviderFailure.TemporarilyUnavailable, null -> SigningIdentityFailure.ProviderUnavailable
-    }
-    private fun classify(cause: Throwable): SigningIdentityFailure = when ((cause as? KeyUseAuthorizationException)?.failure) {
-        KeyUseAuthorizationFailure.UnsupportedCombination -> SigningIdentityFailure.UnsupportedPolicy
-        KeyUseAuthorizationFailure.ProtectedKeyUnavailable -> SigningIdentityFailure.KeyUnavailable
-        KeyUseAuthorizationFailure.InvalidStoredKeyMetadata -> SigningIdentityFailure.InvalidRecoveryRecord
-        KeyUseAuthorizationFailure.BiometricUnavailable, KeyUseAuthorizationFailure.BiometricNotEnrolled,
-        KeyUseAuthorizationFailure.DeviceCredentialNotSet,
-        KeyUseAuthorizationFailure.InteractionContextUnavailable, KeyUseAuthorizationFailure.AuthorizationNotCompleted ->
-            SigningIdentityFailure.AuthorizationNotCompleted
-        null -> SigningIdentityFailure.NativeOperationFailed
-    }
+
 }
