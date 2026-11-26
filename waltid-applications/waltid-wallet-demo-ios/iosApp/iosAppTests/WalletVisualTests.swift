@@ -60,8 +60,8 @@ final class WalletVisualTests: XCTestCase {
         let checkedAt = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-20T12:00:37Z"))
         let notice = PendingCredentialStatusNotice(credentialID: credential.id, version: "revoked-v1",
             kind: .revoked, checkedAt: checkedAt, historical: false)
-        let other = Credential(id: "queued-credential", format: "jwt_vc_json", issuer: credential.issuer,
-            subject: nil, label: "Access card", addedAt: nil, credentialDataJSON: #"{"given_name":"Ada"}"#)
+        let other = Credential(id: "queued-credential", format: "jwt_vc_json",
+            credentialDataJSON: #"{"given_name":"Ada"}"#, issuer: credential.issuer, label: "Access card")
         let queued = PendingCredentialStatusNotice(credentialID: other.id, version: "suspended-v1",
             kind: .suspended, checkedAt: checkedAt.addingTimeInterval(23), historical: false)
         let model = makeModel()
