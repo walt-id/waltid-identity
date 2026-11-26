@@ -94,8 +94,9 @@ to a pinned anchor:
   is within its validity period, the leaf profile, the request signature and the client id binding. Then
   it asks the evaluator about the full `x5c` chain for `WALLET_PRESENTATION_AUTH_REQUEST`.
   The decision must meet `TrustRequirement.RegistryFresh`: `TRUSTED` for a relying-party entity type,
-  from an accepted, fresh source. An `UNKNOWN` decision fails with `X509TrustSourceUnavailable`, any
-  other denial with `X509TrustAnchorMismatch`.
+  from an accepted, fresh source. An `UNKNOWN` decision fails with `X509TrustSourceUnavailable` (the
+  wallet services answer HTTP 503), any other denial with `X509TrustRegistryRejected`, whose `reason`
+  says which part of the requirement was not met.
   The wallet verifies no certificate signature in the chain. Before answering `TRUSTED`, an evaluator
   must validate the path from the leaf to a certificate listed in an accepted source. The walt.id Trust
   Registry does this with PKIX.

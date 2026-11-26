@@ -711,7 +711,7 @@ object Wallet2RouteHandler {
                             "Resolves the VP request, DCQL-matches credentials from the wallet " +
                                     "stores, signs the presentation(s) and submits to the verifier."
                         request { pathParameter<String>("walletId"); body<PresentCredentialRequest>() }
-                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() }; HttpStatusCode.ServiceUnavailable to { description = Wallet2OpenApiDocs.REQUEST_TRUST_SOURCE_UNAVAILABLE } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialRequest>()
@@ -729,7 +729,7 @@ object Wallet2RouteHandler {
                     post("/isolated", {
                         summary = "Present credential(s) — stateless, inline credentials"
                         request { pathParameter<String>("walletId"); body<PresentCredentialIsolatedRequest>() }
-                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() }; HttpStatusCode.ServiceUnavailable to { description = Wallet2OpenApiDocs.REQUEST_TRUST_SOURCE_UNAVAILABLE } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialIsolatedRequest>()
@@ -747,7 +747,7 @@ object Wallet2RouteHandler {
                     post("/resolve-request", {
                         summary = "Isolated: parse and resolve a VP authorization request"
                         request { pathParameter<String>("walletId"); body<ResolveVpRequestRequest>() }
-                        response { HttpStatusCode.OK to { body<ResolveVpRequestResult>() } }
+                        response { HttpStatusCode.OK to { body<ResolveVpRequestResult>() }; HttpStatusCode.ServiceUnavailable to { description = Wallet2OpenApiDocs.REQUEST_TRUST_SOURCE_UNAVAILABLE } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ResolveVpRequestRequest>()
@@ -787,7 +787,7 @@ object Wallet2RouteHandler {
                     post("/build-vp-token/status-reviewed", {
                         summary = "Build a presentation against the credential status warnings actually reviewed"
                         request { pathParameter<String>("walletId"); body<StatusReviewedBuildVpTokenRequest>() }
-                        response { HttpStatusCode.OK to { body<BuildVpTokenResult>() }; HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() } }
+                        response { HttpStatusCode.OK to { body<BuildVpTokenResult>() }; HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() }; HttpStatusCode.ServiceUnavailable to { description = Wallet2OpenApiDocs.REQUEST_TRUST_SOURCE_UNAVAILABLE } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<StatusReviewedBuildVpTokenRequest>()
@@ -805,7 +805,7 @@ object Wallet2RouteHandler {
                     post("/send-response/status-reviewed", {
                         summary = "Deliver a presentation only if the selected local status warnings are unchanged"
                         request { pathParameter<String>("walletId"); body<StatusReviewedSendResponseRequest>() }
-                        response { HttpStatusCode.OK to { body<WalletPresentResult>() }; HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() } }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() }; HttpStatusCode.Conflict to { body<CredentialStatusReviewChangedResponse>() }; HttpStatusCode.ServiceUnavailable to { description = Wallet2OpenApiDocs.REQUEST_TRUST_SOURCE_UNAVAILABLE } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<StatusReviewedSendResponseRequest>()
@@ -827,7 +827,7 @@ object Wallet2RouteHandler {
                                     "pass the same requestUrl used for /preview. " +
                                     "Pass the result to /send-response to complete the flow."
                         request { pathParameter<String>("walletId"); body<BuildVpTokenRequest>() }
-                        response { HttpStatusCode.OK to { body<BuildVpTokenResult>() } }
+                        response { HttpStatusCode.OK to { body<BuildVpTokenResult>() }; HttpStatusCode.ServiceUnavailable to { description = Wallet2OpenApiDocs.REQUEST_TRUST_SOURCE_UNAVAILABLE } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<BuildVpTokenRequest>()
@@ -849,7 +849,7 @@ object Wallet2RouteHandler {
                                     "response_mode / response_uri / encryption from that freshly resolved request. " +
                                     "Do not echo the preview authorizationRequest."
                         request { pathParameter<String>("walletId"); body<SendAuthorizationResponseRequest>() }
-                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() }; HttpStatusCode.ServiceUnavailable to { description = Wallet2OpenApiDocs.REQUEST_TRUST_SOURCE_UNAVAILABLE } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<SendAuthorizationResponseRequest>()
@@ -884,7 +884,7 @@ object Wallet2RouteHandler {
                             }
                             body<PreviewPresentationRequest>()
                         }
-                        response { HttpStatusCode.OK to { body<PresentationPreviewResponse>() } }
+                        response { HttpStatusCode.OK to { body<PresentationPreviewResponse>() }; HttpStatusCode.ServiceUnavailable to { description = Wallet2OpenApiDocs.REQUEST_TRUST_SOURCE_UNAVAILABLE } }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PreviewPresentationRequest>()
@@ -903,7 +903,7 @@ object Wallet2RouteHandler {
                             "Re-resolves the OpenID4VP request from requestUrl and returns the wallet's error " +
                                     "response to the verifier when a response channel is available. No preview handle."
                         request { pathParameter<String>("walletId"); body<RejectPresentationByRequestUrlRequest>() }
-                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() }; HttpStatusCode.ServiceUnavailable to { description = Wallet2OpenApiDocs.REQUEST_TRUST_SOURCE_UNAVAILABLE } }
                     }) {
                         val req = call.receive<RejectPresentationByRequestUrlRequest>()
                         call.respond(

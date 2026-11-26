@@ -470,6 +470,38 @@ class AuthorizationRequestResolverJvmTest {
     }
 
     @Test
+    fun `without local PKIX only a trust registry enables the x509 client id prefixes`() {
+        val registry = ClientIdX509TrustRegistry(TrustDecisionEvaluator { TrustDecision(TrustDecisionCode.NOT_TRUSTED) })
+        val anchors = InMemoryTrustStore(listOf(X509CertificateUtil.parseCertificatePem(ANCHOR_PEM)))
+
+        assertTrue(ClientIdTrustConfiguration(x509TrustRegistry = registry).supportsX509ClientIdPrefixes(pkixAvailable = false))
+        assertTrue(
+            ClientIdTrustConfiguration(x509TrustAnchors = anchors, x509TrustRegistry = registry)
+                .supportsX509ClientIdPrefixes(pkixAvailable = false)
+        )
+        assertFalse(ClientIdTrustConfiguration(x509TrustAnchors = anchors).supportsX509ClientIdPrefixes(pkixAvailable = false))
+        assertFalse(ClientIdTrustConfiguration().supportsX509ClientIdPrefixes(pkixAvailable = false))
+        assertTrue(ClientIdTrustConfiguration(x509TrustAnchors = anchors).supportsX509ClientIdPrefixes(pkixAvailable = true))
+    }
+
+    @Test
+    fun `an unavailable trust source answers 503 temporarily_unavailable, a rejection 400`() {
+        val unavailable = AuthorizationRequestResolver.SignedAuthorizationRequestValidationException(ClientIdError.X509TrustSourceUnavailable)
+        assertEquals(503, unavailable.status)
+        assertEquals("temporarily_unavailable", unavailable.errorCode)
+
+        val rejected = AuthorizationRequestResolver.SignedAuthorizationRequestValidationException(
+            ClientIdError.X509TrustRegistryRejected("Trust decision is NOT_TRUSTED")
+        )
+        assertEquals(400, rejected.status)
+        assertEquals("invalid_request", rejected.errorCode)
+
+        val invalidClient = AuthorizationRequestResolver.SignedAuthorizationRequestValidationException(ClientIdError.InvalidClient)
+        assertEquals(400, invalidClient.status)
+        assertEquals("invalid_client", invalidClient.errorCode)
+    }
+
+    @Test
     fun `signed-only wallet metadata does not advertise redirect uri`() {
         val metadata = Json.parseToJsonElement(
             AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(

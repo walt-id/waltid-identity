@@ -175,16 +175,25 @@ sealed class ClientIdError(val message: String) {
     data object MissingX509TrustAnchors : ClientIdError("No X.509 trust anchors are configured.")
 
     /**
-     * The presented chain is not trusted: it does not reach a configured anchor, or the trust registry denied it.
-     * Distinct from [MissingX509TrustAnchors], which means the wallet has no trust source.
+     * Anchors are configured, but the presented chain does not reach one of them.
+     * Distinct from [MissingX509TrustAnchors], which means the wallet has none.
      */
     @Serializable
     data object X509TrustAnchorMismatch :
-        ClientIdError("The certificate chain is not trusted by the configured X.509 trust anchors or trust registry.")
+        ClientIdError("The certificate chain does not reach a configured X.509 trust anchor.")
+
+    /**
+     * The trust registry answered, but its decision does not meet
+     * [id.walt.trust.decision.TrustRequirement.RegistryFresh]: [reason] says why, e.g. the decision code, the matched
+     * entity type, or the source's freshness or authenticity.
+     */
+    @Serializable
+    data class X509TrustRegistryRejected(val reason: String) :
+        ClientIdError("The trust registry did not trust the certificate chain: $reason")
 
     /**
      * The trust registry could not be asked or did not answer ([id.walt.trust.model.TrustDecisionCode.UNKNOWN]).
-     * Distinct from [X509TrustAnchorMismatch], which is a denial.
+     * Distinct from [X509TrustRegistryRejected], which is a denial.
      */
     @Serializable
     data object X509TrustSourceUnavailable :
