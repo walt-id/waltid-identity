@@ -27,12 +27,6 @@ private struct WalletStatusBannerModel {
     var key: String { "\(kind):\(message):\(occurrenceId)" }
 }
 
-private enum WalletDeepLinkScheme: String {
-    case credentialOffer = "openid-credential-offer"
-    case presentationRequest = "openid4vp"
-    case authorizationCallback = "openid"
-}
-
 private enum WalletStatusText {
     static let startingWallet = "Starting wallet..."
     static let walletReady = "Wallet ready"
@@ -1036,15 +1030,9 @@ class WalletViewModel: ObservableObject {
 
     func handleDeepLink(_ url: URL) {
         logE2E("Deep link received: \(url.scheme ?? "unknown")")
-        switch (url.scheme?.lowercased()).flatMap(WalletDeepLinkScheme.init(rawValue:)) {
-        case .credentialOffer: openResolvedLink(url, kind: .offer)
-        case .presentationRequest: openResolvedLink(url, kind: .presentation)
-        case .authorizationCallback: continueAuthorization(callbackURI: url)
-        case nil:
-            if WalletLinkKind.classify(url.absoluteString) == .authorizationCallback {
-                continueAuthorization(callbackURI: url)
-            }
-        }
+        let kind = WalletLinkKind.classify(url.absoluteString)
+        if ["http", "https"].contains(url.scheme?.lowercased() ?? ""), kind != .authorizationCallback { return }
+        openResolvedLink(url, kind: kind)
     }
 
     /// Resolved scanner and external links enter the same authenticated task sheet.

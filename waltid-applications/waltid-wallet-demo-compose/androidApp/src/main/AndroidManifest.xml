@@ -84,6 +84,8 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="openid4vp" />
+                <data android:scheme="eu-eaap" />
+                <data android:scheme="haip-vp" />
             </intent-filter>
         </activity>
         <activity

@@ -60,7 +60,7 @@ internal object WalletComposeE2EHelper {
     }
 
     /** Uses the normal setup UI; the operator approves each native signing prompt. */
-    fun launchAndCreateScaIdentity(context: Context, device: UiDevice) {
+    fun launchAndCreateScaIdentity(context: Context, device: UiDevice, timedApproval: Boolean = false) {
         fun choose(text: String) {
             val deadline = SystemClock.uptimeMillis() + UI_ELEMENT_TIMEOUT
             while (SystemClock.uptimeMillis() < deadline) {
@@ -79,20 +79,44 @@ internal object WalletComposeE2EHelper {
             fail("SCA setup choice '$text' did not become available")
         }
         launch(context, signingProtectionMode = "required")
-        println("SCA_OPERATOR: approve wallet biometric opt-in, then key setup and issuance prompts")
+        if (!timedApproval) println("SCA_OPERATOR: approve wallet biometric opt-in, then key setup and issuance prompts")
         unlock(device, initializeSigningIdentity = false)
+        if (timedApproval) continueWithPinOnly(device)
         assertNotNull("Operator-assisted setup did not reach signing-key configuration: ${foregroundWindowSnapshot(device)}",
             waitForResource(device, "wallet.keySetupEdit.Storage", 180_000L))
         clickByTag(device, "wallet.keySetupEdit.Storage")
         choose("Hardware required")
         clickByTag(device, "wallet.keySetupContinue")
         clickByTag(device, "wallet.keySetupEdit.Approval")
-        choose("Current biometrics only")
+        choose(if (timedApproval) "Biometrics with timed approval" else "Current biometrics only")
         clickByTag(device, "wallet.keySetupContinue")
         println("SCA_OPERATOR: approve native key setup prompts")
         clickByTag(device, "wallet.keySetupContinue")
         assertNotNull("App key setup failed: ${foregroundWindowSnapshot(device)}",
             waitForResource(device, "wallet.scanButton", 180_000L))
+    }
+
+    private fun continueWithPinOnly(device: UiDevice) {
+        val optIn = By.pkg("com.android.systemui").text("Enable biometric unlock")
+        val continueWithPin = By.pkg(walletPackage).res("wallet.biometricSetupContinue").enabled(true)
+        val deadline = SystemClock.uptimeMillis() + UI_ELEMENT_TIMEOUT
+        var dismissed = false
+        while (SystemClock.uptimeMillis() < deadline) {
+            try {
+                if (!dismissed && device.hasObject(optIn)) {
+                    dismissed = device.pressBack()
+                }
+                val choice = device.findObject(continueWithPin)
+                if (choice != null) {
+                    (choice.clickableAncestorOrSelf() ?: choice).click()
+                    return
+                }
+            } catch (_: StaleObjectException) {
+                // Cancelling the optional prompt replaces the setup nodes.
+            }
+            Thread.sleep(200)
+        }
+        fail("The optional biometric unlock setup did not offer PIN-only access")
     }
 
     fun receiveThroughApp(device: UiDevice, offerUrl: String) {
@@ -258,6 +282,15 @@ internal object WalletComposeE2EHelper {
         }
     }
 
+    fun tapStoredCard(device: UiDevice, id: String) {
+        val frame = requireNotNull(device.findObject(By.res(id))).visibleBounds
+        val lowerEdge = device.findObjects(By.res(Pattern.compile("wallet\\.credentialCard\\..*")))
+            .filter { it.resourceName != id }.map { it.visibleBounds }
+            .filter { it.top > frame.top && Rect.intersects(it, frame) }.minOfOrNull { it.top } ?: frame.bottom
+        assertTrue("The selected card needs an exposed band", lowerEdge > frame.top)
+        device.click(frame.centerX(), (frame.top + lowerEdge) / 2)
+    }
+
     fun clickByTag(device: UiDevice, tag: String) {
         val initialNode = waitForVisibleResource(device, tag, CLICK_VISIBLE_TIMEOUT)
             ?: findResourceAfterScrolling(device, tag)
@@ -270,10 +303,7 @@ internal object WalletComposeE2EHelper {
             try {
                 // The sheet can replace its accessibility nodes after the first lookup.
                 // Reacquire the visible, enabled hit target instead of retaining a stale node.
-                val node = findVisibleResource(device, tag)
-                val target = node?.let { it.clickableAncestorOrSelf() ?: it }
-                if (node?.isEnabled == true && target?.isEnabled == true && target.isVisibleOn(device)) {
-                    target.click()
+                if (clickVisibleResource(device, tag)) {
                     device.waitForIdle()
                     return
                 }
@@ -283,6 +313,14 @@ internal object WalletComposeE2EHelper {
             Thread.sleep(200)
         }
         fail("$tag did not become visible and enabled.\n${visibleUiSnapshot(device)}")
+    }
+
+    fun clickVisibleResource(device: UiDevice, tag: String): Boolean {
+        val node = findVisibleResource(device, tag)?.takeIf { it.isEnabled } ?: return false
+        val target = node.clickableAncestorOrSelf() ?: node
+        if (!target.isEnabled || !target.isVisibleOn(device)) return false
+        target.click()
+        return true
     }
 
     fun setTextByTag(device: UiDevice, tag: String, value: String) {
@@ -430,7 +468,7 @@ internal object WalletComposeE2EHelper {
         device.findObjects(By.pkg(walletPackage).text(Pattern.compile(texts.joinToString("|") { Pattern.quote(it) })))
             .firstOrNull { it.isVisibleOn(device) }
 
-    private fun findVisibleResource(device: UiDevice, tag: String): UiObject2? =
+    fun findVisibleResource(device: UiDevice, tag: String): UiObject2? =
         device.findObjects(By.pkg(walletPackage).res(tag)).firstOrNull { it.isVisibleOn(device) }
 
     fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {
@@ -457,12 +495,14 @@ internal object WalletComposeE2EHelper {
         device: UiDevice,
         tag: String,
         timeoutMs: Long = UI_ELEMENT_TIMEOUT,
+        onPoll: () -> Unit = {},
     ): UiObject2? {
         val deadline = System.currentTimeMillis() + timeoutMs
         var towardBottom = true
         var stepsInDirection = 0
         while (System.currentTimeMillis() < deadline) {
             try {
+                onPoll()
                 findVisibleResource(device, tag)?.let { return it }
                 if (towardBottom) device.scrollDown() else device.scrollUp()
                 stepsInDirection++
@@ -477,6 +517,9 @@ internal object WalletComposeE2EHelper {
         }
         return null
     }
+
+    fun readClaimTextsAfterScrolling(device: UiDevice, path: String, onPoll: () -> Unit): List<String> =
+        waitForResourceAfterScrolling(device, claimTag(path), onPoll = onPoll)?.visibleTexts().orEmpty()
 
     fun assertResourceVisibleAfterScrolling(
         device: UiDevice,

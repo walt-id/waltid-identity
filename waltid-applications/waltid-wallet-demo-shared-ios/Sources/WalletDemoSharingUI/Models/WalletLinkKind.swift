@@ -13,7 +13,7 @@ public enum WalletLinkKind: Equatable, Sendable {
         guard value.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else { return .unsupported }
         switch scheme {
         case "openid-credential-offer": return .offer
-        case "openid4vp": return .presentation
+        case "openid4vp", "eu-eaap", "haip-vp": return .presentation
         case "openid": return .authorizationCallback
         case "http", "https":
             guard let url = URLComponents(string: value), let host = url.host, !host.isEmpty else { return .unsupported }

@@ -3,6 +3,7 @@ package id.walt.walletdemo.compose.android
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import org.json.JSONObject
 
 /**
@@ -77,10 +78,11 @@ internal object DigitalCredentialCreateAuthHandoff {
     }
 
     fun openExternalBrowser(context: Context, authorizationUrl: String) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authorizationUrl)).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(intent)
+        // A regular browser launch can clear the requesting tab's task, including this
+        // provider. Authorization in a custom tab keeps the original request host alive.
+        val tab = CustomTabsIntent.Builder().build()
+        tab.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        tab.launchUrl(context, Uri.parse(authorizationUrl))
     }
 }
 

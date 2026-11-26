@@ -26,10 +26,19 @@ data class ItbCatalogue(
         val publishedVersion: String? = null,
         val cases: List<Case>,
         val actor: String? = null,
+        val optIn: Boolean = false,
     )
 
     @Serializable
-    data class Case(val id: String, val name: String, val invocationScheme: String? = null) {
+    data class Case(
+        val id: String,
+        val name: String,
+        val invocationScheme: String? = null,
+        val prerequisite: String? = null,
+        val attended: Boolean = false,
+        val demoOnly: Boolean = false,
+        val paymentReview: ItbWalletInteraction.PaymentReview? = null,
+    ) {
         init {
             require(invocationScheme == null || invocationScheme in setOf("openid4vp", "eu-eaap", "haip-vp")) {
                 "Unsupported ITB invocation scheme"
@@ -42,9 +51,12 @@ data class ItbCatalogue(
         require(suites.isNotEmpty()) { "The ITB catalogue must contain suites" }
         require(suites.map { it.id }.distinct().size == suites.size) { "Duplicate ITB suite IDs" }
         suites.forEach { suite ->
-            require(suite.id.isNotBlank() && suite.name.isNotBlank() && suite.statement.isNotBlank() && suite.cases.isNotEmpty()) { "Empty ITB suite" }
+            require(suite.id.isNotBlank() && '/' !in suite.id && suite.name.isNotBlank() &&
+                suite.statement.isNotBlank() && suite.cases.isNotEmpty()) { "Invalid ITB suite" }
             require(suite.actor == null || suite.actor.isNotBlank()) { "Empty ITB actor label" }
-            require(suite.cases.all { it.id.isNotBlank() && it.name.isNotBlank() }) { "Empty ITB case identity" }
+            require(suite.cases.all { it.id.isNotBlank() && '/' !in it.id && it.name.isNotBlank() }) {
+                "Invalid ITB case identity"
+            }
             require(suite.cases.map { it.id }.distinct().size == suite.cases.size) {
                 "Duplicate ITB case IDs in ${suite.id}"
             }

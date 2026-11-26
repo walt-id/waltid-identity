@@ -3473,18 +3473,20 @@ class WalletDemoControllerTest {
 
     @Test
     fun handleDeepLinkRoutesCredentialOffersAndPresentationRequests() = runTest {
-        val controller = controllerWith(FakeDemoWallet(), this)
-        val offerUrl = "openid-credential-offer://example"
-        val presentationUrl = "openid4vp://example"
+        for (scheme in listOf("openid4vp", "eu-eaap", "haip-vp")) {
+            val controller = controllerWith(FakeDemoWallet(), this)
+            val offerUrl = "openid-credential-offer://example"
+            val presentationUrl = "$scheme://example"
 
-        controller.handleDeepLink(offerUrl)
-        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
-        controller.handleDeepLink(presentationUrl)
-        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
-        controller.handleDeepLink("https://example.com/ignored")
+            controller.handleDeepLink(offerUrl)
+            assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+            controller.handleDeepLink(presentationUrl)
+            assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
+            controller.handleDeepLink("https://example.com/ignored")
 
-        assertEquals("", controller.state.value.requestDrafts.offerUrl)
-        assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
+            assertEquals("", controller.state.value.requestDrafts.offerUrl)
+            assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
+        }
     }
 
     @Test
