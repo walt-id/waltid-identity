@@ -5,6 +5,7 @@ import id.walt.policies2.vc.policies.WebhookPolicy
 import id.walt.verifier2.verification2.Verifier2PolicyResults
 import kotlinx.serialization.json.JsonPrimitive
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.SameDeviceFlowSetup
@@ -135,6 +136,27 @@ class SameDeviceFlowTest {
         assertEquals(JsonPrimitive("accepted"), completed.policyResults!!.vcPolicies.single().result)
         assertEquals(JsonPrimitive("accepted"), completed.policyResults!!.specificVcPolicies.getValue("requested").single().result)
         assertEquals(webhook, restored.policyResults!!.vcPolicies.single().policy)
+    }
+
+    @Test
+    fun `public structured failure redacts policy credentials without changing stored evidence`() = runTest {
+        val webhook = WebhookPolicy("https://example.com/policy", "failure-user", "failure-password", "failure-token")
+        val violation = CredentialPolicyResult(webhook, success = false, error = "Denied")
+        val session = VerificationSessionCreator.createVerificationSession(
+            CrossDeviceFlowSetup(GeneralFlowConfig()), clientId = null,
+            urlPrefix = "https://verifier.example/verification-session", urlHost = "openid4vp://authorize",
+        ).apply {
+            status = Verification2Session.VerificationSessionStatus.FAILED
+            failure = SessionFailure.VcPolicyViolations("Policy failed", listOf(violation))
+        }
+        val restored = Json.decodeFromString<Verification2Session>(Json.encodeToString(session))
+        val view = restored.publicView()
+        for (secret in listOf("failure-user", "failure-password", "failure-token")) {
+            assertTrue(secret !in Json.encodeToString(view))
+        }
+        val publicFailure = assertIs<SessionFailure.VcPolicyViolations>(view.failure)
+        assertEquals("Denied", publicFailure.violations.single().error)
+        assertEquals(webhook, assertIs<SessionFailure.VcPolicyViolations>(restored.failure).violations.single().policy)
     }
 
     @Test

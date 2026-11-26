@@ -287,6 +287,12 @@ data class Verification2Session(
                 },
             )
         },
+        failure = when (val failure = failure) {
+            is SessionFailure.VcPolicyViolations -> failure.copy(
+                violations = failure.violations.map { it.copy(policy = it.policy.publicView()) },
+            )
+            else -> failure
+        },
         ephemeralDecryptionKey = null,
         crypto2EphemeralDecryptionKey = null,
         responseCode = null,
