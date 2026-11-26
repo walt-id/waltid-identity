@@ -189,6 +189,7 @@ internal object CredentialConfigurationSerializer : KSerializer<CredentialConfig
             vct = jsonObject.string("vct"),
             credentialSigningAlgValuesSupported = jsonObject["credential_signing_alg_values_supported"]?.let {
                 lenientJson.decodeFromJsonElement(SigningAlgIdSetSerializer, it)
+                    .mapTo(LinkedHashSet()) { alg -> alg.forFormat(format) }
             },
             cryptographicBindingMethodsSupported = jsonObject["cryptographic_binding_methods_supported"]?.let {
                 val serializer = SetSerializer(CryptographicBindingMethod.serializer())
@@ -208,6 +209,14 @@ internal object CredentialConfigurationSerializer : KSerializer<CredentialConfig
 
 private fun JsonObject.string(name: String): String? =
     this[name]?.jsonPrimitive?.contentOrNull
+
+/**
+ * [SigningAlgIdSerializer] reads every string as a JOSE algorithm, because a bare string can't say which kind it is.
+ * The configuration's format can: for `ldp_vc` the strings are Linked Data suite or cryptosuite identifiers
+ * (for example `eddsa-rdfc-2022`), which the `ldp_vc` validation in `init` requires.
+ */
+private fun SigningAlgId.forFormat(format: CredentialFormat): SigningAlgId =
+    if (this is SigningAlgId.Jose && format == CredentialFormat.LDP_VC) SigningAlgId.LdSuite(value) else this
 
 /**
  * Format-specific credential definition metadata.
