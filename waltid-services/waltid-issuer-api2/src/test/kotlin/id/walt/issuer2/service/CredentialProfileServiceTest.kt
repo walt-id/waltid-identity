@@ -5,8 +5,8 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
-import id.walt.openid4vci.mdoc.MdlAge
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.mdoc.issuance.MdlAge
+import id.walt.mdoc.issuance.MsoData
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
 import io.ktor.server.plugins.NotFoundException

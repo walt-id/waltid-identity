@@ -34,7 +34,7 @@ import id.walt.issuer2.testsupport.mdocValidityInfo
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.ValidityInfo
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.mdoc.issuance.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
