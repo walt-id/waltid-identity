@@ -102,5 +102,6 @@ let wallet = try await Wallet(
 <!-- doc-snippet:end swift-combined-persistence -->
 
 Call `try await wallet.deleteLocalData()` on an opened wallet to erase its managed signing keys, database files, sidecars and database key. The active credential and DID stores receive the corresponding removal requests. Close other wallets using the same storage and coordinate app and extension processes before erasure.
+Swift class and actor stores retain their identity across wallet opens. Close other wallets using custom Swift value-type stores before erasure, because the wallet cannot identify storage shared behind those values. Hosts coordinating separate store objects that access the same backing service must also coordinate erasure.
 
 If opening fails, restore the matching key and encrypted database using the host’s recovery mechanism. If the user chooses to discard the wallet, use the host’s reset procedure for its app-group container, Keychain entries and custom stores. An app reinstall can leave Keychain items or shared-container data in place.

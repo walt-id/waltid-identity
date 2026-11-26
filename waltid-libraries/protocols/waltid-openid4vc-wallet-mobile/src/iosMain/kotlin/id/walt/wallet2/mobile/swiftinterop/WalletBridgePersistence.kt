@@ -9,6 +9,7 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
+import id.walt.wallet2.mobile.MobileWalletStoreAdapter
 import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
@@ -89,6 +90,12 @@ public data class WalletBridgeStoredCredential(
     public val addedAt: String? = null,
     public val metadataJson: String? = null,
 )
+
+/** Stable object identifying the host storage behind a Swift credential or DID store adapter. */
+public interface WalletBridgeStoreIdentity {
+    /** Retained by the open wallet for comparing overlapping local erasure requests. */
+    public val storageOwner: Any
+}
 
 /**
  * Swift-facing credential store override.
@@ -196,7 +203,9 @@ private class BridgeDatabaseEncryptionKeyProvider(
 
 private class BridgeCredentialStore(
     private val bridgeStore: WalletBridgeCredentialStore,
-) : WalletCredentialStore {
+) : WalletCredentialStore, MobileWalletStoreAdapter {
+    override val storeOwner: Any = (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwner ?: bridgeStore
+
     override suspend fun getCredential(id: String): StoredCredential? =
         bridgeStore.getCredential(id)?.toStoredCredential()
 
@@ -213,7 +222,9 @@ private class BridgeCredentialStore(
 
 private class BridgeDidStore(
     private val bridgeStore: WalletBridgeDidStore,
-) : WalletDidStore {
+) : WalletDidStore, MobileWalletStoreAdapter {
+    override val storeOwner: Any = (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwner ?: bridgeStore
+
     override suspend fun getDid(did: String): WalletDidEntry? =
         bridgeStore.getDid(did)?.toWalletDidEntry()
 
