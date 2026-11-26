@@ -60,14 +60,14 @@ extension WalletCore.ProximityState {
         case let .preparing(value):
             return .preparing(profile: value.profile.toSwiftProfile())
         case let .engagementReady(value):
-            return .engagementReady(
-                swiftArray(value.engagements, of: WalletCore.ProximityEngagement.self).map {
+            return try .engagementReady(
+                requiredBridgeArray(value.engagements, of: WalletCore.ProximityEngagement.self).map {
                     $0.toSwiftEngagement()
                 }
             )
         case let .connecting(value):
-            return .connecting(
-                swiftArray(value.engagements, of: WalletCore.ProximityEngagement.self).map {
+            return try .connecting(
+                requiredBridgeArray(value.engagements, of: WalletCore.ProximityEngagement.self).map {
                     $0.toSwiftEngagement()
                 }
             )
@@ -78,7 +78,7 @@ extension WalletCore.ProximityState {
         case let .preparationRequired(value):
             return .preparationRequired(try value.plan.toSwiftSharingPlan(), reason: value.reason.toSwiftReason())
         case let .authorizingHolderKey(value):
-            return .authorizingHolderKey(value.authorization.toSwiftAuthorization())
+            return .authorizingHolderKey(try value.authorization.toSwiftAuthorization())
         case let .sendingResponse(value):
             return .sendingResponse(exchange: Int(value.exchange))
         case let .awaitingNextRequest(value):
@@ -102,18 +102,18 @@ extension WalletCore.ProximityReview {
         try ProximityReview(
             reviewID: ProximityReviewID(value: reviewId.value),
             exchange: Int(exchange),
-            documents: try swiftArray(documents, of: WalletCore.ProximityDocumentReview.self).map {
+            documents: try requiredBridgeArray(documents, of: WalletCore.ProximityDocumentReview.self).map {
                 try $0.toSwiftReview()
             },
-            readerAuthentication: swiftArray(
+            readerAuthentication: requiredBridgeArray(
                 readerAuthentication,
                 of: WalletCore.ProximityReaderAuthentication.self
             ).map { try $0.toSwiftAuthentication() },
             readerAuthenticationSummary: readerAuthenticationSummary.toSwiftSummary(),
-            useCases: swiftArray(useCases, of: WalletCore.ProximityUseCase.self).map {
-                $0.toSwiftUseCase()
+            useCases: requiredBridgeArray(useCases, of: WalletCore.ProximityUseCase.self).map {
+                try $0.toSwiftUseCase()
             },
-            applicationAuthorizations: try swiftArray(
+            applicationAuthorizations: try requiredBridgeArray(
                 applicationAuthorizations,
                 of: WalletCore.ProximityApplicationAuthorization.self
             ).map { try $0.toSwiftAuthorization() }
@@ -126,11 +126,11 @@ extension WalletCore.ProximityDocumentReview {
         try ProximityDocumentReview(
             requestIndex: Int(requestIndex),
             documentType: docType,
-            credentialOptions: try swiftArray(
+            credentialOptions: try requiredBridgeArray(
                 credentialOptions,
                 of: WalletCore.ProximityCredentialOption.self
             ).map { try $0.toSwiftOption() },
-            requiredElements: Set(swiftSet(requiredElements, of: WalletCore.ProximityElementReference.self).map {
+            requiredElements: Set(requiredBridgeSet(requiredElements, of: WalletCore.ProximityElementReference.self).map {
                 try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier)
             })
         )
@@ -142,7 +142,7 @@ extension WalletCore.ProximityApplicationDocumentRequest {
         try ProximityApplicationDocumentRequest(
             requestIndex: Int(requestIndex),
             documentType: docType,
-            requestedElements: swiftArray(
+            requestedElements: requiredBridgeArray(
                 requestedElements,
                 of: WalletCore.ProximityRequestedElement.self
             ).map { try $0.toSwiftElement() }
@@ -152,11 +152,11 @@ extension WalletCore.ProximityApplicationDocumentRequest {
 
 internal extension WalletCore.ProximityUnsatisfiedRequest {
     func toSwiftUnsatisfiedRequest() throws -> ProximityUnsatisfiedRequest {
-        try ProximityUnsatisfiedRequest(documents: swiftArray(documents, of: WalletCore.ProximityUnsatisfiedDocument.self).map { document in
+        try ProximityUnsatisfiedRequest(documents: requiredBridgeArray(documents, of: WalletCore.ProximityUnsatisfiedDocument.self).map { document in
             try ProximityUnsatisfiedDocument(
                 requestIndex: Int(document.requestIndex),
                 documentType: document.docType,
-                requestedElements: swiftArray(document.requestedElements, of: WalletCore.ProximityRequestedElement.self)
+                requestedElements: requiredBridgeArray(document.requestedElements, of: WalletCore.ProximityRequestedElement.self)
                     .map { try $0.toSwiftElement() }
             )
         })
@@ -263,11 +263,11 @@ private extension WalletCore.ProximityEngagement {
 }
 
 private extension WalletCore.ProximityHolderAuthorization {
-    func toSwiftAuthorization() -> ProximityHolderAuthorization {
-        ProximityHolderAuthorization(
+    func toSwiftAuthorization() throws -> ProximityHolderAuthorization {
+        try ProximityHolderAuthorization(
             reviewID: ProximityReviewID(value: reviewId.value),
             exchange: Int(exchange),
-            requests: swiftArray(
+            requests: requiredBridgeArray(
                 requests,
                 of: WalletCore.ProximityHolderAuthorizationRequest.self
             ).map { request in
@@ -289,7 +289,7 @@ private extension WalletCore.ProximityCredentialOption {
             issuer: issuer,
             validUntil: validUntil.toDate(),
             deviceAuthentication: deviceAuthentication.toSwiftMethod(),
-            requestedElements: swiftArray(
+            requestedElements: requiredBridgeArray(
                 requestedElements,
                 of: WalletCore.ProximityRequestedElement.self
             ).map { try $0.toSwiftElement() }
@@ -312,7 +312,7 @@ private extension WalletCore.ProximityRequestedElement {
             namespace: namespace,
             elementIdentifier: elementIdentifier,
             intentToRetain: intentToRetain,
-            satisfiesRequestedElements: swiftArray(
+            satisfiesRequestedElements: requiredBridgeArray(
                 satisfiesRequestedElements,
                 of: WalletCore.ProximityElementReference.self
             ).map { try ProximityElementReference(namespace: $0.namespace, elementIdentifier: $0.elementIdentifier) }
@@ -335,14 +335,14 @@ private extension WalletCore.ProximityReaderAuthenticationSummary {
 }
 
 private extension WalletCore.ProximityUseCase {
-    func toSwiftUseCase() -> ProximityUseCase {
-        ProximityUseCase(
+    func toSwiftUseCase() throws -> ProximityUseCase {
+        try ProximityUseCase(
             index: Int(index),
             mandatory: mandatory,
-            documentRequestIndices: swiftArray(documentRequestIndices, of: KotlinInt.self).map {
+            documentRequestIndices: requiredBridgeArray(documentRequestIndices, of: KotlinInt.self).map {
                 Int($0.int32Value)
             },
-            purposeHints: swiftArray(purposeHints, of: WalletCore.ProximityPurposeHint.self).map {
+            purposeHints: requiredBridgeArray(purposeHints, of: WalletCore.ProximityPurposeHint.self).map {
                 ProximityPurposeHint(
                     type: $0.type,
                     code: Int($0.code),
@@ -359,13 +359,13 @@ private extension WalletCore.ProximityApplicationAuthorization {
         return try ProximityApplicationAuthorization(
             profileID: profileId,
             displayTitle: displayTitle,
-            details: swiftArray(
+            details: requiredBridgeArray(
                 details,
                 of: WalletCore.ProximityApplicationAuthorizationDetail.self
             ).map { try ProximityApplicationAuthorizationDetail(id: $0.id, label: $0.label, value: $0.value) },
-            compatibleCredentialIDs: swiftSet(compatibleCredentialIds, of: String.self),
+            compatibleCredentialIDs: requiredBridgeSet(compatibleCredentialIds, of: String.self),
             resultBindingDigest: digest,
-            deviceSignedElements: try swiftArray(
+            deviceSignedElements: try requiredBridgeArray(
                 deviceSignedElements,
                 of: WalletCore.ProximityDeviceSignedElement.self
             ).map {

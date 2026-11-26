@@ -2,25 +2,25 @@ package id.walt.walletdemo.compose.logic
 
 import android.content.Context
 import androidx.fragment.app.FragmentActivity
-import id.walt.wallet2.mobile.AndroidMobileWalletNfcConfiguration
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.wallet2.mobile.identity.MobileWalletKeyAuthorization
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceConfig
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationConfig
+import id.walt.wallet2.mobile.AndroidWalletNfcConfiguration
+import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.WalletConfiguration
+import id.walt.wallet2.mobile.WalletFactory
+import id.walt.wallet2.mobile.identity.WalletKeyAuthorization
+import id.walt.wallet2.mobile.issuance.IssuanceConfiguration
+import id.walt.wallet2.mobile.presentation.PresentationConfiguration
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 
 /**
- * An Android demo [MobileWallet] together with anything the caller must warn the user about.
+ * An Android demo [Wallet] together with anything the caller must warn the user about.
  *
  * @property wallet The configured wallet.
  * @property transactionDataProfilesWarning Set when the accepted transaction data profiles could not
  *   be loaded, in which case the wallet rejects every request carrying `transaction_data`.
  */
 data class AndroidDemoMobileWallet(
-    val wallet: MobileWallet,
+    val wallet: Wallet,
     val transactionDataProfilesWarning: String?,
 ) {
     suspend fun bootstrap(signingProtection: WalletDemoSigningProtection): WalletDemoBootstrapResult {
@@ -39,11 +39,11 @@ data class AndroidDemoMobileWallet(
 }
 
 /**
- * The single Android [MobileWallet] construction for this demo app.
+ * The single Android [Wallet] construction for this demo app.
  *
  * Every Android entry point must go through here, including the Credential Manager provider
  * activity, which the operating system may launch without the wallet's own UI ever having run. A
- * second, independently written [MobileWalletConfig] silently diverges: a different `walletId` opens
+ * second, independently written [WalletConfiguration] silently diverges: a different `walletId` opens
  * a different database and so finds no credentials, and omitted `transactionDataProfiles` reject
  * every request carrying `transaction_data` that the main UI would have accepted.
  */
@@ -54,14 +54,14 @@ suspend fun createAndroidDemoMobileWallet(
 ): AndroidDemoMobileWallet {
     val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
     return AndroidDemoMobileWallet(
-        wallet = MobileWalletFactory(
+        wallet = WalletFactory(
             context = context,
             interactionContextProvider = interactionContextProvider,
-            nfcConfiguration = AndroidMobileWalletNfcConfiguration(DemoMdocHostApduService::class.java),
-        ).create(
-            MobileWalletConfig(
+            nfcConfiguration = AndroidWalletNfcConfiguration(DemoMdocHostApduService::class.java),
+        ).open(
+            WalletConfiguration(
                 walletId = config.walletId,
-                keyAuthorization = MobileWalletKeyAuthorization(
+                keyAuthorization = WalletKeyAuthorization(
                     policy = config.signingProtectionMode.defaultSelection.toKeyUseAuthorizationPolicy(),
                     prompt = KeyUseAuthorizationPrompt(
                         reason = "Authorize wallet signing",
@@ -76,11 +76,11 @@ suspend fun createAndroidDemoMobileWallet(
                     ),
                     alternativeAuthorizations = config.signingProtectionMode.alternativeAuthorizations(),
                 ),
-                issuance = MobileWalletIssuanceConfig(
+                issuance = IssuanceConfiguration(
                     attestation = config.toWalletAttestationConfig(),
                     walletProvider = config.toWalletProviderConfig(),
                 ),
-                presentation = MobileWalletPresentationConfig(
+                presentation = PresentationConfiguration(
                     verifierTrust = DemoClientIdTrust.configuration,
                     transactionDataProfiles = transactionDataProfiles.profiles,
                     paymentCredentialIssuers = config.paymentCredentialIssuers(),

@@ -5,8 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.wallet2.mobile.proximity.ProximityReaderPolicy
-import id.walt.wallet2.mobile.proximity.ProximityReaderTrustImportKind
-import id.walt.wallet2.mobile.proximity.ProximityReaderTrustImportPreview
+import id.walt.wallet2.mobile.proximity.trust.ProximityReaderTrustImportKind
+import id.walt.wallet2.mobile.proximity.trust.ProximityReaderTrustImportPreview
 import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.stringResource

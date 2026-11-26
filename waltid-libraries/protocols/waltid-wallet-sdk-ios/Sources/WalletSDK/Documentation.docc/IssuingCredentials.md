@@ -61,7 +61,7 @@ ui.received(outcome)
 
 Save the session ID during offer review. After reopening the same wallet, call `resumeIssuance(_:)` to redisplay the offer while it is still available.
 
-The browser authorization ID can be saved before opening the browser and restored for `continueAuthorizationIssuance(sessionID:callbackURI:)` after reopening the wallet. Supply the exact callback URI registered with the authorization server.
+The browser authorization ID can be saved before opening the browser and restored for `completeAuthorization(_:callback:)` after reopening the wallet. Supply the exact callback URI registered with the authorization server.
 
 ### Select configurations and copies
 

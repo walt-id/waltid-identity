@@ -94,7 +94,7 @@ public enum CredentialDisplayNormalizer {
         )
     }
 
-    public static func transactionDataGroups(for request: PresentationRequestInfo) -> [ClaimGroup] {
+    public static func transactionDataGroups(for request: PresentationRequest) -> [ClaimGroup] {
         transactionDataGroups(for: request.transactionData)
     }
 

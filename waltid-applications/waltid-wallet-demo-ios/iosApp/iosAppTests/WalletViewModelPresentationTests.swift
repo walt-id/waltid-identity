@@ -184,7 +184,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
         let previewHandle = try! PresentationPreviewHandle(value: "invalid-presentation-preview")
         let previewError = PresentationPreviewError(
             previewHandle: previewHandle,
-            request: PresentationRequestContext(
+            request: PartialPresentationRequest(
                 clientID: "https://verifier.example",
                 requestAuthentication: .unauthenticated,
                 responseEncryption: .notRequired,
@@ -674,9 +674,9 @@ private actor PendingPaymentPreparation {
 }
 
 private actor PendingClaimPreparation {
-    private var pending: [([PresentationCredentialSelection], [PresentationDisclosureSelection], CheckedContinuation<PreparedPresentationReview, Error>)] = []
+    private var pending: [([PresentationCredentialSelection], [PresentationDisclosureSelection], CheckedContinuation<ReviewedPresentationClaims, Error>)] = []
     var count: Int { pending.count }
-    func prepare(_ credentials: [PresentationCredentialSelection], _ disclosures: [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview {
+    func prepare(_ credentials: [PresentationCredentialSelection], _ disclosures: [PresentationDisclosureSelection]) async throws -> ReviewedPresentationClaims {
         try await withCheckedThrowingContinuation { pending.append((credentials, disclosures, $0)) }
     }
     func fail(_ index: Int) { pending[index].2.resume(throwing: WalletError.internalFailure("Projection unavailable")) }

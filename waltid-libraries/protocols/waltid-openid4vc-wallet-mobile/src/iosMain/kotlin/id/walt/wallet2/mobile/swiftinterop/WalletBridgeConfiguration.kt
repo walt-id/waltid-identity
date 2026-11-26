@@ -11,18 +11,18 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.wallet2.consent.PaymentCredentialIssuer
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCrossProcessAccess
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialsConfig
-import id.walt.wallet2.mobile.digitalcredentials.UnavailableMobileWalletCredentialRegistry
-import id.walt.wallet2.mobile.identity.MobileWalletKeyAuthorization
+import id.walt.wallet2.mobile.WalletConfiguration
+import id.walt.wallet2.mobile.digitalcredentials.WalletAppGroupAccess
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialsConfiguration
+import id.walt.wallet2.mobile.digitalcredentials.UnavailableCredentialRegistry
+import id.walt.wallet2.mobile.identity.WalletKeyAuthorization
 import id.walt.wallet2.mobile.identity.SigningIdentityConfiguration
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceConfig
+import id.walt.wallet2.mobile.issuance.IssuanceConfiguration
 import id.walt.wallet2.mobile.issuance.WalletAttestationConfig
 import id.walt.wallet2.mobile.issuance.WalletProviderConfig
 import id.walt.wallet2.mobile.platformPreferredLocales
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationConfig
-import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataProfile
+import id.walt.wallet2.mobile.presentation.PresentationConfiguration
+import id.walt.wallet2.mobile.presentation.TransactionDataProfile
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.MetadataSigner
@@ -58,7 +58,7 @@ public data class WalletBridgeConfiguration(
     /** Optional independently configured receipt authorities encoded by the native façade. */
     public val receiptAuthoritiesJson: String? = null,
     public val preferredLocales: List<String> = platformPreferredLocales(),
-    public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
+    public val transactionDataProfiles: List<TransactionDataProfile> = emptyList(),
     /** Independently configured payment attestation issuer keys. */
     public val paymentCredentialIssuers: List<WalletBridgePaymentCredentialIssuer> = emptyList(),
     public val clientIdTrustConfiguration: WalletBridgeClientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(),
@@ -148,19 +148,19 @@ internal fun WalletBridgeClientIdTrustConfiguration.toClientIdTrustConfiguration
         },
     )
 
-internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
+internal fun WalletBridgeConfiguration.toMobileWalletConfig(): WalletConfiguration {
     require((appGroupIdentifier == null) == (keychainAccessGroup == null)) {
         "App Group and Keychain access group must be configured together"
     }
-    return MobileWalletConfig(
+    return WalletConfiguration(
         walletId = walletId,
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
-        keyAuthorization = MobileWalletKeyAuthorization(
+        keyAuthorization = WalletKeyAuthorization(
             policy = defaultKeyUseAuthorizationPolicy.toCorePolicy(),
             prompt = keyUseAuthorizationPrompt,
         ),
         signingIdentity = signingIdentity,
-        issuance = MobileWalletIssuanceConfig(
+        issuance = IssuanceConfiguration(
             attestation = attestation,
             walletProvider = walletProvider,
             receiptTrust = receiptAuthoritiesJson?.let { CredentialReceiptTrust(Json.decodeFromString<List<CredentialReceiptAuthority>>(it)) },
@@ -170,15 +170,15 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
                 }
             },
         ),
-        presentation = MobileWalletPresentationConfig(
+        presentation = PresentationConfiguration(
             verifierTrust = clientIdTrustConfiguration.toClientIdTrustConfiguration(),
             transactionDataProfiles = transactionDataProfiles,
             paymentCredentialIssuers = paymentCredentialIssuers.map { it.toCore() },
         ),
-        digitalCredentials = MobileWalletDigitalCredentialsConfig(
-            registry = if (registersDigitalCredentials) null else UnavailableMobileWalletCredentialRegistry,
+        digitalCredentials = DigitalCredentialsConfiguration(
+            registry = if (registersDigitalCredentials) null else UnavailableCredentialRegistry,
             crossProcessAccess = appGroupIdentifier?.let { appGroup ->
-                MobileWalletCrossProcessAccess(
+                WalletAppGroupAccess(
                     appGroupIdentifier = appGroup,
                     keychainAccessGroup = requireNotNull(keychainAccessGroup),
                 )

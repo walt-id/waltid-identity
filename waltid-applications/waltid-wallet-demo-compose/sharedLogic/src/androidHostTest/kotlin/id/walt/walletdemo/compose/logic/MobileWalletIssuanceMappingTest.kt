@@ -26,11 +26,11 @@ class MobileWalletIssuanceMappingTest {
             WalletDemoHolderBinding("first", "did:key:first"), WalletDemoHolderBinding("second", "did:key:second"),
         )))).toMobileSelections().single()
         assertEquals("pid", result.credentialConfigurationId)
-        assertEquals(listOf("first", "second"), (result.holders as id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders.Existing).bindings.map { it.keyId })
-        assertEquals(listOf("did:key:first", "did:key:second"), (result.holders as id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders.Existing).bindings.map { it.did })
+        assertEquals(listOf("first", "second"), (result.holders as id.walt.wallet2.mobile.issuance.IssuanceHolders.Existing).bindings.map { it.keyId })
+        assertEquals(listOf("did:key:first", "did:key:second"), (result.holders as id.walt.wallet2.mobile.issuance.IssuanceHolders.Existing).bindings.map { it.did })
         val generated = listOf(WalletDemoCredentialSelection("pid", WalletDemoCredentialHolders.NewKeys(2)))
             .toMobileSelections().single()
-        assertEquals(id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders.NewKeys(2), generated.holders)
+        assertEquals(id.walt.wallet2.mobile.issuance.IssuanceHolders.NewKeys(2), generated.holders)
     }
 
     @Test

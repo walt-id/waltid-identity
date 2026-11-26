@@ -1,8 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
 import id.walt.wallet2.mobile.proximity.ProximityReaderPolicy
-import id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettings
-import id.walt.wallet2.mobile.proximity.ProximityStoredReaderTrustAnchor
+import id.walt.wallet2.mobile.proximity.trust.ProximityReaderTrustSettings
+import id.walt.wallet2.mobile.proximity.trust.ProximityStoredReaderTrustAnchor
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.StandardTestDispatcher

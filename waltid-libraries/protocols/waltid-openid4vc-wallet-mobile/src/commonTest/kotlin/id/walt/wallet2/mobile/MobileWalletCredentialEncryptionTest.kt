@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile
 
 import id.walt.wallet2.mobile.issuance.deferredId
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
+import id.walt.wallet2.mobile.issuance.IssuanceSession
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto2.CryptoRuntime
@@ -20,8 +20,8 @@ import id.walt.openid4vci.requests.credential.encryption.CredentialResponseEncry
 import id.walt.openid4vci.requests.credential.encryption.Crypto2JweCredentialRequestDecryptor
 import id.walt.openid4vci.responses.credential.encryption.Crypto2JweCredentialResponseEncryptor
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.issuance.CredentialOfferInput
+import id.walt.wallet2.mobile.issuance.IssuanceRequest
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore
@@ -52,7 +52,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
- * The Compose demo and iOS demo call [MobileWallet]. This checks that path, not only Wallet API.
+ * The Compose demo and iOS demo call [Wallet]. This checks that path, not only Wallet API.
  */
 class MobileWalletCredentialEncryptionTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -141,7 +141,7 @@ class MobileWalletCredentialEncryptionTest {
             install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         }
         val credentials = InMemoryCredentialStore()
-        val wallet = MobileWallet(
+        val wallet = Wallet(
             walletId = "encrypted-issuance",
             keyStore = InMemoryMobileWalletKeyStore().also { it.addCrypto2Key(holderKey) },
             didStore = InMemoryDidStore().also {
@@ -163,11 +163,11 @@ class MobileWalletCredentialEncryptionTest {
         }.buildString()
 
         val session = wallet.startIssuance(
-            MobileWalletIssuanceRequest(
-                offer = MobileWalletCredentialOffer.Uri(offerUrl),
+            IssuanceRequest(
+                offer = CredentialOfferInput.Uri(offerUrl),
             ),
         )
-        val outcome = assertIs<WalletIssuanceOutcome.Stored>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
+        val outcome = assertIs<WalletIssuanceOutcome.Stored>((session as IssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
         val stored = requireNotNull(credentials.getCredential(outcome.credentialIds.single()))
 
         assertEquals(listOf("application/jwt"), requestTypes)
@@ -259,7 +259,7 @@ class MobileWalletCredentialEncryptionTest {
         }
         val credentials = InMemoryCredentialStore()
         val sessions = InMemoryIssuanceSessionStore()
-        fun wallet() = MobileWallet(
+        fun wallet() = Wallet(
             walletId = "encrypted-deferred",
             keyStore = keys,
             didStore = dids,
@@ -269,11 +269,11 @@ class MobileWalletCredentialEncryptionTest {
         )
         val issuing = wallet()
         val session = issuing.startIssuance(
-            MobileWalletIssuanceRequest(
-                offer = MobileWalletCredentialOffer.Uri(preAuthorizedOffer()),
+            IssuanceRequest(
+                offer = CredentialOfferInput.Uri(preAuthorizedOffer()),
             ),
         )
-        val deferred = assertIs<WalletIssuanceOutcome.Deferred>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
+        val deferred = assertIs<WalletIssuanceOutcome.Deferred>((session as IssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
         kotlinx.coroutines.runBlocking { delay(1_100) }
         val outcome = assertIs<WalletIssuanceOutcome.Stored>(
             wallet().resumeDeferredIssuance(deferred.credentials.single().deferredId),

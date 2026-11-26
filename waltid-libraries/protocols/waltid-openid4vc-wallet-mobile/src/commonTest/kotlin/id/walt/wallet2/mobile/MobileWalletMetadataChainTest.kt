@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile
 
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
+import id.walt.wallet2.mobile.issuance.IssuanceSession
 import id.walt.credentials.CredentialParser
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
@@ -15,16 +15,16 @@ import id.walt.sdjwt.metadata.type.TypeMetadataResolver
 import id.walt.sdjwt.metadata.type.validateForIssuance
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistrationResult
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialCapabilities
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequest
-import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistrationResult
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntry
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialCapabilities
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialRequest
+import id.walt.wallet2.mobile.issuance.CredentialOfferInput
+import id.walt.wallet2.mobile.issuance.IssuanceRequest
+import id.walt.wallet2.mobile.presentation.PresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.PresentationSelection
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import io.ktor.client.HttpClient
@@ -83,25 +83,25 @@ class MobileWalletMetadataChainTest {
             }
             respond(body, headers = headersOf(HttpHeaders.ContentType, "application/json"))
         }) { install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) } }
-        var publishedRecords = emptyList<MobileWalletCredentialRegistryRecord>()
-        val registry = object : MobileWalletCredentialRegistry {
-            override val capabilities = MobileWalletDigitalCredentialCapabilities("test", true, "test", true, emptyList())
-            override suspend fun replace(registryId: String, records: List<MobileWalletCredentialRegistryRecord>): MobileWalletCredentialRegistrationResult {
+        var publishedRecords = emptyList<RegistryEntry>()
+        val registry = object : CredentialRegistry {
+            override val capabilities = DigitalCredentialCapabilities("test", true, "test", true, emptyList())
+            override suspend fun replace(registryId: String, records: List<RegistryEntry>): CredentialRegistrationResult {
                 publishedRecords = records.toList()
-                return MobileWalletCredentialRegistrationResult.Applied(records.map { it.credentialId }.distinct().size)
+                return CredentialRegistrationResult.Applied(records.map { it.credentialId }.distinct().size)
             }
         }
-        fun wallet(store: InMemoryCredentialStore) = MobileWallet(
+        fun wallet(store: InMemoryCredentialStore) = Wallet(
             "chain-journey", keys, InMemoryDidStore(), store, issuanceHttpClient = client, credentialRegistry = registry,
         )
         try {
             val store = InMemoryCredentialStore()
             val first = wallet(store)
-            val session = first.startIssuance(MobileWalletIssuanceRequest(
-                offer = MobileWalletCredentialOffer.InlineJson("""{"credential_issuer":"https://issuer.example","credential_configuration_ids":["identity"],"grants":{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"synthetic"}}}"""),
+            val session = first.startIssuance(IssuanceRequest(
+                offer = CredentialOfferInput.InlineJson("""{"credential_issuer":"https://issuer.example","credential_configuration_ids":["identity"],"grants":{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"synthetic"}}}"""),
                 keyId = "holder",
             ))
-            assertIs<WalletIssuanceOutcome.Stored>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
+            assertIs<WalletIssuanceOutcome.Stored>((session as IssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
             assertEquals(3, metadataRequests, "Metadata requests: $requested")
             // A signed legacy neighbour with a malformed reference must not suppress healthy
             // platform registration or the later presentation preview after reopening the store.
@@ -128,20 +128,20 @@ class MobileWalletMetadataChainTest {
             assertTrue(publishedRecords.flatMap { it.fields }.none { it.path == listOf("vct#integrity") },
                 "The type metadata pin is protocol data, not a matchable user claim")
             val request = """{"response_type":"vp_token","response_mode":"dc_api","nonce":"chain-nonce","dcql_query":{"credentials":[{"id":"account","format":"dc+sd-jwt","meta":{"vct_values":["$parent"]}}]}}"""
-            val preview = reopened.previewDigitalCredentialPresentation(MobileWalletDigitalCredentialRequest(
-                MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, request, "https://verifier.example",
+            val preview = reopened.previewDigitalCredentialPresentation(DigitalCredentialRequest(
+                DigitalCredentialProtocols.OPENID4VP_UNSIGNED, request, "https://verifier.example",
             ))
             val selected = preview.credentialOptions.single()
-            val selections = listOf(MobileWalletPresentationCredentialSelection(selected.queryId, selected.credentialId))
+            val selections = listOf(PresentationCredentialSelection(selected.queryId, selected.credential.id))
             val review = reopened.reviewDigitalCredentialPresentation(
                 preview.requestId,
-                MobileWalletPresentationSelection(credentials = selections),
+                PresentationSelection(credentials = selections),
             )
             val reviewed = review.credentials.single()
-            assertEquals(selected.credentialId, reviewed.credentialId)
+            assertEquals(selected.credential.id, reviewed.credentialId)
             val response = reopened.submitDigitalCredentialPresentation(
                 preview.requestId,
-                MobileWalletPresentationSelection(credentials = selections),
+                PresentationSelection(credentials = selections),
             )
             val presentation = Json.parseToJsonElement(response.dataJson).jsonObject.getValue("vp_token")
                 .jsonObject.getValue("account").jsonArray.single().jsonPrimitive.content

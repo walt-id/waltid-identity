@@ -8,9 +8,9 @@ import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
-import id.walt.wallet2.mobile.digitalcredentials.UnavailableMobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.UnavailableCredentialRegistry
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletRegistryProjection
 import id.walt.wallet2.mobile.identity.MobileDidSupport
 import id.walt.wallet2.mobile.identity.SigningIdentityManager
@@ -33,7 +33,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 internal suspend fun createEncryptedSqlDelightMobileWallet(
-    config: MobileWalletConfig,
+    config: WalletConfiguration,
     managedDatabaseKeyProvider: DatabaseEncryptionKeyProvider,
     platformKeyProvider: PlatformManagedKeyProvider,
     proximityTransportFactory: BleProximityTransportFactory,
@@ -46,28 +46,28 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         walletId: String,
     ) -> SqlDriver,
     deleteDatabase: (databaseName: String) -> Unit,
-    registry: MobileWalletCredentialRegistry = config.digitalCredentials.registry ?: UnavailableMobileWalletCredentialRegistry,
+    registry: CredentialRegistry = config.digitalCredentials.registry ?: UnavailableCredentialRegistry,
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
     databaseLocation: String = "wallet_${config.walletId}",
     keyNamespace: String = config.walletId,
-): MobileWallet {
+): Wallet {
     // Resolver state belongs to this process, including when all wallet keys already exist.
     MobileDidSupport.ensureInitialized()
     val databaseName = "wallet_${config.walletId}"
     val databaseKeyProvider = when (val databaseKey = config.persistence.databaseKey) {
-        is MobileWalletDatabaseKey.Managed -> managedDatabaseKeyProvider
-        is MobileWalletDatabaseKey.Provided -> databaseKey.provider
+        is WalletDatabaseKey.Managed -> managedDatabaseKeyProvider
+        is WalletDatabaseKey.Provided -> databaseKey.provider
     }
     val lease = MobileWalletStorageLease(databaseLocation, keyNamespace,
         listOfNotNull(config.persistence.credentialStore, config.persistence.didStore))
-    suspend fun open(owner: MobileWalletStorageLease?): MobileWallet {
+    suspend fun open(owner: MobileWalletStorageLease?): Wallet {
         val encryptionKey = databaseKeyProvider.getOrCreateKey(config.walletId, databaseName)
         // An app-provided key source may complete normally after its caller has cancelled.
         currentCoroutineContext().ensureActive()
         val driver = openEncryptedDriver(
             databaseName,
             encryptionKey,
-            config.persistence.databaseKey is MobileWalletDatabaseKey.Managed,
+            config.persistence.databaseKey is WalletDatabaseKey.Managed,
             config.walletId,
         )
         return try {
@@ -102,7 +102,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
 }
 
 internal fun createSqlDelightMobileWallet(
-    config: MobileWalletConfig,
+    config: WalletConfiguration,
     db: WalletPersistenceDatabase,
     keyProvider: PlatformManagedKeyProvider,
     proximityTransportFactory: BleProximityTransportFactory? = null,
@@ -111,9 +111,9 @@ internal fun createSqlDelightMobileWallet(
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
     persistenceOwner: MobileWalletPersistenceOwner? = null,
-    registry: MobileWalletCredentialRegistry = config.digitalCredentials.registry ?: UnavailableMobileWalletCredentialRegistry,
+    registry: CredentialRegistry = config.digitalCredentials.registry ?: UnavailableCredentialRegistry,
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
-): MobileWallet {
+): Wallet {
     val queries = db.walletPersistenceQueries
     val keyStore = SqlDelightKeyStore(keyProvider, queries, config.walletId)
     val credentialStore = config.persistence.credentialStore ?: SqlDelightCredentialStore(queries)
@@ -124,7 +124,7 @@ internal fun createSqlDelightMobileWallet(
         }
     } ?: SqlDelightDidStore(queries, config.walletId)
     val issuanceSessionStore = SqlDelightIssuanceSessionStore(queries)
-    return MobileWallet(
+    return Wallet(
         scaAuthorizer = NativeScaPresentationAuthorizer(keyProvider),
         walletId = config.walletId,
         createSigningIdentityManager = { lifecycle, onActive ->
@@ -178,6 +178,6 @@ internal fun createSqlDelightMobileWallet(
 /** Resources allocated by the platform factory. A closed wallet reopens storage only for explicit erasure. */
 internal class MobileWalletPersistenceOwner(
     val close: () -> Unit,
-    val openForDeletion: suspend () -> MobileWallet,
+    val openForDeletion: suspend () -> Wallet,
     val storageLease: MobileWalletStorageLease? = null,
 )

@@ -5,15 +5,16 @@ import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentProjectionRe
 import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentProjectionState
 import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistrationStatus
 import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistry
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryField
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.RegistryField
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntry
 import id.walt.wallet2.mobile.digitalcredentials.RegistryEntryDisplay
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistrationResult
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.coroutines.cancel
@@ -48,17 +49,17 @@ class IosIdentityDocumentRegistryTest {
         assertEquals(
             capabilities.platformAvailable,
             capabilities.capabilities.single {
-                it.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C
+                it.protocol == DigitalCredentialProtocols.ISO_MDOC_ANNEX_C
             }.supported,
         )
         assertEquals(
             setOf(
-                MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
-                MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
-                MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
+                DigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+                DigitalCredentialProtocols.OPENID4VP_SIGNED,
+                DigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
             ),
             capabilities.capabilities
-                .filter { it.protocol != MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C }
+                .filter { it.protocol != DigitalCredentialProtocols.ISO_MDOC_ANNEX_C }
                 .filterNot { it.supported }
                 .mapTo(mutableSetOf()) { it.protocol },
         )
@@ -89,7 +90,7 @@ class IosIdentityDocumentRegistryTest {
             assertTrue(registry.capabilities.registrationAvailable)
             assertTrue(
                 registry.capabilities.capabilities.single {
-                    it.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C
+                    it.protocol == DigitalCredentialProtocols.ISO_MDOC_ANNEX_C
                 }.supported,
             )
         } finally {
@@ -104,8 +105,8 @@ class IosIdentityDocumentRegistryTest {
             val result = registry(suite).replace(
                 "registry-1",
                 listOf(
-                    registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL),
-                    registryRecord("dc-b", "cred-b", MobileWalletDigitalCredentialFormat.MDOC, MDL),
+                    registryRecord("dc-a", "cred-a", DigitalCredentialFormat.MDOC, MDL),
+                    registryRecord("dc-b", "cred-b", DigitalCredentialFormat.MDOC, MDL),
                 ),
             )
 
@@ -128,7 +129,7 @@ class IosIdentityDocumentRegistryTest {
             // a host started with a non-default wallet id presentable is this field.
             registry(suite, walletId = "test-123").replace(
                 "registry-1",
-                listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
+                listOf(registryRecord("dc-a", "cred-a", DigitalCredentialFormat.MDOC, MDL)),
             )
 
             assertEquals("test-123", published(suite).walletId)
@@ -141,8 +142,8 @@ class IosIdentityDocumentRegistryTest {
             registry(suite).replace(
                 "registry-1",
                 listOf(
-                    registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL),
-                    registryRecord("dc-b", "cred-b", MobileWalletDigitalCredentialFormat.SD_JWT_VC, "urn:eudi:pid:1"),
+                    registryRecord("dc-a", "cred-a", DigitalCredentialFormat.MDOC, MDL),
+                    registryRecord("dc-b", "cred-b", DigitalCredentialFormat.SD_JWT_VC, "urn:eudi:pid:1"),
                 ),
             )
 
@@ -157,7 +158,7 @@ class IosIdentityDocumentRegistryTest {
     fun refreshingAnUnchangedWalletKeepsTheSameDocumentIdentifiers() = runTest {
         withSuite { suite ->
             val registry = registry(suite)
-            val records = listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL))
+            val records = listOf(registryRecord("dc-a", "cred-a", DigitalCredentialFormat.MDOC, MDL))
 
             registry.replace("registry-1", records)
             val first = published(suite).registrations
@@ -174,14 +175,14 @@ class IosIdentityDocumentRegistryTest {
             registry.replace(
                 "registry-1",
                 listOf(
-                    registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL),
-                    registryRecord("dc-b", "cred-b", MobileWalletDigitalCredentialFormat.MDOC, PID),
+                    registryRecord("dc-a", "cred-a", DigitalCredentialFormat.MDOC, MDL),
+                    registryRecord("dc-b", "cred-b", DigitalCredentialFormat.MDOC, PID),
                 ),
             )
 
             registry.replace(
                 "registry-1",
-                listOf(registryRecord("dc-b", "cred-b", MobileWalletDigitalCredentialFormat.MDOC, PID)),
+                listOf(registryRecord("dc-b", "cred-b", DigitalCredentialFormat.MDOC, PID)),
             )
 
             assertContentEquals(
@@ -198,11 +199,13 @@ class IosIdentityDocumentRegistryTest {
 
             val result = registry(suite).replace(
                 "registry-1",
-                listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
+                listOf(registryRecord("dc-a", "cred-a", DigitalCredentialFormat.MDOC, MDL)),
             )
 
-            assertFalse(result.available)
-            assertEquals("IdentityDocumentServices registration is not authorized", result.reason)
+            val staged = assertIs<CredentialRegistrationResult.ProjectionSaved>(result)
+            assertEquals(1, staged.entryCount)
+            assertFalse(staged.available)
+            assertEquals("IdentityDocumentServices registration is not authorized", staged.reason)
             assertContentEquals(
                 listOf(IosIdentityDocumentProjectionRecord("dc-a", MDL)),
                 published(suite).registrations,
@@ -217,7 +220,7 @@ class IosIdentityDocumentRegistryTest {
             val registry = registry(suite)
             registry.replace(
                 "registry-1",
-                listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
+                listOf(registryRecord("dc-a", "cred-a", DigitalCredentialFormat.MDOC, MDL)),
             )
 
             report(suite, IosIdentityDocumentRegistrationStatus.AUTHORIZED)
@@ -236,7 +239,7 @@ class IosIdentityDocumentRegistryTest {
             val registry = registry(suite)
             registry.replace(
                 "registry-1",
-                listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
+                listOf(registryRecord("dc-a", "cred-a", DigitalCredentialFormat.MDOC, MDL)),
             )
 
             val result = registry.replace("registry-1", emptyList())
@@ -256,11 +259,11 @@ class IosIdentityDocumentRegistryTest {
             // can only serve the one wallet the projection names.
             registry(suite, walletId = "wallet-a").replace(
                 "registry-a",
-                listOf(registryRecord("dc-a", "cred-a", MobileWalletDigitalCredentialFormat.MDOC, MDL)),
+                listOf(registryRecord("dc-a", "cred-a", DigitalCredentialFormat.MDOC, MDL)),
             )
             registry(suite, walletId = "wallet-b").replace(
                 "registry-b",
-                listOf(registryRecord("dc-b", "cred-b", MobileWalletDigitalCredentialFormat.MDOC, PID)),
+                listOf(registryRecord("dc-b", "cred-b", DigitalCredentialFormat.MDOC, PID)),
             )
 
             val state = published(suite)
@@ -321,13 +324,13 @@ class IosIdentityDocumentRegistryTest {
             registry(suite).replace(
                 "registry-1",
                 listOf(
-                    MobileWalletCredentialRegistryRecord(
+                    RegistryEntry(
                         registryEntryId = "dc-a",
                         credentialId = "cred-a",
-                        format = MobileWalletDigitalCredentialFormat.MDOC,
+                        format = DigitalCredentialFormat.MDOC,
                         type = MDL,
                         fields = listOf(
-                            MobileWalletCredentialRegistryField(
+                            RegistryField(
                                 path = listOf("org.iso.18013.5.1", "family_name"),
                                 valueJson = "\"Mustermann\"",
                                 selectivelyDisclosable = true,
@@ -368,9 +371,9 @@ class IosIdentityDocumentRegistryTest {
     private fun registryRecord(
         registryEntryId: String,
         credentialId: String,
-        format: MobileWalletDigitalCredentialFormat,
+        format: DigitalCredentialFormat,
         type: String,
-    ) = MobileWalletCredentialRegistryRecord(
+    ) = RegistryEntry(
         registryEntryId = registryEntryId,
         credentialId = credentialId,
         format = format,

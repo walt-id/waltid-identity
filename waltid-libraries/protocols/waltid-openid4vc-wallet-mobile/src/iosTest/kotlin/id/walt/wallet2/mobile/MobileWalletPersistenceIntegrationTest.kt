@@ -5,14 +5,14 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
-import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
+import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.WalletPersistence
 import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistry
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistrationResult
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialsConfig
-import id.walt.wallet2.mobile.digitalcredentials.UnavailableMobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistrationResult
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntry
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialsConfiguration
+import id.walt.wallet2.mobile.digitalcredentials.UnavailableCredentialRegistry
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import kotlin.test.Test
@@ -39,7 +39,7 @@ class MobileWalletPersistenceIntegrationTest {
         })
         for (registry in listOf(
             null,
-            UnavailableMobileWalletCredentialRegistry,
+            UnavailableCredentialRegistry,
             IosIdentityDocumentRegistry(appGroupIdentifier = null, walletId = "explicit-registry-wallet"),
         )) {
             val credentials = listOf(
@@ -59,28 +59,28 @@ class MobileWalletPersistenceIntegrationTest {
                     metadata = unreadableData,
                 ),
             )
-            val wallet = MobileWalletFactory().create(registryConfig(registry, credentials))
+            val wallet = WalletFactory().open(registryConfig(registry, credentials))
             try {
-                val expected = if (registry === UnavailableMobileWalletCredentialRegistry) "Digital credential registration is unavailable" else "An App Group is required"
+                val expected = if (registry === UnavailableCredentialRegistry) "Digital credential registration is unavailable" else "An App Group is required"
                 assertEquals(expected, wallet.refreshDigitalCredentialRegistration().reason)
             } finally {
-                wallet.deleteWallet()
+                wallet.deleteLocalData()
             }
         }
     }
 
     @Test
     fun customIosRegistryStillReceivesFullMdocAndSdJwtRecords() = runTest {
-        val published = mutableListOf<MobileWalletCredentialRegistryRecord>()
-        val registry = object : MobileWalletCredentialRegistry {
-            override val capabilities = UnavailableMobileWalletCredentialRegistry.capabilities
+        val published = mutableListOf<RegistryEntry>()
+        val registry = object : CredentialRegistry {
+            override val capabilities = UnavailableCredentialRegistry.capabilities
             override suspend fun replace(
                 registryId: String,
-                records: List<MobileWalletCredentialRegistryRecord>,
-            ): MobileWalletCredentialRegistrationResult {
+                records: List<RegistryEntry>,
+            ): CredentialRegistrationResult {
                 published.clear()
                 published.addAll(records)
-                return MobileWalletCredentialRegistrationResult.Applied(records.size)
+                return CredentialRegistrationResult.Applied(records.size)
             }
         }
         val credentials = listOf(
@@ -108,13 +108,13 @@ class MobileWalletPersistenceIntegrationTest {
                 ),
             ),
         )
-        val wallet = MobileWalletFactory().create(registryConfig(registry, credentials))
+        val wallet = WalletFactory().open(registryConfig(registry, credentials))
         try {
             assertEquals(2, wallet.refreshDigitalCredentialRegistration().entryCount)
             assertEquals(setOf("mdl-1", "pid-1"), published.map { it.credentialId }.toSet())
             assertTrue(published.all { it.fields.single().valueJson == "\"Ada\"" && it.display.name.isNotBlank() })
         } finally {
-            wallet.deleteWallet()
+            wallet.deleteLocalData()
         }
         assertTrue(published.isEmpty(), "Deleting the wallet must publish an authoritative empty registry")
     }
@@ -129,22 +129,22 @@ class MobileWalletPersistenceIntegrationTest {
                 material = ByteArray(32) { index -> (index + 5).toByte() },
             )
         )
-        val factory = MobileWalletFactory()
-        val config = MobileWalletConfig(
+        val factory = WalletFactory()
+        val config = WalletConfiguration(
             walletId = walletId,
-            persistence = MobileWalletPersistence(
-                databaseKey = MobileWalletDatabaseKey.Provided(provider),
+            persistence = WalletPersistence(
+                databaseKey = WalletDatabaseKey.Provided(provider),
             ),
         )
 
-        val wallet = factory.create(config)
+        val wallet = factory.open(config)
         assertEquals(emptyList(), wallet.credentials())
 
         wallet.close()
-        val reopenedWallet = factory.create(config)
+        val reopenedWallet = factory.open(config)
         assertEquals(emptyList(), reopenedWallet.credentials())
         assertEquals(listOf("$walletId:$databaseName", "$walletId:$databaseName"), provider.requestedKeys)
-        reopenedWallet.deleteWallet()
+        reopenedWallet.deleteLocalData()
         assertEquals(listOf("$walletId:$databaseName"), provider.deletedKeys)
     }
 
@@ -159,38 +159,38 @@ class MobileWalletPersistenceIntegrationTest {
                 material = ByteArray(32) { index -> (index + 7).toByte() },
             )
         )
-        val factory = MobileWalletFactory()
-        val config = MobileWalletConfig(
+        val factory = WalletFactory()
+        val config = WalletConfiguration(
             walletId = walletId,
-            persistence = MobileWalletPersistence(
-                databaseKey = MobileWalletDatabaseKey.Provided(databaseKeyProvider),
+            persistence = WalletPersistence(
+                databaseKey = WalletDatabaseKey.Provided(databaseKeyProvider),
                 credentialStore = credentialStore,
             ),
         )
 
         // Kotlin/Native iOS test hosts can report Keychain as unavailable. App-hosted
         // Swift integration tests cover managed Keychain persistence with this store shape.
-        val wallet = factory.create(config)
+        val wallet = factory.open(config)
         assertEquals(emptyList(), wallet.credentials())
         assertEquals(listOf("$walletId:$databaseName"), databaseKeyProvider.requestedKeys)
         assertEquals(1, credentialStore.listCredentialsCalls)
 
-        wallet.deleteWallet()
+        wallet.deleteLocalData()
         assertEquals(listOf("$walletId:$databaseName"), databaseKeyProvider.deletedKeys)
     }
 
     private fun registryConfig(
-        registry: MobileWalletCredentialRegistry?,
+        registry: CredentialRegistry?,
         credentials: List<StoredCredential>,
-    ): MobileWalletConfig = MobileWalletConfig(
+    ): WalletConfiguration = WalletConfiguration(
         walletId = "ios-registry-projection-${Uuid.random()}",
-        persistence = MobileWalletPersistence(
-            databaseKey = MobileWalletDatabaseKey.Provided(
+        persistence = WalletPersistence(
+            databaseKey = WalletDatabaseKey.Provided(
                 RecordingDatabaseKeyProvider(DatabaseEncryptionKey("provided-key", ByteArray(32) { 11 })),
             ),
             credentialStore = RecordingCredentialStore(credentials),
         ),
-        digitalCredentials = MobileWalletDigitalCredentialsConfig(registry = registry),
+        digitalCredentials = DigitalCredentialsConfiguration(registry = registry),
     )
 
     private class RecordingDatabaseKeyProvider(

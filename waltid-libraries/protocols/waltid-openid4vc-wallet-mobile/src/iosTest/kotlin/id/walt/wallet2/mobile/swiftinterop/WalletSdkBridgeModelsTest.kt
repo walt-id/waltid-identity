@@ -29,7 +29,7 @@ class WalletSdkBridgeModelsTest {
         val error = WalletBridgeError.fromThrowable(failure)
         assertEquals(WalletBridgeErrorCategory.presentationValidation, error.category)
         val details = requireNotNull(error.presentationValidationFailure)
-        assertEquals(id.walt.wallet2.mobile.presentation.MobileWalletPresentationErrorCode.invalidRequest, details.errorCode)
+        assertEquals(id.walt.wallet2.mobile.presentation.PresentationErrorCode.invalidRequest, details.errorCode)
         assertEquals(requestError.message, details.message)
         assertEquals("Unbound response destination", details.responseSafetyFailure)
         assertEquals(failure.message, error.message)

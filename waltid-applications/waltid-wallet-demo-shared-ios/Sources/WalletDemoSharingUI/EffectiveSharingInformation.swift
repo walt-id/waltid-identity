@@ -60,7 +60,7 @@ struct EffectiveClaimContribution: Equatable, Identifiable {
 public struct EffectivePresentationReview: Equatable {
     let contributions: [EffectiveClaimContribution]
 
-    public init(prepared: PreparedPresentationReview, model: SharingReviewModel,
+    public init(prepared: ReviewedPresentationClaims, model: SharingReviewModel,
                 selection: SharingSelection,
                 preferredLocales: [String] = Locale.preferredLanguages) throws {
         guard prepared.credentials.count == selection.credentials.count,

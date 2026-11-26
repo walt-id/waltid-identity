@@ -2,8 +2,8 @@ package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.credentials.status.CredentialStatus
 import id.walt.credentials.status.CredentialStatusPresentationData
-import id.walt.wallet2.mobile.credentials.MobileWalletCredential
-import id.walt.wallet2.mobile.credentials.MobileWalletCredentialRead
+import id.walt.wallet2.mobile.credentials.WalletCredential
+import id.walt.wallet2.mobile.credentials.CredentialWithStatus
 import id.walt.wallet2.status.WalletCredentialStatusSnapshot
 import id.walt.wallet2.status.toResponse
 import kotlinx.serialization.SerialName
@@ -16,7 +16,7 @@ import kotlinx.serialization.json.jsonObject
 /** A typed credential plus the shared semantic status representation for the native facade. */
 public data class WalletBridgeCredentialRead(
     /** Existing credential/display data, independent of status updates. */
-    public val credential: MobileWalletCredential,
+    public val credential: WalletCredential,
     /** Typed shared status JSON consumed by the native facade. */
     public val statusJson: String,
 )
@@ -37,7 +37,7 @@ public sealed interface WalletBridgeCredentialStatusUpdate {
 
 internal val credentialStatusJson: Json = Json { encodeDefaults = true }
 
-internal fun MobileWalletCredentialRead.toStatusBridgeRead(): WalletBridgeCredentialRead = WalletBridgeCredentialRead(
+internal fun CredentialWithStatus.toStatusBridgeRead(): WalletBridgeCredentialRead = WalletBridgeCredentialRead(
     credential, credentialStatusJson.encodeToString(CredentialStatusPayload.serializer(),
         CredentialStatusPayload(status, presentation.toData(), evaluatedAt.toString())),
 )

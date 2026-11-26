@@ -55,7 +55,7 @@ public data class AndroidDigitalCredentialCreateRequest(
  * acknowledgements currently send an empty object.
  */
 public data class AndroidDigitalCredentialCreateResponse(
-    public val protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+    public val protocol: String = DigitalCredentialProtocols.OPENID4VCI_V1,
     public val dataJson: String = "{}",
 ) {
     /** Factory for the empty OpenID4VCI create acknowledgement. */
@@ -67,7 +67,7 @@ public data class AndroidDigitalCredentialCreateResponse(
          * @param protocol Digital Credentials protocol identifier echoed in the create response.
          */
         public fun acknowledgment(
-            protocol: String = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+            protocol: String = DigitalCredentialProtocols.OPENID4VCI_V1,
         ): AndroidDigitalCredentialCreateResponse =
             AndroidDigitalCredentialCreateResponse(protocol = protocol, dataJson = "{}")
     }

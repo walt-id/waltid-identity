@@ -1,13 +1,13 @@
 package id.walt.walletdemo.compose.logic
 
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCrossProcessAccess
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialsConfig
-import id.walt.wallet2.mobile.identity.MobileWalletKeyAuthorization
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceConfig
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationConfig
+import id.walt.wallet2.mobile.WalletConfiguration
+import id.walt.wallet2.mobile.WalletFactory
+import id.walt.wallet2.mobile.digitalcredentials.WalletAppGroupAccess
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialsConfiguration
+import id.walt.wallet2.mobile.identity.WalletKeyAuthorization
+import id.walt.wallet2.mobile.issuance.IssuanceConfiguration
+import id.walt.wallet2.mobile.presentation.PresentationConfiguration
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 
@@ -22,11 +22,11 @@ import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
  * CardSession outside Kotlin limits common code to protocol state and APDU routing.
  * @param onDigitalCredentialRegistryChanged Called after the wallet re-published its desired Apple
  * registration state. Writing Apple's registration store needs `IdentityDocumentServices`, which only
- * the Swift host may call, so the host reconciles here; see [MobileWalletConfig].
+ * the Swift host may call, so the host reconciles here; see [WalletConfiguration].
  */
 fun createIosDemoWallet(
     config: DemoWalletConfig = DemoWalletConfig(),
-    crossProcessAccess: MobileWalletCrossProcessAccess,
+    crossProcessAccess: WalletAppGroupAccess,
     nfcHostPlatformAdapter: NfcHostPlatformAdapter,
     onDigitalCredentialRegistryChanged: suspend () -> Unit,
 ): ProximityDemoWallet {
@@ -34,10 +34,10 @@ fun createIosDemoWallet(
     return LazyProximityDemoWallet {
         val transactionDataProfiles = config.resolveDemoTransactionDataProfiles()
         MobileDemoWallet(
-            MobileWalletFactory(nfcHostPlatformAdapter).create(
-                MobileWalletConfig(
+            WalletFactory(nfcHostPlatformAdapter).open(
+                WalletConfiguration(
                     walletId = config.walletId,
-                    keyAuthorization = MobileWalletKeyAuthorization(
+                    keyAuthorization = WalletKeyAuthorization(
                         policy = config.signingProtectionMode.defaultSelection.toKeyUseAuthorizationPolicy(),
                         prompt = KeyUseAuthorizationPrompt(
                             reason = "Authorize wallet signing",
@@ -49,16 +49,16 @@ fun createIosDemoWallet(
                         alternativeAuthorizations = config.signingProtectionMode.alternativeAuthorizations(),
                         platform = id.walt.crypto2.keys.PlatformKeyConfiguration.IosKeychain(accessGroup = crossProcessAccess.keychainAccessGroup),
                     ),
-                    issuance = MobileWalletIssuanceConfig(
+                    issuance = IssuanceConfiguration(
                         attestation = config.toWalletAttestationConfig(),
                         walletProvider = config.toWalletProviderConfig(),
                     ),
-                    presentation = MobileWalletPresentationConfig(
+                    presentation = PresentationConfiguration(
                         verifierTrust = DemoClientIdTrust.configuration,
                         transactionDataProfiles = transactionDataProfiles.profiles,
                         paymentCredentialIssuers = config.paymentCredentialIssuers(),
                     ),
-                    digitalCredentials = MobileWalletDigitalCredentialsConfig(
+                    digitalCredentials = DigitalCredentialsConfiguration(
                         crossProcessAccess = crossProcessAccess,
                         onRegistrationChanged = onDigitalCredentialRegistryChanged,
                     ),

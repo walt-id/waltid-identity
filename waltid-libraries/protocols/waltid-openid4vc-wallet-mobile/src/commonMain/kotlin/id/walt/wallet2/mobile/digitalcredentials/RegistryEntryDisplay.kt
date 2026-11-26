@@ -11,7 +11,7 @@ public class RegistryEntryDisplay(
     public val name: String,
     public val subtitle: String = "",
     iconPng: ByteArray? = null,
-    public val cardArt: MobileWalletCardArt = MobileWalletCardArt(),
+    public val cardArt: CardArt = CardArt(),
 ) {
     /** A copy of the resolved picker thumbnail. */
     public val iconPng: ByteArray? get() = icon?.copyOf()
@@ -34,7 +34,7 @@ public class RegistryEntryDisplay(
  * @property backgroundColor Suggested card background color.
  * @param fallbackPng Local thumbnail used when remote artwork is unavailable.
  */
-public class MobileWalletCardArt(
+public class CardArt(
     imageUris: List<String> = emptyList(),
     public val backgroundColor: String? = null,
     fallbackPng: ByteArray? = null,
@@ -45,7 +45,7 @@ public class MobileWalletCardArt(
     public val fallbackPng: ByteArray? get() = fallback?.copyOf()
 
     /** Compares image candidates, background color and fallback bytes. */
-    public override fun equals(other: Any?): Boolean = other is MobileWalletCardArt &&
+    public override fun equals(other: Any?): Boolean = other is CardArt &&
         imageUris == other.imageUris && backgroundColor == other.backgroundColor && fallback.contentEquals(other.fallback)
 
     /** Hash consistent with content-based artwork equality. */

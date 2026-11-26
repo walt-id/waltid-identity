@@ -7,6 +7,16 @@ import WalletSDKEnterpriseCustody
 final class EnterpriseCustodyIntegrationTests: XCTestCase {
     enum FixtureFailure: Error { case unexpectedState(String) }
     // Matches Kotlin's synthetic private JWK, endpoint, and HTTP failure matrix.
+    func testCustodianRejectsInvalidResourceDestinationsAndNames() throws {
+        for resource in ["http://example.org/kms", "https://example.org/", "https://example.org/kms?query",
+                         "https://user@example.org/kms", "https:/kms"] {
+            let url = try XCTUnwrap(URL(string: resource))
+            XCTAssertThrowsError(try EnterpriseIdentityKeyCustodian(kmsResourceURL: url) { $0 })
+        }
+        let valid = try XCTUnwrap(URL(string: "https://example.org/kms"))
+        XCTAssertThrowsError(try EnterpriseIdentityKeyCustodian(kmsResourceURL: valid, id: " ") { $0 })
+    }
+
     func testMatchesKotlinEnterpriseFixtures() async throws {
         let jwk = #"{"kty":"EC","crv":"P-256","x":"_owZzgkFGR68KYqSRXklMfJvDOziRgY56Lw5y39waoI","y":"anebTPlpuKDlOcf2L7PTCtaqj4DjDx0Siq_WiiznLqA","d":"885_2uV-GjENh_HrvebzKL4Kmc28rfTWWJzyneS4_9I"}"#
         let identity = SigningIdentity(id: "identity", keyID: "key-1", did: "did:jwk:fixture", publicJWK: "{}",

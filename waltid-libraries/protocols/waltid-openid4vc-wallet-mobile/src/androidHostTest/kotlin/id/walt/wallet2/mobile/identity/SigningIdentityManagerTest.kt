@@ -15,14 +15,14 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.did.dids.Crypto2DidService
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.WalletConfiguration
 import id.walt.wallet2.mobile.createSqlDelightMobileWallet
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistrationResult
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialsConfig
-import id.walt.wallet2.mobile.digitalcredentials.UnavailableMobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistrationResult
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntry
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialsConfiguration
+import id.walt.wallet2.mobile.digitalcredentials.UnavailableCredentialRegistry
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.*
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
@@ -64,7 +64,7 @@ class SigningIdentityManagerTest {
     }
 
     @Test fun `activation and reopening publish the registry outside the identity lock`() = runTest {
-        lateinit var current: MobileWallet
+        lateinit var current: Wallet
         var notifications = 0
         Fixture(onRegistryChanged = {
             assertIs<SigningIdentityState.Active>(current.signingIdentity.state())
@@ -100,9 +100,9 @@ class SigningIdentityManagerTest {
     }
 
     @Test fun `registration and host notification failures do not undo an active identity`() = runTest {
-        val registry = object : MobileWalletCredentialRegistry {
-            override val capabilities = UnavailableMobileWalletCredentialRegistry.capabilities
-            override suspend fun replace(registryId: String, records: List<MobileWalletCredentialRegistryRecord>): MobileWalletCredentialRegistrationResult =
+        val registry = object : CredentialRegistry {
+            override val capabilities = UnavailableCredentialRegistry.capabilities
+            override suspend fun replace(registryId: String, records: List<RegistryEntry>): CredentialRegistrationResult =
                 error("Registry unavailable")
         }
         Fixture(registry = registry, onRegistryChanged = { error("Host notification failed") }).use { fixture ->
@@ -745,17 +745,17 @@ class SigningIdentityManagerTest {
     private class Fixture(
         configuration: SigningIdentityConfiguration? = null,
         val provider: MemoryRecovery = MemoryRecovery(),
-        registry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+        registry: CredentialRegistry = UnavailableCredentialRegistry,
         private val native: PlatformManagedKeyProvider = NoNative,
         onRegistryChanged: suspend () -> Unit = {},
     ) : AutoCloseable {
         private val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         private val db = WalletPersistenceDatabase(driver)
         val queries = db.walletPersistenceQueries
-        private val config = MobileWalletConfig(
+        private val config = WalletConfiguration(
             signingIdentity = configuration ?: SigningIdentityConfiguration(
             recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)),
-            digitalCredentials = MobileWalletDigitalCredentialsConfig(
+            digitalCredentials = DigitalCredentialsConfiguration(
                 registry = registry,
                 onRegistrationChanged = onRegistryChanged,
             ),

@@ -28,7 +28,7 @@ import id.walt.wallet2.mobile.proximity.ProximityRetrievalOptions
 import id.walt.wallet2.mobile.proximity.ProximityReview
 import id.walt.wallet2.mobile.proximity.ProximityReviewId
 import id.walt.wallet2.mobile.proximity.ProximityRecovery
-import id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettings
+import id.walt.wallet2.mobile.proximity.trust.ProximityReaderTrustSettings
 import id.walt.wallet2.mobile.proximity.ProximitySession
 import id.walt.wallet2.mobile.proximity.ProximityState
 import id.walt.wallet2.mobile.proximity.ProximitySubmission

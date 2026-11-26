@@ -6,7 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCrossProcessAccess
+import id.walt.wallet2.mobile.digitalcredentials.WalletAppGroupAccess
 import id.walt.mdoc.proximity.mobile.NfcHostAvailability
 import id.walt.mdoc.proximity.mobile.NfcHostPreparation
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
@@ -112,7 +112,7 @@ fun walletDemoViewController(
     require(keychainAccessGroup.isNotEmpty()) {
         "This demo ships a document-provider extension and requires a shared Keychain access group"
     }
-    val crossProcessAccess = MobileWalletCrossProcessAccess(
+    val crossProcessAccess = WalletAppGroupAccess(
         appGroupIdentifier = appGroupIdentifier,
         keychainAccessGroup = keychainAccessGroup,
     )

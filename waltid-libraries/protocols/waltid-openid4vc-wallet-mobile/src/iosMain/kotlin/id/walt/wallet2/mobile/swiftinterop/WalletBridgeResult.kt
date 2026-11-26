@@ -8,7 +8,7 @@ import id.walt.wallet2.consent.PaymentConsentException
 import id.walt.wallet2.consent.PaymentConsentFailure
 import id.walt.wallet2.handlers.PresentationReviewChangedException
 import id.walt.wallet2.handlers.PreviewSessionException
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationErrorCode
+import id.walt.wallet2.mobile.presentation.PresentationErrorCode
 import id.walt.wallet2.mobile.presentation.toMobileErrorCode
 import id.walt.wallet2.mobile.WalletStorageInUseException
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
@@ -59,7 +59,7 @@ public enum class WalletBridgeErrorCategory {
  */
 @Serializable
 public data class WalletBridgePresentationValidationFailure(
-    public val errorCode: MobileWalletPresentationErrorCode,
+    public val errorCode: PresentationErrorCode,
     public val message: String,
     public val responseSafetyFailure: String,
 )

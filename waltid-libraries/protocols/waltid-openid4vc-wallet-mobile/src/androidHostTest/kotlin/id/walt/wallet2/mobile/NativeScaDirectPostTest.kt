@@ -8,9 +8,9 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreviewResult
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
+import id.walt.wallet2.mobile.presentation.PresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.PresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.PresentationSelection
 import id.walt.wallet2.persistence.keys.*
 import io.ktor.http.URLBuilder
 import java.net.InetSocketAddress
@@ -73,13 +73,13 @@ class NativeScaDirectPostTest {
                 parameters["response_uri"] = endpoint
                 parameters["client_id"] = "redirect_uri:$endpoint"
             }.buildString()
-            val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(fixture.wallet.previewPresentation(request)).preview
+            val preview = assertIs<PresentationPreviewResult.Ready>(fixture.wallet.previewPresentation(request)).preview
             val selections = preview.credentialOptions.map {
-                MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+                PresentationCredentialSelection(it.queryId, it.credential.id)
             }
             val review = fixture.wallet.reviewPresentation(
                 preview.previewHandle,
-                MobileWalletPresentationSelection(credentials = selections),
+                PresentationSelection(credentials = selections),
             )
             assertNotNull(review.payment)
             fixture.wallet.submitPresentation(review)

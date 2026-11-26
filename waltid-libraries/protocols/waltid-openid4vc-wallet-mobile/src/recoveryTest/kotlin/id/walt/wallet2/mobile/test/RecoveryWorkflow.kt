@@ -13,8 +13,8 @@ import id.walt.crypto2.serialization.BinaryData
 import id.walt.mdoc.proximity.mobile.BleMdocRoleSelection
 import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.WalletConfiguration
 import id.walt.wallet2.mobile.createEncryptedSqlDelightMobileWallet
 import id.walt.wallet2.mobile.identity.*
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
@@ -69,7 +69,7 @@ internal class RecoveryWorkflow(
     suspend fun verify(expected: SigningIdentity, storage: SigningIdentityKeyStorage) = session { it.verify(expected, storage) }
 
     suspend fun cleanup() {
-        session { it.wallet.deleteWallet() }
+        session { it.wallet.deleteLocalData() }
         // This provider is scoped to one disposable run, never to a personal wallet namespace.
         provider.list().forEach { provider.delete(it) }
         assertTrue(provider.list().isEmpty())
@@ -83,7 +83,7 @@ internal class RecoveryWorkflow(
 
 /** Uses production encrypted persistence wiring while retaining a test-only handle for signing proof. */
 internal class RecoveryTestWallet private constructor(
-    val wallet: MobileWallet,
+    val wallet: Wallet,
     val keys: SqlDelightKeyStore,
     private val driver: SqlDriver,
     private val nativeKeys: PlatformManagedKeyProvider,
@@ -93,7 +93,7 @@ internal class RecoveryTestWallet private constructor(
     suspend fun deleteLocalState(expected: SigningIdentity) {
         val key = assertIs<StorableKey>(keys.getCrypto2Key(expected.keyId, setOf(KeyUsage.SIGN)))
         val managed = key.storedKey as? StoredKey.Managed
-        wallet.deleteWallet()
+        wallet.deleteLocalData()
         if (managed != null) assertIs<PlatformManagedKeyRestoration.Missing>(nativeKeys.restoreManagedKey(managed))
     }
 
@@ -137,7 +137,7 @@ internal class RecoveryTestWallet private constructor(
             deleteDatabase: (String) -> Unit,
         ): RecoveryTestWallet {
             require(runId.matches(Regex("[a-f0-9-]{36}")))
-            val config = MobileWalletConfig(walletId = "wal749-recovery-$runId", signingIdentity = SigningIdentityConfiguration(
+            val config = WalletConfiguration(walletId = "wal749-recovery-$runId", signingIdentity = SigningIdentityConfiguration(
                 recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
             lateinit var driver: SqlDriver
             val wallet = createEncryptedSqlDelightMobileWallet(config, databaseKeys, nativeKeys,

@@ -96,7 +96,7 @@ replacement is intentionally outside this PR.
 
 The mobile facade opens encrypted databases by default and keeps managed database keys in platform-protected storage. Android stores the wrapped database key with Android KeyStore-backed material and app-private preferences. iOS stores the database key as a Keychain generic-password item using device-local accessibility.
 
-`DatabaseEncryptionKeyProvider` is the boundary for provided database keys. Implement it when an app needs KMS-backed recovery or enterprise key ownership. The SDK will request key material for opening the local SQLCipher database and call `deleteKey(walletId, databaseName)` when `MobileWallet.deleteWallet()` deletes local wallet data. External KMS recovery state remains the app's responsibility.
+`DatabaseEncryptionKeyProvider` is the boundary for provided database keys. Implement it when an app needs KMS-backed recovery or enterprise key ownership. The SDK will request key material for opening the local SQLCipher database and call `deleteKey(walletId, databaseName)` when `Wallet.deleteLocalData()` deletes local wallet data. External KMS recovery state remains the app's responsibility.
 
 `DriverFactory.deleteDatabase(databaseName)` removes the database file and SQLite sidecars used by the platform driver. For complete wallet deletion, close the driver first, remove managed signing keys referenced by `SqlDelightKeyStore`, delete database files, and then delete the database encryption key.
 

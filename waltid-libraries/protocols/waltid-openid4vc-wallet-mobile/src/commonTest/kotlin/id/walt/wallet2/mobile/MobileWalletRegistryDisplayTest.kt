@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile
 
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialFormat
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletRegistryDisplay
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,7 +14,7 @@ class MobileWalletRegistryDisplayTest {
     @Test
     fun paymentCardUsesHolderNameAndMaskedLastFour() {
         val display = MobileWalletRegistryDisplay.resolve(
-            format = MobileWalletDigitalCredentialFormat.MDOC,
+            format = DigitalCredentialFormat.MDOC,
             type = PAYMENT_CARD,
             credentialData = buildJsonObject {
                 putJsonObject(PAYMENT_CARD) {
@@ -32,7 +32,7 @@ class MobileWalletRegistryDisplayTest {
     @Test
     fun mobileDrivingLicenceUsesStaticTitleAndDocumentNumber() {
         val display = MobileWalletRegistryDisplay.resolve(
-            format = MobileWalletDigitalCredentialFormat.MDOC,
+            format = DigitalCredentialFormat.MDOC,
             type = "org.iso.18013.5.1.mDL",
             credentialData = buildJsonObject {
                 putJsonObject("org.iso.18013.5.1") {
@@ -49,7 +49,7 @@ class MobileWalletRegistryDisplayTest {
     @Test
     fun mdlNamespaceKeyMatchesTheSameMapping() {
         val display = MobileWalletRegistryDisplay.resolve(
-            format = MobileWalletDigitalCredentialFormat.MDOC,
+            format = DigitalCredentialFormat.MDOC,
             type = "org.iso.18013.5.1",
             credentialData = buildJsonObject {
                 putJsonObject("org.iso.18013.5.1") {
@@ -66,7 +66,7 @@ class MobileWalletRegistryDisplayTest {
     @Test
     fun pidUsesStaticTitleAndDocumentNumber() {
         val display = MobileWalletRegistryDisplay.resolve(
-            format = MobileWalletDigitalCredentialFormat.MDOC,
+            format = DigitalCredentialFormat.MDOC,
             type = "eu.europa.ec.eudi.pid.1",
             credentialData = buildJsonObject {
                 putJsonObject("eu.europa.ec.eudi.pid.1") {
@@ -83,7 +83,7 @@ class MobileWalletRegistryDisplayTest {
     @Test
     fun missingMappedClaimFallsBackFieldByField() {
         val display = MobileWalletRegistryDisplay.resolve(
-            format = MobileWalletDigitalCredentialFormat.MDOC,
+            format = DigitalCredentialFormat.MDOC,
             type = PAYMENT_CARD,
             credentialData = buildJsonObject {
                 putJsonObject(PAYMENT_CARD) {
@@ -101,7 +101,7 @@ class MobileWalletRegistryDisplayTest {
     @Test
     fun unknownTypeUsesStoredLabelAndHumanizedSubtitle() {
         val display = MobileWalletRegistryDisplay.resolve(
-            format = MobileWalletDigitalCredentialFormat.MDOC,
+            format = DigitalCredentialFormat.MDOC,
             type = "org.example.unknown.widget.1",
             credentialData = buildJsonObject {},
             storedLabel = "Stored widget",
@@ -116,7 +116,7 @@ class MobileWalletRegistryDisplayTest {
     @Test
     fun unknownTypeWithoutLabelHumanizesTitle() {
         val display = MobileWalletRegistryDisplay.resolve(
-            format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+            format = DigitalCredentialFormat.SD_JWT_VC,
             type = "https://credentials.example/this_case",
             credentialData = buildJsonObject {
                 put("vct", "https://credentials.example/this_case")

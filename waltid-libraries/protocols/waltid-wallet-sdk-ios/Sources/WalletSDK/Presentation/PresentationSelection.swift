@@ -66,37 +66,16 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
     public init(queryID: String, credential: Credential, multiple: Bool = false,
                 disclosures: [PresentationDisclosure] = []) throws {
         guard isPresentationIdentifierNonBlank(queryID) else { throw WalletError.invalidInput("A credential query ID is required") }
-        self.init(queryID: queryID, credentialID: credential.id, format: credential.format, credentialDataJSON: credential.credentialDataJSON,
-                  multiple: multiple, issuer: credential.issuer, subject: credential.subject, label: credential.label,
-                  disclosures: disclosures, metadataJSON: credential.metadataJSON)
-    }
-
-    init(
-        queryID: String,
-        credentialID: String,
-        format: String,
-        credentialDataJSON: String,
-        multiple: Bool = false,
-        issuer: String? = nil,
-        subject: String? = nil,
-        label: String? = nil,
-        disclosures: [PresentationDisclosure] = [],
-        metadataJSON: String? = nil
-    ) {
-        precondition(
-            isPresentationIdentifierNonBlank(queryID),
-            "A presentation credential option must contain a non-blank query ID."
-        )
         self.queryID = queryID
-        self.credentialID = credentialID
+        self.credentialID = credential.id
         self.multiple = multiple
-        self.format = format
-        self.issuer = issuer
-        self.subject = subject
-        self.label = label
-        self.credentialDataJSON = credentialDataJSON
+        self.format = credential.format
+        self.issuer = credential.issuer
+        self.subject = credential.subject
+        self.label = credential.label
+        self.credentialDataJSON = credential.credentialDataJSON
         self.disclosures = disclosures
-        self.metadataJSON = metadataJSON
+        self.metadataJSON = credential.metadataJSON
     }
 }
 

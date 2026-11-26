@@ -43,15 +43,15 @@ import id.walt.mdoc.proximity.mobile.BleProximityAvailability
 import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequest
+import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialRequest
 import id.walt.wallet2.mobile.identity.*
 import id.walt.wallet2.mobile.identity.MobileDidSupport
-import id.walt.wallet2.mobile.identity.MobileWalletKeyType
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreviewResult
-import id.walt.wallet2.mobile.presentation.MobileWalletRequestAuthentication
+import id.walt.wallet2.mobile.identity.WalletKeyType
+import id.walt.wallet2.mobile.presentation.PresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.PresentationRequestAuthentication
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
@@ -95,14 +95,14 @@ class MobileWalletFactoryTest {
         database().use { db ->
             var opened = 0
             var closed = 0
-            val wallet = encryptedWallet(MobileWalletConfig(walletId = "driver-disposal"), db, FakePlatformManagedKeyProvider(),
+            val wallet = encryptedWallet(WalletConfiguration(walletId = "driver-disposal"), db, FakePlatformManagedKeyProvider(),
                 onClose = { closed++ }, onOpen = { opened++ })
             wallet.close()
             wallet.close()
             assertEquals(1, opened)
             assertEquals(1, closed)
-            wallet.deleteWallet()
-            wallet.deleteWallet()
+            wallet.deleteLocalData()
+            wallet.deleteLocalData()
             assertEquals(2, opened)
             assertEquals(opened, closed)
         }
@@ -111,16 +111,16 @@ class MobileWalletFactoryTest {
     @Test
     fun aClosedHandleCannotEraseStorageUsedByItsSuccessor() = runTest {
         database().use { db ->
-            val config = MobileWalletConfig(walletId = "successor")
+            val config = WalletConfiguration(walletId = "successor")
             val keys = FakePlatformManagedKeyProvider()
             val first = encryptedWallet(config, db, keys, onClose = {})
             first.close()
             val successor = encryptedWallet(config, db, keys, onClose = {})
-            assertFailsWith<IllegalStateException> { first.deleteWallet() }
+            assertFailsWith<IllegalStateException> { first.deleteLocalData() }
             assertTrue(successor.credentials().isEmpty())
             successor.close()
-            first.deleteWallet()
-            first.deleteWallet()
+            first.deleteLocalData()
+            first.deleteLocalData()
         }
     }
 
@@ -146,7 +146,7 @@ class MobileWalletFactoryTest {
             var closed = 0
             val opening = async {
                 val openingContext = currentCoroutineContext()
-                encryptedWallet(MobileWalletConfig(), db, FakePlatformManagedKeyProvider(),
+                encryptedWallet(WalletConfiguration(), db, FakePlatformManagedKeyProvider(),
                     onClose = { closed++ }, onOpen = { openingContext.cancel() })
             }
             opening.join()
@@ -207,7 +207,7 @@ class MobileWalletFactoryTest {
     private suspend fun assertColdFactoryAuthenticatesDidRequests(verifier: JWKKey, verifierDid: String, kid: String) {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider()
-            val config = MobileWalletConfig()
+            val config = WalletConfiguration()
             val original = wallet(config, database, provider)
             val identity = assertIs<SigningIdentityOperationResult.Active>(original.signingIdentity.initialize()).identity
             SqlDelightCredentialStore(database.queries).addCredential(StoredCredential(
@@ -223,19 +223,19 @@ class MobileWalletFactoryTest {
                 val reopened = encryptedWallet(config, database, provider)
                 try {
                     // Authenticate before initialize(): resolver setup must not depend on identity work.
-                    val online = assertIs<MobileWalletPresentationPreviewResult.Ready>(reopened.previewPresentation(
+                    val online = assertIs<PresentationPreviewResult.Ready>(reopened.previewPresentation(
                         requestUrl(clientId, signedDidRequest(verifier, verifierDid, "direct_post", kid)),
                     )).preview
                     assertEquals(clientId, online.request.clientId)
-                    assertEquals("saved-pid", online.credentialOptions.single().credentialId)
-                    assertIs<MobileWalletRequestAuthentication.Authenticated>(online.request.requestAuthentication)
-                    val dc = reopened.previewDigitalCredentialPresentation(MobileWalletDigitalCredentialRequest(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                    assertEquals("saved-pid", online.credentialOptions.single().credential.id)
+                    assertIs<PresentationRequestAuthentication.Authenticated>(online.request.requestAuthentication)
+                    val dc = reopened.previewDigitalCredentialPresentation(DigitalCredentialRequest(
+                        protocol = DigitalCredentialProtocols.OPENID4VP_SIGNED,
                         dataJson = buildJsonObject { put("request", signedDidRequest(verifier, verifierDid, "dc_api", kid)) }.toString(),
                         verifiedOrigin = "https://verifier.example",
                     ))
                     assertEquals(clientId, dc.request.clientId)
-                    assertEquals("saved-pid", dc.credentialOptions.single().credentialId)
+                    assertEquals("saved-pid", dc.credentialOptions.single().credential.id)
                     assertEquals(identity, assertIs<SigningIdentityOperationResult.Active>(reopened.signingIdentity.initialize()).identity)
                     assertEquals(savedCredentials, reopened.credentials())
                     assertEquals(1, provider.generateCount)
@@ -262,7 +262,7 @@ class MobileWalletFactoryTest {
             (1..8).map {
                 async(Dispatchers.Default) {
                     database().use { database ->
-                        encryptedWallet(MobileWalletConfig(), database, FakePlatformManagedKeyProvider()).close()
+                        encryptedWallet(WalletConfiguration(), database, FakePlatformManagedKeyProvider()).close()
                     }
                 }
             }.awaitAll()
@@ -281,7 +281,7 @@ class MobileWalletFactoryTest {
             }
             override suspend fun deleteKey(walletId: String, databaseName: String) = Unit
         }
-        val config = MobileWalletConfig(persistence = MobileWalletPersistence(MobileWalletDatabaseKey.Provided(keys)))
+        val config = WalletConfiguration(persistence = WalletPersistence(WalletDatabaseKey.Provided(keys)))
         database().use { database ->
             var opens = 0
             val job = async { encryptedWallet(config, database, FakePlatformManagedKeyProvider()) { opens++ } }
@@ -292,12 +292,12 @@ class MobileWalletFactoryTest {
     }
 
     private suspend fun encryptedWallet(
-        config: MobileWalletConfig,
+        config: WalletConfiguration,
         database: TestDatabase,
         provider: FakePlatformManagedKeyProvider,
         onClose: (() -> Unit)? = null,
         onOpen: () -> Unit = {},
-    ): MobileWallet = createEncryptedSqlDelightMobileWallet(
+    ): Wallet = createEncryptedSqlDelightMobileWallet(
         config = config,
         managedDatabaseKeyProvider = object : DatabaseEncryptionKeyProvider {
             override suspend fun getOrCreateKey(walletId: String, databaseName: String) =
@@ -378,10 +378,10 @@ class MobileWalletFactoryTest {
     fun `retained signing manager cannot recreate keys after wallet deletion`() = runTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider()
-            val wallet = wallet(MobileWalletConfig(), database, provider)
+            val wallet = wallet(WalletConfiguration(), database, provider)
             val manager = wallet.signingIdentity
             assertIs<SigningIdentityOperationResult.Active>(manager.initialize())
-            wallet.deleteWallet()
+            wallet.deleteLocalData()
             assertFailsWith<IllegalStateException> { manager.initialize() }
             assertFailsWith<IllegalStateException> { manager.creationOptions() }
             assertEquals(1, provider.generateCount)
@@ -393,7 +393,7 @@ class MobileWalletFactoryTest {
     fun `identity initialization persists one matched P256 DID and signs after restart`() = runTest {
         database().use { database ->
             val provider = FakePlatformManagedKeyProvider()
-            val config = MobileWalletConfig()
+            val config = WalletConfiguration()
             val original = wallet(config, database, provider)
             val identity = assertIs<SigningIdentityOperationResult.Active>(original.signingIdentity.initialize()).identity
             assertEquals(KeyUseAuthorizationPolicy.BiometricCurrentSet, identity.authorization)
@@ -415,7 +415,7 @@ class MobileWalletFactoryTest {
     fun `identity creation uses the configured DID service`() = runTest {
         database().use { database ->
             val didService = RecordingDidService()
-            val result = wallet(MobileWalletConfig(), database, FakePlatformManagedKeyProvider(), didService).signingIdentity.initialize()
+            val result = wallet(WalletConfiguration(), database, FakePlatformManagedKeyProvider(), didService).signingIdentity.initialize()
             assertIs<SigningIdentityOperationResult.Active>(result)
             assertEquals(listOf("jwk"), didService.registeredMethods)
         }
@@ -427,7 +427,7 @@ class MobileWalletFactoryTest {
             val provider = FakePlatformManagedKeyProvider().apply {
                 preflightResult = KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.BiometricNotEnrolled)
             }
-            val result = wallet(MobileWalletConfig(), database, provider).signingIdentity.initialize()
+            val result = wallet(WalletConfiguration(), database, provider).signingIdentity.initialize()
             assertEquals(SigningIdentityFailure.UnsupportedPolicy, assertIs<SigningIdentityOperationResult.Failed>(result).reason)
             assertEquals(0, provider.generateCount)
             assertTrue(database.queries.selectAll().executeAsList().isEmpty())
@@ -440,7 +440,7 @@ class MobileWalletFactoryTest {
             val provider = FakePlatformManagedKeyProvider().apply {
                 generateFailure = KeyUseAuthorizationException(KeyUseAuthorizationFailure.AuthorizationNotCompleted, "Test cancellation")
             }
-            val result = wallet(MobileWalletConfig(), database, provider).signingIdentity.initialize()
+            val result = wallet(WalletConfiguration(), database, provider).signingIdentity.initialize()
             assertEquals(SigningIdentityFailure.AuthorizationNotCompleted, assertIs<SigningIdentityOperationResult.Failed>(result).reason)
             assertEquals(1, provider.generateCount)
             assertTrue(database.queries.selectAll().executeAsList().isEmpty())
@@ -448,11 +448,11 @@ class MobileWalletFactoryTest {
     }
 
     private fun wallet(
-        config: MobileWalletConfig,
+        config: WalletConfiguration,
         database: TestDatabase,
         provider: FakePlatformManagedKeyProvider,
         didService: Crypto2DidService = Crypto2DidService,
-    ): MobileWallet = createSqlDelightMobileWallet(
+    ): Wallet = createSqlDelightMobileWallet(
         config = config,
         db = database.database,
         keyProvider = provider,
@@ -493,7 +493,7 @@ class MobileWalletFactoryTest {
     }
 
     private data class BootstrapCase(
-        val keyType: MobileWalletKeyType,
+        val keyType: WalletKeyType,
         val didMethod: String,
         val signatureAlgorithm: SignatureAlgorithm,
     )

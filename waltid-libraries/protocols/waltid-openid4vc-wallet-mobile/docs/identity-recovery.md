@@ -65,7 +65,7 @@ identity lifecycle creates P-256 keys.
 ## Configuration and defaults
 
 ```kotlin
-val configuration = MobileWalletConfig(
+val configuration = WalletConfiguration(
     signingIdentity = SigningIdentityConfiguration(
         policy = SigningIdentityKeyPolicy.GeneralPurpose,
         recoveryProviders = listOf(myRecoveryProvider),
@@ -209,7 +209,7 @@ other installation's native alias. Cleanup only targets the operation's owned ke
 This unreleased SDK requires a fresh wallet database for existing development installations. The SDK never clears an old database automatically.
 New-format identities retain their exact key/DID association across restart and recovery.
 
-Set `MobileWalletIssuanceRequest.keyPolicy` (Swift: `IssuanceRequest.keyPolicy`) when a host or issuer
+Set `IssuanceRequest.keyPolicy` (Swift: `IssuanceRequest.keyPolicy`) when a host or issuer
 profile requires `BackupAndCustodyDisabled` or `HardwareGenerated`. Before starting issuance, the SDK checks that
 the selected key is the active identity and already retains the required restriction. A later request
 cannot relabel a general-purpose or recoverable identity as prohibiting backup and custody. The default is

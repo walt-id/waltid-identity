@@ -8,7 +8,7 @@ import WalletCore
 final class CredentialStatusTests: XCTestCase {
 #if canImport(WalletCore) && os(iOS)
     func testUnreadableAdvisoryCannotHideAReadableCredentialAtTheActualBridgeBoundary() throws {
-        let stored = MobileWalletCredential(
+        let stored = WalletCore.WalletCredential(
             id: "identity",
             format: "dc+sd-jwt",
             credentialDataJson: #"{"name":"Example"}"#,

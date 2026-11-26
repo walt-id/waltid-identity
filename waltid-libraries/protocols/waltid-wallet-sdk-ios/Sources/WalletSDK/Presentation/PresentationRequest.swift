@@ -5,8 +5,8 @@ import Foundation
 /// A reportable invalid request has a validated, non-blank client identifier.
 /// Its nonce remains optional because a missing nonce can itself be the
 /// validation error. A ready preview exposes a validated, non-optional nonce
-/// through ``PresentationRequestInfo``.
-public struct PresentationRequestContext: Equatable, Sendable {
+/// through ``PresentationRequest``.
+public struct PartialPresentationRequest: Equatable, Sendable {
     /// Validated OpenID4VP client identifier.
     public let clientID: String
 
@@ -141,7 +141,7 @@ public enum PresentationClientIDScheme: Equatable, Sendable {
 }
 
 /// Verifier, transaction, and response-protection metadata extracted from a presentation request.
-public struct PresentationRequestInfo: Equatable, Sendable {
+public struct PresentationRequest: Equatable, Sendable {
     /// OpenID4VP client identifier.
     public let clientID: String
 

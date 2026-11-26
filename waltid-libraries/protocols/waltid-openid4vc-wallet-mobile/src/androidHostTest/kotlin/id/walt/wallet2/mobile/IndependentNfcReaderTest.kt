@@ -17,6 +17,7 @@ import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.proximity.mobile.*
 import id.walt.wallet2.data.*
+import id.walt.wallet2.data.Wallet as CoreWallet
 import id.walt.wallet2.mobile.peer.SelectCorrectedNfcReader
 import id.walt.wallet2.mobile.proximity.ProximityAction
 import id.walt.wallet2.mobile.proximity.ProximityActionResult
@@ -316,7 +317,7 @@ class IndependentNfcReaderTest {
         override suspend fun updateDialogMessage(message: String) = Unit
     }
 
-    private data class Fixture(val wallet: Wallet, val runtime: CryptoRuntime, val root: ByteArray, val untrustedRoot: ByteArray)
+    private data class Fixture(val wallet: CoreWallet, val runtime: CryptoRuntime, val root: ByteArray, val untrustedRoot: ByteArray)
 
     private suspend fun fixture(): Fixture {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -343,7 +344,7 @@ class IndependentNfcReaderTest {
             docType = DOC_TYPE, data = MdocIssuer.MdocUniversalIssuanceData(mapOf(NAMESPACE to JsonObject(mapOf(
                 "given_name" to JsonPrimitive("Ada"), "family_name" to JsonPrimitive("Lovelace"),
             )))))
-        val wallet = Wallet("independent-peer", keyStores = listOf(InMemoryKeyStore().also { it.addCrypto2Key(holder) }),
+        val wallet = CoreWallet("independent-peer", keyStores = listOf(InMemoryKeyStore().also { it.addCrypto2Key(holder) }),
             credentialStores = listOf(InMemoryCredentialStore()))
         val encoded = coseCompliantCbor.encodeToByteArray(Document.serializer(), Document(DOC_TYPE, issued)).encodeToBase64Url()
         wallet.addCredential(wallet.withImportedHolderKeyBinding(StoredCredential("peer-mdl", CredentialParser.detectAndParse(encoded).second)))

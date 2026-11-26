@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile.swiftinterop
 
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationReview
+import id.walt.wallet2.mobile.presentation.PresentationReview
 import id.walt.wallet2.mobile.issuance.IssuanceClientRegistration
 import id.walt.credentials.status.CredentialStatus
 
@@ -14,38 +14,38 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.handlers.WalletIssuanceOfferReview
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.MobileWalletEvent
-import id.walt.wallet2.mobile.MobileWalletEventPhase
-import id.walt.wallet2.mobile.MobileWalletEventStatus
-import id.walt.wallet2.mobile.credentials.MobileWalletCredential
-import id.walt.wallet2.mobile.credentials.MobileWalletCredentialRead
-import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
-import id.walt.wallet2.mobile.identity.MobileWalletKeyType
-import id.walt.wallet2.mobile.issuance.MobileWalletCredentialSelection
-import id.walt.wallet2.mobile.issuance.MobileWalletHolderBinding
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.WalletConfiguration
+import id.walt.wallet2.mobile.WalletEvent
+import id.walt.wallet2.mobile.WalletEventPhase
+import id.walt.wallet2.mobile.WalletEventStatus
+import id.walt.wallet2.mobile.credentials.WalletCredential
+import id.walt.wallet2.mobile.credentials.CredentialWithStatus
+import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.identity.WalletKeyType
+import id.walt.wallet2.mobile.issuance.IssuanceCredentialSelection
+import id.walt.wallet2.mobile.issuance.IssuanceHolderBinding
+import id.walt.wallet2.mobile.issuance.IssuanceRequest
 import id.walt.wallet2.mobile.issuance.WalletAttestationConfig
 import id.walt.wallet2.mobile.platformPreferredLocales
-import id.walt.wallet2.mobile.presentation.MobileWalletClientIdScheme
-import id.walt.wallet2.mobile.presentation.MobileWalletMetadataDisplay
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialRequirement
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationDisclosureSelection
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationErrorCode
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreview
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreviewHandle
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreviewResult
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationRequestContext
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationRequestInfo
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationResult
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
-import id.walt.wallet2.mobile.presentation.MobileWalletRequestAuthentication
-import id.walt.wallet2.mobile.presentation.MobileWalletResponseEncryption
-import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataProfile
-import id.walt.wallet2.mobile.presentation.MobileWalletVerifierMetadata
+import id.walt.wallet2.mobile.presentation.PresentationClientIdScheme
+import id.walt.wallet2.mobile.presentation.MetadataDisplay
+import id.walt.wallet2.mobile.presentation.PresentationCredentialOption
+import id.walt.wallet2.mobile.presentation.PresentationCredentialRequirement
+import id.walt.wallet2.mobile.presentation.PresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.PresentationDisclosureSelection
+import id.walt.wallet2.mobile.presentation.PresentationErrorCode
+import id.walt.wallet2.mobile.presentation.PresentationPreview
+import id.walt.wallet2.mobile.presentation.PresentationPreviewHandle
+import id.walt.wallet2.mobile.presentation.PresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.PartialPresentationRequest
+import id.walt.wallet2.mobile.presentation.PresentationRequest
+import id.walt.wallet2.mobile.presentation.PresentationResult
+import id.walt.wallet2.mobile.presentation.PresentationSelection
+import id.walt.wallet2.mobile.presentation.PresentationRequestAuthentication
+import id.walt.wallet2.mobile.presentation.PresentationResponseEncryption
+import id.walt.wallet2.mobile.presentation.TransactionDataProfile
+import id.walt.wallet2.mobile.presentation.VerifierMetadata
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.status.CredentialStatusRefreshMode
 import id.walt.wallet2.status.CredentialStatusRefreshResult
@@ -128,7 +128,7 @@ class WalletSdkBridgeTest {
 
         val result = bridge.credentials()
 
-        assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(result)
+        assertIs<WalletBridgeResult.Success<List<WalletCredential>>>(result)
         assertEquals("credential-1", result.value.single().id)
         assertEquals("https://issuer.example", result.value.single().issuer)
         assertEquals("""{"given_name":"Ada"}""", result.value.single().credentialDataJson)
@@ -165,11 +165,11 @@ class WalletSdkBridgeTest {
 
         val result = bridge.previewPresentation("openid4vp://request")
 
-        assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreviewResult>>(result)
-        val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(result.value).preview
+        assertIs<WalletBridgeResult.Success<PresentationPreviewResult>>(result)
+        val preview = assertIs<PresentationPreviewResult.Ready>(result.value).preview
         assertEquals("https://verifier.example", preview.request.clientId)
         assertEquals(
-            MobileWalletResponseEncryption.Required(
+            PresentationResponseEncryption.Required(
                 keyManagementAlgorithm = "ECDH-ES",
                 contentEncryptionAlgorithm = "A256GCM",
                 verifierKeyId = "verifier-key-1",
@@ -177,7 +177,7 @@ class WalletSdkBridgeTest {
             ),
             preview.request.responseEncryption,
         )
-        assertEquals("credential-1", preview.credentialOptions.single().credentialId)
+        assertEquals("credential-1", preview.credentialOptions.single().credential.id)
         assertEquals(true, preview.credentialOptions.single().multiple)
         assertEquals(listOf(listOf("pid")), preview.credentialRequirements.single().options)
         assertEquals("openid4vp://request", operations.previewRequestUrl)
@@ -186,26 +186,26 @@ class WalletSdkBridgeTest {
     @Test
     fun bridgePresentationPreviewPreservesAuthenticatedRequestFacts() = runTest {
         val operations = FakeWalletSdkBridgeOperations(
-            requestAuthentication = MobileWalletRequestAuthentication.Authenticated(
+            requestAuthentication = PresentationRequestAuthentication.Authenticated(
                 compactRequestObject = "signed-request-object",
                 algorithm = "ES256",
                 keyId = "verifier-kid",
-                clientIdScheme = MobileWalletClientIdScheme.PRE_REGISTERED,
+                clientIdScheme = PresentationClientIdScheme.PRE_REGISTERED,
             ),
         )
         val bridge = WalletSdkBridge.forOperations(operations)
 
         val result = bridge.previewPresentation("openid4vp://request")
 
-        val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(
-            assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreviewResult>>(result).value,
+        val preview = assertIs<PresentationPreviewResult.Ready>(
+            assertIs<WalletBridgeResult.Success<PresentationPreviewResult>>(result).value,
         ).preview
         assertEquals(
-            MobileWalletRequestAuthentication.Authenticated(
+            PresentationRequestAuthentication.Authenticated(
                 compactRequestObject = "signed-request-object",
                 algorithm = "ES256",
                 keyId = "verifier-kid",
-                clientIdScheme = MobileWalletClientIdScheme.PRE_REGISTERED,
+                clientIdScheme = PresentationClientIdScheme.PRE_REGISTERED,
             ),
             preview.request.requestAuthentication,
         )
@@ -247,12 +247,12 @@ class WalletSdkBridgeTest {
 
     @Test
     fun bridgePresentationPreviewPreservesDetectedProtocolError() = runTest {
-        val expected = MobileWalletPresentationPreviewResult.Invalid(
-            previewHandle = MobileWalletPresentationPreviewHandle("presentation-preview"),
-            request = MobileWalletPresentationRequestContext(
+        val expected = PresentationPreviewResult.Invalid(
+            previewHandle = PresentationPreviewHandle("presentation-preview"),
+            request = PartialPresentationRequest(
                 clientId = "https://verifier.example",
-                verifierMetadata = MobileWalletVerifierMetadata(
-                    display = MobileWalletMetadataDisplay(
+                verifierMetadata = VerifierMetadata(
+                    display = MetadataDisplay(
                         name = "Example Verifier",
                         locale = "en",
                         logoUri = null,
@@ -262,13 +262,13 @@ class WalletSdkBridgeTest {
                     policyUri = null,
                     termsOfServiceUri = null,
                 ),
-                requestAuthentication = MobileWalletRequestAuthentication.Unauthenticated,
+                requestAuthentication = PresentationRequestAuthentication.Unauthenticated,
                 responseUri = "https://verifier.example/direct-post",
                 state = "state-1",
                 nonce = null,
-                responseEncryption = MobileWalletResponseEncryption.NotRequired,
+                responseEncryption = PresentationResponseEncryption.NotRequired,
             ),
-            errorCode = MobileWalletPresentationErrorCode.invalidTransactionData,
+            errorCode = PresentationErrorCode.invalidTransactionData,
             message = "Unsupported transaction data type",
         )
         val operations = FakeWalletSdkBridgeOperations(previewResult = expected)
@@ -276,7 +276,7 @@ class WalletSdkBridgeTest {
 
         val result = bridge.previewPresentation("openid4vp://request")
 
-        assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreviewResult>>(result)
+        assertIs<WalletBridgeResult.Success<PresentationPreviewResult>>(result)
         assertEquals(expected, result.value)
     }
 
@@ -286,18 +286,18 @@ class WalletSdkBridgeTest {
         val bridge = WalletSdkBridge.forOperations(operations)
 
         val result = bridge.reviewPresentation(
-            previewHandle = MobileWalletPresentationPreviewHandle("presentation-preview"),
-            selection = MobileWalletPresentationSelection(
-                credentials = listOf(MobileWalletPresentationCredentialSelection("pid", "credential-1")),
-                disclosures = listOf(MobileWalletPresentationDisclosureSelection("pid", "credential-1", "$.given_name")),
+            previewHandle = PresentationPreviewHandle("presentation-preview"),
+            selection = PresentationSelection(
+                credentials = listOf(PresentationCredentialSelection("pid", "credential-1")),
+                disclosures = listOf(PresentationDisclosureSelection("pid", "credential-1", "$.given_name")),
             ),
             did = "did:jwk:issuer",
         )
 
         assertIs<WalletBridgeResult.Failure>(result)
-        assertEquals(listOf(MobileWalletPresentationCredentialSelection("pid", "credential-1")), operations.submittedCredentialOptions)
-        assertEquals(listOf(MobileWalletPresentationDisclosureSelection("pid", "credential-1", "$.given_name")), operations.submittedDisclosureOptions)
-        assertEquals(MobileWalletPresentationPreviewHandle("presentation-preview"), operations.submittedPreviewHandle)
+        assertEquals(listOf(PresentationCredentialSelection("pid", "credential-1")), operations.submittedCredentialOptions)
+        assertEquals(listOf(PresentationDisclosureSelection("pid", "credential-1", "$.given_name")), operations.submittedDisclosureOptions)
+        assertEquals(PresentationPreviewHandle("presentation-preview"), operations.submittedPreviewHandle)
         assertEquals("did:jwk:issuer", operations.submittedDid)
     }
 
@@ -305,18 +305,18 @@ class WalletSdkBridgeTest {
     fun bridgeRejectPresentationForwardsErrorDetails() = runTest {
         val operations = FakeWalletSdkBridgeOperations()
         val bridge = WalletSdkBridge.forOperations(operations)
-        val handle = MobileWalletPresentationPreviewHandle("presentation-preview")
+        val handle = PresentationPreviewHandle("presentation-preview")
 
         val result = bridge.rejectPresentation(
             previewHandle = handle,
-            errorCode = MobileWalletPresentationErrorCode.accessDenied,
+            errorCode = PresentationErrorCode.accessDenied,
             errorDescription = "User declined",
         )
 
-        val success = assertIs<WalletBridgeResult.Success<MobileWalletPresentationResult>>(result)
-        assertIs<MobileWalletPresentationResult.Transmitted.Succeeded>(success.value)
+        val success = assertIs<WalletBridgeResult.Success<PresentationResult>>(result)
+        assertIs<PresentationResult.Transmitted.Succeeded>(success.value)
         assertEquals(handle, operations.rejectedPreviewHandle)
-        assertEquals(MobileWalletPresentationErrorCode.accessDenied, operations.rejectedErrorCode)
+        assertEquals(PresentationErrorCode.accessDenied, operations.rejectedErrorCode)
         assertEquals("User declined", operations.rejectedErrorDescription)
     }
 
@@ -324,7 +324,7 @@ class WalletSdkBridgeTest {
     fun bridgeRejectPresentationCanUseWalletDetectedError() = runTest {
         val operations = FakeWalletSdkBridgeOperations()
         val bridge = WalletSdkBridge.forOperations(operations)
-        val handle = MobileWalletPresentationPreviewHandle("presentation-preview")
+        val handle = PresentationPreviewHandle("presentation-preview")
 
         bridge.rejectPresentation(previewHandle = handle)
 
@@ -336,7 +336,7 @@ class WalletSdkBridgeTest {
     @Test
     @OptIn(ExperimentalSerializationApi::class)
     fun factoryMapsSwiftFriendlyConfigurationToMobileWalletConfig() = runTest {
-        var capturedConfig: MobileWalletConfig? = null
+        var capturedConfig: WalletConfiguration? = null
         val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
             capturedConfig = config
             FakeWalletSdkBridgeOperations()
@@ -363,7 +363,7 @@ class WalletSdkBridgeTest {
                 ),
                 preferredLocales = listOf("de-AT", "en"),
                 transactionDataProfiles = listOf(
-                    MobileWalletTransactionDataProfile(
+                    TransactionDataProfile(
                         type = "example.transaction",
                         displayName = "Example Transaction",
                         fields = listOf("amount"),
@@ -375,7 +375,7 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         assertEquals("consumer-wallet", capturedConfig?.walletId)
         assertEquals(
-            MobileWalletPersistence(),
+            WalletPersistence(),
             capturedConfig?.persistence,
         )
         assertEquals("https://attestation.example", capturedConfig?.issuance?.attestation?.baseUrl)
@@ -392,7 +392,7 @@ class WalletSdkBridgeTest {
         assertEquals(listOf("de-AT", "en"), capturedConfig?.preferredLocales)
         assertEquals(
             listOf(
-                MobileWalletTransactionDataProfile(
+                TransactionDataProfile(
                     type = "example.transaction",
                     displayName = "Example Transaction",
                     fields = listOf("amount"),
@@ -402,13 +402,13 @@ class WalletSdkBridgeTest {
         )
 
         val credentials = result.value.credentials()
-        assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(credentials)
+        assertIs<WalletBridgeResult.Success<List<WalletCredential>>>(credentials)
         assertEquals("credential-1", credentials.value.single().id)
     }
 
     @Test
     fun factoryMapsProvidedDatabaseKeyProviderToMobileWalletConfig() = runTest {
-        var capturedConfig: MobileWalletConfig? = null
+        var capturedConfig: WalletConfiguration? = null
         val bridgeKeyProvider = RecordingBridgeDatabaseKeyProvider(
             WalletBridgeDatabaseEncryptionKey(
                 keyId = "swift-key",
@@ -432,7 +432,7 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         val persistence = capturedConfig?.persistence
-        val databaseKey = assertIs<MobileWalletDatabaseKey.Provided>(persistence?.databaseKey)
+        val databaseKey = assertIs<WalletDatabaseKey.Provided>(persistence?.databaseKey)
         val key = databaseKey.provider.getOrCreateKey("swift-managed-wallet", "wallet_swift-managed-wallet")
 
         assertEquals(DatabaseEncryptionKey("swift-key", byteArrayOf(1, 2, 3)), key)
@@ -442,7 +442,7 @@ class WalletSdkBridgeTest {
 
     @Test
     fun factoryMapsSwiftCredentialStoreOverrideToMobileWalletConfig() = runTest {
-        var capturedConfig: MobileWalletConfig? = null
+        var capturedConfig: WalletConfiguration? = null
         val bridgeCredentialStore = RecordingBridgeCredentialStore()
         val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
             capturedConfig = config
@@ -460,7 +460,7 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         val persistence = capturedConfig?.persistence
-        assertIs<MobileWalletDatabaseKey.Managed>(persistence?.databaseKey)
+        assertIs<WalletDatabaseKey.Managed>(persistence?.databaseKey)
         assertNull(persistence?.didStore)
         val credentialStore = persistence?.credentialStore
         assertEquals(true, credentialStore?.removeCredential("credential-1"))
@@ -469,7 +469,7 @@ class WalletSdkBridgeTest {
 
     @Test
     fun swiftCredentialStorePersistsSdJwtDisclosuresForReloadableDisplay() = runTest {
-        var capturedConfig: MobileWalletConfig? = null
+        var capturedConfig: WalletConfiguration? = null
         val bridgeCredentialStore = RecordingBridgeCredentialStore()
         val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
             capturedConfig = config
@@ -510,7 +510,7 @@ class WalletSdkBridgeTest {
 
     @Test
     fun factoryMapsSwiftDidStoreOverrideToMobileWalletConfig() = runTest {
-        var capturedConfig: MobileWalletConfig? = null
+        var capturedConfig: WalletConfiguration? = null
         val bridgeDidStore = RecordingBridgeDidStore(
             WalletBridgeStoredDid(
                 did = "did:key:swift",
@@ -533,7 +533,7 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         val persistence = requireNotNull(capturedConfig).persistence
-        assertIs<MobileWalletDatabaseKey.Managed>(persistence.databaseKey)
+        assertIs<WalletDatabaseKey.Managed>(persistence.databaseKey)
 
         val didStore = requireNotNull(persistence.didStore)
         assertEquals(
@@ -550,7 +550,7 @@ class WalletSdkBridgeTest {
 
     @Test
     fun factoryCombinesSwiftDatabaseKeyProviderAndCredentialStoreOverride() = runTest {
-        var capturedConfig: MobileWalletConfig? = null
+        var capturedConfig: WalletConfiguration? = null
         val bridgeKeyProvider = RecordingBridgeDatabaseKeyProvider(
             WalletBridgeDatabaseEncryptionKey(
                 keyId = "swift-key",
@@ -576,7 +576,7 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         val persistence = capturedConfig?.persistence
-        val databaseKey = assertIs<MobileWalletDatabaseKey.Provided>(persistence?.databaseKey)
+        val databaseKey = assertIs<WalletDatabaseKey.Provided>(persistence?.databaseKey)
         val key = databaseKey.provider.getOrCreateKey("swift-combined-wallet", "wallet_swift-combined-wallet")
 
         assertEquals(DatabaseEncryptionKey("swift-key", byteArrayOf(4, 5, 6)), key)
@@ -591,7 +591,7 @@ class WalletSdkBridgeTest {
 
         assertEquals("default", config.walletId)
         assertEquals(null, config.issuance.attestation)
-        assertEquals(MobileWalletPersistence(), config.persistence)
+        assertEquals(WalletPersistence(), config.persistence)
         assertEquals(platformPreferredLocales(), config.preferredLocales)
         assertEquals(emptyList(), config.presentation.transactionDataProfiles)
     }
@@ -603,7 +603,7 @@ class WalletSdkBridgeTest {
             opens++
             throw CancellationException("opening cancelled")
         }
-        val profile = MobileWalletTransactionDataProfile("example.transaction")
+        val profile = TransactionDataProfile("example.transaction")
         val invalid = factory.create(WalletBridgeConfiguration(transactionDataProfiles = listOf(profile, profile)))
         assertEquals(WalletBridgeErrorCategory.invalidInput, assertIs<WalletBridgeResult.Failure>(invalid).error.category)
         assertEquals(0, opens)
@@ -657,26 +657,26 @@ class WalletSdkBridgeTest {
 
     @Test
     fun bridgeExposesCommonMobileWalletEvents() = runTest {
-        val events = MutableSharedFlow<MobileWalletEvent>(replay = 1)
+        val events = MutableSharedFlow<WalletEvent>(replay = 1)
         val bridge = WalletSdkBridge.forOperations(
             operations = FakeWalletSdkBridgeOperations(),
             eventFlow = events,
         )
 
         events.emit(
-            MobileWalletEvent.PresentationCompleted
+            WalletEvent.PresentationCompleted
         )
         val event = bridge.events.first()
 
-        assertEquals(MobileWalletEventPhase.Presentation, event.phase)
-        assertEquals(MobileWalletEventStatus.Completed, event.status)
+        assertEquals(WalletEventPhase.Presentation, event.phase)
+        assertEquals(WalletEventStatus.Completed, event.status)
         assertEquals("presentation_completed", event.identifier)
     }
 
     private class FakeWalletSdkBridgeOperations(
-        private val previewResult: MobileWalletPresentationPreviewResult? = null,
-        private val requestAuthentication: MobileWalletRequestAuthentication =
-            MobileWalletRequestAuthentication.Unauthenticated,
+        private val previewResult: PresentationPreviewResult? = null,
+        private val requestAuthentication: PresentationRequestAuthentication =
+            PresentationRequestAuthentication.Unauthenticated,
     ) : WalletSdkBridgeOperations {
         var deleteWalletCalls = 0
             private set
@@ -685,43 +685,43 @@ class WalletSdkBridgeTest {
         val deletedCredentialIds = mutableListOf<String>()
         var previewRequestUrl: String? = null
             private set
-        var submittedPreviewHandle: MobileWalletPresentationPreviewHandle? = null
+        var submittedPreviewHandle: PresentationPreviewHandle? = null
             private set
-        var submittedCredentialOptions: List<MobileWalletPresentationCredentialSelection>? = null
+        var submittedCredentialOptions: List<PresentationCredentialSelection>? = null
             private set
-        var submittedDisclosureOptions: List<MobileWalletPresentationDisclosureSelection>? = null
+        var submittedDisclosureOptions: List<PresentationDisclosureSelection>? = null
             private set
         var submittedDid: String? = null
             private set
-        var rejectedPreviewHandle: MobileWalletPresentationPreviewHandle? = null
+        var rejectedPreviewHandle: PresentationPreviewHandle? = null
             private set
-        var rejectedErrorCode: MobileWalletPresentationErrorCode? = null
+        var rejectedErrorCode: PresentationErrorCode? = null
             private set
         var rejectedErrorDescription: String? = null
             private set
         var cancelledIssuanceSessionId: String? = null
             private set
         override suspend fun keyUseAuthorizationPreflight(
-            keyType: MobileWalletKeyType,
+            keyType: WalletKeyType,
             policy: KeyUseAuthorizationPolicy,
         ): KeyUseAuthorizationSupport = error("Not used by this test fake")
 
         override suspend fun createIssuanceHolderKeys(
-            count: Int, keyType: MobileWalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
-        ): List<MobileWalletHolderBinding> = List(count) { MobileWalletHolderBinding("holder-$it", "did:key:holder-$it") }
+            count: Int, keyType: WalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
+        ): List<IssuanceHolderBinding> = List(count) { IssuanceHolderBinding("holder-$it", "did:key:holder-$it") }
 
         override suspend fun resumeIssuance(sessionId: String): WalletIssuanceOfferReview? = null
 
-        override suspend fun startIssuance(request: MobileWalletIssuanceRequest) =
+        override suspend fun startIssuance(request: IssuanceRequest) =
             error("Not used by this test fake")
 
-        override suspend fun beginAuthorizationIssuance(sessionId: String, registration: IssuanceClientRegistration, credentials: List<MobileWalletCredentialSelection>?): WalletIssuanceAuthorization =
+        override suspend fun beginAuthorizationIssuance(sessionId: String, registration: IssuanceClientRegistration, credentials: List<IssuanceCredentialSelection>?): WalletIssuanceAuthorization =
             error("Not used by this test fake")
 
         override suspend fun continuePreAuthorizedIssuance(
             sessionId: String,
             transactionCode: String?,
-            credentials: List<MobileWalletCredentialSelection>?,
+            credentials: List<IssuanceCredentialSelection>?,
             clientId: String?,
         ) = error("Not used by this test fake")
 
@@ -740,8 +740,8 @@ class WalletSdkBridgeTest {
         override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
             error("Not used by this test fake")
 
-        override suspend fun credentialReads(): List<MobileWalletCredentialRead> = credentials().map {
-            MobileWalletCredentialRead(it, CredentialStatus.references(), Clock.System.now())
+        override suspend fun credentialReads(): List<CredentialWithStatus> = credentials().map {
+            CredentialWithStatus(it, CredentialStatus.references(), Clock.System.now())
         }
         var statusFlow: Flow<WalletCredentialStatusSnapshot> = emptyFlow()
         override val credentialStatuses: Flow<WalletCredentialStatusSnapshot>
@@ -751,9 +751,9 @@ class WalletSdkBridgeTest {
         override suspend fun refreshCredentialStatuses(credentialIds: List<String>?, mode: CredentialStatusRefreshMode): List<CredentialStatusRefreshResult> = emptyList()
         override suspend fun close() = Unit
 
-        override suspend fun credentials(): List<MobileWalletCredential> =
+        override suspend fun credentials(): List<WalletCredential> =
             listOf(
-                MobileWalletCredential(
+                WalletCredential(
                     id = "credential-1",
                     format = "vc+sd-jwt",
                     issuer = "https://issuer.example",
@@ -774,14 +774,14 @@ class WalletSdkBridgeTest {
             deleteWalletCalls++
         }
 
-        override suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreviewResult {
+        override suspend fun previewPresentation(requestUrl: String): PresentationPreviewResult {
             previewRequestUrl = requestUrl
-            return previewResult ?: MobileWalletPresentationPreviewResult.Ready(MobileWalletPresentationPreview(
-                previewHandle = MobileWalletPresentationPreviewHandle("presentation-preview"),
-                request = MobileWalletPresentationRequestInfo(
+            return previewResult ?: PresentationPreviewResult.Ready(PresentationPreview(
+                previewHandle = PresentationPreviewHandle("presentation-preview"),
+                request = PresentationRequest(
                     clientId = "https://verifier.example",
-                    verifierMetadata = MobileWalletVerifierMetadata(
-                        display = MobileWalletMetadataDisplay(
+                    verifierMetadata = VerifierMetadata(
+                        display = MetadataDisplay(
                             name = "Example Verifier",
                             locale = "en",
                             logoUri = null,
@@ -795,7 +795,7 @@ class WalletSdkBridgeTest {
                     responseUri = "https://verifier.example/direct-post",
                     state = "state-1",
                     nonce = "nonce-1",
-                    responseEncryption = MobileWalletResponseEncryption.Required(
+                    responseEncryption = PresentationResponseEncryption.Required(
                         keyManagementAlgorithm = "ECDH-ES",
                         contentEncryptionAlgorithm = "A256GCM",
                         verifierKeyId = "verifier-key-1",
@@ -803,9 +803,9 @@ class WalletSdkBridgeTest {
                     ),
                 ),
                 credentialOptions = listOf(
-                    MobileWalletPresentationCredentialOption(
+                    PresentationCredentialOption(
                         queryId = "pid",
-                        credential = MobileWalletCredential(
+                        credential = WalletCredential(
                             id = "credential-1",
                             format = "vc+sd-jwt",
                             credentialDataJson = """{"given_name":"Ada"}""",
@@ -817,14 +817,14 @@ class WalletSdkBridgeTest {
                     )
                 ),
                 credentialRequirements = listOf(
-                    MobileWalletPresentationCredentialRequirement(options = listOf(listOf("pid")))
+                    PresentationCredentialRequirement(options = listOf(listOf("pid")))
                 ),
             ))
         }
 
         override suspend fun retainPresentationReview(
-            previewHandle: MobileWalletPresentationPreviewHandle, selection: MobileWalletPresentationSelection, did: String?,
-        ): MobileWalletPresentationReview {
+            previewHandle: PresentationPreviewHandle, selection: PresentationSelection, did: String?,
+        ): PresentationReview {
             submittedPreviewHandle = previewHandle
             submittedCredentialOptions = selection.credentials
             submittedDisclosureOptions = selection.disclosures
@@ -832,24 +832,24 @@ class WalletSdkBridgeTest {
             throw IllegalArgumentException("Test wallet has no matching credential")
         }
 
-        override suspend fun submitReviewedPresentation(review: MobileWalletPresentationReview): MobileWalletPresentationResult =
+        override suspend fun submitReviewedPresentation(review: PresentationReview): PresentationResult =
             error("No review returned by this fake")
 
         override suspend fun rejectPresentation(
-            previewHandle: MobileWalletPresentationPreviewHandle,
-            errorCode: MobileWalletPresentationErrorCode?,
+            previewHandle: PresentationPreviewHandle,
+            errorCode: PresentationErrorCode?,
             errorDescription: String?,
-        ): MobileWalletPresentationResult {
+        ): PresentationResult {
             rejectedPreviewHandle = previewHandle
             rejectedErrorCode = errorCode
             rejectedErrorDescription = errorDescription
-            return MobileWalletPresentationResult.Transmitted.Succeeded(
+            return PresentationResult.Transmitted.Succeeded(
                 verifierResponseJson = """{"accepted":false}""",
                 redirectUrl = null,
             )
         }
 
-        override suspend fun discardPresentationPreview(previewHandle: MobileWalletPresentationPreviewHandle) = Unit
+        override suspend fun discardPresentationPreview(previewHandle: PresentationPreviewHandle) = Unit
     }
 
     private class RecordingBridgeDatabaseKeyProvider(

@@ -3,7 +3,7 @@ import Foundation
 /// A wallet-issued disclosure decision. Show the claims, status advisories and any authenticated payment before submitting.
 public final class PresentationReview: Sendable {
     /// The complete effective disclosures for the selected credentials.
-    public let claims: PreparedPresentationReview
+    public let claims: ReviewedPresentationClaims
     /// The local advisories captured for the selected credentials.
     public let statuses: [CredentialStatusRecord]
     /// Authenticated payment instructions when the reviewed request requires them.
@@ -11,7 +11,7 @@ public final class PresentationReview: Sendable {
     let owner: Wallet
     let submit: @Sendable () async throws -> PresentationResult
 
-    init(claims: PreparedPresentationReview, statuses: [CredentialStatusRecord], payment: PaymentConsent?,
+    init(claims: ReviewedPresentationClaims, statuses: [CredentialStatusRecord], payment: PaymentConsent?,
          owner: Wallet, submit: @escaping @Sendable () async throws -> PresentationResult) {
         self.claims = claims
         self.statuses = statuses
@@ -22,7 +22,7 @@ public final class PresentationReview: Sendable {
 }
 
 /// Effective credential claims for one selected query, prepared without signing or transport.
-public struct PreparedPresentationReview: Equatable, Sendable {
+public struct ReviewedPresentationClaims: Equatable, Sendable {
     /// Effective contributions kept separate for each selected query and credential.
     public let credentials: [PresentationCredentialClaims]
 

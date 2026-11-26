@@ -10,7 +10,7 @@ extension WalletBridgeCredentialRead {
     }
 }
 
-extension MobileWalletCredential {
+extension WalletCore.WalletCredential {
     func toSwiftCredential(status: CredentialStatus? = nil) throws -> Credential {
         Credential(
             id: id,

@@ -606,7 +606,7 @@ internal class WalletVisualScenarios(
     fun settingsRoot(destination: String = "root", reviewEnabled: Boolean = true) = with(test) {
         val trust = id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController(
             id.walt.walletdemo.compose.logic.InMemoryDemoReaderTrustSettingsStore(
-                id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettings(if (destination == "reader_required")
+                id.walt.wallet2.mobile.proximity.trust.ProximityReaderTrustSettings(if (destination == "reader_required")
                     id.walt.wallet2.mobile.proximity.ProximityReaderPolicy.RequireTrusted else id.walt.wallet2.mobile.proximity.ProximityReaderPolicy.AllowAnonymousOrUntrusted)),
             scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
             dispatcher = kotlinx.coroutines.Dispatchers.Unconfined,

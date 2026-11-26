@@ -348,15 +348,17 @@ final class WalletAPITests: XCTestCase {
                 state: "state-1"
             ),
             credentialOptions: [
-                .init(
+                try .init(
                     queryID: "pid",
-                    credentialID: "credential-1",
-                    format: "vc+sd-jwt",
-                    credentialDataJSON: #"{"given_name":"Ada"}"#,
+                    credential: .init(
+                        id: "credential-1",
+                        format: "vc+sd-jwt",
+                        credentialDataJSON: #"{"given_name":"Ada"}"#,
+                        issuer: "https://issuer.example",
+                        subject: "did:key:subject",
+                        label: "PID",
+                    ),
                     multiple: true,
-                    issuer: "https://issuer.example",
-                    subject: "did:key:subject",
-                    label: "PID",
                     disclosures: [
                         .init(
                             path: "$.given_name",
@@ -482,6 +484,23 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(updated.session, configuration.session)
         XCTAssertEqual(updated.readerPolicy, ProximityReaderPolicy.requireTrusted)
         XCTAssertEqual(updated.maximumMessageBytes, configuration.maximumMessageBytes)
+    }
+
+    func testHostProximityConfigurationRejectsInvalidBoundsAndConflictingPlans() throws {
+        XCTAssertThrowsError(try ProximityDocumentRequestIndex(-1))
+        XCTAssertNoThrow(try ProximityDocumentRequestIndex(Int(Int32.max)))
+        XCTAssertThrowsError(try ProximityDocumentRequestIndex(Int(Int32.max) + 1))
+        XCTAssertThrowsError(try ProximityReaderEvidence(scope: .wholeRequest, certificateChainDER: []))
+        XCTAssertThrowsError(try ProximityReaderEvidence(scope: .wholeRequest, certificateChainDER: [Data([1])],
+                                                        authenticationIndex: Int(Int32.max) + 1))
+        XCTAssertThrowsError(try ProximityNFCRetrievalConfiguration(maximumCommandDataLength: 254))
+        XCTAssertThrowsError(try ProximityNFCRetrievalConfiguration(maximumResponseDataLength: 65_537))
+        XCTAssertThrowsError(try ProximityRetrievalOptions(bluetoothLowEnergy: nil))
+        XCTAssertThrowsError(try ProximityNFCV2SessionConfiguration(maximumCommandDataLength: 0))
+        let central = try ProximityRetrievalOptions(bluetoothLowEnergy: .init(roles: .centralClient))
+        let peripheral = try ProximityRetrievalOptions(bluetoothLowEnergy: .init(roles: .peripheralServer))
+        XCTAssertThrowsError(try ProximityNFCSessionConfiguration(handover: .staticHandover, retrieval: central,
+                                                                 qrFallback: peripheral))
     }
 
     func testProximityConfigurationRepresentsWifiAwareWithoutEnablingBLE() throws {
@@ -867,15 +886,15 @@ final class WalletAPITests: XCTestCase {
                     state: nil
                 ),
                 credentialOptions: [
-                    .init(
+                    try .init(
                         queryID: "pid",
-                        credentialID: "credential-1",
-                        format: "vc+sd-jwt",
-                        credentialDataJSON: "{}",
+                        credential: .init(
+                            id: "credential-1",
+                            format: "vc+sd-jwt",
+                            credentialDataJSON: "{}",
+                            label: "PID",
+                        ),
                         multiple: true,
-                        issuer: nil,
-                        subject: nil,
-                        label: "PID",
                         disclosures: []
                     )
                 ]
@@ -907,7 +926,7 @@ final class WalletAPITests: XCTestCase {
 
     func testPreviewPresentationReturnsTypedProtocolError() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
-        let requestInfo = try PresentationRequestContext(
+        let requestInfo = try PartialPresentationRequest(
             clientID: "https://verifier.example",
             requestAuthentication: .unauthenticated,
             responseEncryption: .notRequired,
@@ -1131,17 +1150,17 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testPresentationModelValidationRejectsInvalidStates() {
-        XCTAssertFalse(PresentationRequestContext.hasValidClientID(" "))
-        XCTAssertTrue(PresentationRequestContext.hasValidClientID("https://verifier.example"))
+        XCTAssertFalse(PartialPresentationRequest.hasValidClientID(" "))
+        XCTAssertTrue(PartialPresentationRequest.hasValidClientID("https://verifier.example"))
 
         XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([]))
         XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([[]]))
         XCTAssertFalse(PresentationCredentialRequirement.hasValidOptions([[" "]]))
         XCTAssertTrue(PresentationCredentialRequirement.hasValidOptions([["pid 1", "age.credential"]]))
 
-        XCTAssertFalse(PresentationRequestInfo.hasRequiredFields(clientID: "", nonce: "nonce"))
-        XCTAssertFalse(PresentationRequestInfo.hasRequiredFields(clientID: "client", nonce: " "))
-        XCTAssertTrue(PresentationRequestInfo.hasRequiredFields(clientID: "client", nonce: "nonce"))
+        XCTAssertFalse(PresentationRequest.hasRequiredFields(clientID: "", nonce: "nonce"))
+        XCTAssertFalse(PresentationRequest.hasRequiredFields(clientID: "client", nonce: " "))
+        XCTAssertTrue(PresentationRequest.hasRequiredFields(clientID: "client", nonce: "nonce"))
 
         XCTAssertTrue(DisclosureDisposition.selectable.selectivelyDisclosable)
         XCTAssertFalse(DisclosureDisposition.fixedSelective.selectable)
@@ -1339,7 +1358,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             credentialOptions: []
         )
     )
-    var effectiveReview = PreparedPresentationReview(credentials: [])
+    var effectiveReview = ReviewedPresentationClaims(credentials: [])
     var effectiveReviewArguments: (PresentationPreviewHandle, [PresentationCredentialSelection], [PresentationDisclosureSelection]?, String?)?
     var submitResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
     var rejectResult = PresentationResult.transmitted(.succeeded(verifierResponseJSON: "{}"))
@@ -1511,7 +1530,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             try await submitPresentation(previewHandle: previewHandle, selection: selection, did: did, paymentConsentRevision: nil)
         }
     }
-    func reviewPresentation(previewHandle: PresentationPreviewHandle, selection: PresentationSelection, did: String?) async throws -> PreparedPresentationReview {
+    func reviewPresentation(previewHandle: PresentationPreviewHandle, selection: PresentationSelection, did: String?) async throws -> ReviewedPresentationClaims {
         if let error { throw error }
         effectiveReviewArguments = (previewHandle, selection.credentials, selection.disclosures, did)
         return effectiveReview

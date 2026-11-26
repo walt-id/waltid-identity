@@ -21,7 +21,7 @@ protocol WalletClient {
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
-    ) async throws -> PreparedPresentationReview
+    ) async throws -> ReviewedPresentationClaims
     func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error>
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot?
     func reconcileBackgroundStatus(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment?
@@ -96,7 +96,7 @@ extension WalletClient {
         selectedCredentialOptions: [PresentationCredentialSelection],
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
-    ) async throws -> PreparedPresentationReview {
+    ) async throws -> ReviewedPresentationClaims {
         throw WalletError.invalidInput("Effective review is unavailable")
     }
     func credentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> { AsyncThrowingStream { $0.finish() } }

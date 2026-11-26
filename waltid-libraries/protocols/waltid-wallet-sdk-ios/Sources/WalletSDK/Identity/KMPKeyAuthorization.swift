@@ -3,7 +3,7 @@ import Foundation
 @preconcurrency import WalletCore
 
 extension WalletKeyType {
-    func toKMPKeyType() -> MobileWalletKeyType {
+    func toKMPKeyType() -> WalletCore.WalletKeyType {
         switch self {
         case .ed25519:
             return .ed25519

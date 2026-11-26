@@ -9,11 +9,11 @@ import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
-import id.walt.wallet2.mobile.identity.MobileWalletKeyAuthorization
+import id.walt.wallet2.mobile.WalletConfiguration
+import id.walt.wallet2.mobile.WalletFactory
+import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.identity.WalletKeyAuthorization
 import id.walt.wallet2.mobile.identity.SigningIdentity
 import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
@@ -192,15 +192,15 @@ class MobileWalletEncryptionTest {
         deleteDatabaseFiles(databaseFileName)
 
         val firstKey = provider.getOrCreateKey(walletId, databaseName)
-        val wallet = MobileWalletFactory(context).create(
-            MobileWalletConfig(
+        val wallet = WalletFactory(context).open(
+            WalletConfiguration(
                 walletId = walletId,
-                keyAuthorization = MobileWalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
+                keyAuthorization = WalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
             )
         )
         assertTrue(databaseFiles(databaseFileName).any { it.exists() }, "Encrypted wallet DB should exist before deletion")
 
-        wallet.deleteWallet()
+        wallet.deleteLocalData()
 
         assertFalse(databaseFiles(databaseFileName).any { it.exists() }, "Managed wallet DB files should be deleted")
         val regeneratedKey = provider.getOrCreateKey(walletId, databaseName)
@@ -223,24 +223,24 @@ class MobileWalletEncryptionTest {
         )
         deleteDatabaseFiles(databaseFileName)
 
-        val factory = MobileWalletFactory(context)
-        val config = MobileWalletConfig(
+        val factory = WalletFactory(context)
+        val config = WalletConfiguration(
             walletId = walletId,
-            persistence = MobileWalletPersistence(
-                databaseKey = MobileWalletDatabaseKey.Provided(provider),
+            persistence = WalletPersistence(
+                databaseKey = WalletDatabaseKey.Provided(provider),
             ),
-            keyAuthorization = MobileWalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
+            keyAuthorization = WalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
         )
-        val wallet = factory.create(config)
+        val wallet = factory.open(config)
 
         val bootstrap = wallet.signingIdentity.initialize().activeIdentity()
         wallet.close()
-        val reopenedWallet = factory.create(config)
+        val reopenedWallet = factory.open(config)
         val reopenedBootstrap = reopenedWallet.signingIdentity.initialize().activeIdentity()
 
         assertEquals(bootstrap, reopenedBootstrap)
         assertEquals(listOf("$walletId:$databaseName", "$walletId:$databaseName"), provider.requestedKeys)
-        reopenedWallet.deleteWallet()
+        reopenedWallet.deleteLocalData()
         assertEquals(listOf("$walletId:$databaseName"), provider.deletedKeys)
         assertFalse(databaseFiles(databaseFileName).any { it.exists() }, "Provided-key wallet DB files should be deleted")
 
@@ -253,22 +253,22 @@ class MobileWalletEncryptionTest {
         val databaseName = "wallet_$walletId"
         val databaseFileName = "$databaseName.db"
         val credentialStore = RecordingCredentialStore()
-        val config = MobileWalletConfig(
+        val config = WalletConfiguration(
             walletId = walletId,
-            persistence = MobileWalletPersistence(
+            persistence = WalletPersistence(
                 credentialStore = credentialStore,
             ),
-            keyAuthorization = MobileWalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
+            keyAuthorization = WalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
         )
-        val factory = MobileWalletFactory(context)
+        val factory = WalletFactory(context)
         deleteDatabaseFiles(databaseFileName)
 
-        val wallet = factory.create(config)
+        val wallet = factory.open(config)
 
         val bootstrap = wallet.signingIdentity.initialize().activeIdentity()
         val credentials = wallet.credentials()
         wallet.close()
-        val reopenedWallet = factory.create(config)
+        val reopenedWallet = factory.open(config)
         val reopenedBootstrap = reopenedWallet.signingIdentity.initialize().activeIdentity()
         val reopenedCredentials = reopenedWallet.credentials()
 
@@ -280,7 +280,7 @@ class MobileWalletEncryptionTest {
         // Both initializations refresh credential registration, in addition to the two explicit reads.
         assertEquals(4, credentialStore.listCredentialsCalls)
 
-        reopenedWallet.deleteWallet()
+        reopenedWallet.deleteLocalData()
         deleteDatabaseFiles(databaseFileName)
         AndroidDatabaseEncryptionKeyProvider(context).deleteKey(walletId, databaseName)
     }

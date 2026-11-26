@@ -1,19 +1,19 @@
 package id.walt.walletdemo.compose.android
 
-import id.walt.wallet2.handlers.WalletIssuanceContinuation
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
-import id.walt.wallet2.mobile.issuance.MobileWalletAuthorizationId
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSessionId
+import id.walt.wallet2.mobile.issuance.DeferredIssuanceId
+import id.walt.wallet2.mobile.issuance.IssuanceSession
+import id.walt.wallet2.mobile.issuance.IssuanceAuthorizationId
+import id.walt.wallet2.mobile.issuance.IssuanceSessionId
 import android.content.Context
 import android.content.Intent
 import androidx.credentials.ExperimentalDigitalCredentialApi
 import androidx.fragment.app.FragmentActivity
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialCreateProvider
-import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.Wallet
 import id.walt.wallet2.mobile.issuance.IssuanceClientRegistration
-import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.issuance.CredentialOfferInput
+import id.walt.wallet2.mobile.issuance.IssuanceRequest
 import id.walt.walletdemo.compose.logic.*
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -36,7 +36,7 @@ internal class MobileDigitalCredentialCreateClient(
     private val context: Context,
     private val activity: () -> FragmentActivity?,
 ) : DigitalCredentialCreateClient {
-    private var wallet: MobileWallet? = null
+    private var wallet: Wallet? = null
     private fun wallet() = requireNotNull(wallet) { "Wallet has not opened" }
 
     override suspend fun prepare(intent: Intent): DigitalCredentialCreateClient.Offer {
@@ -48,22 +48,22 @@ internal class MobileDigitalCredentialCreateClient(
         currentCoroutineContext().ensureActive()
         val identity = created.bootstrap(config.selectedSigningProtection(context))
         currentCoroutineContext().ensureActive()
-        val session = created.wallet.startIssuance(MobileWalletIssuanceRequest(
-            offer = MobileWalletCredentialOffer.InlineJson(input.request.offerJson),
+        val session = created.wallet.startIssuance(IssuanceRequest(
+            offer = CredentialOfferInput.InlineJson(input.request.offerJson),
         )).toDemoIssuanceSession()
         return DigitalCredentialCreateClient.Offer(input.request.protocol, session, WalletDemoHolderBinding(identity.keyId, identity.did))
     }
 
     override suspend fun accept(id: String, code: String?, selections: List<WalletDemoCredentialSelection>) =
-        (requireNotNull(wallet().resumeIssuance(MobileWalletIssuanceSessionId(id))) as MobileWalletIssuanceSession.PreAuthorized)
+        (requireNotNull(wallet().resumeIssuance(IssuanceSessionId(id))) as IssuanceSession.PreAuthorized)
             .accept(code, selections.toMobileSelections(), clientId = "eudiw-abca").toDemoIssuanceOutcome()
     override suspend fun authorize(id: String, selections: List<WalletDemoCredentialSelection>) =
-        (requireNotNull(wallet().resumeIssuance(MobileWalletIssuanceSessionId(id))) as MobileWalletIssuanceSession.AuthorizationCode)
+        (requireNotNull(wallet().resumeIssuance(IssuanceSessionId(id))) as IssuanceSession.AuthorizationCode)
             .beginAuthorization(IssuanceClientRegistration("eudiw-abca", DigitalCredentialCreateAuthHandoff.REDIRECT_URI), selections.toMobileSelections()).request
     override suspend fun continueAuthorization(id: String, callback: String) =
-        wallet().continueAuthorizationIssuance(MobileWalletAuthorizationId(id), callback).toDemoIssuanceOutcome()
-    override suspend fun cancel(id: String) { wallet().cancelIssuance(MobileWalletIssuanceSessionId(id)) }
-    override suspend fun resume(id: String) = wallet().resumeDeferredIssuance(WalletIssuanceContinuation(id)).toDemoIssuanceOutcome()
+        wallet().completeAuthorization(IssuanceAuthorizationId(id), callback).toDemoIssuanceOutcome()
+    override suspend fun cancel(id: String) { wallet().cancelIssuance(IssuanceSessionId(id)) }
+    override suspend fun resume(id: String) = wallet().resumeDeferredIssuance(DeferredIssuanceId(id)).toDemoIssuanceOutcome()
     override suspend fun credentials() = wallet().credentials().map { it.toDemoCredential() }
     override suspend fun continuations() = wallet().listDeferredIssuance().map { it.toDemoDeferredCredential() }
 }

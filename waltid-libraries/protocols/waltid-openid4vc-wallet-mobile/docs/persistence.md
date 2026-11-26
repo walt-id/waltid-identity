@@ -1,10 +1,10 @@
 # Persistence and encryption
 
-`MobileWalletConfig()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
+`WalletConfiguration()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
 
-Managed signing keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Credential and DID store overrides are independent; signing keys always remain platform-managed. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
+Managed signing keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `WalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Credential and DID store overrides are independent; signing keys always remain platform-managed. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
 
-`MobileWalletConfig()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `presentation.transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
+`WalletConfiguration()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `presentation.transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
 
 When an app enables `urn:eudi:sca:payment:1`, reviewed ordinary and Digital
 Credentials API submissions require a generated, non-exportable hardware signing
@@ -23,15 +23,15 @@ action lifetime. The payment scope enforces fresh approval and one proof; the na
 key retains its timed policy for ordinary operations. This adapter does not supply
 transaction UI, authentication batching across payments, or full SCA assurance.
 
-The examples below build `MobileWalletConfig` values. Pass the selected config
-to `MobileWalletFactory(...).create(config)` from a coroutine to create the
+The examples below build `WalletConfiguration` values. Pass the selected config
+to `WalletFactory(...).open(config)` from a coroutine to create the
 wallet.
 
 Use the encrypted default when the app does not need custom persistence:
 
 <!-- doc-snippet:start kotlin-default-persistence -->
 ```kotlin
-val config = MobileWalletConfig(walletId = "consumer-wallet")
+val config = WalletConfiguration(walletId = "consumer-wallet")
 ```
 <!-- doc-snippet:end kotlin-default-persistence -->
 
@@ -50,10 +50,10 @@ class KmsDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
     }
 }
 
-val config = MobileWalletConfig(
+val config = WalletConfiguration(
     walletId = "consumer-wallet",
-    persistence = MobileWalletPersistence(
-        databaseKey = MobileWalletDatabaseKey.Provided(
+    persistence = WalletPersistence(
+        databaseKey = WalletDatabaseKey.Provided(
             provider = KmsDatabaseKeyProvider()
         )
     )
@@ -69,9 +69,9 @@ Override only credential storage while retaining the default encrypted database,
 
 <!-- doc-snippet:start kotlin-custom-credential-store -->
 ```kotlin
-val config = MobileWalletConfig(
+val config = WalletConfiguration(
     walletId = "consumer-wallet",
-    persistence = MobileWalletPersistence(
+    persistence = WalletPersistence(
         credentialStore = appCredentialStore
     )
 )
@@ -82,9 +82,9 @@ KMP consumers can override credential and DID storage while signing keys remain 
 
 <!-- doc-snippet:start kotlin-store-overrides -->
 ```kotlin
-val config = MobileWalletConfig(
+val config = WalletConfiguration(
     walletId = "consumer-wallet",
-    persistence = MobileWalletPersistence(
+    persistence = WalletPersistence(
         credentialStore = appCredentialStore,
         didStore = appDidStore,
     )
@@ -92,7 +92,7 @@ val config = MobileWalletConfig(
 ```
 <!-- doc-snippet:end kotlin-store-overrides -->
 
-Call `MobileWallet.deleteWallet()` to delete local wallet material for a wallet: stored key descriptors, credentials, DIDs, platform signing keys, encrypted database files and sidecars, and the configured database key. Credential and DID custom stores receive the corresponding remove calls.
+Call `Wallet.deleteLocalData()` to delete local wallet material for a wallet: stored key descriptors, credentials, DIDs, platform signing keys, encrypted database files and sidecars, and the configured database key. Credential and DID custom stores receive the corresponding remove calls.
 
 Close every in-process wallet using the database, its managed key or a shared credential or DID store before erasing it. If an app and extension share storage, the host must coordinate both processes before erasure.
 

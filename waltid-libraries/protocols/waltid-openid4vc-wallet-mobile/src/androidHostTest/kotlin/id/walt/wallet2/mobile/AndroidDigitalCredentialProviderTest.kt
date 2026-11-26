@@ -14,8 +14,8 @@ import androidx.credentials.provider.PendingIntentHandler
 import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialProvider
 import id.walt.wallet2.mobile.digitalcredentials.MatcherCredentialSelection
 import id.walt.wallet2.mobile.digitalcredentials.MatcherSelectedRequest
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialResponse
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -64,7 +64,7 @@ class AndroidDigitalCredentialProviderTest {
             AndroidDigitalCredentialProvider.nativeAppOrigin(signature.toByteArray()),
             input.request.verifiedOrigin,
         )
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, input.request.protocol)
+        assertEquals(DigitalCredentialProtocols.OPENID4VP_UNSIGNED, input.request.protocol)
     }
 
     @OptIn(ExperimentalDigitalCredentialApi::class)
@@ -90,7 +90,7 @@ class AndroidDigitalCredentialProviderTest {
      *
      * This wallet registers through `RegistryManager`, so the platform always reports what the user
      * picked. Accepting the absence would produce `selectedRegistryEntryIds = []`, which
-     * `MobileWallet.previewDigitalCredentialPresentation` reads as unrestricted matching over the whole
+     * `Wallet.previewDigitalCredentialPresentation` reads as unrestricted matching over the whole
      * store.
      *
      * The envelope offers a single alternative because that is the one shape whose *protocol request*
@@ -165,8 +165,8 @@ class AndroidDigitalCredentialProviderTest {
         val responseIntent = Intent()
         AndroidDigitalCredentialProvider.setResponse(
             responseIntent,
-            MobileWalletDigitalCredentialResponse(
-                protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+            DigitalCredentialResponse(
+                protocol = DigitalCredentialProtocols.OPENID4VP_UNSIGNED,
                 dataJson = """{"vp_token":{"pid":["presentation"]}}""",
             ),
             providerRequest,
@@ -176,7 +176,7 @@ class AndroidDigitalCredentialProviderTest {
         val credential = assertIs<DigitalCredential>(response.credential)
         val responseJson = Json.parseToJsonElement(credential.credentialJson).jsonObject
         assertEquals(
-            MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+            DigitalCredentialProtocols.OPENID4VP_UNSIGNED,
             responseJson["protocol"]?.jsonPrimitive?.content,
         )
         assertEquals(
@@ -262,7 +262,7 @@ class AndroidDigitalCredentialProviderTest {
             selection = openId4VpSelection(requestIndex = 0, registryEntryIds = listOf("opaque-entry")),
         )
 
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
+        assertEquals(DigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
         assertEquals("n", Json.parseToJsonElement(request.dataJson).jsonObject["nonce"].toString().trim('"'))
         assertEquals(listOf("opaque-entry"), request.selectedRegistryEntryIds)
     }
@@ -282,7 +282,7 @@ class AndroidDigitalCredentialProviderTest {
             ),
         )
 
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
+        assertEquals(DigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
         assertEquals(listOf("opaque-entry"), request.selectedRegistryEntryIds)
     }
 
@@ -304,7 +304,7 @@ class AndroidDigitalCredentialProviderTest {
             selection = openId4VpSelection(requestIndex = 1, registryEntryIds = listOf("oid4vp-entry")),
         )
 
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
+        assertEquals(DigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
         assertEquals("second", Json.parseToJsonElement(request.dataJson).jsonObject["nonce"].toString().trim('"'))
     }
 
@@ -336,7 +336,7 @@ class AndroidDigitalCredentialProviderTest {
                 verifiedOrigin = "https://verifier.example",
                 selection = annexCSelection(combinationIndex = 7, documentIds = listOf("annex-c-doc")),
             )
-            assertEquals(MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C, request.protocol)
+            assertEquals(DigitalCredentialProtocols.ISO_MDOC_ANNEX_C, request.protocol)
             assertEquals(listOf("annex-c-doc"), request.selectedRegistryEntryIds)
             assertEquals("d", Json.parseToJsonElement(request.dataJson).jsonObject["deviceRequest"].toString().trim('"'))
         }
@@ -348,7 +348,7 @@ class AndroidDigitalCredentialProviderTest {
                 verifiedOrigin = "https://verifier.example",
                 selection = openId4VpSelection(requestIndex = index, registryEntryIds = listOf("oid4vp-entry")),
             )
-            assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
+            assertEquals(DigitalCredentialProtocols.OPENID4VP_UNSIGNED, request.protocol)
             assertEquals(listOf("oid4vp-entry"), request.selectedRegistryEntryIds)
         }
     }
@@ -418,7 +418,7 @@ class AndroidDigitalCredentialProviderTest {
                 // Annex C attribution, but request 0 is OpenID4VP.
                 selection = MatcherSelectedRequest(
                     requestIndex = 0,
-                    protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+                    protocol = DigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
                     registryEntryIds = listOf("annex-c-doc"),
                 ),
             )
@@ -441,7 +441,7 @@ class AndroidDigitalCredentialProviderTest {
             verifiedOrigin = "https://verifier.example",
             selection = openId4VpSelection(requestIndex = 0, registryEntryIds = listOf("signed-entry")),
         )
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED, request.protocol)
+        assertEquals(DigitalCredentialProtocols.OPENID4VP_SIGNED, request.protocol)
         assertEquals("""{"request":"a.b.c"}""", request.dataJson)
         assertEquals(listOf("signed-entry"), request.selectedRegistryEntryIds)
     }
@@ -513,7 +513,7 @@ class AndroidDigitalCredentialProviderTest {
     /**
      * No malformed selection may reach `selectedRegistryEntryIds = []`.
      *
-     * `MobileWallet.previewDigitalCredentialPresentation` reads an empty list as unrestricted DCQL
+     * `Wallet.previewDigitalCredentialPresentation` reads an empty list as unrestricted DCQL
      * matching over the whole store, so a malformed matcher result must not be able to *widen* the
      * candidate set.
      */
@@ -630,7 +630,7 @@ class AndroidDigitalCredentialProviderTest {
             MatcherCredentialSelection(
                 registryEntryId = "annex-c-doc",
                 requestIndex = null,
-                protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+                protocol = DigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
             ),
             AndroidDigitalCredentialProvider.parseMatcherCredentialId(
                 credentialId = "3 org-iso-mdoc annex-c-doc",
@@ -677,7 +677,7 @@ class AndroidDigitalCredentialProviderTest {
         combinationIndex: Int,
         documentIds: List<String>,
     ): MatcherSelectedRequest {
-        val protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C
+        val protocol = DigitalCredentialProtocols.ISO_MDOC_ANNEX_C
         return AndroidDigitalCredentialProvider.parseMatcherSelection(
             credentialSetId = "$combinationIndex $protocol",
             credentials = documentIds.map { documentId ->

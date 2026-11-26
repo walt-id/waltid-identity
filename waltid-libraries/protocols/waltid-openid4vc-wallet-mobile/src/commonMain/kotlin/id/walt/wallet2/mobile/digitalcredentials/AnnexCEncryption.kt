@@ -25,7 +25,7 @@ internal suspend fun encryptAnnexCDeviceResponse(
     documents: List<Document>,
     encryptionInfo: DCAPIEncryptionInfo,
     transcript: SessionTranscript,
-): MobileWalletDigitalCredentialResponse {
+): DigitalCredentialResponse {
     val plaintext = coseCompliantCbor.encodeToByteArray(
         DeviceResponse.serializer(),
         DeviceResponse(version = "1.0", documents = documents.toTypedArray(), status = 0u),
@@ -45,8 +45,8 @@ internal suspend fun encryptAnnexCDeviceResponse(
             ),
         ),
     ).encodeToBase64Url()
-    return MobileWalletDigitalCredentialResponse(
-        protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+    return DigitalCredentialResponse(
+        protocol = DigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
         dataJson = buildJsonObject {
             put(
                 "response",

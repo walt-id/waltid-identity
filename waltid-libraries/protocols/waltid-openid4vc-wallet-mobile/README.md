@@ -28,9 +28,9 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 ## Package map
 
-Open [MobileWalletFactory](src/commonMain/kotlin/id/walt/wallet2/mobile/MobileWalletFactory.kt)
-with a [MobileWalletConfig](src/commonMain/kotlin/id/walt/wallet2/mobile/MobileWalletConfig.kt).
-The returned [MobileWallet](src/commonMain/kotlin/id/walt/wallet2/mobile/MobileWallet.kt) owns the
+Open [WalletFactory](src/commonMain/kotlin/id/walt/wallet2/mobile/WalletFactory.kt)
+with a [WalletConfiguration](src/commonMain/kotlin/id/walt/wallet2/mobile/WalletConfiguration.kt).
+The returned [Wallet](src/commonMain/kotlin/id/walt/wallet2/mobile/Wallet.kt) owns the
 session and its lifecycle. Import feature types from these packages under `id.walt.wallet2.mobile`.
 
 | Package | Public responsibilities |
@@ -40,6 +40,7 @@ session and its lifecycle. Import feature types from these packages under `id.wa
 | [issuance](src/commonMain/kotlin/id/walt/wallet2/mobile/issuance) | Offers, holder bindings, accepted credentials and attestation settings |
 | [presentation](src/commonMain/kotlin/id/walt/wallet2/mobile/presentation) | Verifier requests, disclosure choices, consent and response delivery |
 | [proximity](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity) | Nearby transport, reader trust, approval and session state |
+| [proximity.trust](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity/trust) | Reader trust, revocation policies and saved trust settings |
 | [digitalcredentials](src/commonMain/kotlin/id/walt/wallet2/mobile/digitalcredentials) | OS registration, digital credential requests and Annex C responses |
 
 Configuration captures device language preferences by default on Android and iOS. Pass
@@ -109,7 +110,7 @@ Read the wallet's local status snapshot, observe updates, and explicitly refresh
 
 ## Receiving and presenting credentials
 
-Open a wallet with `factory.create()`. Initialize the signing identity, preview an offer, then accept its grant. Supply the registered client when starting browser authorization. An optional issuer receipt profile belongs in the issuance configuration.
+Open a wallet with `factory.open()`. Initialize the signing identity, preview an offer, then accept its grant. Supply the registered client when starting browser authorization. An optional issuer receipt profile belongs in the issuance configuration.
 
 Preview a presentation URL, choose credentials and disclosures, and show the review returned by the wallet. After confirmation, submit that review. A prepared redirect or form requires host delivery.
 

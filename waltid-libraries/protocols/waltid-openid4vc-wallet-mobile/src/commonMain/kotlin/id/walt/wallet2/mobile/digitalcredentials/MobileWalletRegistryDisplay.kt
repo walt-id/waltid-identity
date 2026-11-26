@@ -24,7 +24,7 @@ internal object MobileWalletRegistryDisplay {
     )
 
     fun resolve(
-        format: MobileWalletDigitalCredentialFormat,
+        format: DigitalCredentialFormat,
         type: String,
         credentialData: JsonObject,
         storedLabel: String?,
@@ -46,7 +46,7 @@ internal object MobileWalletRegistryDisplay {
     }
 
     private fun mappingFor(
-        format: MobileWalletDigitalCredentialFormat,
+        format: DigitalCredentialFormat,
         type: String,
         credentialData: JsonObject,
     ): DisplayMapping? {
@@ -57,28 +57,28 @@ internal object MobileWalletRegistryDisplay {
     }
 
     private fun matchKeys(
-        format: MobileWalletDigitalCredentialFormat,
+        format: DigitalCredentialFormat,
         type: String,
         credentialData: JsonObject,
     ): Set<String> = buildSet {
         add(type)
         when (format) {
-            MobileWalletDigitalCredentialFormat.MDOC ->
+            DigitalCredentialFormat.MDOC ->
                 credentialData.keys.filter { it != "docType" && it != "doctype" && it != "doc_type" }
                     .forEach(::add)
-            MobileWalletDigitalCredentialFormat.SD_JWT_VC ->
+            DigitalCredentialFormat.SD_JWT_VC ->
                 credentialTypes(credentialData).forEach(::add)
         }
     }
 
     private fun humanizedType(
-        format: MobileWalletDigitalCredentialFormat,
+        format: DigitalCredentialFormat,
         type: String,
     ): String = CredentialTitles.fromPayload(
         format = format.identifier,
         credentialDataJson = when (format) {
-            MobileWalletDigitalCredentialFormat.MDOC -> buildJsonObject { put("docType", type) }.toString()
-            MobileWalletDigitalCredentialFormat.SD_JWT_VC -> buildJsonObject { put("vct", type) }.toString()
+            DigitalCredentialFormat.MDOC -> buildJsonObject { put("docType", type) }.toString()
+            DigitalCredentialFormat.SD_JWT_VC -> buildJsonObject { put("vct", type) }.toString()
         },
     )
 
@@ -91,9 +91,9 @@ internal object MobileWalletRegistryDisplay {
         }
     }
 
-    private fun MobileWalletDigitalCredentialFormat.toMappingKind(): MappingKind = when (this) {
-        MobileWalletDigitalCredentialFormat.MDOC -> MappingKind.MDOC
-        MobileWalletDigitalCredentialFormat.SD_JWT_VC -> MappingKind.SD_JWT
+    private fun DigitalCredentialFormat.toMappingKind(): MappingKind = when (this) {
+        DigitalCredentialFormat.MDOC -> MappingKind.MDOC
+        DigitalCredentialFormat.SD_JWT_VC -> MappingKind.SD_JWT
     }
 
     private val Mappings = listOf(

@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
 /** Compiled examples checked against the public guide; never opens radios during tests. */
 @Suppress("UNUSED_PARAMETER")
 internal class MobileWalletProximitySnippets {
-    suspend fun session(wallet: MobileWallet) {
+    suspend fun session(wallet: Wallet) {
         // doc-snippet:start kotlin-proximity-session
         val configuration = ProximityConfiguration()
         val capabilities = wallet.proximityPresentationCapabilities(configuration)
@@ -48,7 +48,7 @@ internal class MobileWalletProximitySnippets {
     }
 
     suspend fun reconnect(
-        wallet: MobileWallet,
+        wallet: Wallet,
         configuration: ProximityConfiguration,
         plan: ProximitySharingPlan,
         submission: ProximitySubmission,
