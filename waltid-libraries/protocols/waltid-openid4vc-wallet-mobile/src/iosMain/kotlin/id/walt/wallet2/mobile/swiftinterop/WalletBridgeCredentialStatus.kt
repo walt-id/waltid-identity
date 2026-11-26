@@ -10,6 +10,18 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 
+/** Display fields for one inventory card crossing the Swift boundary. */
+public class WalletBridgeCredentialSummary internal constructor(row: id.walt.wallet2.data.WalletCredentialSummary) {
+    public val id: String = row.id
+    public val format: String = row.format
+    public val issuer: String? = row.issuer
+    public val subject: String? = row.subject
+    public val label: String? = row.label
+    public val addedAt: String? = row.addedAt
+    public val typeMetadataJson: String = row.typeMetadataJson
+    public val metadataJson: String? = row.metadataJson
+}
+
 /** A typed credential plus the shared semantic status representation for the native facade. */
 public data class WalletBridgeCredentialRead(
     /** Existing credential/display data, independent of status updates. */

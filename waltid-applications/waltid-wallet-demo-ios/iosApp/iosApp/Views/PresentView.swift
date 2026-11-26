@@ -19,6 +19,7 @@ struct PresentView: View {
     @StateObject private var proximityScreenPolicy = ProximityScreenPolicy()
     @State private var showingConnectionOptions = false
     @State private var credentialDetailsByID: [String: CredentialDetails] = [:]
+    @State private var proximityDetailsUnavailable = false
     @State private var renderedSharingOptions: [PresentationCredentialOption] = []
     @StateObject private var submission = ReviewSubmissionGate<ReviewSubmissionBinding<OnlineSubmissionKey>>()
 
@@ -85,9 +86,7 @@ struct PresentView: View {
                 .accessibilityHidden(true)
             }
         }
-        .task(id: ProximityCredentialLoadKey(credentials: viewModel.credentials, active: nearbySheet || proximityPresentation.active)) {
-            await refreshProximityCredentialDetails()
-        }
+        .task(id: proximityCredentialRows) { await refreshProximityCredentialDetails() }
         .onAppear(perform: updateProximityScreenPolicy)
         .onDisappear { proximityScreenPolicy.restore() }
         .onChange(of: proximityPresentation.displayedEngagement == .qr) { _ in
@@ -119,13 +118,32 @@ struct PresentView: View {
         }
     }
 
+    private var proximityCredentialRows: [CredentialSummary] {
+        guard nearbySheet || proximityPresentation.active,
+              let review = proximityPresentation.review ?? proximityPresentation.preparedSharing?.review else { return [] }
+        let ids = Set(review.documents.flatMap { $0.credentialOptions.map(\.credentialID) })
+        return viewModel.credentials.filter { ids.contains($0.id) }
+    }
+
     private func refreshProximityCredentialDetails() async {
+        let rows = proximityCredentialRows
         credentialDetailsByID = [:]
-        guard nearbySheet || proximityPresentation.active else { return }
-        let credentials = viewModel.credentials
-        let details = await CredentialDisplayNormalizer.details(for: credentials)
-        guard !Task.isCancelled, nearbySheet || proximityPresentation.active, viewModel.credentials == credentials else { return }
-        credentialDetailsByID = Dictionary(details.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        proximityDetailsUnavailable = false
+        var result: [String: CredentialDetails] = [:]
+        do {
+            for row in rows {
+                try Task.checkCancellation()
+                guard let credential = try await viewModel.credential(id: row.id) else {
+                    proximityDetailsUnavailable = true
+                    return
+                }
+                let details = await CredentialDisplayNormalizer.details(for: [credential])
+                result[row.id] = details.first
+            }
+            if !Task.isCancelled { credentialDetailsByID = result }
+        } catch {
+            if !Task.isCancelled { proximityDetailsUnavailable = true }
+        }
     }
 
     private func updateProximityScreenPolicy() {
@@ -232,7 +250,10 @@ struct PresentView: View {
         }
     }
 
-    private var proximityContent: some View {
+    @ViewBuilder private var proximityContent: some View {
+        if proximityDetailsUnavailable {
+            WarningBannerView(message: String(localized: "Credential details unavailable"))
+        }
         ProximityPresentationView(viewModel: proximityPresentation, approvalMode: $viewModel.proximityApprovalMode,
             headerOwnsClose: true,
             onConnectionOptions: proximityPresentation.showsConnectionOptions
@@ -315,9 +336,4 @@ private struct PresentationFormPostWebView: UIViewRepresentable {
             onFailed(error.localizedDescription)
         }
     }
-}
-
-private struct ProximityCredentialLoadKey: Equatable {
-    let credentials: [Credential]
-    let active: Bool
 }

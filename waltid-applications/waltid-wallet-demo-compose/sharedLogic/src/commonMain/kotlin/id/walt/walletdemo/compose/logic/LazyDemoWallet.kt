@@ -62,6 +62,8 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
         statusReviewEpoch: Long?,
     ): WalletDemoOperationResult = wallet().submitStatusReviewedPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, reviewedStatus, did, paymentConsentRevision, statusReviewEpoch)
 
+    override suspend fun listCredentialSummaries() = wallet().listCredentialSummaries()
+    override suspend fun credential(id: String) = wallet().credential(id)
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
 

@@ -1716,7 +1716,7 @@ func makeWalletVisualProximityState(_ kind: String) async throws -> WalletViewMo
     wallet.isReady = true
     wallet.statusMessage = ""
     wallet.selectedTab = .present
-    wallet.credentials = [try fixtures.nearbyCredential()]
+    wallet.credentials = [CredentialSummary(try fixtures.nearbyCredential())]
     wallet.proximityPresentation.start()
     if kind == "permission" {
         try await waitUntil { wallet.proximityPresentation.sessionState != nil }

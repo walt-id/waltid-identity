@@ -45,7 +45,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.channels.BufferOverflow
@@ -335,8 +334,7 @@ class WalletCredentialStatusService private constructor(
     /** Freshness deadlines emit local state changes without requesting a status list. */
     fun observe(): Flow<WalletCredentialStatusSnapshot> = channelFlow {
         if (!job.isActive) { close(); return@channelFlow }
-        val completion = job.invokeOnCompletion { close() }
-        val collector = launch {
+        val collector = scope.async {
             changes.onStart { emit(Unit) }.transformLatest {
                 while (currentCoroutineContext().isActive) {
                     val snapshot = snapshot()
@@ -349,6 +347,9 @@ class WalletCredentialStatusService private constructor(
                 }
             }.collect { send(it) }
         }
+        val completion = collector.invokeOnCompletion { cause ->
+            if (job.isCancelled) close() else close(cause)
+        }
         awaitClose { collector.cancel(); completion.dispose() }
     }.buffer(Channel.CONFLATED)
 
@@ -358,6 +359,20 @@ class WalletCredentialStatusService private constructor(
         mode: CredentialStatusRefreshMode = CredentialStatusRefreshMode.IF_DUE,
         maxItems: Int = 100,
         executionBudget: Duration = 30.seconds,
+    ): List<CredentialStatusRefreshResult> {
+        val work = scope.async { refreshOwned(selection, mode, maxItems, executionBudget) }
+        return try {
+            work.await()
+        } finally {
+            work.cancel()
+        }
+    }
+
+    private suspend fun refreshOwned(
+        selection: Set<WalletCredentialReference>?,
+        mode: CredentialStatusRefreshMode,
+        maxItems: Int,
+        executionBudget: Duration,
     ): List<CredentialStatusRefreshResult> = coroutineScope {
         check(job.isActive) { "Credential status service is closed" }
         require(selection == null || selection.isNotEmpty())
@@ -708,6 +723,11 @@ class WalletCredentialStatusService private constructor(
         else retryAfter.remove(reference)
         changes.tryEmit(Unit)
         return CredentialStatusRefreshResult(reference, CredentialStatusRefreshOutcome.COMPLETED, state.metadata)
+    }
+
+    internal suspend fun closeAndJoin() {
+        close()
+        job.join()
     }
 
     override fun close() {

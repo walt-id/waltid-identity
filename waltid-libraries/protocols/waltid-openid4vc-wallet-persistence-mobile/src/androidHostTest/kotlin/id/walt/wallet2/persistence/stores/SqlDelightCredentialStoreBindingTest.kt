@@ -2,6 +2,7 @@ package id.walt.wallet2.persistence.stores
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.examples.SdJwtExamples
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.wallet2.data.HolderKeyBinding
 import id.walt.wallet2.data.HolderKeyBindingOrigin
@@ -14,10 +15,44 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.time.Instant
 
 class SqlDelightCredentialStoreBindingTest {
+
+    @Test
+    fun migratedInventoryBackfillsAndInvalidatesOnReplacementWithoutChangingSignedBytes() = runTest {
+        JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY).use { driver ->
+            driver.execute(null, """
+                CREATE TABLE credentials (id TEXT PRIMARY KEY NOT NULL, serialized_credential TEXT NOT NULL,
+                    format TEXT NOT NULL DEFAULT '', label TEXT, added_at INTEGER NOT NULL, metadata TEXT, holder_key_binding TEXT)
+            """.trimIndent(), 0)
+            val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
+            val original = MdocsExamples.mdocsExampleBase64Url
+            queries.insertCredential("one", original, "mso_mdoc", "Original", 0, null, null)
+            WalletPersistenceDatabase.Schema.migrate(driver, 1, WalletPersistenceDatabase.Schema.version)
+            val store = SqlDelightCredentialStore(queries)
+            assertNull(queries.selectCredentialSummaries().executeAsOne().type_metadata)
+            val row = store.credentialSummaries().single()
+            assertEquals("Original", row.label)
+            assertFalse(row.typeMetadataJson.contains("portrait"))
+            assertEquals(row.typeMetadataJson, queries.selectCredentialSummaries().executeAsOne().type_metadata)
+            assertEquals(original, queries.selectCredentialById("one").executeAsOne().serialized_credential)
+
+            val replacement = SdJwtExamples.sdJwtVcSignedExample2
+            queries.insertCredential("one", replacement, "dc+sd-jwt", "Replacement", 1, null, null)
+            queries.saveCredentialInventoryIfCurrent(row.issuer, row.subject, row.typeMetadataJson, "one", original)
+            assertNull(queries.selectCredentialSummaries().executeAsOne().type_metadata)
+            val current = store.credentialSummaries().single()
+            assertEquals("Replacement", current.label)
+            assertEquals(current, store.credentialSummaries().single())
+            assertEquals(replacement, queries.selectCredentialById("one").executeAsOne().serialized_credential)
+            store.removeCredential("one")
+            assertEquals(emptyList(), store.credentialSummaries())
+        }
+    }
 
     @Test
     fun `fresh schema round trips holder key binding`() = runTest {

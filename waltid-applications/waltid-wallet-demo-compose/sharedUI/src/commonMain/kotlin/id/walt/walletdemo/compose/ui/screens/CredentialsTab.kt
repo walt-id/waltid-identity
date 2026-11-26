@@ -55,7 +55,9 @@ import id.walt.walletdemo.compose.logic.WalletStatusKind
 import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.logic.statusBanner
 import id.walt.walletdemo.compose.logic.toCardDisplayData
-import id.walt.walletdemo.compose.logic.toCredentialDetails
+import id.walt.walletdemo.compose.logic.WalletDemoCredential
+import id.walt.walletdemo.compose.ui.components.storedCredentialDetail
+import id.walt.walletdemo.compose.ui.components.StoredCredentialDetail
 import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
 import id.walt.walletdemo.compose.ui.LocalWalletTimeFormatter
 import id.walt.walletdemo.compose.ui.SystemBackHandler
@@ -87,6 +89,7 @@ import kotlin.time.Instant
 @Composable
 internal fun CredentialsTab(
     state: WalletDemoUiState,
+    loadCredential: suspend (String) -> WalletDemoCredential? = { null },
     modifier: Modifier = Modifier,
     onDeleteCredential: ((String) -> Unit)? = null,
     onDetailsChromeChange: (CredentialDetailsChrome?) -> Unit = {},
@@ -112,14 +115,9 @@ internal fun CredentialsTab(
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val selectedCredential = credentials.firstOrNull { it.id == expandedId }
-    val expanded by produceState<CredentialDetails?>(null, selectedCredential) {
-        value = null
-        value = selectedCredential?.let { credential ->
-            withContext(Dispatchers.Default) { credential.toCredentialDetails() }
-        }
-    }
-    val rawCredential = selectedCredential?.credentialDataJson?.takeIf { it.isNotBlank() }
-        ?: "No raw credential available"
+    val detail = selectedCredential?.let { storedCredentialDetail(it, loadCredential) }
+    val expanded = (detail as? StoredCredentialDetail.Ready)?.details
+    val rawCredential = (detail as? StoredCredentialDetail.Ready)?.raw
     val showingDetails = selectedCredential != null
     val reduceMotion = LocalWalletVisualPreferences.current.reduceMotion
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -145,11 +143,11 @@ internal fun CredentialsTab(
                     onClose = ::requestClose,
                     title = "Technical details".takeIf { technicalOpen },
                     onBack = ({ technicalOpen = false }).takeIf { technicalOpen },
-                    onCopy = {
+                    onCopy = rawCredential?.let { raw -> {
                         scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                            clipboard.setClipEntry(plainTextClipEntry(rawCredential))
+                            clipboard.setClipEntry(plainTextClipEntry(raw))
                         }
-                    },
+                    } },
                     onDelete = if (onDeleteCredential != null) {
                         { confirmDelete = true }
                     } else {
@@ -193,7 +191,7 @@ internal fun CredentialsTab(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     if (technical && expanded != null) {
-                        CredentialTechnicalInformation(expanded!!)
+                        CredentialTechnicalInformation(expanded)
                     } else if (session is WalletSessionState.NotBootstrapped || session is WalletSessionState.Bootstrapping) {
                         CircularProgressIndicator(Modifier.testTag(WalletUiTestTags.CredentialsLoading))
                     } else if (session is WalletSessionState.Failed) {
@@ -208,8 +206,10 @@ internal fun CredentialsTab(
                             expandedId = expandedId.takeIf { showingDetails },
                             onOpenDetails = ::toggleCard,
                         )
-                        if (selectedCredential != null && expanded == null) {
-                            CircularProgressIndicator()
+                        when (detail) {
+                            StoredCredentialDetail.Loading -> CircularProgressIndicator()
+                            StoredCredentialDetail.Unavailable -> Text("Credential details unavailable")
+                            else -> Unit
                         }
                         AnimatedContent(
                             targetState = expanded.takeIf { showingDetails },

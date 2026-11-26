@@ -527,7 +527,7 @@ class WalletDemoController(
         if (foregroundSession.value == null || externalStatusReview.value || current.auth != WalletAuthState.Unlocked ||
             current.presentationReview != null || current.isBusy || pendingCredentialStatusNotices.isEmpty()) return
         val names = pendingCredentialStatusNotices.sorted().map { id ->
-            ready.credentials.firstOrNull { it.id == id }?.toCredentialDetails()?.toCardDisplayData()?.title ?: "Credential"
+            ready.credentials.firstOrNull { it.id == id }?.toCardDisplayData()?.title ?: "Credential"
         }
         pendingCredentialStatusNotices.clear()
         _state.update { it.copy(credentialStatusNotice = "Status changed: ${names.joinToString(", ")}. Open the marked cards for details.") }
@@ -690,7 +690,7 @@ class WalletDemoController(
                 check(result.signingProtection == target) {
                     "Reprovisioned wallet did not apply the selected signing protection"
                 }
-                val credentials = wallet.listCredentials()
+                val credentials = wallet.listCredentialSummaries()
                 result to credentials
             }.onSuccess { (result, credentials) ->
                 statusHideJob?.cancel()
@@ -788,13 +788,15 @@ class WalletDemoController(
         }
     }
 
+    suspend fun credentialDetails(id: String): WalletDemoCredential? = wallet.credential(id)
+
     fun deleteCredential(credentialId: String) {
         if (_state.value.session !is WalletSessionState.Ready) return
         scope.launch(dispatcher) {
             runCatching { wallet.deleteCredential(credentialId) }
                 .onSuccess { removed ->
                     if (!removed) return@onSuccess
-                    runCatching { wallet.listCredentials() }
+                    runCatching { wallet.listCredentialSummaries() }
                         .onSuccess { credentials ->
                             val previous = getAndUpdateState { state ->
                                 val currentReady = state.session as? WalletSessionState.Ready ?: return@getAndUpdateState state
@@ -884,7 +886,7 @@ class WalletDemoController(
     fun refreshCredentialsFromStore() {
         scope.launch(dispatcher) {
             if (_state.value.session !is WalletSessionState.Ready) return@launch
-            runCatching { wallet.listCredentials() }
+            runCatching { wallet.listCredentialSummaries() }
                 .onSuccess { credentials ->
                     _state.update { state ->
                         val currentReady = state.session as? WalletSessionState.Ready ?: return@update state
@@ -1252,7 +1254,7 @@ class WalletDemoController(
                         receiveCompleted = false,
                     )
                 }
-                val credentials = if (outcome.storedCredentialIds.isNotEmpty()) wallet.listCredentials() else ready.credentials
+                val credentials = if (outcome.storedCredentialIds.isNotEmpty()) wallet.listCredentialSummaries() else ready.credentials
                 currentCoroutineContext().ensureActive()
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.copy(
@@ -1301,7 +1303,7 @@ class WalletDemoController(
                         receiveCompleted = false,
                     )
                 }
-                val credentials = if (outcome.storedCredentialIds.isNotEmpty()) wallet.listCredentials() else ready.credentials
+                val credentials = if (outcome.storedCredentialIds.isNotEmpty()) wallet.listCredentialSummaries() else ready.credentials
                 currentCoroutineContext().ensureActive()
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.copy(session = ready.copy(credentials = credentials)).withFailedOperation(
@@ -1314,7 +1316,7 @@ class WalletDemoController(
         }
         issuanceSession = null
         var detailsError: String? = null
-        val credentials = try { wallet.listCredentials() }
+        val credentials = try { wallet.listCredentialSummaries() }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
             detailsError = WalletDisplayText.ReceivedCredentialsUnavailable
@@ -1389,7 +1391,7 @@ class WalletDemoController(
                 when (outcome) {
                     is WalletDemoIssuanceOutcome.Stored -> {
                         var detailsError: String? = null
-                        val credentials = try { wallet.listCredentials() }
+                        val credentials = try { wallet.listCredentialSummaries() }
                         catch (cancelled: CancellationException) { throw cancelled }
                         catch (_: Exception) {
                             detailsError = WalletDisplayText.ReceivedCredentialsUnavailable
@@ -1428,7 +1430,7 @@ class WalletDemoController(
                         }
                     }
                     is WalletDemoIssuanceOutcome.Deferred -> {
-                        val credentials = if (outcome.storedCredentialIds.isNotEmpty()) wallet.listCredentials() else ready.credentials
+                        val credentials = if (outcome.storedCredentialIds.isNotEmpty()) wallet.listCredentialSummaries() else ready.credentials
                         currentCoroutineContext().ensureActive()
                         updateIfCurrent(request, WalletOperationState.Receiving) {
                             it.copy(
@@ -1462,7 +1464,7 @@ class WalletDemoController(
                                 issuanceReceipt = receipt(outcome.deferredCredentials, outcome.problem()),
                             )
                         }
-                        val credentials = if (outcome.storedCredentialIds.isNotEmpty()) wallet.listCredentials() else ready.credentials
+                        val credentials = if (outcome.storedCredentialIds.isNotEmpty()) wallet.listCredentialSummaries() else ready.credentials
                         currentCoroutineContext().ensureActive()
                         updateIfCurrent(request, WalletOperationState.Receiving) {
                             it.copy(session = ready.copy(credentials = credentials)).withFailedOperation(
@@ -1505,7 +1507,7 @@ class WalletDemoController(
         receiveJob = scope.launch(dispatcher) {
             try {
                 val pending = wallet.listDeferredIssuance()
-                val credentials = wallet.listCredentials()
+                val credentials = wallet.listCredentialSummaries()
                 currentCoroutineContext().ensureActive()
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     val refreshed = it.copy(session = ready.copy(credentials = credentials), deferredCredentials = pending,
@@ -2190,7 +2192,7 @@ class WalletDemoController(
             }
             runCatching {
                 val result = wallet.bootstrap(_state.value.selectedSigningProtection)
-                val credentials = wallet.listCredentials()
+                val credentials = wallet.listCredentialSummaries()
                 val deferred = wallet.listDeferredIssuance()
                 ensureCurrentLoading(generation)
                 val selection = signingProtectionMode.resolve(result.signingProtection)

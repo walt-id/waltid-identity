@@ -325,12 +325,16 @@ object CredentialParser {
         val compact = if (type == "dc+sd-jwt" || type == "vc+sd-jwt") SDJwt.parse(credential) else null
         val parsedDisclosures = if (compact == null) {
             parseDisclosureString(credential.substringAfter("~", ""))
-        } else if (credential.indexOf('~') == credential.lastIndex) {
+        } else if (credential.indexOf('~') !in 0 until credential.lastIndex) {
             null
         } else {
             compact.digestedDisclosures.values.map { disclosure ->
-                SdJwtSelectiveDisclosure(salt = disclosure.salt, name = (disclosure as? ObjectPropertyDisclosure)?.key,
-                    value = disclosure.value, encoded = disclosure.disclosure)
+                SdJwtSelectiveDisclosure(
+                    salt = disclosure.salt,
+                    name = (disclosure as? ObjectPropertyDisclosure)?.key,
+                    value = disclosure.value,
+                    encoded = disclosure.disclosure,
+                )
             }
         }
         val locatedDisclosures = SdJwtDisclosureLocator.locate(payload, parsedDisclosures.orEmpty())

@@ -78,8 +78,26 @@ kotlin {
             }
         }
         if (enableIosBuild) {
-            iosMain.dependencies {
-                implementation(identityLibs.sqldelight.native.driver)
+            val appleSources = configurations.create("sqlDelightAppleSources") {
+                isCanBeConsumed = false
+                isTransitive = false
+                attributes {
+                    attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.DOCUMENTATION))
+                    attribute(DocsType.DOCS_TYPE_ATTRIBUTE, objects.named(DocsType.SOURCES))
+                }
+            }
+            project.dependencies.add(appleSources.name,
+                "app.cash.sqldelight:native-driver-iossimulatorarm64:${identityLibs.versions.sqldelight.get()}")
+            val appleDriver = tasks.register<PrepareWalletAppleSqlDriver>("prepareWalletAppleSqlDriver") {
+                sourceArchive.fileProvider(appleSources.elements.map { it.single().asFile })
+                outputDirectory.set(layout.buildDirectory.dir("generated/walletAppleSqlDriver"))
+            }
+            iosMain {
+                kotlin.srcDir(appleDriver)
+                dependencies {
+                    implementation(identityLibs.sqliter.driver)
+                    implementation(identityLibs.stately.concurrency)
+                }
             }
         }
     }

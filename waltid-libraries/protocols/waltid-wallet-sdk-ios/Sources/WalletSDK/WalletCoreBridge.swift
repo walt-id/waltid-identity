@@ -34,10 +34,13 @@ protocol WalletCoreBridge: Sendable {
     ) async throws
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
     func credentials() async throws -> [Credential]
+    func credentialSummaries() async throws -> [CredentialSummary]
+    func credential(id: String) async throws -> Credential?
     func deleteCredential(id: String) async throws -> Bool
     func deleteLocalData() async throws
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
+    func previewPresentationForClaimReview(request: URL) async throws -> PresentationPreviewResult
     func reviewPresentation(
         previewHandle: PresentationPreviewHandle,
         selectedCredentialOptions: [PresentationCredentialSelection],
@@ -197,6 +200,10 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         throw unavailableError()
     }
 
+    func previewPresentationForClaimReview(request: URL) async throws -> PresentationPreviewResult {
+        try await previewPresentation(request: request)
+    }
+
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         throw unavailableError()
     }
@@ -272,6 +279,11 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
 }
 
 @available(macOS 10.15, *)
+extension WalletCoreBridge {
+    func credentialSummaries() async throws -> [CredentialSummary] { try await credentials().map(CredentialSummary.init) }
+    func credential(id: String) async throws -> Credential? { try await credentials().first { $0.id == id } }
+}
+
 extension WalletCoreBridge {
     var signingIdentityCore: any SigningIdentityCore { UnavailableSigningIdentityCore() }
 }

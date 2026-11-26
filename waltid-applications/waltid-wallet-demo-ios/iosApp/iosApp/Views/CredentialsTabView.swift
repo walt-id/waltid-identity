@@ -19,12 +19,14 @@ struct CredentialsTabView: View {
 
     @State private var expanded: CredentialDetails?
 
-    private var selectedCredential: Credential? {
+    @State private var detailUnavailable = false
+
+    private var selectedCredential: CredentialSummary? {
         viewModel.credentials.first { $0.id == selectedDetailsID }
     }
 
     private var expandedRawCredential: String {
-        viewModel.credentials.first(where: { $0.id == selectedDetailsID })?.credentialDataJSON
+        expanded?.credentialDataJSON
             ?? "No raw credential available"
     }
 
@@ -74,6 +76,8 @@ struct CredentialsTabView: View {
                         if selectedDetailsID != nil, let expanded, expanded.id == selectedDetailsID {
                             CredentialDetailsView(details: expanded)
                             .transition(.opacity)
+                        } else if selectedCredential != nil && detailUnavailable {
+                            Text(String(localized: "Credential details unavailable"))
                         } else if selectedCredential != nil {
                             WalletProgressRow(String(localized: "Loading details…"))
                         }
@@ -103,6 +107,7 @@ struct CredentialsTabView: View {
                                 Button("Copy") {
                                     UIPasteboard.general.string = expandedRawCredential
                                 }
+                                .disabled(expanded?.id != selectedDetailsID || expanded == nil)
                                 .accessibilityIdentifier(WalletAccessibilityID.copyRawCredential)
                                 Button("Delete", role: .destructive) {
                                     confirmDelete = true
@@ -163,9 +168,18 @@ struct CredentialsTabView: View {
         .task(id: selectedCredential) {
             expanded = nil
             guard let selectedCredential else { return }
-            let snapshot = await CredentialDisplayNormalizer.details(for: [selectedCredential])
-            guard !Task.isCancelled else { return }
-            expanded = snapshot.first
+            detailUnavailable = false
+            do {
+                guard let credential = try await viewModel.credential(id: selectedCredential.id) else {
+                    if !Task.isCancelled { detailUnavailable = true }
+                    return
+                }
+                let snapshot = await CredentialDisplayNormalizer.details(for: [credential])
+                guard !Task.isCancelled else { return }
+                expanded = snapshot.first
+            } catch {
+                if !Task.isCancelled { detailUnavailable = true }
+            }
         }
     }
 

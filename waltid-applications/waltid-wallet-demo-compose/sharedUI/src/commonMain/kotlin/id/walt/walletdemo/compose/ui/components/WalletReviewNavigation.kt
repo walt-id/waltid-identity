@@ -35,6 +35,7 @@ internal fun WalletReviewNavigationHost(
     requestKey: String,
     offer: WalletDemoOfferPreview? = null,
     savedCredentials: List<WalletDemoCredential> = emptyList(),
+    loadCredential: suspend (String) -> WalletDemoCredential? = { null },
     enabled: Boolean = true,
     onClose: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -46,7 +47,8 @@ internal fun WalletReviewNavigationHost(
     val page = ReviewDetailPage.valueOf(pageName)
     val offered = offer?.offeredCredentials?.find { route == "offer:${it.configurationId}" }
     val storedCredential = savedCredentials.find { route == "stored:${it.id}" }
-    val latestSavedCredentials by rememberUpdatedState(savedCredentials)
+    val loaded = storedCredential?.let { storedCredentialDetail(it, loadCredential) }
+    val latestDetail by rememberUpdatedState(loaded)
     val latestOffer by rememberUpdatedState(offer)
     val latestContent by rememberUpdatedState(content)
     LaunchedEffect(route, offered, storedCredential) {
@@ -91,8 +93,8 @@ internal fun WalletReviewNavigationHost(
                     // Resolve the displayed entry, including the outgoing page during Back.
                     val displayedRoute = key.substringBeforeLast(':')
                     val offered = offer?.offeredCredentials?.find { displayedRoute == "offer:${it.configurationId}" }
-                    val storedCredential = latestSavedCredentials.find { displayedRoute == "stored:${it.id}" }
-                    val stored = remember(storedCredential) { storedCredential?.toCredentialDetails() }
+                    val stored = (latestDetail as? StoredCredentialDetail.Ready)?.details
+                        ?.takeIf { displayedRoute == "stored:${it.summary.id}" }
                     savedPages.SaveableStateProvider("$requestKey:$key") {
                         if (key == "review") Box(Modifier.fillMaxWidth().walletNavigationBackground()) { latestContent() }
                         else {
@@ -107,6 +109,8 @@ internal fun WalletReviewNavigationHost(
                                         CredentialSummaryRow(stored.toCardDisplayData().toCardArt())
                                         CredentialDetailsBody(stored, onTechnicalDetails = { pageName = ReviewDetailPage.Technical.name })
                                     }
+                                    displayedRoute.startsWith("stored:") -> if (latestDetail == StoredCredentialDetail.Unavailable)
+                                        Text("Credential details unavailable") else CircularProgressIndicator()
                                     offered != null -> OfferedCredentialDetails(offered,
                                         offer.issuer.display?.name?.trim()?.takeIf(String::isNotEmpty) ?: offer.issuer.credentialIssuer,
                                         offer.issuer.credentialIssuer)

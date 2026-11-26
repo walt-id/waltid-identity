@@ -54,6 +54,8 @@ interface DemoWallet {
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability
     suspend fun listCredentials(): List<WalletDemoCredential>
+    suspend fun listCredentialSummaries(): List<WalletDemoCredential> = listCredentials()
+    suspend fun credential(id: String): WalletDemoCredential? = listCredentials().firstOrNull { it.id == id }
     suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential>
     suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
     suspend fun beginAuthorizationIssuance(

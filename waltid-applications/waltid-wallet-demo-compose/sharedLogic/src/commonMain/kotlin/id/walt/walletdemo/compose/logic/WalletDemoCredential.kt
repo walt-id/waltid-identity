@@ -9,6 +9,7 @@ data class CredentialSummary(
     val addedAt: String? = null,
     val credentialDataJson: String? = null,
     val metadataJson: String? = null,
+    val typeMetadataJson: String? = null,
 )
 
 typealias WalletDemoCredential = CredentialSummary

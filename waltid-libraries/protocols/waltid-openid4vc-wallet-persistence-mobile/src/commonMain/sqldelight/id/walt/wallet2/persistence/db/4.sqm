@@ -1,0 +1,18 @@
+CREATE TABLE credential_inventory (
+    credential_id TEXT NOT NULL PRIMARY KEY REFERENCES credentials(id) ON DELETE CASCADE,
+    issuer TEXT,
+    subject TEXT,
+    type_metadata TEXT NOT NULL
+);
+
+CREATE TRIGGER invalidate_inventory_on_insert AFTER INSERT ON credentials BEGIN
+    DELETE FROM credential_inventory WHERE credential_id = new.id;
+END;
+
+CREATE TRIGGER invalidate_inventory_on_update AFTER UPDATE OF serialized_credential, id ON credentials BEGIN
+    DELETE FROM credential_inventory WHERE credential_id IN (old.id, new.id);
+END;
+
+CREATE TRIGGER invalidate_inventory_on_delete AFTER DELETE ON credentials BEGIN
+    DELETE FROM credential_inventory WHERE credential_id = old.id;
+END;

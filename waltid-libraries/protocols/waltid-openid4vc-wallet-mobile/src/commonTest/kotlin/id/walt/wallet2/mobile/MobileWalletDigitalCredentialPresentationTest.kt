@@ -123,13 +123,15 @@ class MobileWalletDigitalCredentialPresentationTest {
     fun previewsAndSubmitsAnSdJwtVcRequestThroughTheDigitalCredentialsApi() = runTest {
         val fixture = walletFixture(sdJwtCredential())
 
-        val preview = fixture.wallet.previewDigitalCredentialPresentation(
+        val preview = fixture.wallet.previewDigitalCredentialPresentationForClaimReview(
             dcApiRequest(
                 data = sdJwtQuery(),
                 selectedRegistryEntryIds = listOf(fixture.registryEntryId("pid-1")),
             )
         )
 
+        val cardData = Json.parseToJsonElement(preview.credentialOptions.single().credentialDataJson).jsonObject
+        assertEquals(setOf("vct"), cardData.keys)
         assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED, preview.protocol)
         assertEquals("https://verifier.example", preview.verifiedOrigin)
         // The unsigned protocol ignores the request-supplied client_id; the platform origin is the

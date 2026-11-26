@@ -97,7 +97,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
                 submitAnnexC(wallet, preview, request, selection, input.providerRequest)
             }
         } else {
-            val preview = wallet.previewDigitalCredentialPresentation(input.request)
+            val preview = wallet.previewDigitalCredentialPresentationForClaimReview(input.request)
             discardReview = { wallet.discardDigitalCredentialPreview(preview.requestId) }
             currentCoroutineContext().ensureActive()
             install(preview.toSharingReview(), "Share digital credential?", showPreview,

@@ -14,6 +14,14 @@ public enum CredentialDisplayNormalizer {
         }
     }
 
+    public static func cards(for summaries: [CredentialSummary]) async -> [CredentialCardItem] {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: summaries.map { CredentialCardItem(id: $0.id, summary: .stored(from: $0)) })
+            }
+        }
+    }
+
     /// Build one display snapshot off the main thread. Image claims remain unresolved.
     public static func details(for credentials: [Credential]) async -> [CredentialDetails] {
         await withCheckedContinuation { continuation in

@@ -293,6 +293,27 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return reads.map { $0.toSwiftCredential() }
     }
 
+    func credentialSummaries() async throws -> [CredentialSummary] {
+        let result = try await bridge.credentialSummaries()
+        guard let rows = try Self.successAnyValue(result, operation: "list credential summaries") as? [WalletBridgeCredentialSummary] else {
+            throw WalletError.internalFailure("Unexpected credential inventory result")
+        }
+        return rows.map { row in
+            CredentialSummary(id: row.id, format: row.format, issuer: row.issuer, subject: row.subject, label: row.label,
+                              addedAt: row.addedAt.flatMap(parseWalletISO8601Date), typeMetadataJSON: row.typeMetadataJson,
+                              metadataJSON: row.metadataJson)
+        }
+    }
+
+    func credential(id: String) async throws -> Credential? {
+        let result = try await bridge.credentialRead(credentialId: id)
+        guard let value = try Self.successOptionalValue(result, operation: "read credential") else { return nil }
+        guard let read = value as? WalletBridgeCredentialRead else {
+            throw WalletError.internalFailure("Unexpected credential detail result")
+        }
+        return read.toSwiftCredential()
+    }
+
     func deleteCredential(id: String) async throws -> Bool {
         let result = try await bridge.deleteCredential(credentialId: id)
         let value = try Self.successAnyValue(result, operation: "delete credential")
@@ -333,6 +354,12 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             operation: "preview presentation"
         )
 
+        return try value.toSwiftPreviewResult()
+    }
+
+    func previewPresentationForClaimReview(request: URL) async throws -> PresentationPreviewResult {
+        let result = try await bridge.previewPresentationForClaimReview(requestUrl: request.absoluteString)
+        let value = try Self.successValue(result, as: MobileWalletPresentationPreviewResult.self, operation: "preview presentation")
         return try value.toSwiftPreviewResult()
     }
 
@@ -615,17 +642,20 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         _ result: any WalletBridgeResult,
         operation: String
     ) throws -> Any {
+        guard let value = try successOptionalValue(result, operation: operation) else {
+            throw WalletError.internalFailure("Wallet bridge returned an empty \(operation) result.")
+        }
+        return value
+    }
+
+    private static func successOptionalValue(_ result: any WalletBridgeResult, operation: String) throws -> Any? {
         if let failure = result as? WalletBridgeResultFailure {
             throw failure.error.toSwiftWalletError()
         }
         guard let success = result as? WalletBridgeResultSuccess<AnyObject> else {
             throw WalletError.internalFailure("Unexpected \(operation) result wrapper: \(type(of: result))")
         }
-        guard let value = success.value else {
-            throw WalletError.internalFailure("Wallet bridge returned an empty \(operation) result.")
-        }
-
-        return value
+        return success.value
     }
 }
 

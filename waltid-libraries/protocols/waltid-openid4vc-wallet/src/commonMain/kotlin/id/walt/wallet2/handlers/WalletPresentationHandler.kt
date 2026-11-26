@@ -2557,7 +2557,12 @@ object WalletPresentationHandler {
     private data class CredentialCandidate(val credential: RawDcqlCredential, val metadata: ResolvedTypeMetadata?)
 
     private fun List<CredentialCandidate>.matchingContext() = DcqlMatchingContext(
-        associate { it.credential to it.metadata?.types.orEmpty() },
+        buildMap {
+            for (candidate in this@matchingContext) {
+                val types = candidate.metadata?.types ?: continue
+                if (types.isNotEmpty()) put(candidate.credential, types)
+            }
+        },
     )
 
     /** An unusable stored credential cannot fail matching for the other candidates. */

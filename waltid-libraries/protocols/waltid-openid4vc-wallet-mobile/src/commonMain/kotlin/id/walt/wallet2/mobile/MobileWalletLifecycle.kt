@@ -11,6 +11,7 @@ internal class MobileWalletLifecycle {
     private val deletionMutex = Mutex()
     private var closed = false
     private var activeOperations = 0
+    private var disposed = false
     private var deleted = false
 
     suspend inline fun <T> use(block: () -> T): T {
@@ -25,15 +26,16 @@ internal class MobileWalletLifecycle {
         }
     }
 
-    suspend fun close(cleanup: () -> Unit) = deletionMutex.withLock {
-        val shouldClose = mutex.withLock {
-            if (closed) false else {
-                check(activeOperations == 0) { "Cannot close the mobile wallet while an operation is in progress" }
-                closed = true
-                true
-            }
+    suspend fun close(cleanup: suspend () -> Unit) = deletionMutex.withLock {
+        if (disposed || deleted) return@withLock
+        mutex.withLock {
+            check(activeOperations == 0) { "Cannot close the mobile wallet while an operation is in progress" }
+            closed = true
         }
-        if (shouldClose) cleanup()
+        withContext(NonCancellable) {
+            cleanup()
+            disposed = true
+        }
     }
 
     /**

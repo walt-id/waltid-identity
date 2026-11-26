@@ -191,30 +191,37 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         is MobileWalletDatabaseKey.Managed -> managedDatabaseKeyProvider
         is MobileWalletDatabaseKey.Provided -> databaseKey.provider
     }
-    val driver = openEncryptedDriver(
+    suspend fun openDriver() = openEncryptedDriver(
         databaseName,
         databaseKeyProvider.getOrCreateKey(config.walletId, databaseName),
         config.persistence.databaseKey is MobileWalletDatabaseKey.Managed,
         config.walletId,
     )
-    val db = WalletPersistenceDatabase(driver)
+    val driver = OwnedWalletDriver(openDriver(), ::openDriver)
+    return try {
+        val db = WalletPersistenceDatabase(driver)
 
-    return createSqlDelightMobileWallet(
-        config = config,
-        clientIdTrustConfiguration = clientIdTrustConfiguration,
-        db = db,
-        maintenanceLocation = { maintenanceLocation(databaseName) },
-        keyProvider = platformKeyProvider,
-        registrationProjection = registrationProjection,
-        proximityTransportFactory = proximityTransportFactory,
-        proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
-        proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
-        deleteLocalPersistence = {
-            runCatching { driver.close() }
-            deleteDatabase(databaseName)
-            databaseKeyProvider.deleteKey(config.walletId, databaseName)
-        },
-    )
+        createSqlDelightMobileWallet(
+            config = config,
+            clientIdTrustConfiguration = clientIdTrustConfiguration,
+            db = db,
+            maintenanceLocation = { maintenanceLocation(databaseName) },
+            keyProvider = platformKeyProvider,
+            registrationProjection = registrationProjection,
+            proximityTransportFactory = proximityTransportFactory,
+            proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
+            proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
+            closePersistence = driver::close,
+            preparePersistenceForDeletion = driver::openForDeletion,
+            deleteLocalPersistence = {
+                deleteDatabase(databaseName)
+                databaseKeyProvider.deleteKey(config.walletId, databaseName)
+            },
+        )
+    } catch (cause: Throwable) {
+        driver.close()
+        throw cause
+    }
 }
 
 internal fun createSqlDelightMobileWallet(
@@ -227,6 +234,8 @@ internal fun createSqlDelightMobileWallet(
     proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
+    closePersistence: () -> Unit = {},
+    preparePersistenceForDeletion: suspend () -> Unit = {},
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
     maintenanceLocation: () -> String? = { null },
 ): MobileWallet {
@@ -291,5 +300,7 @@ internal fun createSqlDelightMobileWallet(
         proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
         proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
         deleteLocalPersistence = deleteLocalPersistence,
+        closePersistence = closePersistence,
+        preparePersistenceForDeletion = preparePersistenceForDeletion,
     )
 }
