@@ -63,7 +63,7 @@ and removes the forwards when the run ends. Reserve the test device for this run
 The installation retains its test data for inspection. Use a fresh emulator or
 uninstall that run's disposable Preview package before reuse.
 
-With no selector the app runs 21 core unattended cases. `ITB_CASES` accepts
+In unattended mode, the default selection runs 21 core cases. `ITB_CASES` accepts
 comma-separated `suite/case` selectors such as `cs02v1/tc_vp_002`; bare IDs work
 when unique. The catalogue schedules each presentation's required issuance first.
 A presentation uses that exact newly stored credential and has no ITB session if
@@ -245,7 +245,7 @@ On 2026-11-26 the authenticated **WE BUILD LSP** catalogue listed 87 cases in
 16 suites. The four walt.id conformance statements contain 84 of them. The
 [case manifest](../src/main/resources/itb/wallet-catalogue.json) selects 31
 wallet cases by suite and case ID. These comprise 21 core unattended cases,
-four opt-in reference issuer cases and six attended payments. The [ledger](#blocked-wallet-cases)
+four opt-in reference issuer cases and six attended payments. The [ledger](#wallet-case-ledger)
 accounts for the other 42 wallet cases and the 14 cases outside wallet coverage.
 The suite metadata versions below are independent of the per-case version in each
 execution report and of the normative specification version.
@@ -270,34 +270,38 @@ execution report and of the normative specification version.
 | CS-06 | [CS-06 v1.1](https://github.com/webuild-consortium/wp4-architecture/pull/287) assigns certificate issuance to the relying party and certificate provider. The catalogue has no dedicated CS-06 wallet case. The separate Trust Framework suite offers issuance and presentation variants. [WAL-1485](https://linear.app/walt-new/issue/WAL-1485) covers signed presentation-request trust. [WAL-1851](https://linear.app/walt-new/issue/WAL-1851) covers issuer trust on receipt. |
 | CS-07 | The app path drives `tc15` through Chrome presentation and `tc16` through Chrome issuance. It verifies the browser response, the new stored PID and the issuer status for that offer. In a control, closing the instructions alone yielded ITB `SUCCESS`. |
 | CS-10 | RV-ISS-01 redeems both offers in one session and checks that the two stored SD-JWTs have one status-list URI, different indices and fresh clear status. RV-ISS-02 requires a fresh `INVALID` result, the SDK's projection of Token Status List value 1. The app run records each card's visible label before and after Check status and requires a new displayed check time before confirming the portal prompt. |
-| CS-12 | All nine wallet cases are selected. All three issuance variants succeeded on the OnePlus. Both payment paths for each variant stopped at review because the wallet could not retrieve payment instructions. The [native guide](ITB-NATIVE.md#sca-user-audience-compatibility) describes the separate SCA-User relying-party permission question. |
+| CS-12 | The runner supports all three issuance variants and their six attended payments. See the [device results](#wallet-case-ledger) for the outstanding payment checks. The [native guide](ITB-NATIVE.md#sca-user-audience-compatibility) describes the separate SCA-User relying-party permission question. |
 | CS-13 | The inspected statements expose no dedicated [intermediary wallet suite](https://github.com/webuild-consortium/wp4-architecture/blob/d6603effe714411d5dd7e9542d4d7b7d9fe11426/conformance-specs/cs-13-intermediary-services-preflight.md). Coverage needs an intermediary counterpart and the registration material for the wallet to authenticate the intermediary and identify the represented relying party. |
 
-### Blocked wallet cases
+### Wallet case ledger
 
-[WAL-1868](https://linear.app/walt-new/issue/WAL-1868) tracks the 42 unselected
-wallet cases below. ITB enables 41 of them and disables base CS-02 VP-004.
-The failures describe the last wallet trials on 2026-11-23. The 2026-11-26
-catalogue check verified case availability. The Trust Framework suite has
-since moved from version 1.4 to 1.5, so its results need a fresh trial.
+The runner supports the four reference issuer cases in the [deployed catalogue](#deployed-catalogue)
+by explicit selection. The default unattended run omits them.
 
-| Suite | Cases | Observed blocker and what to recheck |
-| --- | --- | --- |
-| Base CS-02 (`cs02v1`) | `tc_vp_004` | The tenant disables the case. Recheck when ITB enables it with a runnable transaction-data fixture. |
-| OneSpan (`onespan_com`) | `onespan_vci_02` | The authorization-code dialog exposed neither an offer QR nor a usable offer value. The issuer fixture needs to supply an offer. |
-| OneSpan (`onespan_com`) | `onespan_vci_04` | The offer requires a transaction code and ITB supplied no code. The dialog needs to provide it. |
-| OneSpan (`onespan_com`) | `onespan_vp_01` through `onespan_vp_07` | GET retrieval returned HTTP 200. Wallet validation found no matching trust anchor. The POST-labelled cases (`02`, `05`) also omitted `request_uri_method`, and the DID-labelled cases (`05`, `06`) sent `x509_hash`. Recheck with verified test trust material and fixtures that exercise the stated methods and identifiers. |
-| Namirial (`namiral_suite`) | `nam_issue_01`, `nam_issue_02`, `nam_issue_03`, `vci_006`, `vci_007`, `vci_008`, `nam_vp_01`, `nam_vp_02`, `nam_vp_03`, `vp_001`, `vp_002`, `vp_003`, `vp_004`, `vp_007` | All 14 scan dialogs lacked a usable attachment. Sample issuance and presentation dialogs had empty QR and raw values. Recheck once the fixtures supply wallet input. |
-| Procivis (`ts01`) | `tc001`, `tc002` | The issuer returned HTTP 400 `invalid_client` at token exchange. Recheck the test client's issuer registration and authentication requirements. |
-| Procivis (`ts01`) | `tc003`, `tc004` | Both signed requests failed leaf certificate hash binding. Recheck that `x509_hash` matches the DER-encoded leaf in `x5c`. The deployed cases share a title, so the bridge also needs an unambiguous case selector. |
-| Trust Framework (`tf-test-suite`) | `tc_vci_001`, `tc_vci_005`, `tc_vci_006`, `tc_vci_007`, `tc_vci_008` | The issuer returned HTTP 401 `invalid_client` at token exchange. Confirm the reference issuer's client registration and authentication requirements. Issuer trust on receipt can only be exercised after issuance reaches the wallet. |
-| Trust Framework (`tf-test-suite`) | `tc_vp_001`, `tc_vp_002` | The sessions exposed no usable wallet input. Recheck with a deployed request attachment. |
-| Trust Framework (`tf-test-suite`) | `tc_vp_003`, `tc_vp_004`, `tc_vp_007`, `tc_vp_011`, `tc_vp_012` | Both attempts timed out before an interactive session ID appeared. Recheck portal startup before assessing wallet behavior. |
-| Trust Framework (`tf-test-suite`) | `tc_vp_013` | POST returned HTTP 200. The demo wallet found no matching trust anchor. Retry this case first with an independently verified test anchor configured in the wallet. [WAL-1485](https://linear.app/walt-new/issue/WAL-1485) adds a registry option for signed requests. The demo can already use static anchors. |
-| QES (`cs03_suite`) | `signatrure_01` | The case requests holder consent and a document signature in AdES format. Qualification needs the wallet signing flow and a qualified remote signing provider. [WAL-1847](https://linear.app/walt-new/issue/WAL-1847) |
+[WAL-1868](https://linear.app/walt-new/issue/WAL-1868) tracks the 42 wallet cases
+outside the runner manifest. ITB listed 41 as enabled on 2026-11-26. Base CS-02
+VP-004 was disabled. The table records the evidence from the 2026-11-23 trials
+and the next check for each group. The 13 Trust Framework trials used v1.4.
+ITB now publishes v1.5. Five of those trials stopped before session startup,
+so wallet compatibility for those cases is unknown.
 
-**Selected payments awaiting a passing result.** On 2026-11-24 the OnePlus
-reached wallet review for `ts12_pay_01`, `ts12_pay_02`, `ts12_pay_03` and
+| Suite | Cases | Status | Evidence and next check |
+| --- | --- | --- | --- |
+| Base CS-02 (`cs02v1`) | `tc_vp_004` | Disabled in ITB | The tenant disables the case. Recheck when ITB enables it with a runnable transaction-data fixture. |
+| OneSpan (`onespan_com`) | `onespan_vci_02` | Missing offer in last trial | The authorization-code dialog exposed neither an offer QR nor a usable offer value. The issuer fixture needs to supply an offer. |
+| OneSpan (`onespan_com`) | `onespan_vci_04` | Missing code in last trial | The offer requires a transaction code and ITB supplied no code. The dialog needs to provide it. |
+| OneSpan (`onespan_com`) | `onespan_vp_01` through `onespan_vp_07` | Trust configuration needed | GET retrieval returned HTTP 200. Wallet validation found no matching trust anchor. The POST-labelled cases (`02`, `05`) also omitted `request_uri_method`, and the DID-labelled cases (`05`, `06`) sent `x509_hash`. Recheck with verified test trust material and fixtures that exercise the stated methods and identifiers. |
+| Namirial (`namiral_suite`) | `nam_issue_01`, `nam_issue_02`, `nam_issue_03`, `vci_006`, `vci_007`, `vci_008`, `nam_vp_01`, `nam_vp_02`, `nam_vp_03`, `vp_001`, `vp_002`, `vp_003`, `vp_004`, `vp_007` | Missing input in last trials | All 14 scan dialogs lacked a usable attachment. Sample issuance and presentation dialogs had empty QR and raw values. Recheck once the fixtures supply wallet input. |
+| Procivis (`ts01`) | `tc001`, `tc002` | Client authentication failed | The issuer returned HTTP 400 `invalid_client` at token exchange. Recheck the test client's issuer registration and authentication requirements. |
+| Procivis (`ts01`) | `tc003`, `tc004` | Certificate binding failed | Both signed requests failed leaf certificate hash binding. Recheck that `x509_hash` matches the DER-encoded leaf in `x5c`. The deployed cases share a title, so the bridge also needs an unambiguous case selector. |
+| Trust Framework (`tf-test-suite`) | `tc_vci_001`, `tc_vci_005`, `tc_vci_006`, `tc_vci_007`, `tc_vci_008` | Retest token exchange on v1.5 | The issuer returned HTTP 401 `invalid_client` at token exchange. Confirm the reference issuer's client registration and authentication requirements. Issuer trust on receipt can only be exercised after issuance reaches the wallet. |
+| Trust Framework (`tf-test-suite`) | `tc_vp_001`, `tc_vp_002` | Retest request delivery on v1.5 | The sessions exposed no usable wallet input. Recheck with a deployed request attachment. |
+| Trust Framework (`tf-test-suite`) | `tc_vp_003`, `tc_vp_004`, `tc_vp_007`, `tc_vp_011`, `tc_vp_012` | Ready to retry on v1.5 | Two attempts timed out before ITB assigned a session ID. Start a fresh session and observe the first wallet interaction. |
+| Trust Framework (`tf-test-suite`) | `tc_vp_013` | Verify the anchor and retest on v1.5 | POST returned HTTP 200. The demo wallet found no matching trust anchor. Retry this case first with an independently verified test anchor configured in the wallet. [WAL-1485](https://linear.app/walt-new/issue/WAL-1485) adds a registry option for signed requests. The demo can already use static anchors. |
+| QES (`cs03_suite`) | `signatrure_01` | Wallet signing capability needed | The case requests holder consent and a document signature in AdES format. Qualification needs the wallet signing flow and a qualified remote signing provider. [WAL-1847](https://linear.app/walt-new/issue/WAL-1847) |
+
+**Selected payments awaiting a passing result.** On 2026-11-24 all three issuance variants succeeded on a physical Android device.
+The wallet reached payment review for `ts12_pay_01`, `ts12_pay_02`, `ts12_pay_03` and
 their `ts12_pay_dc_api_01`, `ts12_pay_dc_api_02`, `ts12_pay_dc_api_03`
 counterparts. All six recorded “Payment instructions could not be retrieved”
 and ITB `UNDEFINED`. Recheck the reference issuer's type metadata, then rerun

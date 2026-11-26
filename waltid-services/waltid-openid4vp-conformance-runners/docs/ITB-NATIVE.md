@@ -36,8 +36,9 @@ prerequisites. Each started case reports its own ITB session. If issuance fails,
 dependent payments are recorded as prerequisite failures without opening a session.
 When the wallet blocks payment review, the runner stops the owned session and
 records the wallet-owned reason in the local report when available.
-For a watched run of all 27 selected cases on the phone, leave `ITB_CASES` unset,
-set `ITB_SHOW_BROWSER=true` and open `android device hub --device <physical-serial>`.
+In attended mode, leaving `ITB_CASES` unset runs the 27 core cases (21 unattended cases and six payments).
+The four [reference issuer cases](ITB-WALLET.md#deployed-catalogue) require explicit selection.
+To watch the device and portal, set `ITB_SHOW_BROWSER=true` and open `android device hub --device <physical-serial>`.
 The desktop browser shows the portal. The mirror shows the wallet, Android Chrome
 and provider handoffs. The driver confirms the browser and Android sharing prompts
 for the configured ITB host.
