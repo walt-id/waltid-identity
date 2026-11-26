@@ -85,11 +85,13 @@ class Verifier2WebhookRecorder : AutoCloseable {
         )
     }
 
-    fun awaitEvents(sessionId: String, timeoutMillis: Long = 5_000): List<KtorSessionUpdate> {
+    fun awaitEvents(sessionId: String, timeoutMillis: Long = 5_000, event: SessionEvent? = null): List<KtorSessionUpdate> {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {
             val events = receivedUpdates.filter { it.update.target == sessionId }
-            if (events.isNotEmpty()) return events.sortedBy { it.sequence }.map { it.update }
+            if (events.isNotEmpty() && (event == null || events.any { it.update.event == event.name })) {
+                return events.sortedBy { it.sequence }.map { it.update }
+            }
             Thread.sleep(50)
         }
         throw AssertionError(
