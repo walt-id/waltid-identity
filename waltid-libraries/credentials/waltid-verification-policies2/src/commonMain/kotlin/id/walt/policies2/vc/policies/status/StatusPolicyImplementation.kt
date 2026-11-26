@@ -1,6 +1,7 @@
 package id.walt.policies2.vc.policies.status
 
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.formats.MdocsCredential
 import id.walt.policies2.vc.policies.status.Values
 import id.walt.policies2.vc.policies.status.bit.BitValueReaderFactory
 import id.walt.policies2.vc.policies.status.content.CwtParser
@@ -30,6 +31,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.serializer
 
 object StatusPolicyImplementation {
@@ -197,7 +200,10 @@ object StatusPolicyImplementation {
         val ietf = ietfEntryExtractor.extract(credential)
         val w3c = w3cEntryExtractor.extract(credential)
         ietf?.let {
-            val mechanisms = (it as? JsonObject)?.keys.orEmpty()
+            val declarations = if (credential is MdocsCredential) {
+                credential.documentMso.status?.let { status -> Json.encodeToJsonElement(status).jsonObject }
+            } else it as? JsonObject
+            val mechanisms = declarations?.keys.orEmpty()
             require(mechanisms == setOf("status_list")) {
                 "Unsupported credential status mechanisms: ${mechanisms - "status_list"}"
             }
