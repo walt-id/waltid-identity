@@ -96,7 +96,7 @@ class MdocCredentialHandler(
 
             computeCredentialResult(
                 configuration = configuration,
-                issue = { certificateChain, docType, issuedAt, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
+                issue = { certificateChain, docType, issuedAt, signedAt, msoValidFrom, msoValidUntil, instance ->
                     MdocCredentialSigner.generateMdocCredential(
                         credentialData = mapMdocData(
                             instance.input.credentialData,
@@ -106,14 +106,14 @@ class MdocCredentialHandler(
                             instance.verifiedBinding,
                             issuedAt,
                             docType,
-                            effectiveValidFrom ?: signedAt,
+                            msoValidFrom ?: signedAt,
                         ),
                         issuerKey = issuerKey,
                         issuerCertificate = certificateChain,
                         docType = docType,
                         signedAt = signedAt,
-                        validFrom = effectiveValidFrom,
-                        validUntil = effectiveValidUntil,
+                        validFrom = msoValidFrom,
+                        validUntil = msoValidUntil,
                         expectedUpdate = expectedUpdate,
                         requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
                         status = instance.input.credentialStatus,
@@ -157,7 +157,7 @@ class MdocCredentialHandler(
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             validFrom = validFrom,
             validUntil = validUntil,
-            issue = { certificateChain, docType, issuedAt, signedAt, effectiveValidFrom, effectiveValidUntil, instance ->
+            issue = { certificateChain, docType, issuedAt, signedAt, msoValidFrom, msoValidUntil, instance ->
                 MdocCredentialSigner.generateMdocCredential(
                     credentialData = mapMdocData(
                         instance.input.credentialData,
@@ -167,15 +167,15 @@ class MdocCredentialHandler(
                         instance.verifiedBinding,
                         issuedAt,
                         docType,
-                        effectiveValidFrom ?: signedAt,
+                        msoValidFrom ?: signedAt,
                     ),
                     issuerKey = issuerKey.key,
                     signatureAlgorithm = issuerKey.requireCoseAlgorithm(),
                     issuerCertificate = certificateChain,
                     docType = docType,
                     signedAt = signedAt,
-                    validFrom = effectiveValidFrom,
-                    validUntil = effectiveValidUntil,
+                    validFrom = msoValidFrom,
+                    validUntil = msoValidUntil,
                     expectedUpdate = expectedUpdate,
                     requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
                     status = instance.input.credentialStatus,
@@ -227,8 +227,8 @@ class MdocCredentialHandler(
             docType: String,
             issuedAt: Instant,
             signedAt: Instant,
-            validFrom: Instant?,
-            validUntil: Instant,
+            msoValidFrom: Instant?,
+            msoValidUntil: Instant,
             instance: CredentialIssuanceInstance,
         ) -> String,
     ): CredentialResponseResult.Success {
@@ -245,8 +245,8 @@ class MdocCredentialHandler(
             roundedMdocValidity(issuedAt, certificates.first().data.validity, validFrom, validUntil)
         } else null
         val signedAt = truncateMdocTDate(roundedValidity?.signed ?: issuedAt)
-        val effectiveValidFrom = (roundedValidity?.validFrom ?: validFrom)?.let(::truncateMdocTDate)
-        val effectiveValidUntil = truncateMdocTDate(roundedValidity?.validUntil ?: validUntil ?: issuedAt.plus(365.days))
+        val msoValidFrom = (roundedValidity?.validFrom ?: validFrom)?.let(::truncateMdocTDate)
+        val msoValidUntil = truncateMdocTDate(roundedValidity?.validUntil ?: validUntil ?: issuedAt.plus(365.days))
         return issuanceBatch.signEach { instance ->
             val credentialData = instance.input.credentialData
             val namespaceIdentifiers = credentialData.keys
@@ -265,7 +265,7 @@ class MdocCredentialHandler(
             }
             issue(
                 issuerCertificateChain, docType, issuedAt, signedAt,
-                effectiveValidFrom, effectiveValidUntil, instance,
+                msoValidFrom, msoValidUntil, instance,
             )
         }
     }
