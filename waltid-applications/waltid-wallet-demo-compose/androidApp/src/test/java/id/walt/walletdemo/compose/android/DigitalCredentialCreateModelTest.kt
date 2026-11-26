@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.fragment.app.FragmentActivity
+import id.walt.wallet2.mobile.issuance.IssuanceAuthorizationId
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.handlers.WalletIssuancePkceState
 import id.walt.walletdemo.compose.logic.*
@@ -42,7 +43,7 @@ class DigitalCredentialCreateModelTest {
     @Before fun setUp() { Dispatchers.setMain(dispatcher) }
     @After fun tearDown() {
         store.clear()
-        DigitalCredentialCreateAuthHandoff.clear(context, "provider-session")
+        DigitalCredentialCreateAuthHandoff.clear(context, "provider-authorization")
         Dispatchers.resetMain()
     }
     private fun model(client: Client) = ViewModelProvider(owner, viewModelFactory {
@@ -106,7 +107,7 @@ class DigitalCredentialCreateModelTest {
             assertEquals(expected, DigitalCredentialCreateAuthHandoff.deliver(context, Uri.parse("openid://?code=abc&state=expected")))
         }
         runCurrent()
-        assertEquals(1, client.callbacks)
+        assertEquals(listOf("provider-authorization"), client.completedAuthorizationIds)
         assertEquals(0, client.accepts)
         assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state)
         val resume = assertNotNull(shadowOf(host.get()).nextStartedActivity)
@@ -229,7 +230,8 @@ class DigitalCredentialCreateModelTest {
         var credentialsFail = false
         var selections = emptyList<WalletDemoCredentialSelection>()
         var code: String? = null
-        var accepts = 0; var callbacks = 0; var resumes = 0; var cancels = 0
+        val completedAuthorizationIds = mutableListOf<String>()
+        var accepts = 0; var resumes = 0; var cancels = 0
         var acceptGate: CompletableDeferred<Unit>? = null
         override suspend fun prepare(intent: Intent) = DigitalCredentialCreateClient.Offer("openid4vci-v1", session, WalletDemoHolderBinding("key"))
         override suspend fun accept(id: String, code: String?, selections: List<WalletDemoCredentialSelection>): WalletDemoIssuanceOutcome {
@@ -237,11 +239,17 @@ class DigitalCredentialCreateModelTest {
             acceptGate?.await()
             return outcome
         }
-        override suspend fun authorize(id: String, selections: List<WalletDemoCredentialSelection>): WalletIssuanceAuthorization {
+        override suspend fun authorize(id: String, selections: List<WalletDemoCredentialSelection>): DigitalCredentialCreateClient.Authorization {
             this.selections = selections
-            return WalletIssuanceAuthorization("https://issuer.example/authorize", "expected", "openid://", WalletIssuancePkceState("challenge", "S256"), false)
+            return DigitalCredentialCreateClient.Authorization(
+                IssuanceAuthorizationId("provider-authorization"),
+                WalletIssuanceAuthorization("https://issuer.example/authorize", "expected", "openid://", WalletIssuancePkceState("challenge", "S256"), false),
+            )
         }
-        override suspend fun continueAuthorization(id: String, callback: String): WalletDemoIssuanceOutcome { callbacks++; return outcome }
+        override suspend fun completeAuthorization(id: IssuanceAuthorizationId, callback: String): WalletDemoIssuanceOutcome {
+            completedAuthorizationIds += id.value
+            return outcome
+        }
         override suspend fun cancel(id: String) { cancels++ }
         override suspend fun resume(id: String): WalletDemoIssuanceOutcome { resumes++; return outcome }
         override suspend fun credentials(): List<WalletDemoCredential> { check(!credentialsFail); return saved }

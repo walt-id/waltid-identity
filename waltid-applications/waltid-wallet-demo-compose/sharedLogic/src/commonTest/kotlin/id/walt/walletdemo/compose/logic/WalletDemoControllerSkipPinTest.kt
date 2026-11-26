@@ -187,7 +187,7 @@ private class RecordingDemoWallet : DemoWallet {
         signingProtection: WalletDemoSigningProtection,
     ) = WalletDemoSigningProtectionAvailability.Available
 
-    override fun pendingAuthorizationIssuance(): WalletDemoIssuanceSession? = pendingSession
+    override fun pendingAuthorizationId(): String? = pendingSession?.id
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
     override suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?) =
@@ -195,7 +195,7 @@ private class RecordingDemoWallet : DemoWallet {
     override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>) = error("unused")
     override suspend fun continuePreAuthorizedIssuance(sessionId: String, transactionCode: String?, credentials: List<WalletDemoCredentialSelection>) =
         error("unused")
-    override suspend fun continueAuthorizationIssuance(sessionId: String, callbackUri: String): WalletDemoIssuanceOutcome {
+    override suspend fun completeAuthorization(authorizationId: String, callbackUri: String): WalletDemoIssuanceOutcome {
         authorizationCallback = callbackUri
         credentials = listOf(
             WalletDemoCredential(

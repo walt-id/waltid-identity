@@ -21,10 +21,11 @@ import kotlinx.coroutines.ensureActive
 /** Android provider boundary; all protocol validation and issuance behavior remain in the SDK. */
 internal interface DigitalCredentialCreateClient {
     data class Offer(val protocol: String, val session: WalletDemoIssuanceSession, val holder: WalletDemoHolderBinding)
+    data class Authorization(val id: IssuanceAuthorizationId, val request: WalletIssuanceAuthorization)
     suspend fun prepare(intent: Intent): Offer
     suspend fun accept(id: String, code: String?, selections: List<WalletDemoCredentialSelection>): WalletDemoIssuanceOutcome
-    suspend fun authorize(id: String, selections: List<WalletDemoCredentialSelection>): WalletIssuanceAuthorization
-    suspend fun continueAuthorization(id: String, callback: String): WalletDemoIssuanceOutcome
+    suspend fun authorize(id: String, selections: List<WalletDemoCredentialSelection>): Authorization
+    suspend fun completeAuthorization(id: IssuanceAuthorizationId, callback: String): WalletDemoIssuanceOutcome
     suspend fun cancel(id: String)
     suspend fun resume(id: String): WalletDemoIssuanceOutcome
     suspend fun credentials(): List<WalletDemoCredential>
@@ -59,9 +60,10 @@ internal class WalletDigitalCredentialCreateClient(
             .accept(code, selections.toIssuanceSelections(), clientId = "eudiw-abca").toDemoIssuanceOutcome()
     override suspend fun authorize(id: String, selections: List<WalletDemoCredentialSelection>) =
         (requireNotNull(wallet().resumeIssuance(IssuanceSessionId(id))) as IssuanceSession.AuthorizationCode)
-            .beginAuthorization(IssuanceClientRegistration("eudiw-abca", DigitalCredentialCreateAuthHandoff.REDIRECT_URI), selections.toIssuanceSelections()).request
-    override suspend fun continueAuthorization(id: String, callback: String) =
-        wallet().completeAuthorization(IssuanceAuthorizationId(id), callback).toDemoIssuanceOutcome()
+            .beginAuthorization(IssuanceClientRegistration("eudiw-abca", DigitalCredentialCreateAuthHandoff.REDIRECT_URI), selections.toIssuanceSelections())
+            .let { pending -> DigitalCredentialCreateClient.Authorization(pending.id, pending.request) }
+    override suspend fun completeAuthorization(id: IssuanceAuthorizationId, callback: String) =
+        wallet().completeAuthorization(id, callback).toDemoIssuanceOutcome()
     override suspend fun cancel(id: String) { wallet().cancelIssuance(IssuanceSessionId(id)) }
     override suspend fun resume(id: String) = wallet().resumeDeferredIssuance(DeferredIssuanceId(id)).toDemoIssuanceOutcome()
     override suspend fun credentials() = wallet().credentials().map { it.toDemoCredential() }

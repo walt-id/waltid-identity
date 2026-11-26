@@ -14,7 +14,7 @@ import org.json.JSONObject
  * here so the still-running create Activity can finish the OpenID4VCI token exchange and return
  * the CREATE_CREDENTIAL provider result.
  *
- * The pending session id is also persisted so a process death after browser launch can still
+ * The pending authorization ID is persisted so a process death after browser launch can still
  * complete wallet-side issuance (the CREATE_CREDENTIAL provider result may already be lost).
  */
 internal object DigitalCredentialCreateAuthHandoff {
@@ -26,21 +26,21 @@ internal object DigitalCredentialCreateAuthHandoff {
     private val claimed = mutableSetOf<String>()
 
     @Synchronized
-    fun register(context: Context, sessionId: String, state: String, redirectUri: String, onCallback: (String) -> Unit) {
-        require(sessionId.isNotBlank() && state.isNotBlank()) { "Authorization correlation is missing" }
+    fun register(context: Context, authorizationId: String, state: String, redirectUri: String, onCallback: (String) -> Unit) {
+        require(authorizationId.isNotBlank() && state.isNotBlank()) { "Authorization correlation is missing" }
         val entry = JSONObject().put("state", state).put("redirect", redirectUri).toString()
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(PREFIX + sessionId, entry).apply()
-        live[sessionId] = onCallback
+            .putString(PREFIX + authorizationId, entry).apply()
+        live[authorizationId] = onCallback
     }
 
     /** Cleanup is scoped to one owner, including when another provider invocation is active. */
     @Synchronized
-    fun clear(context: Context, sessionId: String) {
-        live.remove(sessionId)
-        claimed.remove(sessionId)
+    fun clear(context: Context, authorizationId: String) {
+        live.remove(authorizationId)
+        claimed.remove(authorizationId)
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .remove(PREFIX + sessionId).apply()
+            .remove(PREFIX + authorizationId).apply()
     }
 
     /** Test-only process-loss simulation: persisted correlation remains available. */
@@ -65,14 +65,14 @@ internal object DigitalCredentialCreateAuthHandoff {
                     uri.encodedAuthority.orEmpty() == redirect.encodedAuthority.orEmpty() &&
                     uri.encodedPath.orEmpty() == redirect.encodedPath.orEmpty()
             }
-        val sessionId = matches.keys.singleOrNull()?.removePrefix(PREFIX) ?: return Delivery.Unmatched
-        if (!claimed.add(sessionId)) return Delivery.Duplicate
-        val continuation = live.remove(sessionId)
+        val authorizationId = matches.keys.singleOrNull()?.removePrefix(PREFIX) ?: return Delivery.Unmatched
+        if (!claimed.add(authorizationId)) return Delivery.Duplicate
+        val continuation = live.remove(authorizationId)
         return if (continuation != null) {
             continuation(uri.toString())
             Delivery.Live
         } else {
-            OrphanAuthorizationCallback.queue(sessionId, uri.toString())
+            OrphanAuthorizationCallback.queue(authorizationId, uri.toString())
             Delivery.Orphan
         }
     }
@@ -88,14 +88,14 @@ internal object DigitalCredentialCreateAuthHandoff {
 
 /**
  * Holds an authorization callback that arrived after [DigitalCredentialCreateActivity] was
- * destroyed. [MainActivity] drains this into the SDK's continueAuthorizationIssuance so the
+ * destroyed. [MainActivity] passes the saved authorization ID and callback to the wallet so the
  * credential is still stored even when the CREATE_CREDENTIAL result can no longer be returned.
  */
 internal object OrphanAuthorizationCallback {
     private val pending = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, String>>()
 
-    fun queue(sessionId: String, callbackUri: String) {
-        pending.add(sessionId to callbackUri)
+    fun queue(authorizationId: String, callbackUri: String) {
+        pending.add(authorizationId to callbackUri)
     }
 
     fun take(): Pair<String, String>? = pending.poll()

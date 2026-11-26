@@ -156,7 +156,7 @@ internal class WalletApi2DemoWallet(
         )
         issuanceSessions[sessionId] = updated
         WalletApi2BrowserSessionStore.savePendingIssuance(updated.toPersisted(walletId))
-        WalletDemoIssuanceAuthorization(url = result.authorizationUrl)
+        WalletDemoIssuanceAuthorization(id = sessionId, url = result.authorizationUrl)
     }
 
     override suspend fun continuePreAuthorizedIssuance(
@@ -178,10 +178,10 @@ internal class WalletApi2DemoWallet(
         result.toOutcome()
     }
 
-    override suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    override suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
-    ): WalletDemoIssuanceOutcome = withIssuance(sessionId) { session ->
+    ): WalletDemoIssuanceOutcome = withIssuance(authorizationId) { session ->
         val parsed = parseWalletApi2AuthorizationCallback(
             callbackUri = callbackUri,
             expectedState = session.authorizationState,
@@ -189,8 +189,8 @@ internal class WalletApi2DemoWallet(
         )
         val code = when (parsed) {
             WalletApi2AuthorizationCallback.Denied -> {
-                issuanceSessions.remove(sessionId)
-                WalletApi2BrowserSessionStore.clearPendingIssuance(sessionId)
+                issuanceSessions.remove(authorizationId)
+                WalletApi2BrowserSessionStore.clearPendingIssuance(authorizationId)
                 return@withIssuance WalletDemoIssuanceOutcome.Cancelled
             }
             is WalletApi2AuthorizationCallback.Invalid -> {
@@ -214,7 +214,7 @@ internal class WalletApi2DemoWallet(
                 keyId = keyId,
             ),
         )
-        finishIssuance(sessionId)
+        finishIssuance(authorizationId)
         result.toOutcome()
     }
 
@@ -466,15 +466,10 @@ internal class WalletApi2DemoWallet(
         }
     }
 
-    override fun pendingAuthorizationIssuance(): WalletDemoIssuanceSession? {
+    override fun pendingAuthorizationId(): String? {
         if (resetStage != null) return null
         val persisted = WalletApi2BrowserSessionStore.loadPendingIssuance()?.takeIf { it.matchesWallet(walletId) } ?: return null
-        val session = issuanceSessions.getOrPut(persisted.id) { persisted.toApi2Session() }
-        return WalletDemoIssuanceSession(
-            id = session.id,
-            grant = WalletDemoIssuanceGrant.AuthorizationCode,
-            preview = emptyOfferPreview(session.credentialIssuer),
-        )
+        return issuanceSessions.getOrPut(persisted.id) { persisted.toApi2Session() }.id
     }
 
     private suspend fun ensureIdentity(): WalletIdentity {

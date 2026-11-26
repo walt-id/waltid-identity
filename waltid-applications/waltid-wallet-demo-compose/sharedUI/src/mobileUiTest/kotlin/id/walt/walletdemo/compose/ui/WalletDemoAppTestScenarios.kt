@@ -2462,7 +2462,7 @@ internal class WalletUiTestWallet(
     }
 
     override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
-        WalletDemoIssuanceAuthorization("https://issuer.example/authorize")
+        WalletDemoIssuanceAuthorization(sessionId, "https://issuer.example/authorize")
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
@@ -2478,8 +2478,8 @@ internal class WalletUiTestWallet(
 
     var receivedSelections: List<WalletDemoCredentialSelection>? = null
 
-    override suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    override suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
     ): WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Failed("Authorization code is not configured")
 
