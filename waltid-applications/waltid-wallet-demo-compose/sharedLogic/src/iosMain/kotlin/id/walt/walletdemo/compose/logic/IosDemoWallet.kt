@@ -1,13 +1,15 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
-import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
-import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
-import platform.Foundation.NSLocale
-import platform.Foundation.preferredLanguages
+import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCrossProcessAccess
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialsConfig
+import id.walt.wallet2.mobile.identity.MobileWalletKeyAuthorization
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceConfig
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationConfig
+import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 
 /**
  * Creates the Compose demo's iOS wallet.
@@ -35,26 +37,32 @@ fun createIosDemoWallet(
             MobileWalletFactory(nfcHostPlatformAdapter).create(
                 MobileWalletConfig(
                     walletId = config.walletId,
+                    keyAuthorization = MobileWalletKeyAuthorization(
+                        policy = config.signingProtectionMode.defaultSelection.toKeyUseAuthorizationPolicy(),
+                        prompt = KeyUseAuthorizationPrompt(
+                            reason = "Authorize wallet signing",
+                            cancelText = "Cancel",
+                        ),
+                    ),
                     signingIdentity = id.walt.wallet2.mobile.identity.SigningIdentityConfiguration(
                         recoveryProviders = listOf(id.walt.wallet2.recovery.keychain.KeychainIdentityRecovery("wallet-demo", crossProcessAccess.keychainAccessGroup)),
                         alternativeAuthorizations = config.signingProtectionMode.alternativeAuthorizations(),
                         platform = id.walt.crypto2.keys.PlatformKeyConfiguration.IosKeychain(accessGroup = crossProcessAccess.keychainAccessGroup),
                     ),
-                    attestationConfig = config.toWalletAttestationConfig(),
-                    walletProvider = config.toWalletProviderConfig(),
-                    transactionDataProfiles = transactionDataProfiles.profiles,
-                paymentCredentialIssuers = config.paymentCredentialIssuers(),
-                    preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },
-                    crossProcessAccess = crossProcessAccess,
-                    onDigitalCredentialRegistryChanged = onDigitalCredentialRegistryChanged,
-                    defaultKeyUseAuthorizationPolicy =
-                        config.signingProtectionMode.defaultSelection.toKeyUseAuthorizationPolicy(),
-                    keyUseAuthorizationPrompt = KeyUseAuthorizationPrompt(
-                        reason = "Authorize wallet signing",
-                        cancelText = "Cancel",
+                    issuance = MobileWalletIssuanceConfig(
+                        attestation = config.toWalletAttestationConfig(),
+                        walletProvider = config.toWalletProviderConfig(),
+                    ),
+                    presentation = MobileWalletPresentationConfig(
+                        verifierTrust = DemoClientIdTrust.configuration,
+                        transactionDataProfiles = transactionDataProfiles.profiles,
+                        paymentCredentialIssuers = config.paymentCredentialIssuers(),
+                    ),
+                    digitalCredentials = MobileWalletDigitalCredentialsConfig(
+                        crossProcessAccess = crossProcessAccess,
+                        onRegistrationChanged = onDigitalCredentialRegistryChanged,
                     ),
                 ),
-                DemoClientIdTrust.configuration,
             ).attachKeyAttestationProviderResolver(DemoKeyAttestationProviders()),
             warning = transactionDataProfiles.warning,
             isIos = true,

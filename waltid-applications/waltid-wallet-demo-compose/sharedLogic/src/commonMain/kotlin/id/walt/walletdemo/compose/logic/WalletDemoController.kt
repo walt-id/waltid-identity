@@ -1176,7 +1176,7 @@ class WalletDemoController(
                         ready, request, wallet.continuePreAuthorizedIssuance(session.id, txCode, selections),
                     )
                     WalletDemoIssuanceGrant.AuthorizationCode -> {
-                        val authorization = wallet.beginAuthorizationIssuance(session.id, selections)
+                        val authorization = wallet.beginAuthorizationIssuance(session.id, issuanceRedirectUri, selections)
                         updateIfCurrent(request, WalletOperationState.Receiving) {
                             it.copy(authorizationRequestUrl = authorization.url, operation = WalletOperationState.OfferPreview)
                         }
@@ -1775,7 +1775,9 @@ class WalletDemoController(
             } catch (cause: CancellationException) { throw cause
             } catch (cause: Exception) { WalletDemoClaimReview.Failed(cause.message ?: "Couldn't update the information to share.") }
             val review = try {
-                if (preview.requiresPaymentConsent && information.canConfirm)
+                val retained = (information as? WalletDemoClaimReview.Ready)?.review?.retained
+                if (retained != null) retained.payment?.let { WalletDemoPaymentReview.Ready(it) } ?: WalletDemoPaymentReview.NotRequired
+                else if (preview.requiresPaymentConsent && information.canConfirm)
                     wallet.preparePaymentConsent(preview.previewHandle, current.selectedPresentationCredentialOptions.toList(),
                         current.selectedPresentationDisclosureOptions.toList(), did)
                         ?.let { WalletDemoPaymentReview.Ready(it) } ?: WalletDemoPaymentReview.NotRequired
@@ -1798,6 +1800,7 @@ class WalletDemoController(
         val ready = current.session as? WalletSessionState.Ready ?: return
         if (!current.presentationReviewEnabled || !current.paymentReview.canConfirm || !current.claimReview.canConfirm || current.presentationStatusRefresh != null) return
         val reviewed = submission.selection
+        if (submission.retained !== (current.claimReview as? WalletDemoClaimReview.Ready)?.review?.retained) return
         if (submission.previewHandle != current.presentationPreview?.previewHandle || submission.walletKeyId != ready.keyId ||
             submission.walletContext != current.credentialStatusContext ||
             submission.statusReviewEpoch != current.credentialStatuses.reviewEpoch ||
@@ -1832,7 +1835,8 @@ class WalletDemoController(
 
         presentationJob = scope.launch(dispatcher) {
             try {
-                val result = wallet.submitStatusReviewedPresentation(
+                val retained = (current.claimReview as? WalletDemoClaimReview.Ready)?.review?.retained
+                val result = retained?.submit?.invoke() ?: wallet.submitStatusReviewedPresentation(
                     previewHandle,
                     selectedCredentialOptions,
                     selectedDisclosureOptions,

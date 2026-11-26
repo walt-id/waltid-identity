@@ -548,7 +548,7 @@ final class WalletVisualTests: XCTestCase {
         XCTAssertEqual(definitions.filter { $0.mandatory != true }.map(\.name), ["Contact email"])
         try capture(ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                OfferedCredentialDetails(credential: credential, issuerName: offer.issuer.name!, issuerIdentifier: offer.issuer.identifier)
+                OfferedCredentialDetails(credential: credential, issuerName: offer.issuer.display.name!, issuerIdentifier: offer.issuer.identifier)
             }.padding(20)
         }, id: "batch.offer.definitions")
     }

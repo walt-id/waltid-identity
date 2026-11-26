@@ -1,9 +1,27 @@
 package id.walt.walletdemo.compose.ui
 
-import id.walt.wallet2.mobile.*
+import id.walt.wallet2.mobile.proximity.ProximityCredentialOption
+import id.walt.wallet2.mobile.proximity.ProximityDeviceAuthenticationMethod
+import id.walt.wallet2.mobile.proximity.ProximityDocumentReview
+import id.walt.wallet2.mobile.proximity.ProximityDocumentSubmission
+import id.walt.wallet2.mobile.proximity.ProximityElementReference
+import id.walt.wallet2.mobile.proximity.ProximityError
+import id.walt.wallet2.mobile.proximity.ProximityErrorCategory
+import id.walt.wallet2.mobile.proximity.ProximityReaderAuthentication
+import id.walt.wallet2.mobile.proximity.ProximityReaderAuthenticationOutcome
+import id.walt.wallet2.mobile.proximity.ProximityReaderAuthenticationScope
+import id.walt.wallet2.mobile.proximity.ProximityReaderCertificatePathState
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustDecision
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustState
+import id.walt.wallet2.mobile.proximity.ProximityRecovery
+import id.walt.wallet2.mobile.proximity.ProximityRequestedElement
+import id.walt.wallet2.mobile.proximity.ProximityReview
+import id.walt.wallet2.mobile.proximity.ProximityReviewId
+import id.walt.wallet2.mobile.proximity.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximitySubmission
 import id.walt.walletdemo.compose.logic.*
-import kotlinx.serialization.json.*
 import kotlin.time.Instant
+import kotlinx.serialization.json.*
 
 /** Both native and Compose renderers read these synthetic nearby facts. */
 internal object WalletVisualProximityFixtures {

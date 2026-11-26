@@ -2,10 +2,11 @@
 
 package id.walt.walletdemo.compose.android
 
-import id.walt.wallet2.mobile.AndroidDigitalCredentialRegistry
-import id.walt.wallet2.mobile.MobileWalletCredentialRegistryField
-import id.walt.wallet2.mobile.MobileWalletCredentialRegistryRecord
-import id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
+import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryField
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
 import id.walt.mobile.test.DigitalCredentialProviderTest
 
 import android.content.Context
@@ -38,8 +39,8 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
 import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
@@ -956,9 +957,11 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 runtimeOverrides = imageOverrides.takeIf { scenario.id in setOf("iso-mdl", "eudi-pid-sdjwt") },
             )
             val session = wallet.startIssuance(
-                MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offer.offerUrl))
+                MobileWalletIssuanceRequest(
+                    offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
+                )
             )
-            return when (val outcome = wallet.continuePreAuthorizedIssuance(session.id, offer.txCode)) {
+            return when (val outcome = (session as MobileWalletIssuanceSession.PreAuthorized).accept(offer.txCode, clientId = "eudiw-abca")) {
                 is WalletIssuanceOutcome.Stored -> outcome.credentialIds
                 is WalletIssuanceOutcome.Deferred -> error(
                     "Live issuer unexpectedly deferred ${scenario.id}: " +

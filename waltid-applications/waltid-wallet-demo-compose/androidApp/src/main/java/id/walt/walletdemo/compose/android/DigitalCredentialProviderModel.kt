@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.android
 
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import id.walt.walletdemo.compose.logic.WalletDemoStatusReadState
 import id.walt.walletdemo.compose.logic.toDemoStatuses
@@ -15,15 +16,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.credentials.provider.ProviderGetCredentialRequest
-import id.walt.wallet2.mobile.AndroidDigitalCredentialProvider
+import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialProvider
 import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
-import id.walt.wallet2.mobile.MobileWalletAnnexCRequest
-import id.walt.wallet2.mobile.MobileWalletAnnexCSubmission
-import id.walt.wallet2.mobile.MobileWalletDigitalCredentialPreview
-import id.walt.wallet2.mobile.MobileWalletDigitalCredentialProtocols
-import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
-import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCPreview
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCRequest
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCSubmission
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialPreview
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
@@ -102,12 +103,22 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
             currentCoroutineContext().ensureActive()
             install(preview.toSharingReview(), "Share digital credential?", showPreview,
                 prepareClaimReview = { selection ->
-                    wallet.reviewDigitalCredentialPresentation(preview.requestId,
-                        selection.toCredentialSelections(), selection.toDisclosureSelections()).toDemoClaimReview()
+                    wallet.reviewDigitalCredentialPresentation(
+                        preview.requestId,
+                        MobileWalletPresentationSelection(
+                            credentials = selection.toCredentialSelections(),
+                            disclosures = selection.toDisclosureSelections(),
+                        ),
+                    ).toDemoClaimReview()
                 },
                 preparePaymentConsent = { selection ->
-                    wallet.prepareDigitalCredentialPaymentConsent(preview.requestId,
-                        selection.toCredentialSelections(), selection.toDisclosureSelections())?.toDemoPaymentConsent()
+                    wallet.prepareDigitalCredentialPaymentConsent(
+                        preview.requestId,
+                        MobileWalletPresentationSelection(
+                            credentials = selection.toCredentialSelections(),
+                            disclosures = selection.toDisclosureSelections(),
+                        ),
+                    )?.toDemoPaymentConsent()
                 }) { selection -> submitDigitalCredential(wallet, preview, selection, input.providerRequest) }
         }
     }
@@ -158,11 +169,20 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         val response = if (statusReviewEnabled) wallet.submitStatusReviewedDigitalCredentialPresentation(
             reviewedStatus = selection.credentialStatusRevisions,
             requestId = preview.requestId,
-            selectedCredentialOptions = selection.toCredentialSelections(),
-            selectedDisclosureOptions = selection.toDisclosureSelections(),
+            selection = MobileWalletPresentationSelection(
+                credentials = selection.toCredentialSelections(),
+                disclosures = selection.toDisclosureSelections(),
+            ),
             paymentConsentRevision = selection.paymentConsentRevision,
         )
-        else wallet.submitDigitalCredentialPresentation(preview.requestId, selection.toCredentialSelections(), selection.toDisclosureSelections(), paymentConsentRevision = selection.paymentConsentRevision)
+        else wallet.submitDigitalCredentialPresentation(
+            preview.requestId,
+            MobileWalletPresentationSelection(
+                credentials = selection.toCredentialSelections(),
+                disclosures = selection.toDisclosureSelections(),
+            ),
+            paymentConsentRevision = selection.paymentConsentRevision,
+        )
         currentCoroutineContext().ensureActive()
         AndroidDigitalCredentialProvider.setResponse(resultIntent, response, providerRequest)
         finish(resultIntent)

@@ -455,27 +455,18 @@ final class AnnexCPresentationModelTests: XCTestCase {
             return preview
         }
 
-        func submitAnnexCPresentation(
-            requestID: String,
-            verifiedOrigin: String,
-            deviceRequestBase64URL: String,
-            encryptionInfoBase64URL: String,
-            selectedCredentialOptions: [PresentationCredentialSelection]
-        ) async throws -> DigitalCredentialResponse {
+        func submitAnnexCPresentation(_ submission: AnnexCSubmission) async throws -> DigitalCredentialResponse {
             lock.withLock { ordinaryCount += 1 }
-            if let directSubmitFailure { throw directSubmitFailure }
-            return try seal(requestID: requestID, verifiedOrigin: verifiedOrigin,
-                deviceRequestBase64URL: deviceRequestBase64URL, encryptionInfoBase64URL: encryptionInfoBase64URL,
-                selectedCredentialOptions: selectedCredentialOptions)
+            return try seal(requestID: submission.requestID, verifiedOrigin: submission.verifiedOrigin,
+                deviceRequestBase64URL: submission.deviceRequestBase64URL, encryptionInfoBase64URL: submission.encryptionInfoBase64URL,
+                selectedCredentialOptions: submission.selectedCredentialOptions)
         }
 
-        func submitStatusReviewedAnnexCPresentation(reviewedStatus: [String: String], requestID: String, verifiedOrigin: String,
-            deviceRequestBase64URL: String, encryptionInfoBase64URL: String,
-            selectedCredentialOptions: [PresentationCredentialSelection]) async throws -> DigitalCredentialResponse {
+        func submitStatusReviewedAnnexCPresentation(_ submission: AnnexCSubmission, reviewedStatus: [String: String]) async throws -> DigitalCredentialResponse {
             lock.withLock { recordedStatus = reviewedStatus }
-            return try seal(requestID: requestID, verifiedOrigin: verifiedOrigin,
-                deviceRequestBase64URL: deviceRequestBase64URL, encryptionInfoBase64URL: encryptionInfoBase64URL,
-                selectedCredentialOptions: selectedCredentialOptions)
+            return try seal(requestID: submission.requestID, verifiedOrigin: submission.verifiedOrigin,
+                deviceRequestBase64URL: submission.deviceRequestBase64URL, encryptionInfoBase64URL: submission.encryptionInfoBase64URL,
+                selectedCredentialOptions: submission.selectedCredentialOptions)
         }
 
         private func seal(requestID: String, verifiedOrigin: String, deviceRequestBase64URL: String,
@@ -526,10 +517,10 @@ final class AnnexCPresentationModelTests: XCTestCase {
             queryID: queryID,
             credentialID: credentialID,
             format: "mso_mdoc",
+            credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe"}}"#,
             issuer: "https://issuer.example",
             subject: "did:example:holder",
             label: "Mobile Driving Licence",
-            credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe"}}"#,
             disclosures: [
                 PresentationDisclosure(
                     path: "org.iso.18013.5.1.family_name",

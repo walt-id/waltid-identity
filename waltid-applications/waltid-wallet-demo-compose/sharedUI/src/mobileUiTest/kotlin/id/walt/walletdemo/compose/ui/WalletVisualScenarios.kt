@@ -82,9 +82,9 @@ import id.walt.walletdemo.compose.ui.components.WalletIcon
 import id.walt.walletdemo.compose.ui.components.WalletSymbol
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
-import id.walt.wallet2.mobile.ProximityEngagement
-import id.walt.wallet2.mobile.ProximityHostActionResult
-import id.walt.wallet2.mobile.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximityEngagement
+import id.walt.wallet2.mobile.proximity.ProximityHostActionResult
+import id.walt.wallet2.mobile.proximity.ProximityState
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.WalletCredentialContentMaxWidth
@@ -606,8 +606,8 @@ internal class WalletVisualScenarios(
     fun settingsRoot(destination: String = "root", reviewEnabled: Boolean = true) = with(test) {
         val trust = id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController(
             id.walt.walletdemo.compose.logic.InMemoryDemoReaderTrustSettingsStore(
-                id.walt.wallet2.mobile.ProximityReaderTrustSettings(if (destination == "reader_required")
-                    id.walt.wallet2.mobile.ProximityReaderPolicy.RequireTrusted else id.walt.wallet2.mobile.ProximityReaderPolicy.AllowAnonymousOrUntrusted)),
+                id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettings(if (destination == "reader_required")
+                    id.walt.wallet2.mobile.proximity.ProximityReaderPolicy.RequireTrusted else id.walt.wallet2.mobile.proximity.ProximityReaderPolicy.AllowAnonymousOrUntrusted)),
             scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
             dispatcher = kotlinx.coroutines.Dispatchers.Unconfined,
             workerDispatcher = kotlinx.coroutines.Dispatchers.Unconfined)
@@ -921,7 +921,7 @@ internal class WalletVisualScenarios(
             }) {
                 ProximityTerminalContent("Presentation complete", "The approved credential data was sent to the reader.") {
                     ProximitySharingReceiptContent(fixtures.review, fixtures.submission,
-                        id.walt.wallet2.mobile.ProximityApprovalTiming.BeforeConnection, fixtures.completedAt, fixtures.details)
+                        id.walt.wallet2.mobile.proximity.ProximityApprovalTiming.BeforeConnection, fixtures.completedAt, fixtures.details)
                 }
             } else WalletDemoProximityScreen(state, fixtures.details,
                 WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
@@ -945,7 +945,7 @@ internal class WalletVisualScenarios(
     }
 
     fun nearbyReady() = with(test) {
-        val method = mutableStateOf(id.walt.wallet2.mobile.ProximityEngagementMethod.Qr)
+        val method = mutableStateOf(id.walt.wallet2.mobile.proximity.ProximityEngagementMethod.Qr)
         content { CompositionLocalProvider(LocalWalletVisualPreferences provides WalletVisualPreferences(reduceMotion = true)) {
             nearbyVisualHost {
             WalletDemoProximityScreen(
@@ -962,7 +962,7 @@ internal class WalletVisualScenarios(
         onNodeWithTag(WalletUiTestTags.ProximityQr).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.ProximityCancel).assertIsDisplayed()
         capture("nearby.ready.qr")
-        runOnIdle { method.value = id.walt.wallet2.mobile.ProximityEngagementMethod.Nfc }
+        runOnIdle { method.value = id.walt.wallet2.mobile.proximity.ProximityEngagementMethod.Nfc }
         onNodeWithText("Hold near the reader").assertIsDisplayed()
         onNodeWithText("Show QR code instead").assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.ProximityQr).assertDoesNotExist()

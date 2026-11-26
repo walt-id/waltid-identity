@@ -221,7 +221,7 @@ fun MobileWalletDemoApp(
                 }
             }
         } else null,
-        readerTrustPolicySummary = stringResource(if (trustSettings.settings.readerPolicy == id.walt.wallet2.mobile.ProximityReaderPolicy.RequireTrusted)
+        readerTrustPolicySummary = stringResource(if (trustSettings.settings.readerPolicy == id.walt.wallet2.mobile.proximity.ProximityReaderPolicy.RequireTrusted)
             Res.string.reader_trust_require_a_trusted_reader else Res.string.reader_trust_allow_anonymous_or_untrusted_readers),
         readerTrustSettingsContent = {
             DemoReaderTrustSettings(

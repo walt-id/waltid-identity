@@ -6,13 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
-import id.walt.wallet2.mobile.CredentialStatusMaintenanceResult
-import id.walt.wallet2.mobile.refreshDueStatusesForExistingWallet
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCrossProcessAccess
 import id.walt.mdoc.proximity.mobile.NfcHostAvailability
 import id.walt.mdoc.proximity.mobile.NfcHostPreparation
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter

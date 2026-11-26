@@ -566,8 +566,9 @@ final class ProximityPresentationViewModelTests: XCTestCase {
                     validUntil: Date(timeIntervalSince1970: 1_893_456_000), deviceAuthentication: .signature,
                     requestedElements: [.init(namespace: "org.iso.18013.5.1", elementIdentifier: "given_name",
                         intentToRetain: false, satisfiesRequestedElements: [])])])],
-            readerAuthentication: [.init(scope: .wholeRequest, authenticationIndex: 0,
-                outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: "City service desk")))],
+            readerAuthentication: [.init(scope: .wholeRequest,
+                outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: "City service desk")),
+                authenticationIndex: 0)],
             readerAuthenticationSummary: .trusted, useCases: [], applicationAuthorizations: [])
         let selection = try fixtureSubmission(review)
         let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: selection,
@@ -1700,8 +1701,9 @@ func makeWalletVisualProximityState(_ kind: String) async throws -> WalletViewMo
                 validUntil: Date(timeIntervalSince1970: 1_893_456_000), deviceAuthentication: .signature,
                 requestedElements: [.init(namespace: try text("namespace"), elementIdentifier: try text("element"),
                     intentToRetain: true, satisfiesRequestedElements: [])])])],
-        readerAuthentication: [.init(scope: .wholeRequest, authenticationIndex: 0,
-            outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: text("reader"))))],
+        readerAuthentication: [.init(scope: .wholeRequest,
+            outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: text("reader"))),
+            authenticationIndex: 0)],
         readerAuthenticationSummary: .trusted, useCases: [], applicationAuthorizations: [])
     let session = FakeProximitySession()
     let client = FakeProximityWalletClient(session: session, capabilityResults: [kind == "permission"

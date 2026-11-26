@@ -7,6 +7,7 @@ data class WalletDemoPresentationSubmission(
     val walletContext: Long,
     val selection: WalletDemoSharingSelection,
     val statusReviewEpoch: Long,
+    val retained: WalletDemoRetainedPresentation? = null,
 )
 
 fun WalletDemoUiState.presentationSubmission(reviewedStatus: Map<String, String>): WalletDemoPresentationSubmission? {
@@ -16,5 +17,5 @@ fun WalletDemoUiState.presentationSubmission(reviewedStatus: Map<String, String>
         selectedPresentationCredentialOptions.toSet(),
         selectedPresentationDisclosureOptions.forSelectedCredentials(selectedPresentationCredentialOptions).toSet(),
         paymentReview.consent?.revision, reviewedStatus.toMap(),
-    ), credentialStatuses.reviewEpoch)
+    ), credentialStatuses.reviewEpoch, (claimReview as? WalletDemoClaimReview.Ready)?.review?.retained)
 }

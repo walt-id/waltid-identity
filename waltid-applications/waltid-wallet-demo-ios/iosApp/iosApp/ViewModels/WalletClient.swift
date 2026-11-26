@@ -2,6 +2,8 @@ import Foundation
 import WalletSDK
 
 protocol WalletClient {
+    func submit(_ review: PresentationReview) async throws -> PresentationResult
+    func retainedPresentation(_ handle: PresentationPreviewHandle, selection: PresentationSelection, did: String?) async throws -> PresentationReview?
     var supportsClaimReview: Bool { get }
     func reviewPresentation(
         previewHandle: PresentationPreviewHandle,
@@ -34,14 +36,7 @@ protocol WalletClient {
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
-    func rejectIssuedCredential(
-        notificationID: String,
-        accessToken: String,
-        credentialIssuerBaseURL: URL?,
-        notificationEndpoint: URL?,
-        eventDescription: String?
-    ) async throws
-    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
+    func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
@@ -63,10 +58,27 @@ protocol WalletClient {
 }
 
 extension WalletClient {
-    func reconcileBackgroundStatus(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
-    func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
-    func invalidateCredentialStatusSnapshot() async throws {}
+    func submit(_ review: PresentationReview) async throws -> PresentationResult { throw WalletError.invalidInput("Retained review is unavailable") }
+    func preparePaymentConsent(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?
+    ) async throws -> PaymentConsent? {
+        throw WalletError.invalidInput("This wallet requires a retained presentation review")
+    }
 
+    func submitPresentation(
+        previewHandle: PresentationPreviewHandle,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection],
+        did: String?,
+        paymentConsentRevision: String?
+    ) async throws -> PresentationResult {
+        throw WalletError.invalidInput("This wallet requires a retained presentation review")
+    }
+
+    func retainedPresentation(_ handle: PresentationPreviewHandle, selection: PresentationSelection, did: String?) async throws -> PresentationReview? { nil }
     var supportsClaimReview: Bool { false }
     func reviewPresentation(
         previewHandle: PresentationPreviewHandle,
@@ -93,33 +105,15 @@ extension WalletClient {
     }
 
     func signingIdentityManager() async throws -> SigningIdentityManager? { nil }
-    func rejectIssuedCredential(
-        notificationID: String,
-        accessToken: String,
-        credentialIssuerBaseURL: URL?,
-        notificationEndpoint: URL?,
-        eventDescription: String?
-    ) async throws {}
 }
 
 final class SDKWalletClient: WalletClient {
+    func submit(_ review: PresentationReview) async throws -> PresentationResult { try await wallet().submitPresentation(review) }
+
     var supportsClaimReview: Bool { true }
-    func reviewPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection],
-        did: String?
-    ) async throws -> PreparedPresentationReview {
-        try await wallet().reviewPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions, did: did)
+    func retainedPresentation(_ handle: PresentationPreviewHandle, selection: PresentationSelection, did: String?) async throws -> PresentationReview? {
+        try await wallet().reviewPresentation(previewHandle: handle, selection: selection, did: did)
     }
-    private let configuration: WalletConfiguration
-    private var cachedWallet: Wallet?
-
-    init(configuration: WalletConfiguration) {
-        self.configuration = configuration
-    }
-
     func signingIdentityManager() async throws -> SigningIdentityManager? { try await wallet().signingIdentity }
 
     func bootstrap(signingProtection: WalletDemoSigningProtection) async throws -> WalletDemoBootstrapResult {
@@ -159,18 +153,6 @@ final class SDKWalletClient: WalletClient {
 
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { try await wallet().credentialStatusSnapshot() }
     func refreshCredentialStatuses(ids: [String]?, force: Bool) async throws -> [CredentialStatusRefreshResult] { try await wallet().refreshCredentialStatuses(ids: ids, force: force) }
-    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
-        try await cachedWallet?.acknowledgeCredentialStatusNotice(credentialID: credentialID, version: version)
-    }
-    func submitStatusReviewedPresentation(
-        previewHandle: PresentationPreviewHandle, selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection], reviewedStatus: [String: String],
-        did: String?, paymentConsentRevision: String?
-    ) async throws -> PresentationResult {
-        try await wallet().submitStatusReviewedPresentation(previewHandle: previewHandle,
-            selectedCredentialOptions: selectedCredentialOptions, selectedDisclosureOptions: selectedDisclosureOptions,
-            reviewedStatus: reviewedStatus, did: did, paymentConsentRevision: paymentConsentRevision)
-    }
 
     func credentials() async throws -> [Credential] {
         try await wallet().credentials()
@@ -178,55 +160,14 @@ final class SDKWalletClient: WalletClient {
 
     func listDeferredIssuance() async throws -> [DeferredCredential] { try await wallet().listDeferredIssuance() }
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession { try await wallet().startIssuance(request) }
-    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization { try await wallet().beginAuthorizationIssuance(sessionID: sessionID, credentials: credentials) }
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome { try await wallet().continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: transactionCode, credentials: credentials) }
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome { try await wallet().continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI) }
-    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { try await wallet().cancelIssuance(sessionID: sessionID) }
-    func rejectIssuedCredential(
-        notificationID: String,
-        accessToken: String,
-        credentialIssuerBaseURL: URL?,
-        notificationEndpoint: URL?,
-        eventDescription: String?
-    ) async throws {
-        try await wallet().rejectIssuedCredential(
-            notificationID: notificationID,
-            accessToken: accessToken,
-            credentialIssuerBaseURL: credentialIssuerBaseURL,
-            notificationEndpoint: notificationEndpoint,
-            eventDescription: eventDescription
-        )
-    }
-    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome { try await wallet().resumeDeferredIssuance(deferredCredentialID: deferredCredentialID) }
+    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization { try await wallet().beginAuthorization(.init(rawValue: sessionID), registration: .init(clientID: "eudiw-abca", redirectURI: URL(string: "openid://")!), credentials: credentials).request }
+    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome { try await wallet().accept(.init(rawValue: sessionID), transactionCode: transactionCode, credentials: credentials, clientID: "eudiw-abca") }
+    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome { try await wallet().continueAuthorizationIssuance(sessionID: .init(rawValue: sessionID), callbackURI: callbackURI) }
+    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { try await wallet().cancelIssuance(sessionID: .init(rawValue: sessionID)) }
+    func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome { try await wallet().resumeDeferredIssuance(continuation) }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await wallet().previewPresentation(request: request)
-    }
-
-    func preparePaymentConsent(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection],
-        did: String?
-    ) async throws -> PaymentConsent? {
-        try await wallet().preparePaymentConsent(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions, did: did)
-    }
-
-    func submitPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection],
-        did: String?,
-        paymentConsentRevision: String?
-    ) async throws -> PresentationResult {
-        try await wallet().submitPresentation(
-            previewHandle: previewHandle,
-            selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions,
-            did: did,
-            paymentConsentRevision: paymentConsentRevision
-        )
     }
 
     func rejectPresentation(previewHandle: PresentationPreviewHandle) async throws -> PresentationResult {

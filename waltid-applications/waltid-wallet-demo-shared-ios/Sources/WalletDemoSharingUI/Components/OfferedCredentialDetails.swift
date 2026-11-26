@@ -17,7 +17,7 @@ public struct OfferedCredentialDetails: View {
     public var body: some View {
         let definitions = claims
         CredentialSummaryRow(summary: .offered(from: credential, issuer: issuerName))
-        if let description = credential.descriptionText, !description.isEmpty { Text(description) }
+        if let description = credential.display.description, !description.isEmpty { Text(description) }
         Text(String(localized: "Values have not been received yet.", bundle: .module))
             .foregroundStyle(.secondary)
         if definitions.isEmpty {

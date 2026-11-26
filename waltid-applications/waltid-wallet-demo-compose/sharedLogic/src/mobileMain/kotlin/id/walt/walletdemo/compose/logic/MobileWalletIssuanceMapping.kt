@@ -1,16 +1,17 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.handlers.WalletIssuanceOfferPreview
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.handlers.WalletIssuanceBatchSession
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
 import id.walt.wallet2.handlers.WalletIssuanceTransactionCode
 import id.walt.wallet2.handlers.WalletDeferredCredential
 import id.walt.wallet2.handlers.WalletIssuanceContinuation
 import id.walt.wallet2.handlers.WalletIssuanceContinuationStatus
 import id.walt.wallet2.handlers.WalletIssuanceErrorCode
-import id.walt.wallet2.mobile.MobileWalletCredentialSelection
-import id.walt.wallet2.mobile.MobileWalletHolderBinding
-import id.walt.wallet2.mobile.MobileWalletCredentialHolders
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialSelection
+import id.walt.wallet2.mobile.issuance.MobileWalletHolderBinding
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders
 
 /** Keeps in-app and platform-provider acceptance on the same SDK batch-selection contract. */
 fun List<WalletDemoCredentialSelection>.toMobileSelections(): List<MobileWalletCredentialSelection> = map { selection ->
@@ -24,24 +25,29 @@ fun List<WalletDemoCredentialSelection>.toMobileSelections(): List<MobileWalletC
 }
 
 /** Maps a core issuance session into the demo offer-review model. */
-fun WalletIssuanceBatchSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
+fun MobileWalletIssuanceSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
+    offer.toDemoIssuanceSession(id.value, batchSize, credentialDisplayMetadata)
+
+internal fun WalletIssuanceOfferPreview.toDemoIssuanceSession(
+    sessionId: String, batchSize: Int?, credentialDisplayMetadata: Map<String, String>,
+): WalletDemoIssuanceSession =
     WalletDemoIssuanceSession(
-        id = id,
-        grant = when (offer.grant) {
+        id = sessionId,
+        grant = when (grant) {
             WalletIssuanceGrant.PRE_AUTHORIZED_CODE -> WalletDemoIssuanceGrant.PreAuthorizedCode
             WalletIssuanceGrant.AUTHORIZATION_CODE -> WalletDemoIssuanceGrant.AuthorizationCode
         },
         preview = WalletDemoOfferPreview(
             issuer = WalletDemoIssuerMetadata(
-                credentialIssuer = offer.issuer.identifier,
+                credentialIssuer = issuer.identifier,
                 display = WalletDemoMetadataDisplay(
-                    name = offer.issuer.name,
-                    logoUri = offer.issuer.logoUri,
-                    logoAltText = offer.issuer.logoAltText,
+                    name = issuer.name,
+                    logoUri = issuer.logoUri,
+                    logoAltText = issuer.logoAltText,
                     description = null,
                 ),
             ),
-            offeredCredentials = offer.credentials.map { credential ->
+            offeredCredentials = credentials.map { credential ->
                 WalletDemoOfferedCredentialMetadata(
                     configurationId = credential.configurationId,
                     format = credential.format,
@@ -59,8 +65,8 @@ fun WalletIssuanceBatchSession.toDemoIssuanceSession(): WalletDemoIssuanceSessio
                     claims = StoredCredentialMetadataParser.claims(credentialDisplayMetadata[credential.configurationId], platformPreferredLocales()),
                 )
             },
-            transactionCode = offer.transactionCode?.toDemoRequirement(),
-            requiresIssuerAuthentication = offer.grant == WalletIssuanceGrant.AUTHORIZATION_CODE,
+            transactionCode = transactionCode?.toDemoRequirement(),
+            requiresIssuerAuthentication = grant == WalletIssuanceGrant.AUTHORIZATION_CODE,
             batchSize = batchSize,
         ),
     )

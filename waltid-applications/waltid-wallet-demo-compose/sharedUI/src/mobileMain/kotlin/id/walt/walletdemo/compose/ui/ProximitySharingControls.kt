@@ -17,9 +17,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import id.walt.wallet2.mobile.ProximityConnectedRoute
-import id.walt.wallet2.mobile.ProximityEngagementMethod
-import id.walt.wallet2.mobile.ProximityTransport
+import id.walt.wallet2.mobile.proximity.ProximityConnectedRoute
+import id.walt.wallet2.mobile.proximity.ProximityEngagementMethod
+import id.walt.wallet2.mobile.proximity.ProximityTransport
 import id.walt.walletdemo.compose.ui.components.MetadataDisclosure
 import id.walt.walletdemo.compose.ui.resources.*
 import org.jetbrains.compose.resources.painterResource

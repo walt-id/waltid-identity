@@ -58,6 +58,7 @@ interface DemoWallet {
     suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
     suspend fun beginAuthorizationIssuance(
         sessionId: String,
+        redirectUri: String,
         credentials: List<WalletDemoCredentialSelection>,
     ): WalletDemoIssuanceAuthorization
     suspend fun continuePreAuthorizedIssuance(
@@ -70,18 +71,6 @@ interface DemoWallet {
         callbackUri: String,
     ): WalletDemoIssuanceOutcome
     suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome
-    /**
-     * Posts OpenID4VCI `credential_deleted` for a credential fetched but not stored.
-     * Session-based offer decline has no `notification_id` yet and can leave this unimplemented.
-     */
-    suspend fun rejectIssuedCredential(
-        notificationId: String,
-        accessToken: String,
-        credentialIssuerBaseUrl: String? = null,
-        notificationEndpoint: String? = null,
-        eventDescription: String? = null,
-    ) {
-    }
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletDemoIssuanceOutcome
     suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult
     val supportsClaimReview: Boolean get() = false
@@ -104,7 +93,7 @@ interface DemoWallet {
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String? = null,
         paymentConsentRevision: String? = null,
-    ): WalletDemoOperationResult
+    ): WalletDemoOperationResult = error("This wallet requires a retained presentation review")
     suspend fun rejectPresentation(previewHandle: WalletDemoPresentationPreviewHandle): WalletDemoOperationResult
     suspend fun discardPresentationPreview(previewHandle: WalletDemoPresentationPreviewHandle)
     suspend fun deleteCredential(credentialId: String): Boolean

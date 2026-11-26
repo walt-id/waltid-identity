@@ -1,8 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.ProximityCapabilities
-import id.walt.wallet2.mobile.ProximityConfiguration
-import id.walt.wallet2.mobile.ProximitySession
+import id.walt.wallet2.mobile.proximity.ProximityCapabilities
+import id.walt.wallet2.mobile.proximity.ProximityConfiguration
+import id.walt.wallet2.mobile.proximity.ProximitySession
 
 /** Narrow shared boundary used by the proximity journey controller. */
 interface ProximityPresentationBackend {

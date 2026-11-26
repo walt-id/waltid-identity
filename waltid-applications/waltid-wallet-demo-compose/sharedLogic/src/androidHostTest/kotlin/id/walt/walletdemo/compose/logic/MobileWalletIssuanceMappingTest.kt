@@ -26,11 +26,11 @@ class MobileWalletIssuanceMappingTest {
             WalletDemoHolderBinding("first", "did:key:first"), WalletDemoHolderBinding("second", "did:key:second"),
         )))).toMobileSelections().single()
         assertEquals("pid", result.credentialConfigurationId)
-        assertEquals(listOf("first", "second"), (result.holders as id.walt.wallet2.mobile.MobileWalletCredentialHolders.Existing).bindings.map { it.keyId })
-        assertEquals(listOf("did:key:first", "did:key:second"), (result.holders as id.walt.wallet2.mobile.MobileWalletCredentialHolders.Existing).bindings.map { it.did })
+        assertEquals(listOf("first", "second"), (result.holders as id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders.Existing).bindings.map { it.keyId })
+        assertEquals(listOf("did:key:first", "did:key:second"), (result.holders as id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders.Existing).bindings.map { it.did })
         val generated = listOf(WalletDemoCredentialSelection("pid", WalletDemoCredentialHolders.NewKeys(2)))
             .toMobileSelections().single()
-        assertEquals(id.walt.wallet2.mobile.MobileWalletCredentialHolders.NewKeys(2), generated.holders)
+        assertEquals(id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders.NewKeys(2), generated.holders)
     }
 
     @Test
@@ -101,8 +101,9 @@ class MobileWalletIssuanceMappingTest {
             batchSize = 4,
         )
 
-        val offered = session.toDemoIssuanceSession().preview.offeredCredentials.single()
-        assertEquals(4, session.toDemoIssuanceSession().preview.batchSize)
+        val preview = session.offer.toDemoIssuanceSession(session.id, session.batchSize, session.credentialDisplayMetadata).preview
+        val offered = preview.offeredCredentials.single()
+        assertEquals(4, preview.batchSize)
         assertEquals("Driving licence logo", offered.display?.logoAltText)
         assertEquals("#12107c", offered.display?.backgroundColor)
         assertEquals("https://issuer.example/mdl-bg.png", offered.display?.backgroundImageUri)

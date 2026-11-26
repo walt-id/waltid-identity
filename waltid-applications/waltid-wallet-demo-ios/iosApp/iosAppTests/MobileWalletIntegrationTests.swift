@@ -91,8 +91,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: walletId ?? testWalletId,
-                transactionDataProfiles: Self.demoTransactionDataProfiles,
-                defaultKeyUseAuthorizationPolicy: .none
+                keyAuthorization: .init(policy: .none),
+                presentation: .init(
+                    transactionDataProfiles: Self.demoTransactionDataProfiles
+                )
             )
         )
     }
@@ -101,12 +103,14 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: walletId ?? testWalletId,
-                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
-                    x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
-                ),
-                transactionDataProfiles: Self.demoTransactionDataProfiles,
-                defaultKeyUseAuthorizationPolicy: .none,
-                keyAttestationProvider: DemoKeyAttestationProviders()
+                keyAuthorization: .init(policy: .none),
+                issuance: .init(keyAttestationProvider: DemoKeyAttestationProviders()),
+                presentation: .init(
+                    verifierTrust: WalletClientIDTrustConfiguration(
+                        x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
+                    ),
+                    transactionDataProfiles: Self.demoTransactionDataProfiles
+                )
             )
         )
     }
@@ -115,14 +119,16 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: walletId,
-                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
-                    preRegisteredClientMetadataJSON: [
-                        DemoBackend.verifierClientID: DemoBackend.verifierRequestObjectClientMetadataJSON,
-                    ]
-                ),
-                issuerMetadataTrustResolver: PublicDemoIssuerMetadataTrustResolver(),
-                transactionDataProfiles: Self.demoTransactionDataProfiles,
-                defaultKeyUseAuthorizationPolicy: .none
+                keyAuthorization: .init(policy: .none),
+                issuance: .init(metadataTrustResolver: PublicDemoIssuerMetadataTrustResolver()),
+                presentation: .init(
+                    verifierTrust: WalletClientIDTrustConfiguration(
+                        preRegisteredClientMetadataJSON: [
+                            DemoBackend.verifierClientID: DemoBackend.verifierRequestObjectClientMetadataJSON,
+                        ]
+                    ),
+                    transactionDataProfiles: Self.demoTransactionDataProfiles
+                )
             )
         )
     }
@@ -132,8 +138,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
             configuration: WalletConfiguration(
                 walletID: testWalletId,
                 persistence: persistence,
-                transactionDataProfiles: Self.demoTransactionDataProfiles,
-                defaultKeyUseAuthorizationPolicy: .none
+                keyAuthorization: .init(policy: .none),
+                presentation: .init(transactionDataProfiles: Self.demoTransactionDataProfiles)
             )
         )
     }
@@ -144,8 +150,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
     ) async throws -> IssuanceSession {
         try await wallet.startIssuance(
             IssuanceRequest(
-                offer: offerURL,
-                redirectURI: URL(string: "openid://")!
+                offer: offerURL
             )
         )
     }
@@ -156,10 +161,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         transactionCode: String? = nil
     ) async throws -> [String] {
         let session = try await startIssuance(wallet: wallet, offerURL: offerURL)
-        let outcome = try await wallet.continuePreAuthorizedIssuance(
-            sessionID: session.id,
-            transactionCode: transactionCode
-        )
+        let outcome = try await wallet.accept(.init(rawValue: session.id.rawValue), transactionCode: transactionCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
@@ -175,10 +177,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let wallet = try await Wallet(
             configuration: WalletConfiguration(
                 walletID: testWalletId,
-                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
-                    x509TrustAnchorsPEM: [X509RequestObjectFixture.trustAnchorPEM]
-                ),
-                defaultKeyUseAuthorizationPolicy: .none
+                keyAuthorization: .init(policy: .none),
+                presentation: .init(
+                    verifierTrust: WalletClientIDTrustConfiguration(
+                        x509TrustAnchorsPEM: [X509RequestObjectFixture.trustAnchorPEM]
+                    )
+                )
             )
         )
         _ = try await initializeSigningIdentity(wallet)
@@ -196,10 +200,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let wallet = try await Wallet(
             configuration: WalletConfiguration(
                 walletID: testWalletId,
-                clientIDTrustConfiguration: WalletClientIDTrustConfiguration(
-                    x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
-                ),
-                defaultKeyUseAuthorizationPolicy: .none
+                keyAuthorization: .init(policy: .none),
+                presentation: .init(
+                    verifierTrust: WalletClientIDTrustConfiguration(
+                        x509TrustAnchorsPEM: [EudiTestBackend.verifierTrustAnchorPEM]
+                    )
+                )
             )
         )
 
@@ -377,7 +383,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
             !$0.configurationID.isEmpty && !$0.format.isEmpty
         })
         XCTAssertNotNil(session.offer.transactionCode, "EUDI offer should require a transaction code")
-        let outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id, transactionCode: offer.txCode)
+        let outcome = try await wallet.accept(.init(rawValue: session.id.rawValue), transactionCode: offer.txCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
@@ -440,10 +446,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertNotNil(issuerProvenance.keyID)
         XCTAssertEqual(.trustedIssuer, issuerProvenance.trustType)
 
-        let outcome = try await wallet.continuePreAuthorizedIssuance(
-            sessionID: issuanceSession.id,
-            transactionCode: offer.txCode
-        )
+        let outcome = try await wallet.accept(.init(rawValue: issuanceSession.id.rawValue), transactionCode: offer.txCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
@@ -468,11 +471,11 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertNotNil(keyID)
         XCTAssertEqual(.preRegistered, clientIDScheme)
 
-        let result = try await wallet.submitPresentation(
+        let result = try await wallet.submitPresentation(try await wallet.reviewPresentation(
             previewHandle: preview.previewHandle,
-            selectedCredentialOptions: preview.credentialOptions.map(\.selection),
+            selection: .init(credentials: preview.credentialOptions.map(\.selection)),
             did: bootstrap.did
-        )
+        ))
         assertTransmittedSuccess(result, "Signed public demo presentation should succeed")
         try await DemoBackend.shared.waitForVerifierSuccess(
             sessionID: signedSession.sessionID,
@@ -631,8 +634,13 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-        let presentResult = try await wallet2.present(
-            request: presentationURL,
+        guard case let .ready(preview) = try await wallet2.previewPresentation(request: presentationURL) else {
+            return XCTFail("Expected a presentation preview for the issued credential")
+        }
+        let selection = try XCTUnwrap(preview.credentialOptions.first { credentialIDs.contains($0.credentialID) }).selection
+        let presentResult = try await wallet2.submitPresentation(
+            previewHandle: preview.previewHandle,
+            selection: .init(credentials: [selection]),
             did: did
         )
 
@@ -667,7 +675,15 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let offeredCredentialID = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
         let transaction = try await EudiTestBackend.shared.createVerifierTransaction(credentialId: offeredCredentialID)
         let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
-        let result = try await wallet.present(request: presentationURL, did: bootstrapResult.did)
+        guard case let .ready(preview) = try await wallet.previewPresentation(request: presentationURL) else {
+            return XCTFail("Expected a presentation preview for the issued credential")
+        }
+        let selection = try XCTUnwrap(preview.credentialOptions.first { credentialIDs.contains($0.credentialID) }).selection
+        let result = try await wallet.submitPresentation(try await wallet.reviewPresentation(
+            previewHandle: preview.previewHandle,
+            selection: .init(credentials: [selection]),
+            did: bootstrapResult.did
+        ))
         assertTransmittedSuccess(
             result,
             "EUDI presentation should succeed for \(credentialID). Credentials: \(credentials), Result: \(result)"
@@ -710,11 +726,11 @@ final class MobileWalletIntegrationTests: XCTestCase {
             return XCTFail("EUDI verifier should request an encrypted response: \(preview)")
         }
 
-        let result = try await wallet.submitPresentation(
+        let result = try await wallet.submitPresentation(try await wallet.reviewPresentation(
             previewHandle: preview.previewHandle,
-            selectedCredentialOptions: preview.credentialOptions.map(\.selection),
+            selection: .init(credentials: preview.credentialOptions.map(\.selection)),
             did: bootstrapResult.did
-        )
+        ))
         assertTransmittedSuccess(
             result,
             "EUDI stepwise presentation should succeed for \(credentialID). Preview: \(preview), Result: \(result)"
@@ -755,11 +771,11 @@ final class MobileWalletIntegrationTests: XCTestCase {
             "Preview should only offer credentials received in this test. Received: \(credentialIDs), Preview: \(preview)"
         )
 
-        let result = try await wallet.submitPresentation(
+        let result = try await wallet.submitPresentation(try await wallet.reviewPresentation(
             previewHandle: preview.previewHandle,
-            selectedCredentialOptions: preview.credentialOptions.map(\.selection),
+            selection: .init(credentials: preview.credentialOptions.map(\.selection)),
             did: did
-        )
+        ))
 
         assertTransmittedSuccess(
             result,
@@ -862,10 +878,15 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-        let presentResult = try await wallet.present(
-            request: presentationURL,
+        guard case let .ready(preview) = try await wallet.previewPresentation(request: presentationURL) else {
+            return XCTFail("Expected a presentation preview for the issued credential")
+        }
+        let selection = try XCTUnwrap(preview.credentialOptions.first { credentialIDs.contains($0.credentialID) }).selection
+        let presentResult = try await wallet.submitPresentation(try await wallet.reviewPresentation(
+            previewHandle: preview.previewHandle,
+            selection: .init(credentials: [selection]),
             did: did
-        )
+        ))
 
         assertTransmittedSuccess(
             presentResult,

@@ -11,11 +11,17 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let encoded = Self.validPNGBase64.replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
         let attachment = "SGVsbG8sIHdhbGxldA"
-        let option = PresentationCredentialOption(queryID: "mdl", credentialID: "one", format: "mso_mdoc",
-            issuer: nil, subject: nil, label: "Driving licence",
+        let option = PresentationCredentialOption(
+            queryID: "mdl",
+            credentialID: "one",
+            format: "mso_mdoc",
             credentialDataJSON: "{\"\(namespace)\":{\"portrait\":\(rawPortrait)}}",
+            issuer: nil,
+            subject: nil,
+            label: "Driving licence",
             disclosures: [PresentationDisclosure(path: path, name: "Portrait", valueJSON: rawPortrait,
-                displayValue: nil, selectivelyDisclosable: true, required: true)])
+                displayValue: nil, selectivelyDisclosable: true, required: true)]
+        )
         func location(_ path: String, isBinary: Bool = false, sharedBy: [String] = []) -> PresentationClaimLocation {
             .init(sourcePathJSON: path, receivedPathJSON: path, sharedBy: sharedBy, alwaysCarried: false, isBinary: isBinary)
         }
@@ -61,8 +67,16 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(claims.compactMap(\.name), try XCTUnwrap(fixture["projectedArrayLabels"] as? [String]))
         XCTAssertEqual(claims.map(\.path), [[.key("accounts"), .integer("1"), .key("iban")], [.key("name")]])
         XCTAssertEqual(claims.first?.mandatory, true)
-        let credential = Credential(id: "array-contract", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Account", addedAt: nil,
-            credentialDataJSON: String(decoding: try JSONSerialization.data(withJSONObject: XCTUnwrap(fixture["projectedArrayCredentialData"])), as: UTF8.self), metadataJSON: metadata)
+        let credential = Credential(
+            id: "array-contract",
+            format: "dc+sd-jwt",
+            credentialDataJSON: String(decoding: try JSONSerialization.data(withJSONObject: XCTUnwrap(fixture["projectedArrayCredentialData"])), as: UTF8.self),
+            issuer: nil,
+            subject: nil,
+            label: "Account",
+            addedAt: nil,
+            metadataJSON: metadata
+        )
         let rows = CredentialDisplayNormalizer.details(for: credential, preferredLocales: ["en"]).groups.flatMap(\.items)
         guard case .list(let accounts, _) = try XCTUnwrap(rows.first { $0.path.id == "accounts" }).value,
               accounts.count == 2, case .object(let first) = accounts[0], case .object(let second) = accounts[1] else {
@@ -73,9 +87,17 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(second.first?.label, "Second IBAN")
         XCTAssertEqual(second.first?.labelSource, .issuerMetadata)
         XCTAssertEqual(rows.first { $0.path.id == "name" }?.label, "Full name")
-        let option = PresentationCredentialOption(queryID: "account", credentialID: credential.id, format: credential.format,
-            issuer: nil, subject: nil, label: "Account", credentialDataJSON: credential.credentialDataJSON,
-            disclosures: [PresentationDisclosure(path: #"["accounts",1,"iban"]"#, name: "Iban", valueJSON: #""DE456""#, displayValue: nil, selectivelyDisclosable: true)], metadataJSON: metadata)
+        let option = PresentationCredentialOption(
+            queryID: "account",
+            credentialID: credential.id,
+            format: credential.format,
+            credentialDataJSON: credential.credentialDataJSON,
+            issuer: nil,
+            subject: nil,
+            label: "Account",
+            disclosures: [PresentationDisclosure(path: #"["accounts",1,"iban"]"#, name: "Iban", valueJSON: #""DE456""#, displayValue: nil, selectivelyDisclosable: true)],
+            metadataJSON: metadata
+        )
         let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true, preferredLocales: ["en"])
         XCTAssertEqual(details.groups.first { $0.id == "requested" }?.items.first?.label, "Second IBAN")
         let path = try XCTUnwrap(option.disclosures.first).path
@@ -125,13 +147,28 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     func testMdocDateAndTimestampClaimsRetainTheirDifferentMeaningsInDetailsAndConsent() {
         for name in ["issue_date", "expiry_date", "portrait_capture_date"] {
             for source in ["2026-10-30", "2026-10-30T02:00:00+02:00"] {
-                let credential = Credential(id: "one", format: "mso_mdoc", issuer: nil, subject: nil, label: "mDL", addedAt: nil,
-                    credentialDataJSON: "{\"org.iso.18013.5.1\":{\"\(name)\":\"\(source)\"}}")
-                let option = PresentationCredentialOption(queryID: "mdl", credentialID: "one", format: "mso_mdoc",
-                    issuer: nil, subject: nil, label: "mDL", credentialDataJSON: credential.credentialDataJSON, disclosures: [
+                let credential = Credential(
+                    id: "one",
+                    format: "mso_mdoc",
+                    credentialDataJSON: "{\"org.iso.18013.5.1\":{\"\(name)\":\"\(source)\"}}",
+                    issuer: nil,
+                    subject: nil,
+                    label: "mDL",
+                    addedAt: nil
+                )
+                let option = PresentationCredentialOption(
+                    queryID: "mdl",
+                    credentialID: "one",
+                    format: "mso_mdoc",
+                    credentialDataJSON: credential.credentialDataJSON,
+                    issuer: nil,
+                    subject: nil,
+                    label: "mDL",
+                    disclosures: [
                         PresentationDisclosure(path: "org.iso.18013.5.1/\(name)", name: name,
                             valueJSON: "\"\(source)\"", displayValue: source, selectivelyDisclosable: false)
-                    ])
+                    ]
+                )
                 let expected: DisplayValue = source.count == 10 ? .text(source)
                     : .instant(WalletInstant(epochSeconds: 1793318400, nanoseconds: 0))
                 let requested = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
@@ -195,14 +232,28 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     func testConsentPreservesNormalizedClaimsAcrossCredentialFormats() {
         for format in ["dc+sd-jwt", "vc+sd-jwt", "jwt_vc", "jwt_vc_json", "jwt_vc_json-ld", "ldp_vc", "mso_mdoc"] {
             let disclosures = [("iat", "1793318400"), ("exp", "1801094400"), ("nbf", "1793318400.25")]
-            let credential = Credential(id: "one", format: format, issuer: nil, subject: nil, label: "Identity", addedAt: nil,
-                credentialDataJSON: #"{"iat":1793318400,"exp":1801094400,"nbf":1793318400.25}"#)
-            let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: format,
-                issuer: nil, subject: nil, label: "Identity", credentialDataJSON: credential.credentialDataJSON,
+            let credential = Credential(
+                id: "one",
+                format: format,
+                credentialDataJSON: #"{"iat":1793318400,"exp":1801094400,"nbf":1793318400.25}"#,
+                issuer: nil,
+                subject: nil,
+                label: "Identity",
+                addedAt: nil
+            )
+            let option = PresentationCredentialOption(
+                queryID: "identity",
+                credentialID: "one",
+                format: format,
+                credentialDataJSON: credential.credentialDataJSON,
+                issuer: nil,
+                subject: nil,
+                label: "Identity",
                 disclosures: disclosures.map { name, value in
                     PresentationDisclosure(path: name, name: name, valueJSON: value, displayValue: value,
                         selectivelyDisclosable: false)
-                })
+                }
+            )
             let requested = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true).groups.flatMap(\.items)
             let expected = [WalletInstant(epochSeconds: 1793318400, nanoseconds: 0), WalletInstant(epochSeconds: 1801094400, nanoseconds: 0), WalletInstant(epochSeconds: 1793318400, nanoseconds: 250000000)]
             XCTAssertEqual(requested.map(\.value), expected.map(DisplayValue.instant), format)
@@ -265,11 +316,19 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     }
 
     private func disclosureValue(_ name: String, _ json: String, format: String = "dc+sd-jwt") -> DisplayValue? {
-        let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: format,
-            issuer: nil, subject: nil, label: "Identity", credentialDataJSON: "{}", disclosures: [
+        let option = PresentationCredentialOption(
+            queryID: "identity",
+            credentialID: "one",
+            format: format,
+            credentialDataJSON: "{}",
+            issuer: nil,
+            subject: nil,
+            label: "Identity",
+            disclosures: [
                 PresentationDisclosure(path: name, name: name, valueJSON: json, displayValue: "Fallback",
                     selectivelyDisclosable: false)
-            ])
+            ]
+        )
         return CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true).groups.first?.items.first?.value
     }
 
@@ -278,10 +337,18 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         for row in try XCTUnwrap(fixture["sharingVisibility"] as? [[String: Any]]) {
             let requested = try XCTUnwrap(row["requested"] as? Bool)
             let visible = try XCTUnwrap(row["visible"] as? Bool)
-            let option = PresentationCredentialOption(queryID: "identity", credentialID: "one", format: try XCTUnwrap(row["format"] as? String),
-                issuer: "Issuer", subject: nil, label: "Identity", credentialDataJSON: "{}", disclosures: [
+            let option = PresentationCredentialOption(
+                queryID: "identity",
+                credentialID: "one",
+                format: try XCTUnwrap(row["format"] as? String),
+                credentialDataJSON: "{}",
+                issuer: "Issuer",
+                subject: nil,
+                label: "Identity",
+                disclosures: [
                     .init(path: try XCTUnwrap(row["path"] as? String), name: "Field", valueJSON: #""Value""#, displayValue: "Value",
-                        selectivelyDisclosable: false, required: false, selectable: false, requested: requested)])
+                        selectivelyDisclosable: false, required: false, selectable: false, requested: requested)]
+            )
             let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
             let fields = informationFields(option: option, details: details, disclosures: [])
             XCTAssertEqual(!fields.isEmpty, visible, "\(row)")
@@ -302,8 +369,16 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let metadata = try json("metadata")
         let format = try XCTUnwrap(fixture["format"] as? String)
         let locales = try strings("preferredLocales")
-        let credential = Credential(id: "metadata-contract", format: format, issuer: nil, subject: nil, label: "Identity", addedAt: nil,
-            credentialDataJSON: try json("credentialData"), metadataJSON: metadata)
+        let credential = Credential(
+            id: "metadata-contract",
+            format: format,
+            credentialDataJSON: try json("credentialData"),
+            issuer: nil,
+            subject: nil,
+            label: "Identity",
+            addedAt: nil,
+            metadataJSON: metadata
+        )
         let rows = CredentialDisplayNormalizer.details(for: credential, preferredLocales: locales).groups.flatMap(\.items)
         XCTAssertEqual(rows.map { $0.path.id }, try strings("expectedStoredRootPaths"))
         XCTAssertEqual(Array(rows.prefix(2)).map(\.label), Array(try strings("expectedLabels").prefix(2)))
@@ -318,9 +393,17 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         for path in ["address", #"["ns.with.dots"]"#] {
             guard case .object = rows.first(where: { $0.path.id == path })?.value else { return XCTFail("Parent must remain visible") }
         }
-        let option = PresentationCredentialOption(queryID: "identity", credentialID: credential.id, format: format,
-            issuer: nil, subject: nil, label: "Identity", credentialDataJSON: credential.credentialDataJSON,
-            disclosures: try strings("requestedPaths").map { PresentationDisclosure(path: $0, name: "Unhelpful fallback", valueJSON: "\"Ada\"", displayValue: nil, selectivelyDisclosable: false) }, metadataJSON: metadata)
+        let option = PresentationCredentialOption(
+            queryID: "identity",
+            credentialID: credential.id,
+            format: format,
+            credentialDataJSON: credential.credentialDataJSON,
+            issuer: nil,
+            subject: nil,
+            label: "Identity",
+            disclosures: try strings("requestedPaths").map { PresentationDisclosure(path: $0, name: "Unhelpful fallback", valueJSON: "\"Ada\"", displayValue: nil, selectivelyDisclosable: false) },
+            metadataJSON: metadata
+        )
         let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true, preferredLocales: locales)
         let requested = try XCTUnwrap(details.groups.first { $0.id == "requested" }).items
         XCTAssertEqual(requested.map(\.label), try strings("requestedLabels"))
@@ -417,8 +500,16 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     }
 
     private func hierarchyDetails(_ json: String, format: String = "dc+sd-jwt", metadata: String? = nil) -> CredentialDetails {
-        CredentialDisplayNormalizer.details(for: Credential(id: "hierarchy", format: format, issuer: nil,
-            subject: nil, label: "Identity", addedAt: nil, credentialDataJSON: json, metadataJSON: metadata))
+        CredentialDisplayNormalizer.details(for: Credential(
+            id: "hierarchy",
+            format: format,
+            credentialDataJSON: json,
+            issuer: nil,
+            subject: nil,
+            label: "Identity",
+            addedAt: nil,
+            metadataJSON: metadata
+        ))
     }
 
     func testStoredObjectsKeepParentContextAndSiblingMetadataOrder() throws {
@@ -535,8 +626,16 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
     func testTypedMetadataLabelsNestedStoredAndRequestedValuesWithoutChangingData() throws {
         let metadata = #"{"credentialClaims":[{"path":["people",null,"name"],"display":[{"name":"Person name"}]}]}"#
-        let credential = Credential(id: "typed", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "People", addedAt: nil,
-            credentialDataJSON: #"{"people":[{"name":"Alice"},{"name":"Bob"}]}"#, metadataJSON: metadata)
+        let credential = Credential(
+            id: "typed",
+            format: "dc+sd-jwt",
+            credentialDataJSON: #"{"people":[{"name":"Alice"},{"name":"Bob"}]}"#,
+            issuer: nil,
+            subject: nil,
+            label: "People",
+            addedAt: nil,
+            metadataJSON: metadata
+        )
         let people = try XCTUnwrap(CredentialDisplayNormalizer.details(for: credential).groups.flatMap(\.items).first { $0.path.id == "people" })
         guard case .list(let values, _) = people.value else { return XCTFail("Expected the original list") }
         let rows = try values.map { value -> ClaimItem in
@@ -546,10 +645,18 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(rows.map(\.label), ["Person name", "Person name"])
         XCTAssertEqual(rows.map(\.value), [.text("Alice"), .text("Bob")])
         XCTAssertEqual(rows.map { $0.path.id }, ["people[0].name", "people[1].name"])
-        let option = PresentationCredentialOption(queryID: "people", credentialID: "typed", format: "dc+sd-jwt",
-            issuer: nil, subject: nil, label: "People", credentialDataJSON: credential.credentialDataJSON,
+        let option = PresentationCredentialOption(
+            queryID: "people",
+            credentialID: "typed",
+            format: "dc+sd-jwt",
+            credentialDataJSON: credential.credentialDataJSON,
+            issuer: nil,
+            subject: nil,
+            label: "People",
             disclosures: [PresentationDisclosure(path: #"["people",0,"name"]"#, name: "Fallback",
-                valueJSON: #""Alice""#, displayValue: nil, selectivelyDisclosable: false)], metadataJSON: metadata)
+                valueJSON: #""Alice""#, displayValue: nil, selectivelyDisclosable: false)],
+            metadataJSON: metadata
+        )
         let requested = try XCTUnwrap(CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true).groups.first { $0.id == "requested" })
         XCTAssertEqual(requested.items.map(\.label), ["Person name"])
         XCTAssertEqual(requested.items.map(\.value), [.text("Alice")])
@@ -557,12 +664,28 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
     func testArrayIndexDoesNotMatchPropertyMetadata() {
         let metadata = #"{"credentialClaims":[{"path":["jobs","name"],"display":[{"name":"Company name"}]}]}"#
-        let credential = Credential(id: "job-card", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Job", addedAt: nil,
-            credentialDataJSON: #"{"jobs":[{"name":"Engineer"}]}"#, metadataJSON: metadata)
-        let option = PresentationCredentialOption(queryID: "job", credentialID: "job-card", format: "dc+sd-jwt",
-            issuer: nil, subject: nil, label: "Job", credentialDataJSON: credential.credentialDataJSON,
+        let credential = Credential(
+            id: "job-card",
+            format: "dc+sd-jwt",
+            credentialDataJSON: #"{"jobs":[{"name":"Engineer"}]}"#,
+            issuer: nil,
+            subject: nil,
+            label: "Job",
+            addedAt: nil,
+            metadataJSON: metadata
+        )
+        let option = PresentationCredentialOption(
+            queryID: "job",
+            credentialID: "job-card",
+            format: "dc+sd-jwt",
+            credentialDataJSON: credential.credentialDataJSON,
+            issuer: nil,
+            subject: nil,
+            label: "Job",
             disclosures: [PresentationDisclosure(path: #"["jobs",0,"name"]"#, name: "Name",
-                valueJSON: #""Engineer""#, displayValue: nil, selectivelyDisclosable: false)], metadataJSON: metadata)
+                valueJSON: #""Engineer""#, displayValue: nil, selectivelyDisclosable: false)],
+            metadataJSON: metadata
+        )
         let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
         XCTAssertEqual(details.groups.first { $0.id == "requested" }?.items.first?.label, "Name")
         let job = CredentialDisplayNormalizer.details(for: credential).groups.flatMap(\.items).first
@@ -1419,10 +1542,10 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             queryID: "pid",
             credentialID: "credential-1",
             format: "dc+sd-jwt",
+            credentialDataJSON: "{}",
             issuer: "https://issuer.example",
             subject: nil,
             label: "PID",
-            credentialDataJSON: "{}",
             disclosures: [
                 PresentationDisclosure(
                     path: #"["$","verification_artifact"]"#,
@@ -1448,15 +1571,15 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             queryID: "pid",
             credentialID: "credential-1",
             format: "dc+sd-jwt",
-            issuer: "https://issuer.example",
-            subject: "did:key:holder",
-            label: "PID",
             credentialDataJSON: """
             {
               "given_name": "Alice",
               "family_name": "Tester"
             }
             """,
+            issuer: "https://issuer.example",
+            subject: "did:key:holder",
+            label: "PID",
             disclosures: [
                 PresentationDisclosure(
                     path: #"["$","given_name"]"#,
@@ -1501,14 +1624,14 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             queryID: "pid",
             credentialID: "credential-1",
             format: "dc+sd-jwt",
-            issuer: nil,
-            subject: nil,
-            label: "PID",
             credentialDataJSON: """
             {
               "given_name": "Alice"
             }
             """,
+            issuer: nil,
+            subject: nil,
+            label: "PID",
             disclosures: []
         )
 
@@ -1522,10 +1645,10 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             queryID: "pid",
             credentialID: "credential-1",
             format: "dc+sd-jwt",
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
             issuer: "https://issuer.example",
             subject: "did:key:holder",
             label: "PID",
-            credentialDataJSON: #"{"given_name":"Ada"}"#,
             metadataJSON: """
             {
               "credentialDisplay": [
@@ -1549,10 +1672,10 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             queryID: "pid",
             credentialID: "credential-1",
             format: "mso_mdoc",
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
             issuer: nil,
             subject: nil,
-            label: "Personal ID",
-            credentialDataJSON: #"{"given_name":"Ada"}"#
+            label: "Personal ID"
         )
 
         let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: false)
@@ -1758,11 +1881,11 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let credential = Credential(
             id: "cred-1",
             format: "vc+sd-jwt",
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
             issuer: "https://issuer.example",
             subject: "did:key:holder",
             label: "PID",
             addedAt: nil,
-            credentialDataJSON: #"{"given_name":"Ada"}"#,
             metadataJSON: """
             {
               "issuerDisplay": [
@@ -1808,11 +1931,11 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let credential = Credential(
             id: "cred-1",
             format: "vc+sd-jwt",
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
             issuer: "https://issuer.example",
             subject: "did:key:holder",
             label: "PID",
             addedAt: nil,
-            credentialDataJSON: #"{"given_name":"Ada"}"#,
             metadataJSON: """
             {
               "issuerDisplay": [

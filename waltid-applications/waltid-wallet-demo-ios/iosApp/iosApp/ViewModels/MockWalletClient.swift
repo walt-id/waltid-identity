@@ -173,13 +173,14 @@ actor MockWalletClient: WalletClient {
                 grant: issuanceGrant,
                 issuer: .init(
                     identifier: "https://issuer.example",
-                    name: "Example Issuer",
-                    locale: nil,
-                    logoURI: nil,
-                    logoAltText: nil,
-                    metadataProvenance: .unsigned
+                    metadataProvenance: .unsigned,
+                    display: .init(name: "Example Issuer")
                 ),
-                credentials: [.init(configurationID: "ExampleCredential", format: "dc+sd-jwt", name: "Example", descriptionText: nil, logoURI: nil)],
+                credentials: [.init(
+                    configurationID: "ExampleCredential",
+                    format: "dc+sd-jwt",
+                    display: .init(name: "Example")
+                )],
                 transactionCode: transactionCodeRequired
                     ? .init(inputMode: "numeric", length: 6, descriptionText: "Enter the six-digit code")
                     : nil
@@ -212,7 +213,8 @@ actor MockWalletClient: WalletClient {
 
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { .cancelled(sessionID: sessionID) }
 
-    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+    func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome {
+        let deferredCredentialID = continuation.id
         .failed(
             sessionID: "mock-session",
             error: .init(code: .invalidSession, message: "No mock deferred credential"),
@@ -347,6 +349,9 @@ actor MockWalletClient: WalletClient {
     private var previewRequestInfo: PresentationRequestInfo {
         PresentationRequestInfo(
             clientID: verifierClientID,
+            requestAuthentication: .unauthenticated,
+            nonce: "nonce-456",
+            responseEncryption: responseEncryption,
             verifierMetadata: verifierName.map {
                 VerifierMetadata(
                     display: MetadataDisplay(
@@ -360,11 +365,8 @@ actor MockWalletClient: WalletClient {
                     termsOfServiceURI: "https://verifier.example/terms"
                 )
             },
-            requestAuthentication: .unauthenticated,
             responseURI: URL(string: "https://verifier.example/response"),
             state: "state-123",
-            nonce: "nonce-456",
-            responseEncryption: responseEncryption,
             transactionData: paymentTransaction ? [Self.paymentAuthorizationTransactionData] : []
         )
     }
@@ -444,10 +446,10 @@ actor MockWalletClient: WalletClient {
             queryID: "pid",
             credentialID: sampleCredential.id,
             format: sampleCredential.format,
+            credentialDataJSON: sampleCredential.credentialDataJSON,
             issuer: sampleCredential.issuer,
             subject: sampleCredential.subject,
             label: sampleCredential.label,
-            credentialDataJSON: sampleCredential.credentialDataJSON,
             disclosures: disclosures
         )
     }
@@ -479,11 +481,11 @@ actor MockWalletClient: WalletClient {
         Credential(
             id: "cred-1",
             format: "jwt_vc_json",
+            credentialDataJSON: sampleCredentialDataJSON ?? Self.defaultSampleCredentialDataJSON,
             issuer: "Example Issuer",
             subject: nil,
             label: "Example Credential",
-            addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
-            credentialDataJSON: sampleCredentialDataJSON ?? Self.defaultSampleCredentialDataJSON
+            addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z")
         )
     }
 
@@ -504,10 +506,6 @@ actor MockWalletClient: WalletClient {
     private static let photoIDCredential = Credential(
         id: "photo-id-1",
         format: "mso_mdoc",
-        issuer: "Example Issuer",
-        subject: nil,
-        label: "Photo ID",
-        addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
         credentialDataJSON: """
         {
           "org.iso.23220.1": {
@@ -524,7 +522,11 @@ actor MockWalletClient: WalletClient {
             "dtc_dg2": null
           }
         }
-        """
+        """,
+        issuer: "Example Issuer",
+        subject: nil,
+        label: "Photo ID",
+        addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z")
     )
 }
 
@@ -534,10 +536,10 @@ private extension PresentationCredentialOption {
             queryID: queryID,
             credentialID: credentialID,
             format: format,
+            credentialDataJSON: credentialDataJSON,
             issuer: issuer,
             subject: subject,
             label: label,
-            credentialDataJSON: credentialDataJSON,
             disclosures: disclosures
         )
     }

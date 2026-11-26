@@ -145,10 +145,17 @@ final class WalletViewModelPresentationTests: XCTestCase {
     }
 
     private func claimClient(_ preparation: PendingClaimPreparation) -> MockWalletClient {
-        let option = PresentationCredentialOption(queryID: "pid", credentialID: "claim-credential", format: "dc+sd-jwt",
-            issuer: nil, subject: nil, label: "Employee", credentialDataJSON: #"{"given_name":"Ada"}"#,
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "claim-credential",
+            format: "dc+sd-jwt",
+            credentialDataJSON: #"{"given_name":"Ada"}"#,
+            issuer: nil,
+            subject: nil,
+            label: "Employee",
             disclosures: [.init(path: "$.given_name", name: "Given name", valueJSON: #""Ada""#,
-                displayValue: nil, selectivelyDisclosable: true)])
+                displayValue: nil, selectivelyDisclosable: true)]
+        )
         let preview = PresentationPreview(previewHandle: .init(value: "claim-preview"),
             request: .init(clientID: "https://verifier.example", requestAuthentication: .unauthenticated,
                 nonce: "fixture", responseEncryption: .notRequired), credentialOptions: [option])
@@ -181,6 +188,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
             previewHandle: previewHandle,
             request: PresentationRequestContext(
                 clientID: "https://verifier.example",
+                requestAuthentication: .unauthenticated,
                 verifierMetadata: VerifierMetadata(
                     display: MetadataDisplay(
                         name: "Example Verifier",
@@ -192,7 +200,6 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     policyURI: nil,
                     termsOfServiceURI: nil
                 ),
-                requestAuthentication: .unauthenticated,
                 responseEncryption: .notRequired
             ),
             code: .invalidTransactionData,
@@ -488,11 +495,11 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     Credential(
                         id: "cred-1",
                         format: "jwt_vc_json",
+                        credentialDataJSON: "{}",
                         issuer: "Example Issuer",
                         subject: nil,
                         label: "Example Credential",
-                        addedAt: nil,
-                        credentialDataJSON: "{}"
+                        addedAt: nil
                     )
                 ]
             )
@@ -518,11 +525,11 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     Credential(
                         id: "cred-1",
                         format: "jwt_vc_json",
+                        credentialDataJSON: "{}",
                         issuer: "Example Issuer",
                         subject: nil,
                         label: "Example Credential",
-                        addedAt: nil,
-                        credentialDataJSON: "{}"
+                        addedAt: nil
                     )
                 ]
             )
@@ -540,11 +547,11 @@ final class WalletViewModelPresentationTests: XCTestCase {
                 Credential(
                     id: "cred-1",
                     format: "jwt_vc_json",
+                    credentialDataJSON: "{}",
                     issuer: "Example Issuer",
                     subject: nil,
                     label: "Example Credential",
-                    addedAt: nil,
-                    credentialDataJSON: "{}"
+                    addedAt: nil
                 )
             ]
         )
@@ -577,11 +584,11 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     Credential(
                         id: "cred-1",
                         format: "jwt_vc_json",
+                        credentialDataJSON: "{}",
                         issuer: "Example Issuer",
                         subject: nil,
                         label: "Example Credential",
-                        addedAt: nil,
-                        credentialDataJSON: "{}"
+                        addedAt: nil
                     )
                 ]
             ),

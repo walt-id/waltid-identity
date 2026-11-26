@@ -5,8 +5,16 @@ import WalletSDK
 @MainActor
 final class ReviewSubmissionGateTests: XCTestCase {
     func testChangedClaimReviewInvalidatesStatusConfirmationWithTheSameSelection() throws {
-        let option = PresentationCredentialOption(queryID: "identity", credentialID: "card", format: "dc+sd-jwt",
-            issuer: nil, subject: nil, label: "Identity", credentialDataJSON: #"{"name":"Ada"}"#, disclosures: [])
+        let option = PresentationCredentialOption(
+            queryID: "identity",
+            credentialID: "card",
+            format: "dc+sd-jwt",
+            credentialDataJSON: #"{"name":"Ada"}"#,
+            issuer: nil,
+            subject: nil,
+            label: "Identity",
+            disclosures: []
+        )
         let review = SharingReviewModel(request: .init(requester: nil), credentialOptions: [option])
         let selection = SharingSelection(credentials: [option.selection], disclosures: [])
         func key(_ claimsJSON: String) throws -> SharingSubmissionKey {

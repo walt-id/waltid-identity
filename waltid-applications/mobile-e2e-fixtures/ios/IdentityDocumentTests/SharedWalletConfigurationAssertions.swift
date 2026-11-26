@@ -98,7 +98,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
     var hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
     // Simulators cannot create Secure Enclave keys protected by biometryCurrentSet. These
     // assertions cover shared-storage wiring; protected extension signing remains device coverage.
-    hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
+    hostConfiguration.keyAuthorization.policy = .none
     let hostWallet = try await Wallet(configuration: hostConfiguration)
     let hostBootstrap = try await initializeSigningIdentity(hostWallet)
     let hostCredentials = try await hostWallet.credentials()
@@ -169,7 +169,7 @@ public func assertProviderResolvesThePublishedWalletID(
     // and the iOS registry writes the wallet id it was built with into the App Group.
     var hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
     // This assertion covers publishing the selected wallet identifier, not biometric enforcement.
-    hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
+    hostConfiguration.keyAuthorization.policy = .none
     let hostWallet = try await Wallet(configuration: hostConfiguration)
     _ = try await initializeSigningIdentity(hostWallet)
 
