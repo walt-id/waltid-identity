@@ -1,4 +1,4 @@
-import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 
 plugins {
     id("waltid.full.library")
@@ -8,16 +8,11 @@ plugins {
 
 group = "id.walt.crypto"
 
-if (enableAndroidBuild) {
-    extensions.configure<KotlinMultiplatformAndroidComponentsExtension>("androidComponents") {
-        finalizeDsl { android ->
-            android.optimization.consumerKeepRules.file("consumer-rules.pro")
-            android.optimization.consumerKeepRules.publish = true
-        }
-    }
-}
-
 kotlin {
+    targets.withType<KotlinMultiplatformAndroidLibraryTarget>().configureEach {
+        optimization.consumerKeepRules.file("consumer-rules.pro")
+        optimization.consumerKeepRules.publish = true
+    }
 
     js {
         outputModuleName = "x509"

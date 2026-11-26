@@ -164,7 +164,7 @@ The base mobile SDK registers no recovery integration. Add the artifact and regi
 
 - Android: `waltid-openid4vc-wallet-recovery-blockstore`, `BlockStoreIdentityRecovery(context, namespace)`.
 - Kotlin/iOS: `waltid-openid4vc-wallet-recovery-keychain`, `KeychainIdentityRecovery(namespace, accessGroup)`.
-- Swift: the `WalletSDKKeychainRecovery` product, `KeychainIdentityRecovery(namespace:accessGroup:)`.
+- Swift apps register `KeychainIdentityRecovery(namespace:accessGroup:)` from the `WalletSDKKeychainRecovery` module. Choose the [Swift package product for your app](../../waltid-wallet-sdk-ios/README.md#choosing-swift-package-products).
 
 Block Store defaults to cloud mode requiring its end-to-end-encryption availability check.
 `DeviceTransfer` is a separate mode with cloud backup disabled. Records are bounded to 4096 bytes;
@@ -253,7 +253,7 @@ extend the existing A-SIT Signum integration (Indispensable 3.24.0, Supreme 0.15
 
 ## Optional Enterprise key custody
 
-Add `waltid-openid4vc-wallet-custody-enterprise` or the Swift `WalletSDKEnterpriseCustody` product,
+Add `waltid-openid4vc-wallet-custody-enterprise` or the [Swift custody product for your app](../../waltid-wallet-sdk-ios/README.md#choosing-swift-package-products),
 then register `EnterpriseIdentityKeyCustodian` in `keyCustodians`. Neither integration is a base-SDK
 dependency or default registration. Hosts supply the authenticated HTTPS KMS resource and client settings.
 

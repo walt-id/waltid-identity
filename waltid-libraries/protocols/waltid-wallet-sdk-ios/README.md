@@ -45,8 +45,11 @@ reviewed sharing, persistence and lifecycle examples.
 
 | App configuration | Products and Xcode settings |
 | --- | --- |
-| One executable | Link `WalletSDK`. For optional signing-key recovery or enterprise custody, add `WalletSDKKeychainRecoveryStatic` or `WalletSDKEnterpriseCustodyStatic`. Select one linkage per adapter. The existing dynamic products use the same imports and registration calls. |
+| One executable | Link `WalletSDK`. For optional signing-key recovery, add `WalletSDKKeychainRecoveryStatic`. For Enterprise KMS import, add `WalletSDKEnterpriseCustodyStatic`. |
 | App and credential-provider extension | Link `WalletSDKShared` in both targets and select it in their supporting packages. Choose **Embed & Sign** in the containing app and **Do Not Embed** in the extension. Add `@executable_path/../../Frameworks` to the extension’s **Runpath Search Paths**. Both targets can use `import WalletSDK`. |
+
+The existing dynamic adapter products are `WalletSDKKeychainRecovery` and `WalletSDKEnterpriseCustody`.
+Choose one linkage per adapter. Both linkages use the same unsuffixed module name and registration calls.
 
 Xcode can place the implementation in `WalletSDK.framework` when another package product depends on
 it. From the Swift package directory, check that both executables can find one copy in the
@@ -574,8 +577,9 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 Use `initialize()` for the default identity without recovery, or request complete SDK-issued
 options for explicit protection and recovery choices. The unreleased `bootstrap` API is removed. This version requires a fresh database; no compatibility migration is provided.
 
-The base `WalletSDK` product has no backup provider. Add `WalletSDKKeychainRecovery` and
-register `KeychainIdentityRecovery(namespace:)` to opt in, or implement the replaceable
+The base `WalletSDK` product has no backup provider. Choose the
+[recovery product for your app](#choosing-swift-package-products) and register
+`KeychainIdentityRecovery(namespace:)` to opt in, or implement the replaceable
 `IdentityRecoveryProvider` contract. Same-key Secure Enclave recovery is unavailable;
 iOS recovery uses ordinary Keychain or encrypted database signing.
 

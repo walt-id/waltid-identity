@@ -35,7 +35,9 @@ Ordinary Keychain access controls remain distinct from hardware execution.
 
 ### Optional providers
 
-Add the `WalletSDKKeychainRecovery` product and register its provider explicitly:
+For a single executable, add `WalletSDKKeychainRecoveryStatic`. Apps that need the dynamic
+adapter can select `WalletSDKKeychainRecovery`. Both products expose the same module.
+Register the provider in the wallet configuration.
 
 ```swift
 import WalletSDK
@@ -54,9 +56,11 @@ Deleting wallet data and deleting provider recovery records are separate actions
 
 ### Optional Enterprise custody
 
-Add the `WalletSDKEnterpriseCustody` product and register its `EnterpriseIdentityKeyCustodian`
-in ``SigningIdentityConfiguration/keyCustodians``. Hosts supply the HTTPS KMS resource and an
-authorizer for a body-free request. Select an option from ``SigningIdentityManager/custodyOptions(identityID:)``
+For a single executable, add `WalletSDKEnterpriseCustodyStatic`. The dynamic product is
+`WalletSDKEnterpriseCustody`. Import `WalletSDKEnterpriseCustody` for either linkage and
+register `EnterpriseIdentityKeyCustodian` in ``SigningIdentityConfiguration/keyCustodians``.
+Hosts supply the HTTPS KMS resource and an authorizer for a body-free request.
+Select an option from ``SigningIdentityManager/custodyOptions(identityID:)``
 and pass it to ``SigningIdentityManager/copyToCustody(_:)`` to import the original signing key.
 The SDK verifies the destination public key and records a public reference. The local key remains
 available and recovery status stays unchanged. This integration does not store an identity recovery

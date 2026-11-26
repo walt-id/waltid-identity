@@ -37,11 +37,13 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 ## Measuring release size
 
-Measure what the SDK adds to the same signed release app. Build a control without the SDK,
-then build the app with the SDK linked, with issuance and presentation in use, and with
-each optional integration enabled. Keep the host dependencies, signing, device and build
-settings fixed. Subtract the control from each measurement. An app already using Kotlin
-or Compose can share dependencies with the SDK.
+Build the same release host without the SDK, with the SDK linked but unused, and with source
+code that calls issuance and presentation. Build each optional integration separately on top
+of the receive-and-present host. Keep other dependencies, signing, device and build settings
+fixed. Subtract the SDK-free host to measure what each build ships. Calling an API from host
+code can keep more code in the release binary. Using the feature after installation changes
+only runtime state, such as the wallet database. A host already using Kotlin or Compose can
+share dependencies with the SDK.
 
 On Android, enable R8 optimization and resource shrinking in the app's release build.
 The X.509 library supplies the Bouncy Castle keystore rules used by Android TLS.
@@ -52,8 +54,9 @@ wallet data and cache separately.
 
 On iOS, archive each Release host and export it with app thinning for the same device.
 Compare the compressed and uncompressed entries for that device in Xcode's App Thinning
-Size Report. Include the containing app and its extensions. The XCFramework download also
-contains the simulator slice, so its archive size answers a separate distribution question.
+Size Report. Include the containing app and its extensions. Choose the
+[Swift package products](../waltid-wallet-sdk-ios/README.md#choosing-swift-package-products)
+for that layout. The developer XCFramework download also includes the simulator slice.
 
 ## Signing identity and recovery
 
