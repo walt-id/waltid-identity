@@ -1,103 +1,34 @@
 # Presenting Credentials
 
-Use ``Wallet/previewPresentation(request:)`` and
-``Wallet/submitPresentation(previewHandle:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:paymentConsentRevision:)``
-to review and answer an OpenID4VP authorization request with credentials from
-the local wallet.
+Resolve the request with ``Wallet/previewPresentation(request:)``. Resolution can contact the verifier.
+An invalid preview retains a safe error destination. The app can dismiss it locally or return the
+classified error. A ready preview supplies candidate credentials and claim paths.
 
 ## Overview
 
-### Review and Present to a Verifier
+### Review the effective claims
 
-Pass the verifier request URL and, when needed, the DID returned by
-``SigningIdentityManager/initialize()``.
+Start with the ready `preview` and its `previewHandle`. The host's `ui.choose` selects credentials and
+claim paths. `ui.confirm` shows the effective claims, the selected credentials' status warnings and any
+payment instructions, and waits for the holder. A nil disclosure selection enables request-matched
+defaults. An explicit list captures the user's selection. Review again whenever that selection changes.
 
 ```swift
-let previewResult = try await wallet.previewPresentation(request: authorizationRequestURL)
-
-let result: PresentationResult
-switch previewResult {
-case .ready(let preview):
-    if let verifierName = preview.request.verifierMetadata?.display?.name {
-        showVerifierName(verifierName)
-    }
-    switch preview.request.responseEncryption {
-    case .notRequired:
-        showPlainResponseNotice()
-    case .required(let details):
-        showEncryptedResponseNotice(
-            algorithm: details.keyManagementAlgorithm,
-            contentEncryption: details.contentEncryptionAlgorithm,
-            verifierKeyID: details.verifierKeyID,
-            verifierKeyThumbprint: details.verifierKeyThumbprint
-        )
-    }
-    result = try await wallet.submitPresentation(
-        previewHandle: preview.previewHandle,
-        selectedCredentialOptions: preview.credentialOptions.map(\.selection),
-        did: identity.did
-    )
-case .invalid(let error):
-    showRequestError(error)
-    // After user interaction, either dismiss locally or notify the verifier.
-    result = try await wallet.rejectPresentation(previewHandle: error.previewHandle)
-}
-
-switch result {
-case .transmitted(.succeeded(_, let redirectURL)):
-    if let redirectURL {
-        await openVerifierRedirect(redirectURL)
-    } else {
-        showPresentationComplete()
-    }
-case .prepared(.openURL(let url)):
-    await openVerifierRedirect(url)
-case .prepared(.submitForm(let html)):
-    await renderAndSubmitFormPost(html)
-case .transmitted(.failed):
-    showPresentationFailure()
+let handle = preview.previewHandle
+let selection = await ui.choose(preview)
+let review = try await wallet.reviewPresentation(previewHandle: handle, selection: selection)
+if await ui.confirm(review.claims, review.statuses, review.payment) {
+    ui.deliver(try await wallet.submitPresentation(review))
+} else {
+    try await wallet.discardPresentationPreview(handle)
 }
 ```
 
-The returned ``PresentationResult`` identifies the host's next action without
-combining mutually exclusive response artifacts. Keep `.prepared(.openURL)` and
-`.prepared(.submitForm)` operations pending until the handoff or navigation
-succeeds, and surface delivery failures so the user can retry.
+For SD-JWT, selecting an ancestor disclosure can include clear-text children. Render the actual claims
+in the review, keeping each query's contribution separate. For mdoc, a location marked `isBinary` carries
+an unpadded base64url string. Use source paths for controls and received paths for rendered data.
 
-### Review the Effective Claims
-
-After selecting credentials and disclosures, call `reviewPresentation` on the retained preview handle.
-The returned claims include clear-text data carried by selected ancestor disclosures. Preserve each query's
-contribution and use source paths for labels/controls, received paths for its compacted presentation data.
-Do not fill withheld values from the stored credential. Keep optional candidate values visibly separate.
-
-For mdoc, a location with `isBinary` identifies a byte string represented by one unpadded base64url
-value in `claimsJSON`. Use the flag to display the claim as binary data.
-Effective mdoc review paths follow the signed CBOR structure. Display serializers can still
-format the stored credential view.
-
-```swift
-let information = try await wallet.reviewPresentation(
-    previewHandle: preview.previewHandle,
-    selectedCredentialOptions: selectedCredentials,
-    selectedDisclosureOptions: selectedDisclosures,
-    did: identity.did
-)
-// Display information.credentials; recompute whenever these choices change.
-// Prepare any payment consent sequentially on the same preview handle.
-let result = try await wallet.submitPresentation(
-    previewHandle: preview.previewHandle,
-    selectedCredentialOptions: selectedCredentials,
-    selectedDisclosureOptions: selectedDisclosures,
-    did: identity.did,
-    paymentConsentRevision: paymentConsent?.revision
-)
-```
-
-Disable confirmation while preparing or after an error. Discard late results after selections change,
-and submit the same selection snapshot that was displayed. The SDK does not bind claim review to
-submission; apps own this consistency guard. Reviewing does not sign, refetch the authorization
-request, or send a presentation. Payment consent keeps its independent revision checks.
+A new review supersedes the previous one. Submit the wallet-issued review after confirmation. Status or selection changes can require another review before delivery. A prepared URL or form needs host delivery. A transmitted result contains the verifier outcome.
 
 ### Reject a Presentation Request
 
@@ -134,8 +65,3 @@ thumbprint are technical identity details, not evidence that the verifier is tru
 Submission and ``Wallet/rejectPresentation(previewHandle:error:errorDescription:)``
 consume the selected preview. A local dismissal should instead call
 ``Wallet/discardPresentationPreview(_:)``.
-
-> Note: ``Wallet/present(request:did:runPolicies:)`` still exists for immediate
-> submission after the app has already handled request review and user consent.
-> Use the preview and submit APIs when displaying verifier details, credential
-> choices, selective disclosures, or transaction data.

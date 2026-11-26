@@ -13,6 +13,16 @@ This guide is for contributors working on the native mobile wallet SDK, demo app
 | iOS demo app | [waltid-wallet-demo-ios](../waltid-applications/waltid-wallet-demo-ios/README.md) |
 | Mobile cryptography | [Crypto2](../waltid-libraries/crypto/waltid-crypto2/README.md) and [Signum](../waltid-libraries/crypto/waltid-crypto2-signum/README.md) |
 
+### SDK source layout
+
+The [Kotlin package map](../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md#package-map)
+and [Swift source map](../waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md#source-map)
+lead to the wallet entry point and each feature. Keep a feature's public contract first in
+its file or type, followed by internal integrations and private helpers. Keep related overloads
+together and retain the execution order of stored properties, initializers and enum entries.
+Put the primary input and other required arguments first, optional settings next, and a trailing
+callback last when the language supports trailing-closure syntax.
+
 ## IDE guidance
 
 Use Android Studio for Android application and Android Gradle Plugin work. IntelliJ IDEA can still be useful for common Kotlin/JVM code, but should not be treated as the supported Android import/build path while Android plugin support is incomplete for the Android Gradle Plugin used by this repository.
@@ -127,7 +137,7 @@ MobileWalletConfig(
         baseUrl = "https://{org}.enterprise-sandbox.waltid.dev",
         servicePath = "{org}.{tenant}.wallet-provider",
         bearerToken = enterpriseSessionToken,
-        composition = "wia_ka",
+        composition = WalletProviderConfig.Composition.WalletInstanceAndKey,
     ),
 )
 ```
@@ -141,7 +151,7 @@ WalletConfiguration(
         baseURL: "https://{org}.enterprise-sandbox.waltid.dev",
         servicePath: "{org}.{tenant}.wallet-provider",
         bearerToken: enterpriseSessionToken,
-        composition: "wia_ka"
+        composition: .walletInstanceAndKey
     )
 )
 ```

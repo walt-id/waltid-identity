@@ -16,23 +16,14 @@ let wallet = try await Wallet(
     configuration: WalletConfiguration(walletID: "consumer-wallet")
 )
 
-guard case .active(let identity) = try await wallet.signingIdentity.initialize() else {
-    // Show pending setup or an unavailable identity before continuing.
-    return
-}
-let session = try await wallet.startIssuance(
-    IssuanceRequest(
-        offer: credentialOfferURL,
-        redirectURI: URL(string: "openid://")!
-    )
-)
-let outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id)
-let credentials = try await wallet.credentials()
-let presentation = try await wallet.present(
-    request: authorizationRequestURL,
-    did: identity.did
-)
+guard case .active = try await wallet.signingIdentity.initialize() else { return }
+let session = try await wallet.startIssuance(.init(offer: credentialOfferURL))
+await showOffer(session.offer)
 ```
+
+<doc:IssuingCredentials> shows how to accept each grant and resume deferred receipt.
+
+<doc:PresentingCredentials> shows preview, claim selection, consent, denial and delivery. Close the wallet after its tasks finish.
 
 The public API intentionally exposes Swift actors, structs, enums, and typed
 errors. Kotlin Multiplatform and bridge implementation details stay behind this
@@ -113,52 +104,79 @@ reset; plaintext-to-encrypted migration is not performed.
 
 ## Topics
 
-### Signing identity
+### Open and configure a wallet
+
+- <doc:GettingStarted>
+- ``Wallet``
+- ``WalletConfiguration``
+- ``WalletConfiguration/KeyAuthorization``
+- ``WalletConfiguration/Issuance``
+- ``WalletConfiguration/Presentation``
+
+### Signing identity and keys
 
 - <doc:IdentityRecovery>
 - ``SigningIdentityManager``
+- ``SigningIdentity``
 - ``SigningIdentityConfiguration``
 - ``IdentityRecoveryProvider``
+- ``WalletKeyType``
 
-### Integration Guides
+### Stored credentials and status
 
-- <doc:GettingStarted>
-- <doc:IssuingCredentials>
-- <doc:PresentingCredentials>
-- <doc:ProximityPresentation>
-- <doc:ObservingEventsAndErrors>
 - <doc:CheckingCredentialStatus>
-
-### Wallet
-
-- ``Wallet``
-- ``WalletConfiguration``
+- ``Credential``
+- ``CredentialStatusRecord``
 - ``WalletPersistence``
 - ``WalletDatabaseKeyConfiguration``
 - ``WalletDatabaseKeyProvider``
 - ``WalletDatabaseKey``
 - ``WalletCredentialStore``
 - ``WalletDidStore``
-- ``WalletAttestationConfiguration``
-
-### Wallet Data
-
-- ``Credential``
 - ``StoredCredential``
 - ``StoredDid``
-- ``SigningIdentity``
+
+### Issue credentials
+
+- <doc:IssuingCredentials>
+- ``IssuanceClientRegistration``
+- ``IssuanceRequest``
+- ``IssuanceSession``
+- ``IssuanceOutcome``
+- ``IssuanceGrantSession``
+- ``CredentialReceiptAuthority``
+- ``MetadataDisplay``
+- ``WalletAttestationConfiguration``
+
+### Present credentials
+
+- <doc:PresentingCredentials>
+- ``PresentationPreviewResult``
+- ``PresentationSelection``
+- ``PresentationReview``
+- ``PreparedPresentationReview``
 - ``PresentationResult``
+
+### Nearby presentation
+
+- <doc:ProximityPresentation>
+- ``ProximityConfiguration``
 - ``ProximityReaderTrustSettings``
 - ``ProximityReaderTrustSettingsCodec``
 - ``ProximityReaderTrustImportPreview``
 
-### Events
+### System credential providers
 
+- ``DigitalCredentialCapabilities``
+- ``WalletCrossProcessAccess``
+- ``AnnexCPresentationPreview``
+- ``AnnexCSubmission``
+- ``DigitalCredentialResponse``
+
+### Events, errors and lifecycle
+
+- <doc:ObservingEventsAndErrors>
 - ``WalletEvent``
 - ``WalletEventPhase``
 - ``WalletEventStatus``
-
-### Errors And Key Types
-
 - ``WalletError``
-- ``WalletKeyType``
