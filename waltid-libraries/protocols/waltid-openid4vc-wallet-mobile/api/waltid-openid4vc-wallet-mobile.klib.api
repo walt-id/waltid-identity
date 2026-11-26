@@ -896,8 +896,8 @@ abstract interface id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeyAttestatio
 }
 
 abstract interface id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoreIdentity { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoreIdentity|null[0]
-    abstract val storageOwner // id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoreIdentity.storageOwner|{}storageOwner[0]
-        abstract fun <get-storageOwner>(): kotlin/Any // id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoreIdentity.storageOwner.<get-storageOwner>|<get-storageOwner>(){}[0]
+    abstract val storageOwnerId // id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoreIdentity.storageOwnerId|{}storageOwnerId[0]
+        abstract fun <get-storageOwnerId>(): kotlin/Long // id.walt.wallet2.mobile.swiftinterop/WalletBridgeStoreIdentity.storageOwnerId.<get-storageOwnerId>|<get-storageOwnerId>(){}[0]
 }
 
 sealed interface <#A: out kotlin/Any?> id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult|null[0]
