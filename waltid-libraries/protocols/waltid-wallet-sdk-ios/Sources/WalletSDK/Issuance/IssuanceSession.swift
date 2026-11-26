@@ -18,45 +18,72 @@ public struct AuthorizationIssuanceID: RawRepresentable, Hashable, Codable, Send
     public init(rawValue: String) { self.rawValue = rawValue }
 }
 
-/// Reference to a retained pre-authorized grant.
-public struct PreAuthorizedIssuanceID: RawRepresentable, Hashable, Codable, Sendable {
-    /// Persist this value to return to the reviewed offer.
-    public let rawValue: String
-    /// Restores a saved pre-authorized offer reference.
-    /// - Parameter rawValue: Previously saved reference from this wallet.
-    public init(rawValue: String) { self.rawValue = rawValue }
+/// Identification required to accept a pre-authorized offer.
+public enum IssuanceClientIdentification: Sendable {
+    case anonymousAllowed
+    case clientIDRequired
 }
 
-/// The grant and matching continuation selected during offer discovery.
-public enum IssuanceGrantSession: Equatable, Sendable {
-    /// Accept with the app's browser registration.
-    case authorizationCode(AuthorizationIssuanceID)
-    /// Accept with a transaction code or identified client when required.
-    case preAuthorized(PreAuthorizedIssuanceID)
+/// A browser offer reviewed in this wallet.
+public struct AuthorizationCodeOffer: Sendable {
+    /// Verified authorization server identifier used to choose the app’s registration.
+    public let authorizationServer: String
+    let id: IssuanceSessionID
+    let wallet: Wallet
+
+    /// Accepts the offer and prepares a browser request and its durable callback reference.
+    public func beginAuthorization(using registration: IssuanceClientRegistration,
+                                   credentials: [IssuanceCredentialSelection]? = nil) async throws -> PendingIssuanceAuthorization {
+        try await wallet.beginAuthorization(id, registration: registration, credentials: credentials)
+    }
+}
+
+/// A pre-authorized offer and the inputs required by its selected authorization server.
+public struct PreAuthorizedOffer: Sendable {
+    public let authorizationServer: String
+    public let clientIdentification: IssuanceClientIdentification
+    public let transactionCode: IssuanceTransactionCode?
+    let id: IssuanceSessionID
+    let wallet: Wallet
+
+    /// Accepts the offer after the holder reviews the credentials and supplies any requested inputs.
+    public func accept(transactionCode: String? = nil, credentials: [IssuanceCredentialSelection]? = nil,
+                       clientID: String? = nil) async throws -> IssuanceOutcome {
+        try await wallet.accept(id, transactionCode: transactionCode, credentials: credentials, clientID: clientID)
+    }
+}
+
+/// The grant selected during discovery and the operation available after review.
+public enum IssuanceGrantSession: Sendable {
+    case authorizationCode(AuthorizationCodeOffer)
+    case preAuthorized(PreAuthorizedOffer)
 }
 
 /// Issuer and credential preview together with the chosen grant.
-public struct IssuanceSession: Equatable, Sendable {
-    /// Stable offer reference for cancellation.
+public struct IssuanceSession: Sendable {
+    /// Save this reference to reopen or cancel the offer.
     public let id: IssuanceSessionID
-    /// Issuer and credentials to review.
     public let offer: IssuanceOfferPreview
-    /// The operations available for this offer.
-    public var grant: IssuanceGrantSession {
+    public let grant: IssuanceGrantSession
+
+    init(_ review: IssuanceOfferReview, wallet: Wallet) {
+        id = .init(rawValue: review.id)
+        offer = review.offer
         switch offer.grant {
-        case .authorizationCode: return .authorizationCode(.init(rawValue: id.rawValue))
-        case .preAuthorizedCode: return .preAuthorized(.init(rawValue: id.rawValue))
+        case .authorizationCode:
+            grant = .authorizationCode(.init(authorizationServer: review.authorizationServer, id: id, wallet: wallet))
+        case .preAuthorizedCode:
+            grant = .preAuthorized(.init(authorizationServer: review.authorizationServer, clientIdentification: review.clientIdentification,
+                                         transactionCode: offer.transactionCode, id: id, wallet: wallet))
         }
     }
+}
 
-    /// Creates the display model for a resolved offer.
-    /// - Parameters:
-    ///   - id: Durable session identifier.
-    ///   - offer: Resolved display metadata and selected grant.
-    public init(id: String, offer: IssuanceOfferPreview) {
-        self.id = IssuanceSessionID(rawValue: id)
-        self.offer = offer
-    }
+struct IssuanceOfferReview: Sendable {
+    let id: String
+    let offer: IssuanceOfferPreview
+    let authorizationServer: String
+    let clientIdentification: IssuanceClientIdentification
 }
 
 /// A browser request paired with the callback continuation that created it.

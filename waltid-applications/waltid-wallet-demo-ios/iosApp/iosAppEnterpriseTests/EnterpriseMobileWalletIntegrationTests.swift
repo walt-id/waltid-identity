@@ -31,7 +31,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
                         guard case .authorizationCode(let grantID) = session.grant else {
                             throw WalletError.invalidInput("Unexpected grant for this test offer")
                         }
-                        let authorization = try await wallet.beginAuthorization(grantID, registration: .init(clientID: "wallet-client", redirectURI: redirect))
+                        let authorization = try await grantID.beginAuthorization(using: .init(clientID: "wallet-client", redirectURI: redirect))
                         XCTAssertTrue(authorization.request.pushedAuthorizationRequestUsed)
                         // Recreate the Swift facade and real KMP wallet before code exchange.
                         let reopened = try await makeWallet(walletId: walletID, attestation: offer.attestation)
@@ -42,7 +42,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
                         guard case .preAuthorized(let grantID) = session.grant else {
                             throw WalletError.invalidInput("Unexpected grant for this test offer")
                         }
-                        outcome = try await wallet.accept(grantID, transactionCode: offer.txCode, clientID: "wallet-client")
+                        outcome = try await grantID.accept(transactionCode: offer.txCode, clientID: "wallet-client")
                     }
                     guard case let .stored(_, credentialIDs) = outcome else {
                         return XCTFail("Challenge issuance failed for \(scenarioID): \(outcome)")
@@ -143,7 +143,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         guard case .preAuthorized(let grantID) = session.grant else {
             throw WalletError.invalidInput("Unexpected grant for this test offer")
         }
-        let outcome = try await wallet.accept(grantID, credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
+        let outcome = try await grantID.accept(credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
                                 holders: .newKeys(count: 2))], clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             return XCTFail("Expected two stored credentials, got \(outcome)")
@@ -198,7 +198,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         guard case .preAuthorized(let grantID) = session.grant else {
             throw WalletError.invalidInput("Unexpected grant for this test offer")
         }
-        let outcome = try await wallet.accept(grantID, credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
+        let outcome = try await grantID.accept(credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
                                 holders: .existing(first + second))], clientID: "eudiw-abca")
         guard case let .failed(_, failure, storedIDs, deferred) = outcome else {
             return XCTFail("Expected a signing failure after operator cancellation, got \(outcome)")
@@ -224,7 +224,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         guard case .preAuthorized(let grantID) = session.grant else {
             throw WalletError.invalidInput("Unexpected grant for this test offer")
         }
-        let outcome = try await wallet.accept(grantID, transactionCode: transactionCode, clientID: "eudiw-abca")
+        let outcome = try await grantID.accept(transactionCode: transactionCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")

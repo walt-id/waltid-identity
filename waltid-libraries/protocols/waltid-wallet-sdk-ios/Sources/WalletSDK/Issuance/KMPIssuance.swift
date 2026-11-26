@@ -2,11 +2,17 @@ import Foundation
 #if canImport(WalletCore) && os(iOS)
 @preconcurrency import WalletCore
 
-extension Waltid_openid4vc_walletWalletIssuanceBatchSession {
-    func toSwiftIssuanceSession() throws -> IssuanceSession {
-        IssuanceSession(
-            id: id,
-            offer: try offer.toSwiftIssuanceOfferPreview(batchSize: batchSize?.intValue, displayMetadata: credentialDisplayMetadata)
+extension Waltid_openid4vc_walletWalletIssuanceOfferReview {
+    func toSwiftOfferReview() throws -> IssuanceOfferReview {
+        let identification: IssuanceClientIdentification
+        switch clientIdentification {
+        case .anonymousAllowed: identification = .anonymousAllowed
+        case .clientIdRequired: identification = .clientIDRequired
+        }
+        return IssuanceOfferReview(
+            id: session.id,
+            offer: try session.offer.toSwiftIssuanceOfferPreview(batchSize: session.batchSize?.intValue, displayMetadata: session.credentialDisplayMetadata),
+            authorizationServer: authorizationServer, clientIdentification: identification
         )
     }
 }
@@ -38,13 +44,13 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
         case let .stored(value):
             return .stored(
                 sessionID: value.sessionId,
-                credentialIDs: swiftArray(value.credentialIds, of: String.self)
+                credentialIDs: try requiredBridgeArray(value.credentialIds, of: String.self)
             )
         case let .deferred(value):
             return .deferred(
                 sessionID: value.sessionId,
-                storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self),
-                credentials: swiftArray(
+                storedCredentialIDs: try requiredBridgeArray(value.storedCredentialIds, of: String.self),
+                credentials: try requiredBridgeArray(
                     value.credentials,
                     of: Waltid_openid4vc_walletWalletDeferredCredential.self
                 ).map { $0.toSwiftDeferredCredential() }
@@ -58,10 +64,10 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
                     code: value.error.issuerTrustFailed ? .issuerTrust : value.error.code.toSwiftIssuanceErrorCode(),
                     message: value.error.message,
                     canRetryOffer: value.error.canRetryOffer,
-                    targetFailure: value.failure?.toSwiftTargetFailure()
+                    targetFailure: try value.failure?.toSwiftTargetFailure()
                 ),
-                storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self),
-                deferredCredentials: swiftArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletIssuanceContinuation.self)
+                storedCredentialIDs: try requiredBridgeArray(value.storedCredentialIds, of: String.self),
+                deferredCredentials: try requiredBridgeArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletIssuanceContinuation.self)
                     .map { $0.toSwiftDeferredCredential() }
             )
         }
@@ -99,10 +105,15 @@ extension Waltid_openid4vc_walletWalletIssuanceContinuation {
 
 private extension Waltid_openid4vc_walletWalletIssuanceOfferPreview {
     func toSwiftIssuanceOfferPreview(batchSize: Int?, displayMetadata: [String: String]) throws -> IssuanceOfferPreview {
-        IssuanceOfferPreview(
-            grant: grant == .authorizationCode ? .authorizationCode : .preAuthorizedCode,
-            issuer: issuer.toSwiftIssuanceIssuerPreview(),
-            credentials: swiftArray(credentials, of: Waltid_openid4vc_walletWalletIssuanceCredentialPreview.self)
+        let selected: IssuanceGrant
+        switch grant {
+        case .authorizationCode: selected = .authorizationCode
+        case .preAuthorizedCode: selected = .preAuthorizedCode
+        }
+        return IssuanceOfferPreview(
+            grant: selected,
+            issuer: try issuer.toSwiftIssuanceIssuerPreview(),
+            credentials: try requiredBridgeArray(credentials, of: Waltid_openid4vc_walletWalletIssuanceCredentialPreview.self)
                 .map { $0.toSwiftIssuanceCredentialPreview(metadataJSON: displayMetadata[$0.configurationId]) },
             transactionCode: transactionCode?.toSwiftIssuanceTransactionCode(),
             batchSize: batchSize
@@ -111,10 +122,10 @@ private extension Waltid_openid4vc_walletWalletIssuanceOfferPreview {
 }
 
 private extension Waltid_openid4vc_walletWalletIssuanceIssuerPreview {
-    func toSwiftIssuanceIssuerPreview() -> IssuanceIssuerPreview {
+    func toSwiftIssuanceIssuerPreview() throws -> IssuanceIssuerPreview {
         IssuanceIssuerPreview(
             identifier: identifier,
-            metadataProvenance: metadataProvenance.toSwiftMetadataProvenance(),
+            metadataProvenance: try metadataProvenance.toSwiftMetadataProvenance(),
             display: .init(
                 name: name,
                 locale: locale,
@@ -126,21 +137,26 @@ private extension Waltid_openid4vc_walletWalletIssuanceIssuerPreview {
 }
 
 private extension Waltid_openid4vc_walletWalletIssuanceMetadataProvenance {
-    func toSwiftMetadataProvenance() -> MetadataProvenance {
+    func toSwiftMetadataProvenance() throws -> MetadataProvenance {
         switch self {
         case is Waltid_openid4vc_walletWalletIssuanceMetadataProvenanceUnsigned:
             return .unsigned
         case let signed as Waltid_openid4vc_walletWalletIssuanceMetadataProvenanceSigned:
+            let trust: MetadataTrustType
+            switch signed.trustType {
+            case .trustedIssuer: trust = .trustedIssuer
+            case .trustedDelegate: trust = .trustedDelegate
+            }
             return .signed(
                 SignedMetadataProvenance(
                     compactJWT: signed.compactJwt,
                     algorithm: signed.algorithm,
                     keyID: signed.keyId,
-                    trustType: signed.trustType == .trustedIssuer ? .trustedIssuer : .trustedDelegate
+                    trustType: trust
                 )
             )
         default:
-            preconditionFailure("Unsupported issuer metadata provenance: \(type(of: self))")
+            throw WalletError.internalFailure("Unsupported issuer metadata provenance: \(type(of: self))")
         }
     }
 }
@@ -189,7 +205,7 @@ private extension Waltid_openid4vc_walletWalletIssuanceContinuationStatus {
 }
 
 private extension Waltid_openid4vc_walletCredentialIssuanceFailure {
-    func toSwiftTargetFailure() -> IssuanceTargetFailure {
+    func toSwiftTargetFailure() throws -> IssuanceTargetFailure {
         let stage: IssuanceFailureStage
         switch self.stage {
         case .proof: stage = .proof
@@ -201,7 +217,7 @@ private extension Waltid_openid4vc_walletCredentialIssuanceFailure {
         return IssuanceTargetFailure(
             target: IssuanceCredentialTarget(configurationID: target.credentialConfigurationId, credentialIdentifier: target.credentialIdentifier),
             stage: stage,
-            notAttempted: swiftArray(notAttempted, of: Waltid_openid4vci_walletCredentialIssuanceTarget.self).map {
+            notAttempted: try requiredBridgeArray(notAttempted, of: Waltid_openid4vci_walletCredentialIssuanceTarget.self).map {
                 IssuanceCredentialTarget(configurationID: $0.credentialConfigurationId, credentialIdentifier: $0.credentialIdentifier)
             })
     }

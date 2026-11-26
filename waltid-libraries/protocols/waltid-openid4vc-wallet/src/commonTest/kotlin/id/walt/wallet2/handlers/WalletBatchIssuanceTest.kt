@@ -303,7 +303,7 @@ class WalletBatchIssuanceTest {
                 val authorization = WalletIssuanceHandler.generateBatchAuthorizationUrl(fixture.wallet,
                     GenerateBatchAuthorizationUrlRequest(
                         credentialIssuer = BATCH_TEST_ISSUER.takeUnless { withOffer },
-                        offerJson = batchTestOffer().takeIf { withOffer },
+                        offerJson = batchTestBrowserOffer().takeIf { withOffer },
                         credentialConfigurationIds = listOf("identity")), httpClient = http)
                 assertAutomaticParameters(Url(authorization.authorizationUrl.toString()).parameters, detailsSupported)
             }
@@ -350,7 +350,7 @@ class WalletBatchIssuanceTest {
             assertEquals(1, tokenCalls)
             assertFailsWith<IllegalArgumentException> {
                 WalletIssuanceHandler.generateBatchAuthorizationUrl(fixture.wallet,
-                    GenerateBatchAuthorizationUrlRequest(offerJson = batchTestOffer()), httpClient = http)
+                    GenerateBatchAuthorizationUrlRequest(offerJson = batchTestBrowserOffer()), httpClient = http)
             }
         }
     }

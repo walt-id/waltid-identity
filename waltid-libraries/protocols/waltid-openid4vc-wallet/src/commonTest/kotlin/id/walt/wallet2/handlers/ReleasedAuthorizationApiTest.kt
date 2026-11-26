@@ -8,7 +8,7 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class ReleasedAuthorizationApiTest {
-    private val offer = JsonObject(batchTestOffer() + ("credential_configuration_ids" to
+    private val offer = JsonObject(batchTestBrowserOffer() + ("credential_configuration_ids" to
             JsonArray(listOf("identity", "other").map(::JsonPrimitive))))
     private val metadata = Json.parseToJsonElement(batchTestMetadata()).jsonObject.let { metadata ->
         val configs = metadata.getValue("credential_configurations_supported").jsonObject
@@ -64,7 +64,7 @@ class ReleasedAuthorizationApiTest {
             credential = { error("Authorization must not issue credentials") }).use { http ->
             assertFailsWith<IllegalArgumentException> {
                 WalletIssuanceHandler.generateAuthorizationUrl(fixture.wallet,
-                    GenerateAuthorizationUrlRequest(offerJson = batchTestOffer(), useScope = true), httpClient = http)
+                    GenerateAuthorizationUrlRequest(offerJson = batchTestBrowserOffer(), useScope = true), httpClient = http)
             }
         }
     }

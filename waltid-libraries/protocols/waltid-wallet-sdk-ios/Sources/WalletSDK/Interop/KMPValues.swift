@@ -25,6 +25,14 @@ func swiftArray<T>(_ value: Any, of type: T.Type) -> [T] {
     return []
 }
 
+/// Authoritative protocol and result collections must retain every element supplied by the core.
+func requiredBridgeArray<T>(_ value: Any, of type: T.Type) throws -> [T] {
+    guard let values = value as? [T] else {
+        throw WalletError.internalFailure("Wallet core returned an incompatible collection of \(type).")
+    }
+    return values
+}
+
 extension KotlinInstant {
     func toDate() -> Date {
         Date(timeIntervalSince1970: TimeInterval(epochSeconds) + TimeInterval(nanosecondsOfSecond) / 1_000_000_000)

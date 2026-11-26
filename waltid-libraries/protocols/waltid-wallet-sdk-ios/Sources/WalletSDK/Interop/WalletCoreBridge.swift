@@ -20,8 +20,8 @@ protocol WalletCoreBridge: Sendable {
     ) async throws -> WalletKeyUseAuthorizationPreflight
     func createIssuanceHolderKeys(count: Int, keyType: WalletKeyType, didMethod: String, policy: WalletKeyUseAuthorizationPolicy) async throws -> [IssuanceHolderBinding]
     func listDeferredIssuance() async throws -> [DeferredCredential]
-    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession
-    func resumeIssuance(id: IssuanceSessionID) async throws -> IssuanceSession?
+    func startIssuance(request: IssuanceRequest) async throws -> IssuanceOfferReview
+    func resumeIssuance(id: IssuanceSessionID) async throws -> IssuanceOfferReview?
     func beginAuthorizationIssuance(sessionID: String, registration: IssuanceClientRegistration, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?, clientID: String?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
@@ -88,7 +88,7 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
 
     func listDeferredIssuance() async throws -> [DeferredCredential] { throw unavailableError() }
 
-    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
+    func startIssuance(request: IssuanceRequest) async throws -> IssuanceOfferReview {
         throw unavailableError()
     }
 
@@ -197,7 +197,7 @@ extension WalletCoreBridge {
 }
 
 extension WalletCoreBridge {
-    func resumeIssuance(id: IssuanceSessionID) async throws -> IssuanceSession? {
+    func resumeIssuance(id: IssuanceSessionID) async throws -> IssuanceOfferReview? {
         throw WalletError.internalFailure("Issuance session storage is unavailable")
     }
 

@@ -6,7 +6,7 @@ import id.walt.wallet2.mobile.issuance.IssuanceClientRegistration
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
-import id.walt.wallet2.handlers.WalletIssuanceBatchSession
+import id.walt.wallet2.handlers.WalletIssuanceOfferReview
 import id.walt.wallet2.handlers.WalletIssuanceContinuation
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWallet
@@ -211,7 +211,7 @@ public class WalletSdkBridge private constructor(
     /** Resolves an offer and starts its bound OpenID4VCI issuance session. */
     public suspend fun startIssuance(
         request: MobileWalletIssuanceRequest,
-    ): WalletBridgeResult<WalletIssuanceBatchSession> =
+    ): WalletBridgeResult<WalletIssuanceOfferReview> =
         walletBridgeCall { operations.startIssuance(request) }
 
     /** Resolves a saved offer reference in this wallet's session store. */
@@ -424,8 +424,8 @@ internal interface WalletSdkBridgeOperations {
         count: Int, keyType: MobileWalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
     ): List<MobileWalletHolderBinding>
 
-    suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceBatchSession
-    suspend fun resumeIssuance(sessionId: String): WalletIssuanceBatchSession?
+    suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceOfferReview
+    suspend fun resumeIssuance(sessionId: String): WalletIssuanceOfferReview?
 
     suspend fun beginAuthorizationIssuance(sessionId: String, registration: IssuanceClientRegistration, credentials: List<MobileWalletCredentialSelection>?): WalletIssuanceAuthorization
 
@@ -527,10 +527,10 @@ internal class MobileWalletSdkBridgeOperations(
         count: Int, keyType: MobileWalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
     ): List<MobileWalletHolderBinding> = wallet.createIssuanceHolderKeys(count, keyType, didMethod, policy)
 
-    override suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceBatchSession =
+    override suspend fun startIssuance(request: MobileWalletIssuanceRequest): WalletIssuanceOfferReview =
         wallet.startIssuance(request).snapshot
 
-    override suspend fun resumeIssuance(sessionId: String): WalletIssuanceBatchSession? =
+    override suspend fun resumeIssuance(sessionId: String): WalletIssuanceOfferReview? =
         wallet.resumeIssuance(MobileWalletIssuanceSessionId(sessionId))?.snapshot
 
     override suspend fun beginAuthorizationIssuance(sessionId: String, registration: IssuanceClientRegistration, credentials: List<MobileWalletCredentialSelection>?): WalletIssuanceAuthorization =
@@ -603,5 +603,5 @@ internal class MobileWalletSdkBridgeOperations(
 /** A saved offer that is still available for review, or null after it has been consumed. */
 public class WalletBridgeIssuanceLookup internal constructor(
     /** The retained offer and its selected grant. */
-    public val session: WalletIssuanceBatchSession?,
+    public val session: WalletIssuanceOfferReview?,
 )
