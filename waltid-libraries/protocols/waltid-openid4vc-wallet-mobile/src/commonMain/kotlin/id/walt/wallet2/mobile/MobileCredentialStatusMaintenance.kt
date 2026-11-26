@@ -158,7 +158,7 @@ internal suspend fun runCredentialStatusMaintenance(
                 val completed = withTimeoutOrNull(budget - started.elapsedNow()) {
                     MobileDidSupport.ensureInitialized()
                     WalletCredentialStatusService.refreshMaintenancePage(
-                        session.inventory, session.cursor, maxItems, httpClient, ::managedCredentialStatusTrustPolicy,
+                        session.inventory, session.scanIds(), maxItems, httpClient, ::managedCredentialStatusTrustPolicy,
                         advance = { id -> session.advance(id).also { itemInProgress = it } },
                         onItem = {
                             itemInProgress = false

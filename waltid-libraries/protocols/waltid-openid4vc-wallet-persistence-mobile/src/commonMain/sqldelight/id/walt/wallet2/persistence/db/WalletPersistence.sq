@@ -44,6 +44,12 @@ SELECT credentials.id, credentials.serialized_credential, snapshots.snapshot, sn
 FROM credentials LEFT JOIN credential_status_snapshots AS snapshots ON snapshots.credential_id = credentials.id
 WHERE credentials.id = ?;
 
+firstMaintenanceIds:
+SELECT id FROM credentials ORDER BY id LIMIT 64;
+
+nextMaintenanceIds:
+SELECT id FROM credentials WHERE id > ? ORDER BY id LIMIT 64;
+
 firstStatusPage:
 SELECT credentials.id, credentials.serialized_credential, snapshots.snapshot, snapshots.notice
 FROM credentials LEFT JOIN credential_status_snapshots AS snapshots ON snapshots.credential_id = credentials.id

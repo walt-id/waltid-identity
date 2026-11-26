@@ -409,41 +409,47 @@ class StatusMaintenanceIntegrationTest {
     }
 
     @Test
-    fun cancellationWhileReadingALaterRowPreservesThePreviousCommitAndCursor() = withWallet {
+    fun interruptedRowDoesNotStarveLaterCredentialsAndRemainsEligibleAfterWraparound() = withWallet {
         val first = add("a", value = 2u)
-        val second = add("b")
+        val slow = add("b")
+        val last = add("c")
         val grant = requireNotNull(SqlDelightStatusMaintenanceStore(queries, "review").read()?.grantId)
-        val readingSecond = CompletableDeferred<Unit>()
 
-        suspend fun scan(interruptSecond: Boolean) {
+        suspend fun scan(expectedCursor: String?, stalled: CompletableDeferred<Unit>? = null) {
             open().use { driver ->
                 val session = requireNotNull(SqlDelightStatusMaintenanceStore.admit(driver, "review", grant))
-                if (!interruptSecond) assertEquals("a", session.cursor)
+                assertEquals(expectedCursor, session.cursor)
                 val inventory = object : CredentialStatusInventory by session.inventory {
-                    override suspend fun statusPage(afterId: String?, limit: Int): List<CredentialStatusInput> {
-                        val rows = session.inventory.statusPage(afterId, limit)
-                        if (interruptSecond && rows.any { it.id == "b" }) {
-                            readingSecond.complete(Unit)
+                    override suspend fun readStatusInput(id: String): CredentialStatusInput? {
+                        if (id == "b" && stalled != null) {
+                            stalled.complete(Unit)
                             awaitCancellation()
                         }
-                        return rows
+                        return session.inventory.readStatusInput(id)
                     }
                 }
-                WalletCredentialStatusService.refreshMaintenancePage(inventory, session.cursor, 2, client,
+                WalletCredentialStatusService.refreshMaintenancePage(inventory, session.scanIds(), 3, client,
                     ::managedCredentialStatusTrustPolicy, session::advance, onItem = {}, onNoticeCommitted = {})
             }
         }
 
-        withTimeout(10.seconds) {
-            val worker = launch { scan(interruptSecond = true) }
-            readingSecond.await()
+        suspend fun interruptAtB(cursor: String?) = withTimeout(10.seconds) {
+            val stalled = CompletableDeferred<Unit>()
+            val worker = launch { scan(cursor, stalled) }
+            stalled.await()
             worker.cancelAndJoin()
         }
+
+        interruptAtB(null)
         assertNotNull(store.readCredentialStatus("a"))
         assertNull(store.readCredentialStatus("b"))
-        scan(interruptSecond = false)
+        scan("b")
+        assertNotNull(store.readCredentialStatus("c"))
+        interruptAtB("c")
+        scan("b")
+        scan("c")
         assertNotNull(store.readCredentialStatus("b"))
-        assertEquals(listOf(first.uri, second.uri), requests)
+        assertEquals(listOf(first.uri, last.uri, slow.uri), requests)
     }
 
     @Test

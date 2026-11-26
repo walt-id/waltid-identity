@@ -55,7 +55,7 @@ public class SqlDelightStatusMaintenanceStore(
         private val grantId: String,
         cursor: String?,
     ) {
-        /** The last inspected wallet-local ID in this rotation. */
+        /** The last wallet-local ID claimed in this rotation. */
         public var cursor: String? = cursor
             private set
 
@@ -65,6 +65,16 @@ public class SqlDelightStatusMaintenanceStore(
         /** Checks whether this session still belongs to the active grant. */
         public fun isAuthorized(): Boolean =
             queries.selectCredentialStatusMaintenance(walletId).executeAsOneOrNull()?.grant_id == grantId
+
+        /** A bounded page of IDs, wrapping on the next wake after the end of the inventory. */
+        public fun scanIds(): List<String> {
+            val after = cursor
+            if (after != null) {
+                val next = queries.nextMaintenanceIds(after).executeAsList()
+                if (next.isNotEmpty()) return next
+            }
+            return queries.firstMaintenanceIds().executeAsList()
+        }
 
         /** Advances only while the expected cursor and grant are current. */
         public fun advance(id: String): Boolean = queries.transactionWithResult {

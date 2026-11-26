@@ -116,7 +116,7 @@ class WalletCredentialStatusService private constructor(
         /** One bounded, due-only pass over a restricted store, with progress recorded before each attempt. */
         suspend fun refreshMaintenancePage(
             inventory: CredentialStatusInventory,
-            cursor: String?,
+            ids: List<String>,
             maxItems: Int,
             client: HttpClient?,
             trustPolicy: suspend () -> String?,
@@ -127,7 +127,7 @@ class WalletCredentialStatusService private constructor(
             val owner = Owner.Maintenance(inventory)
             WalletCredentialStatusService(owner, client, { Clock.System.now() }, trustPolicy,
                 CredentialStatusLimits(), null, null, this, onNoticeCommitted).use { service ->
-                service.maintenancePage(owner, cursor, maxItems, advance, onItem)
+                service.maintenancePage(owner, ids, maxItems, advance, onItem)
             }
         }
     }
@@ -431,7 +431,7 @@ class WalletCredentialStatusService private constructor(
 
     private suspend fun maintenancePage(
         owner: Owner.Maintenance,
-        cursor: String?,
+        ids: List<String>,
         maxItems: Int,
         advance: (String) -> Boolean,
         onItem: (CredentialStatusRefreshOutcome) -> Unit,
@@ -441,25 +441,21 @@ class WalletCredentialStatusService private constructor(
         val session = resolver.newRefreshSession()
         try {
             var remaining = maxItems
-            var afterId = cursor
-            var scanned = 0
-            while (remaining > 0 && scanned < 64) {
+            for (id in ids) {
+                if (remaining == 0) break
                 currentCoroutineContext().ensureActive()
-                // Decode only the next signed row so a later row cannot consume this one's budget.
-                val input = inventory.statusPage(afterId, 1).firstOrNull()
+                // Claim the ID before decoding: an interrupted row gets another turn after wraparound.
+                if (!advance(id)) break
+                val input = inventory.readStatusInput(id)
                 if (input == null) {
-                    if (scanned > 0 || afterId == null) break
-                    afterId = null
+                    onItem(CredentialStatusRefreshOutcome.UNCHANGED)
                     continue
                 }
-                val reference = WalletCredentialReference(0, input.id)
+                val reference = WalletCredentialReference(0, id)
                 val candidate = Candidate(reference, source, input)
                 val record = candidate.record()
                 val cached = record?.let { candidate.readLocalState(it).metadata } ?: unreadable
                 currentCoroutineContext().ensureActive()
-                if (!advance(input.id)) break
-                afterId = input.id
-                scanned++
                 val outcome = when {
                     record == null -> {
                         remaining--
