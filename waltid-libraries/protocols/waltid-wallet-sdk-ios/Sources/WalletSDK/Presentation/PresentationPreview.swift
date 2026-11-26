@@ -110,11 +110,10 @@ public struct PresentationCredentialRequirement: Equatable, Sendable {
     ///
     /// - Parameter options: Alternative query-id combinations that can satisfy
     ///   this requirement.
-    public init(options: [[String]]) {
-        precondition(
-            Self.hasValidOptions(options),
-            "A presentation credential requirement must contain non-empty options with non-blank query IDs."
-        )
+    public init(options: [[String]]) throws {
+        guard Self.hasValidOptions(options) else {
+            throw WalletError.invalidInput("A presentation credential requirement must contain non-empty options with non-blank query IDs.")
+        }
         self.options = options
     }
 

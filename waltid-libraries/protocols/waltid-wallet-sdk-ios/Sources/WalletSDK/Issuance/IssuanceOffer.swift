@@ -135,25 +135,6 @@ public struct IssuanceCredentialPreview: Equatable, Sendable {
         self.metadataJSON = metadataJSON
     }
 
-    /// Minimal payload so `CredentialTitles` can resolve a friendly type when display omits a name.
-    public var typePayloadJSON: String? {
-        var fields: [String] = []
-        if let vct, !vct.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            fields.append(#""vct":\#(Self.jsonString(vct))"#)
-        }
-        if let doctype, !doctype.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            fields.append(#""docType":\#(Self.jsonString(doctype))"#)
-        }
-        guard !fields.isEmpty else { return nil }
-        return "{\(fields.joined(separator: ","))}"
-    }
-
-    private static func jsonString(_ value: String) -> String {
-        let escaped = value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        return "\"\(escaped)\""
-    }
 }
 
 /// Typed preview of a resolved OpenID4VCI credential offer.

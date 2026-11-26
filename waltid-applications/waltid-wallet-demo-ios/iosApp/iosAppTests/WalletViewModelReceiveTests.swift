@@ -233,7 +233,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
             model.unlockForTests()
             try await waitUntil { model.isReady }
-            let pending = DeferredCredential(id: "pending", credentialConfigurationID: nil, intervalSeconds: nil, status: status)
+            let pending = DeferredCredential(id: .init(rawValue: "pending")!, credentialConfigurationID: nil, intervalSeconds: nil, status: status)
             model.deferredCredentials = [pending]
             model.resumeDeferredCredential(pending)
             await Task.yield()
@@ -253,21 +253,21 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         model.unlockForTests()
         try await waitUntil { model.isReady }
-        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
+        let pending = DeferredCredential(id: .init(rawValue: "pending")!, credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
         model.deferredCredentials = [pending]
-        model.issuanceReceipt = IssuanceReceipt(pendingIDs: ["pending"])
+        model.issuanceReceipt = IssuanceReceipt(pendingIDs: [.init(rawValue: "pending")!])
         model.lastReceivedCredentialIDs = ["earlier-saved"]
         model.resumeDeferredCredential(pending)
         try await waitUntil { !model.isLoading }
         XCTAssertEqual(model.lastReceivedCredentialIDs, ["earlier-saved", "credential-1"])
-        XCTAssertEqual(model.issuanceReceipt?.pendingIDs, ["pending"])
+        XCTAssertEqual(model.issuanceReceipt?.pendingIDs, [.init(rawValue: "pending")!])
         model.resumeDeferredCredential(pending)
         try await waitUntil { !model.isLoading }
         XCTAssertEqual(model.lastReceivedCredentialIDs, ["earlier-saved", "credential-1"])
     }
 
     func testRetainedPresentationDoesNotEraseNewIntervalOrUncertainFailure() {
-        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "pid", intervalSeconds: 15)
+        let pending = DeferredCredential(id: .init(rawValue: "pending")!, credentialConfigurationID: "pid", intervalSeconds: 15)
         let lost = IssuanceOutcome.failed(sessionID: "session", error: .init(code: .remoteOutcomeUncertain, message: "Response lost"),
             storedCredentialIDs: ["saved"], deferredCredentials: [pending])
         guard case let .failed(_, _, saved, blocked) = lost.withContinuations([], resumingID: pending.id) else { return XCTFail() }
@@ -346,7 +346,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         model.unlockForTests()
         try await waitUntil { model.isReady }
-        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
+        let pending = DeferredCredential(id: .init(rawValue: "pending")!, credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
         model.deferredCredentials = [pending]
         XCTAssertTrue(model.credentials.isEmpty)
         model.resumeDeferredCredential(pending)
@@ -1077,7 +1077,7 @@ private actor TransactionCodeWalletClient: WalletClient {
     func setCredentialReadFailure(_ fail: Bool) { credentialReadFailure = fail }
 
     func listDeferredIssuance() async throws -> [DeferredCredential] {
-        (failWithProgress || deferWithProgress) && credentialIssued ? [.init(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)] : []
+        (failWithProgress || deferWithProgress) && credentialIssued ? [.init(id: .init(rawValue: "pending")!, credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)] : []
     }
 
     func startIssuance(_ request: IssuanceRequest) async throws -> ReviewedIssuanceOffer {

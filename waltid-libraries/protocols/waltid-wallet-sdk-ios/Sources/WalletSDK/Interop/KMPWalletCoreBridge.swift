@@ -91,7 +91,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     func listDeferredIssuance() async throws -> [DeferredCredential] {
         let result = try await bridge.listDeferredIssuance()
         return try requiredBridgeArray(Self.successAnyValue(result, operation: "list deferred issuance"),
-            of: Waltid_openid4vc_walletWalletIssuanceContinuation.self).map { $0.toSwiftDeferredCredential() }
+            of: Waltid_openid4vc_walletWalletIssuanceContinuation.self).map { try $0.toSwiftDeferredCredential() }
     }
 
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceOfferReview {

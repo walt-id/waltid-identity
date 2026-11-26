@@ -85,7 +85,7 @@ final class IssuanceBridgeContractTests: XCTestCase {
             }
             XCTAssertEqual(error.code, swiftCode)
             XCTAssertEqual(stored, ["stored"])
-            XCTAssertEqual(deferred.map(\.id), ["handle"])
+            XCTAssertEqual(deferred.map(\.id.rawValue), ["handle"])
         }
     }
 
@@ -99,7 +99,7 @@ final class IssuanceBridgeContractTests: XCTestCase {
         }
         XCTAssertEqual(session, "session")
         XCTAssertEqual(stored, ["stored"])
-        XCTAssertEqual(handles, [.init(id: "pending", credentialConfigurationID: "identity", intervalSeconds: 7,
+        XCTAssertEqual(handles, [.init(id: .init(rawValue: "pending")!, credentialConfigurationID: "identity", intervalSeconds: 7,
             credentialIdentifier: "dataset-a")])
     }
 
@@ -136,7 +136,7 @@ final class IssuanceBridgeContractTests: XCTestCase {
             }
             XCTAssertEqual(session, "session")
             XCTAssertEqual(stored, ["stored"])
-            XCTAssertEqual(deferred, [.init(id: "handle", credentialConfigurationID: "identity", intervalSeconds: 7,
+            XCTAssertEqual(deferred, [.init(id: .init(rawValue: "handle")!, credentialConfigurationID: "identity", intervalSeconds: 7,
                 credentialIdentifier: "dataset-a")])
             XCTAssertEqual(error.targetFailure?.stage, swiftStage)
             XCTAssertEqual(error.targetFailure?.target.credentialIdentifier, "dataset-b")

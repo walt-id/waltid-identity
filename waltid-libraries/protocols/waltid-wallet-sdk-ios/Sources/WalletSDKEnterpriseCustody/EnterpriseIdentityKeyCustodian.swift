@@ -18,10 +18,17 @@ public actor EnterpriseIdentityKeyCustodian: IdentityKeyCustodian {
     ///   - authorize: Adds authentication without changing the destination URL or method.
     public init(kmsResourceURL: URL, id: String = "enterprise-kms", displayName: String = "Enterprise KMS",
                 configuration: URLSessionConfiguration = .ephemeral,
-                authorize: @escaping @Sendable (URLRequest) async throws -> URLRequest) {
-        precondition(kmsResourceURL.scheme == "https" && kmsResourceURL.user == nil && kmsResourceURL.password == nil)
-        precondition(kmsResourceURL.query == nil && kmsResourceURL.fragment == nil && !kmsResourceURL.path.isEmpty && !kmsResourceURL.path.hasSuffix("/"))
-        precondition(!id.isEmpty && !displayName.isEmpty)
+                authorize: @escaping @Sendable (URLRequest) async throws -> URLRequest) throws {
+        guard kmsResourceURL.scheme?.lowercased() == "https", kmsResourceURL.host?.isEmpty == false,
+              kmsResourceURL.user == nil, kmsResourceURL.password == nil,
+              kmsResourceURL.query == nil, kmsResourceURL.fragment == nil,
+              !kmsResourceURL.path.isEmpty, !kmsResourceURL.hasDirectoryPath else {
+            throw WalletError.invalidInput("Provide an HTTPS KMS resource URL with a host and resource path")
+        }
+        guard !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw WalletError.invalidInput("A custodian ID and display name are required")
+        }
         self.resourceURL = kmsResourceURL
         self.id = id
         self.displayName = displayName

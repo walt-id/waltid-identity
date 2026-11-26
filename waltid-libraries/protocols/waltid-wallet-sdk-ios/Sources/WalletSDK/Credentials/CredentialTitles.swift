@@ -24,15 +24,25 @@ public enum CredentialTitles {
         let payload = credentialDataJSON.flatMap(parseJSON)
         let extracted: String?
         if isMdoc(format) {
-            extracted = mdocTitle(payload)
+            extracted = mdocTitle((payload?["docType"] ?? payload?["doctype"] ?? payload?["doc_type"]) as? String)
         } else if isSdJwt(format) {
-            extracted = sdJwtTitle(payload)
+            extracted = (payload?["vct"] as? String).flatMap(humanizeToken)
         } else {
             extracted = w3cTitle(payload)
         }
         return extracted
             ?? fallback?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
             ?? format
+    }
+
+    /// Resolves the title of an offered credential from its display name and typed format metadata.
+    public static func displayName(for credential: IssuanceCredentialPreview) -> String {
+        if let name = credential.display.name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty {
+            return name
+        }
+        if isMdoc(credential.format) { return mdocTitle(credential.doctype) ?? credential.format }
+        if isSdJwt(credential.format) { return credential.vct.flatMap(humanizeToken) ?? credential.format }
+        return credential.format
     }
 
     private static func w3cTitle(_ payload: [String: Any]?) -> String? {
@@ -42,15 +52,7 @@ public enum CredentialTitles {
             .flatMap(humanizeToken)
     }
 
-    private static func sdJwtTitle(_ payload: [String: Any]?) -> String? {
-        guard let vct = payload?["vct"] as? String else { return nil }
-        return humanizeToken(vct)
-    }
-
-    private static func mdocTitle(_ payload: [String: Any]?) -> String? {
-        let docType = (payload?["docType"] as? String)
-            ?? (payload?["doctype"] as? String)
-            ?? (payload?["doc_type"] as? String)
+    private static func mdocTitle(_ docType: String?) -> String? {
         guard let docType else { return nil }
         if let mapped = mdocFriendlyNames[docType] { return mapped }
         let namespace = docType.split(separator: ".").dropLast().joined(separator: ".")

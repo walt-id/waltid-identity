@@ -53,7 +53,7 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
                 credentials: try requiredBridgeArray(
                     value.credentials,
                     of: Waltid_openid4vc_walletWalletDeferredCredential.self
-                ).map { $0.toSwiftDeferredCredential() }
+                ).map { try $0.toSwiftDeferredCredential() }
             )
         case let .cancelled(value):
             return .cancelled(sessionID: value.sessionId)
@@ -68,7 +68,7 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
                 ),
                 storedCredentialIDs: try requiredBridgeArray(value.storedCredentialIds, of: String.self),
                 deferredCredentials: try requiredBridgeArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletIssuanceContinuation.self)
-                    .map { $0.toSwiftDeferredCredential() }
+                    .map { try $0.toSwiftDeferredCredential() }
             )
         }
     }
@@ -89,15 +89,21 @@ extension IssuanceCredentialSelection {
 }
 
 extension Waltid_openid4vc_walletWalletDeferredCredential {
-    func toSwiftDeferredCredential() -> DeferredCredential {
-        DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
+    func toSwiftDeferredCredential() throws -> DeferredCredential {
+        guard let id = DeferredIssuanceID(rawValue: id) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid deferred reference")
+        }
+        return DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
             intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier)
     }
 }
 
 extension Waltid_openid4vc_walletWalletIssuanceContinuation {
-    func toSwiftDeferredCredential() -> DeferredCredential {
-        DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
+    func toSwiftDeferredCredential() throws -> DeferredCredential {
+        guard let id = DeferredIssuanceID(rawValue: id) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid deferred reference")
+        }
+        return DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
             intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier,
             status: status.toSwift(), displayMetadataJSON: displayMetadataJson)
     }

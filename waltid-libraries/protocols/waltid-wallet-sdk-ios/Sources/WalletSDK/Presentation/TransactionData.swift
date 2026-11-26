@@ -36,15 +36,13 @@ public struct PresentationTransactionData: Equatable, Sendable {
         supportedFields: [String],
         rawJSON: String,
         detailsJSON: String
-    ) {
-        precondition(
-            !credentialQueryIDs.isEmpty,
-            "Transaction data must reference at least one credential query ID."
-        )
-        precondition(
-            credentialQueryIDs.allSatisfy(isPresentationIdentifierNonBlank),
-            "Transaction data must contain non-blank credential query IDs."
-        )
+    ) throws {
+        guard !credentialQueryIDs.isEmpty else {
+            throw WalletError.invalidInput("Transaction data must reference at least one credential query ID.")
+        }
+        guard credentialQueryIDs.allSatisfy(isPresentationIdentifierNonBlank) else {
+            throw WalletError.invalidInput("Transaction data must contain non-blank credential query IDs.")
+        }
         self.type = type
         self.displayName = displayName
         self.credentialQueryIDs = credentialQueryIDs

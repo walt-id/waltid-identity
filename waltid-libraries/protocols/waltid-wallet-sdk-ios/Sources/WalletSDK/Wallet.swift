@@ -195,11 +195,11 @@ public actor Wallet {
 
     /// Polls a deferred credential operation without exposing its access material.
     ///
-    /// - Parameter continuation: Opaque identifier returned in a deferred outcome.
+    /// - Parameter id: Deferred reference from an issuance outcome or the retained listing.
     /// - Returns: A stored, still-deferred, or failed outcome.
     /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
-    public func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome {
-        try await bridge.resumeDeferredIssuance(deferredCredentialID: continuation.id)
+    public func resumeDeferredIssuance(_ id: DeferredIssuanceID) async throws -> IssuanceOutcome {
+        try await bridge.resumeDeferredIssuance(deferredCredentialID: id.rawValue)
     }
 
     /// Lists credentials currently known to the wallet.

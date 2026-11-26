@@ -32,6 +32,21 @@ public struct IssuanceAuthorizationID: RawRepresentable, Hashable, Codable, Send
     init(session: IssuanceSessionID) { rawValue = session.rawValue }
 }
 
+/// Wallet-local reference for resuming a retained deferred credential.
+public struct DeferredIssuanceID: RawRepresentable, Hashable, Codable, Sendable, CustomStringConvertible {
+    /// Printable form for diagnostics that omits the saved reference.
+    public var description: String { "DeferredIssuanceID(<redacted>)" }
+
+    /// Persist this value when the app needs to resume deferred issuance.
+    public let rawValue: String
+    /// Restores a saved deferred reference.
+    /// - Parameter rawValue: Previously saved reference from this wallet.
+    public init?(rawValue: String) {
+        guard !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        self.rawValue = rawValue
+    }
+}
+
 /// Identification required to accept a pre-authorized offer.
 public enum IssuanceClientIdentification: Sendable {
     /// The server accepts this wallet without a client identifier.
@@ -147,7 +162,7 @@ public enum IssuanceContinuationStatus: Equatable, Sendable {
 /// Issuance continuation awaiting issuer processing or local credential storage.
 public struct DeferredCredential: Equatable, Sendable {
     /// Opaque identifier used to resume this deferred operation.
-    public let id: String
+    public let id: DeferredIssuanceID
 
     /// Credential configuration, or nil when an isolated request did not supply one.
     public let credentialConfigurationID: String?
@@ -173,7 +188,7 @@ public struct DeferredCredential: Equatable, Sendable {
     ///   - credentialIdentifier: Optional issuer-granted dataset identifier.
     ///   - status: Current retained state of the continuation.
     ///   - displayMetadataJSON: Optional issuer display metadata, without credential values or protocol secrets.
-    public init(id: String, credentialConfigurationID: String?, intervalSeconds: Int64?, credentialIdentifier: String? = nil,
+    public init(id: DeferredIssuanceID, credentialConfigurationID: String? = nil, intervalSeconds: Int64? = nil, credentialIdentifier: String? = nil,
                 status: IssuanceContinuationStatus = .unresolved, displayMetadataJSON: String? = nil) {
         self.id = id
         self.credentialConfigurationID = credentialConfigurationID

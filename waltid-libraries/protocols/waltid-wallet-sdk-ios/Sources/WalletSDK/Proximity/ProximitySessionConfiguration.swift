@@ -55,16 +55,27 @@ public struct ProximityNFCRetrievalConfiguration: Sendable, Hashable {
     /// Maximum response-data length returned to the reader.
     public let maximumResponseDataLength: Int
 
+    /// Creates the default configuration.
+    public init() {
+        maximumCommandDataLength = 65_535
+        maximumResponseDataLength = 65_536
+    }
+
     /// Creates a validated conventional NFC retrieval configuration.
+    /// - Throws: \`WalletError.invalidInput\` for incompatible options or unsupported limits.
     /// - Parameters:
     ///   - maximumCommandDataLength: Maximum command-data length accepted from the reader.
     ///   - maximumResponseDataLength: Maximum response-data length returned to the reader.
     public init(
         maximumCommandDataLength: Int = 65_535,
         maximumResponseDataLength: Int = 65_536
-    ) {
-        precondition((255...65_535).contains(maximumCommandDataLength))
-        precondition((256...65_536).contains(maximumResponseDataLength))
+    ) throws {
+        guard (255...65_535).contains(maximumCommandDataLength) else {
+            throw WalletError.invalidInput("NFC command data length must be in 255...65535")
+        }
+        guard (256...65_536).contains(maximumResponseDataLength) else {
+            throw WalletError.invalidInput("NFC response data length must be in 256...65536")
+        }
         self.maximumCommandDataLength = maximumCommandDataLength
         self.maximumResponseDataLength = maximumResponseDataLength
     }
@@ -79,7 +90,15 @@ public struct ProximityRetrievalOptions: Sendable, Hashable {
     /// Whether to offer Wi-Fi Aware with mandatory NCS-SK-128 security.
     public let wifiAware: Bool
 
+    /// Creates the default configuration.
+    public init() {
+        bluetoothLowEnergy = .init()
+        nfc = nil
+        wifiAware = false
+    }
+
     /// Creates a nonempty conventional retrieval configuration.
+    /// - Throws: \`WalletError.invalidInput\` for incompatible options or unsupported limits.
     /// - Parameters:
     ///   - bluetoothLowEnergy: Optional BLE role and bearer configuration.
     ///   - nfc: Optional conventional NFC command/response configuration.
@@ -88,8 +107,10 @@ public struct ProximityRetrievalOptions: Sendable, Hashable {
         bluetoothLowEnergy: ProximityBLEConfiguration? = .init(),
         nfc: ProximityNFCRetrievalConfiguration? = nil,
         wifiAware: Bool = false
-    ) {
-        precondition(bluetoothLowEnergy != nil || nfc != nil || wifiAware)
+    ) throws {
+        guard bluetoothLowEnergy != nil || nfc != nil || wifiAware else {
+            throw WalletError.invalidInput("Select at least one retrieval method")
+        }
         self.bluetoothLowEnergy = bluetoothLowEnergy
         self.nfc = nfc
         self.wifiAware = wifiAware
@@ -122,10 +143,11 @@ public struct ProximityNFCSessionConfiguration: Sendable, Hashable {
         handover: ProximityNFCHandover,
         retrieval: ProximityRetrievalOptions,
         qrFallback: ProximityRetrievalOptions? = nil
-    ) {
-        requireSharedBLEPolicy(retrieval.bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
-        precondition(retrieval.nfc == nil || qrFallback?.nfc == nil || retrieval.nfc == qrFallback?.nfc,
-                     "QR and NFC handover must use the same conventional NFC retrieval length limits")
+    ) throws {
+        try requireSharedBLEPolicy(retrieval.bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
+        guard retrieval.nfc == nil || qrFallback?.nfc == nil || retrieval.nfc == qrFallback?.nfc else {
+            throw WalletError.invalidInput("QR and NFC handover must use the same conventional NFC retrieval length limits")
+        }
         self.handover = handover
         self.retrieval = retrieval
         self.qrFallback = qrFallback
@@ -143,7 +165,16 @@ public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
     /// Optional nonempty retrieval plan offered through QR.
     public let qrFallback: ProximityRetrievalOptions?
 
+    /// Creates the default configuration.
+    public init() {
+        maximumCommandDataLength = 65_536
+        bluetoothLowEnergy = nil
+        qrFallback = nil
+        wifiAware = false
+    }
+
     /// Creates an NFCv2 session with optional alternate BLE and QR retrieval.
+    /// - Throws: \`WalletError.invalidInput\` for incompatible options or unsupported limits.
     /// - Parameters:
     ///   - maximumCommandDataLength: Validated NFCv2 command-data limit.
     ///   - bluetoothLowEnergy: Optional alternate BLE bearer.
@@ -154,9 +185,11 @@ public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
         bluetoothLowEnergy: ProximityBLEConfiguration? = nil,
         qrFallback: ProximityRetrievalOptions? = nil,
         wifiAware: Bool = false
-    ) {
-        precondition((1...65_536).contains(maximumCommandDataLength))
-        requireSharedBLEPolicy(bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
+    ) throws {
+        guard (1...65_536).contains(maximumCommandDataLength) else {
+            throw WalletError.invalidInput("NFCv2 command data length must be in 1...65536")
+        }
+        try requireSharedBLEPolicy(bluetoothLowEnergy, qrFallback?.bluetoothLowEnergy)
         self.maximumCommandDataLength = maximumCommandDataLength
         self.bluetoothLowEnergy = bluetoothLowEnergy
         self.qrFallback = qrFallback
@@ -190,6 +223,8 @@ extension ProximitySessionConfiguration {
 
 private func requireSharedBLEPolicy(
     _ nfc: ProximityBLEConfiguration?, _ qr: ProximityBLEConfiguration?
-) {
-    precondition(nfc == nil || qr == nil || nfc == qr, "QR and NFC must use the same BLE policy")
+) throws {
+    guard nfc == nil || qr == nil || nfc == qr else {
+        throw WalletError.invalidInput("QR and NFC must use the same BLE policy")
+    }
 }

@@ -4,11 +4,11 @@ import WalletSDK
 /// Retains the original result while individual pending operations continue.
 public struct IssuanceReceipt {
     public let issuer: IssuanceIssuerPreview?
-    public let pendingIDs: Set<String>
+    public let pendingIDs: Set<DeferredIssuanceID>
     public let problem: IssuanceFailure?
     public let detailsError: String?
 
-    public init(issuer: IssuanceIssuerPreview? = nil, pendingIDs: Set<String> = [], problem: IssuanceFailure? = nil,
+    public init(issuer: IssuanceIssuerPreview? = nil, pendingIDs: Set<DeferredIssuanceID> = [], problem: IssuanceFailure? = nil,
                 detailsError: String? = nil) {
         self.issuer = issuer
         self.pendingIDs = pendingIDs
@@ -31,7 +31,7 @@ extension IssuanceOutcome {
         }
     }
 
-    public func withContinuations(_ latest: [DeferredCredential], resumingID: String? = nil) -> IssuanceOutcome {
+    public func withContinuations(_ latest: [DeferredCredential], resumingID: DeferredIssuanceID? = nil) -> IssuanceOutcome {
         func updated(_ items: [DeferredCredential]) -> [DeferredCredential] {
             items.map { item in
                 let retained = latest.first(where: { $0.id == item.id })

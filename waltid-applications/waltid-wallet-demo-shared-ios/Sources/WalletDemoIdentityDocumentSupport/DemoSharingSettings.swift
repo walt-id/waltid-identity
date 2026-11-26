@@ -35,7 +35,7 @@ public enum WalletDemoProximityTransportProfile: String, CaseIterable, Identifia
     public var configuration: ProximityConfiguration {
         switch self {
         case .defaultProfile, .bluetooth, .wifiAware:
-            let retrieval = ProximityRetrievalOptions(
+            let retrieval = try! ProximityRetrievalOptions(
                 bluetoothLowEnergy: self == .wifiAware ? nil : .init(),
                 nfc: self == .defaultProfile ? .init() : nil,
                 wifiAware: self != .bluetooth
