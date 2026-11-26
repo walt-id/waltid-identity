@@ -149,6 +149,27 @@ final class ProximityPresentationViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testCompletedReceiptLoadsOnlyTheApprovedCredentialsAfterAnOrdinaryReview() async throws {
+        let session = FakeProximitySession()
+        let client = FakeProximityWalletClient(session: session)
+        let viewModel = ProximityPresentationViewModel(client: client, hostActions: FakeProximityHostActionExecutor())
+        viewModel.start()
+        try await chooseConnectionAndWaitForStart(viewModel, client: client, count: 1)
+        let review = combinedProximityReview()
+        await session.emit(.reviewRequired(review))
+        try await waitUntil { viewModel.review == review }
+        let candidates = Set(review.documents.flatMap { $0.credentialOptions.map(\.credentialID) })
+        XCTAssertEqual(viewModel.displayedCredentialIDs, candidates)
+        let selected = try fixtureSubmission(review)
+        await session.emit(.completed(exchanges: 1, declined: false,
+            receipt: .init(review: review, submission: selected, approvalTiming: .duringConnection, completedAt: Date())))
+        try await waitUntil { viewModel.isTerminal }
+        XCTAssertNil(viewModel.preparedSharing)
+        XCTAssertEqual(viewModel.displayedCredentialIDs, Set(selected.documents.map(\.credentialID)))
+        XCTAssertGreaterThan(candidates.count, selected.documents.count)
+    }
+
+    @MainActor
     func testPendingReviewReservesOneDecisionAndNextReviewCanProceed() async throws {
         let session = FakeProximitySession()
         let client = FakeProximityWalletClient(session: session)
@@ -577,7 +598,10 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         let first = FakeProximitySession(connectedRoute: .init(engagement: .nfc, transport: .nfc))
         let next = FakeProximitySession()
         let client = FakeProximityWalletClient(session: first, nextSession: next)
-        let wallet = WalletViewModel(walletID: "proximity-ui-fixture", walletClient: MockWalletClient(), proximityWalletClient: client)
+        let stored = Credential(id: "credential", format: "mso_mdoc", issuer: "Example issuer", subject: nil,
+            label: "Credential", addedAt: nil, credentialDataJSON: #"{"org.iso.18013.5.1":{"given_name":"Ada"}}"#)
+        let wallet = WalletViewModel(walletID: "proximity-ui-fixture",
+            walletClient: MockWalletClient(storedCredentials: [stored]), proximityWalletClient: client)
         await wallet.readerTrustSettings.awaitPendingOperations()
         wallet.selectedTab = .present
         wallet.dismissStatus()
@@ -614,6 +638,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
         await next.emit(.completed(exchanges: 1, declined: false,
             receipt: .init(review: review, submission: selection, approvalTiming: .beforeConnection, completedAt: Date())))
         try await waitUntil { viewModel.isTerminal }
+        XCTAssertEqual(viewModel.displayedCredentialIDs, Set(selection.documents.map(\.credentialID)))
         try await capture("native-sharing-receipt")
     }
 

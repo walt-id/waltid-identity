@@ -259,7 +259,7 @@ internal class MobileDemoWallet(
         mobileWallet.credentialSummaries().map { row ->
             WalletDemoCredential(id = row.id, format = row.format, issuer = row.issuer, subject = row.subject,
                 label = row.label ?: row.format, addedAt = row.addedAt, metadataJson = row.metadataJson,
-                typeMetadataJson = row.typeMetadataJson)
+                content = CredentialContent.Inventory(row.typeMetadataJson))
         }
 
     override suspend fun credential(id: String): WalletDemoCredential? = mobileWallet.credentialRead(id)?.credential?.toDemoCredential()

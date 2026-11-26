@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -32,8 +33,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.logic.WalletDemoTab
-import id.walt.walletdemo.compose.logic.WalletSessionState
-import id.walt.walletdemo.compose.logic.toCredentialDetails
+import id.walt.walletdemo.compose.logic.loadProximityCredentialDetails
 import id.walt.walletdemo.compose.ui.resources.*
 import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.screens.SettingsDestination
@@ -78,14 +78,13 @@ fun MobileWalletDemoApp(
     LaunchedEffect(proximity.canChangeConnectionOptions) {
         if (proximity.active && !proximity.closing && !proximity.canChangeConnectionOptions) showingConnectionOptions = false
     }
-    val credentials = (walletState.session as? WalletSessionState.Ready)
-        ?.credentials
-        .orEmpty()
-    val credentialDetailsById by produceState<Map<String, CredentialDetails>>(emptyMap(), credentials, showingNearbySheet) {
-        value = emptyMap()
-        if (showingNearbySheet) {
+    val credentialIds = remember(showingNearbySheet, displayedProximity.sessionState, displayedProximity.preparedSharing) {
+        if (showingNearbySheet) displayedProximity.displayedCredentialIds else emptySet()
+    }
+    val credentialDetailsById by key(controller, credentialIds) {
+        produceState<Map<String, CredentialDetails>>(emptyMap()) {
             value = withContext(Dispatchers.Default) {
-                credentials.associate { credential -> credential.id to credential.toCredentialDetails() }
+                loadProximityCredentialDetails(credentialIds, controller::credentialDetails)
             }
         }
     }

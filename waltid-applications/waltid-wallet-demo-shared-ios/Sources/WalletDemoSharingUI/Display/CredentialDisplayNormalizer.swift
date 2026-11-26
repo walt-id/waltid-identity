@@ -23,10 +23,10 @@ public enum CredentialDisplayNormalizer {
     }
 
     /// Build one display snapshot off the main thread. Image claims remain unresolved.
-    public static func details(for credentials: [Credential]) async -> [CredentialDetails] {
+    public static func loadDetails(for credential: Credential) async -> CredentialDetails {
         await withCheckedContinuation { continuation in
             queue.async {
-                continuation.resume(returning: credentials.map(details(for:)))
+                continuation.resume(returning: details(for: credential))
             }
         }
     }

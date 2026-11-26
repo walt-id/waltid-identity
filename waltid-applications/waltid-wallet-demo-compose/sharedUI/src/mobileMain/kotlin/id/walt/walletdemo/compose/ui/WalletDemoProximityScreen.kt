@@ -231,7 +231,8 @@ private fun WalletDemoProximityReview(
     val expired = (state.sessionState as? ProximityState.PreparationRequired)?.plan?.isExpired == true
     val submitLabel = if (state.preparingApproval) stringResource(Res.string.proximity_approve_and_prepare) else null
     val submission = rememberSharingSubmission(
-        enabled = state.pendingReviewId == null && !expired, selectionComplete = state.canApprove,
+        enabled = state.pendingReviewId == null && !expired,
+        selectionComplete = state.canApprove && state.selections.all { it.credentialId in credentialDetailsById },
         reviewKey = listOf(review, state.selections, state.continueAfterResponse, state.preparingApproval),
         onSubmit = onApprove, presentation = ReviewActionPresentation.Proximity, submitLabelOverride = submitLabel,
         credentialStatuses = state.selections.distinctBy { it.credentialId }.map { selected ->

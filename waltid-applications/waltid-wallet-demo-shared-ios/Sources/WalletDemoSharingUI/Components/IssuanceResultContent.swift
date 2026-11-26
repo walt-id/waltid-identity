@@ -126,8 +126,8 @@ private struct SavedCredentialRow: View {
             details = nil
             unavailable = false
             if let value = try? await loadCredential(credential.id) {
-                let loaded = await CredentialDisplayNormalizer.details(for: [value])
-                if !Task.isCancelled { details = loaded.first }
+                let loaded = await CredentialDisplayNormalizer.loadDetails(for: value)
+                if !Task.isCancelled { details = loaded }
             } else if !Task.isCancelled { unavailable = true }
         }
         .onDisappear { details = nil }

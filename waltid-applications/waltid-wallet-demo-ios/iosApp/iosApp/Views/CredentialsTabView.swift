@@ -174,9 +174,9 @@ struct CredentialsTabView: View {
                     if !Task.isCancelled { detailUnavailable = true }
                     return
                 }
-                let snapshot = await CredentialDisplayNormalizer.details(for: [credential])
+                let snapshot = await CredentialDisplayNormalizer.loadDetails(for: credential)
                 guard !Task.isCancelled else { return }
-                expanded = snapshot.first
+                expanded = snapshot
             } catch {
                 if !Task.isCancelled { detailUnavailable = true }
             }

@@ -109,6 +109,18 @@ data class WalletDemoProximityUiState(
             else -> null
         }
 
+    val displayedCredentialIds: Set<String>
+        get() {
+            review?.let { current ->
+                return current.documents.flatMap { document -> document.credentialOptions.map { it.credentialId } }.toSet()
+            }
+            val submission = when (sessionState) {
+                is ProximityState.Completed -> sessionState.receipt?.submission
+                else -> preparedSharing?.submission
+            }
+            return submission?.documents.orEmpty().map { it.credentialId }.toSet()
+        }
+
     val preparingApproval: Boolean get() = sessionState is ProximityState.PreparationRequired
 
     val canClose: Boolean
@@ -136,6 +148,22 @@ data class WalletDemoProximityUiState(
 
     val isTerminal: Boolean
         get() = sessionState.isTerminal()
+}
+
+/** Resolves the stored values displayed in a nearby review or receipt. */
+suspend fun loadProximityCredentialDetails(
+    ids: Set<String>,
+    read: suspend (String) -> WalletDemoCredential?,
+): Map<String, CredentialDetails> = buildMap {
+    for (id in ids) {
+        try {
+            read(id)?.let { put(id, it.toCredentialDetails()) }
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (_: Exception) {
+            // Other candidates can still be reviewed when this credential is unavailable.
+        }
+    }
 }
 
 /** Performs one OS-owned prerequisite action and returns only its privacy-safe outcome. */

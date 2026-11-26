@@ -87,7 +87,7 @@ struct ProximityPresentationView: View {
         let reject: (() -> Void)? = viewModel.preparingApproval ? nil : { viewModel.decline() }
         return ReviewActions<NearbySubmissionKey>(
                     gate: submission,
-                    selectionComplete: viewModel.canApprove,
+                    selectionComplete: viewModel.canApprove && viewModel.selections.allSatisfy { credentialDetailsByID[$0.credentialID] != nil },
                     isLoading: viewModel.pendingReviewID != nil,
                     reviewKey: key,
                     credentialStatuses: selectedStatuses,

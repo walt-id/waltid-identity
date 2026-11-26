@@ -57,17 +57,17 @@ internal object WalletVisualFixtures {
     val localizedCredentialDetails: CredentialDetails get() {
         val contract = Json.parseToJsonElement(SyntheticCredentialImageFiles.read("credential-information.json").decodeToString()).jsonObject
         return CredentialDisplayNormalizer.toDetails(credentialSummary.copy(
-            credentialDataJson = contract.getValue("credentialData").toString(),
+            content = CredentialContent.Full(contract.getValue("credentialData").toString()),
             metadataJson = contract.getValue("metadata").toString(),
         ), contract.getValue("preferredLocales").jsonArray.map { it.jsonPrimitive.content })
     }
 
     val credentialWithImages: CredentialDetails get() = CredentialDisplayNormalizer.toDetails(
-        credentialSummary.copy(credentialDataJson = buildJsonObject {
+        credentialSummary.copy(content = CredentialContent.Full(buildJsonObject {
             credential.getValue("data").jsonObject.forEach { (key, value) -> put(key, value) }
             put("portrait", SyntheticCredentialImageFixtures.portraitDataUrl)
             put("signature_usual_mark", SyntheticCredentialImageFixtures.signatureDataUrl)
-        }.toString()), listOf("en"),
+        }.toString())), listOf("en"),
     )
 
     val keySetup: WalletDemoIdentitySetup.Choose get() = WalletDemoIdentitySetup.Choose(

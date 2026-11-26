@@ -86,7 +86,7 @@ struct PresentView: View {
                 .accessibilityHidden(true)
             }
         }
-        .task(id: proximityCredentialRows) { await refreshProximityCredentialDetails() }
+        .task(id: proximityCredentialIDs) { await refreshProximityCredentialDetails() }
         .onAppear(perform: updateProximityScreenPolicy)
         .onDisappear { proximityScreenPolicy.restore() }
         .onChange(of: proximityPresentation.displayedEngagement == .qr) { _ in
@@ -118,32 +118,24 @@ struct PresentView: View {
         }
     }
 
-    private var proximityCredentialRows: [CredentialSummary] {
-        guard nearbySheet || proximityPresentation.active,
-              let review = proximityPresentation.review ?? proximityPresentation.preparedSharing?.review else { return [] }
-        let ids = Set(review.documents.flatMap { $0.credentialOptions.map(\.credentialID) })
-        return viewModel.credentials.filter { ids.contains($0.id) }
+    private var proximityCredentialIDs: Set<String> {
+        nearbySheet || proximityPresentation.active ? proximityPresentation.displayedCredentialIDs : []
     }
 
     private func refreshProximityCredentialDetails() async {
-        let rows = proximityCredentialRows
+        let ids = proximityCredentialIDs
         credentialDetailsByID = [:]
         proximityDetailsUnavailable = false
         var result: [String: CredentialDetails] = [:]
-        do {
-            for row in rows {
-                try Task.checkCancellation()
-                guard let credential = try await viewModel.credential(id: row.id) else {
-                    proximityDetailsUnavailable = true
-                    return
-                }
-                let details = await CredentialDisplayNormalizer.details(for: [credential])
-                result[row.id] = details.first
+        for id in ids {
+            guard !Task.isCancelled else { return }
+            if let credential = try? await viewModel.credential(id: id) {
+                result[id] = await CredentialDisplayNormalizer.loadDetails(for: credential)
             }
-            if !Task.isCancelled { credentialDetailsByID = result }
-        } catch {
-            if !Task.isCancelled { proximityDetailsUnavailable = true }
         }
+        guard !Task.isCancelled else { return }
+        credentialDetailsByID = result
+        proximityDetailsUnavailable = result.count != ids.count
     }
 
     private func updateProximityScreenPolicy() {

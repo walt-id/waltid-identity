@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.CredentialContent
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import kotlinx.coroutines.CancellationException
@@ -42,7 +43,10 @@ internal fun storedCredentialDetail(
     produceState<StoredCredentialDetail>(StoredCredentialDetail.Loading) {
         value = try {
             withContext(Dispatchers.Default) {
-                val full = if (row.typeMetadataJson == null) row else load(row.id)
+                val full = when (row.content) {
+                    is CredentialContent.Full -> row
+                    is CredentialContent.Inventory -> load(row.id)
+                }
                 full?.let { StoredCredentialDetail.Ready(it.toCredentialDetails(), it.credentialDataJson) }
                     ?: StoredCredentialDetail.Unavailable
             }
