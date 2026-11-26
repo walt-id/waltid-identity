@@ -5,8 +5,11 @@ import XCTest
 
 final class IssuanceBridgeContractTests: XCTestCase {
     func testExplicitSelectionPreservesDatasetAndEveryHolderBinding() throws {
-        let selection = try IssuanceCredentialSelection(configurationID: "identity", credentialIdentifier: "dataset-a",
-            holders: .existing([.init(keyID: "first", did: "did:key:first"), .init(keyID: "second")]))
+        let selection = try IssuanceCredentialSelection(
+            configurationID: "identity",
+            holders: .existing([.init(keyID: "first", did: "did:key:first"), .init(keyID: "second")]),
+            credentialIdentifier: "dataset-a"
+        )
         let core = try selection.toKMPSelection()
         XCTAssertEqual(core.credentialConfigurationId, "identity")
         XCTAssertEqual(core.credentialIdentifier, "dataset-a")
@@ -29,7 +32,11 @@ final class IssuanceBridgeContractTests: XCTestCase {
             XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", holders: holders))
         }
         XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: " ", holders: .newKeys(count: 1)))
-        XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", credentialIdentifier: " ", holders: .newKeys(count: 1)))
+        XCTAssertThrowsError(try IssuanceCredentialSelection(
+            configurationID: "identity",
+            holders: .newKeys(count: 1),
+            credentialIdentifier: " "
+        ))
     }
 
     func testIssuerRejectionPreservesTheCoreOfferRetryDecision() throws {

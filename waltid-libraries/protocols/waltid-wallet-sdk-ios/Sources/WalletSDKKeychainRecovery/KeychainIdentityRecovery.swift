@@ -13,10 +13,6 @@ public enum SynchronizableKeychainAccessibility: Sendable {
 public actor KeychainIdentityRecovery: IdentityRecoveryProvider {
     public nonisolated let id: String
     public nonisolated let displayName = "iCloud Keychain recovery"
-    private let service: String
-    private let accessGroup: String?
-    private let accessibility: SynchronizableKeychainAccessibility
-
     public init(namespace: String, accessGroup: String? = nil,
                 accessibility: SynchronizableKeychainAccessibility = .whenUnlocked) {
         precondition(namespace.range(of: "^[A-Za-z0-9._-]{1,64}$", options: .regularExpression) != nil)
@@ -26,7 +22,6 @@ public actor KeychainIdentityRecovery: IdentityRecoveryProvider {
         self.accessGroup = accessGroup
         self.accessibility = accessibility
     }
-
     public func availability() async throws -> WalletRecoveryAvailability {
         var request = query()
         request[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
@@ -37,7 +32,6 @@ public actor KeychainIdentityRecovery: IdentityRecoveryProvider {
         default: return .unavailable(reason: "Keychain recovery is unavailable")
         }
     }
-
     public func list() async throws -> [String] {
         var request = query()
         request[kSecMatchLimit as String] = kSecMatchLimitAll
@@ -72,6 +66,12 @@ public actor KeychainIdentityRecovery: IdentityRecoveryProvider {
         if status != errSecItemNotFound { try check(status) }
         return .acceptedLocally
     }
+
+    private let service: String
+
+    private let accessGroup: String?
+
+    private let accessibility: SynchronizableKeychainAccessibility
 
     private func read(recordID: String) throws -> Data? {
         var request = try query(recordID: recordID)

@@ -63,9 +63,14 @@ final class ProximityInputValidationTests: XCTestCase {
             details: [detail], compatibleCredentialIDs: ["credential"], resultBindingDigest: Data()) }
         let foreign = try ProximityDeviceSignedElement(credentialID: "other", namespace: "ns",
             elementIdentifier: "amount", valueCBOR: Data([0x01]))
-        assertInvalid { try ProximityApplicationAuthorization(profileID: "profile", displayTitle: "Title",
-            details: [detail], compatibleCredentialIDs: ["credential"], deviceSignedElements: [foreign],
-            resultBindingDigest: digest) }
+        assertInvalid { try ProximityApplicationAuthorization(
+            profileID: "profile",
+            displayTitle: "Title",
+            details: [detail],
+            compatibleCredentialIDs: ["credential"],
+            resultBindingDigest: digest,
+            deviceSignedElements: [foreign]
+        ) }
         let valid = try ProximityApplicationAuthorization(profileID: "profile", displayTitle: "Title",
             details: [detail], compatibleCredentialIDs: ["credential"], resultBindingDigest: digest)
         XCTAssertEqual(valid.resultBindingDigest, digest)

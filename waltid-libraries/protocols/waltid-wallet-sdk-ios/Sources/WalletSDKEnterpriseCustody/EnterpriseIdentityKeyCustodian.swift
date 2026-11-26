@@ -9,10 +9,6 @@ public actor EnterpriseIdentityKeyCustodian: IdentityKeyCustodian {
     public nonisolated let id: String
     /// Destination label shown before explicit selection.
     public nonisolated let displayName: String
-    private let resourceURL: URL
-    private let configuration: URLSessionConfiguration
-    private let authorize: @Sendable (URLRequest) async throws -> URLRequest
-
     /// Configures an explicit HTTPS KMS destination. The authorizer receives a body-free request.
     /// - Parameters:
     ///   - kmsResourceURL: Resource URL such as `https://enterprise.example/v1/org.kms`.
@@ -32,7 +28,6 @@ public actor EnterpriseIdentityKeyCustodian: IdentityKeyCustodian {
         self.configuration = configuration
         self.authorize = authorize
     }
-
     /// Imports idempotently under the identity's stable key ID. The SDK verifies the returned public key.
     /// - Parameters:
     ///   - identity: Original identity and stable key ID.
@@ -99,6 +94,11 @@ public actor EnterpriseIdentityKeyCustodian: IdentityKeyCustodian {
             throw IdentityProviderError.temporarilyUnavailable
         }
     }
+    private let resourceURL: URL
+
+    private let configuration: URLSessionConfiguration
+
+    private let authorize: @Sendable (URLRequest) async throws -> URLRequest
     private static func coordinate(_ value: String) -> Data? {
         let base64 = value.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
         guard let bytes = Data(base64Encoded: base64 + String(repeating: "=", count: (4 - base64.count % 4) % 4)),
