@@ -75,6 +75,9 @@ class SignatureJwtVcJsonVPPolicy(
                 else -> "UNKNOWN"
             }
             if (legacySource == "DID") {
+                val signerDid = presentation.payload["iss"]?.jsonPrimitive?.contentOrNull
+                require(signerDid == presentation.issuer) { "VP issuer must match the signed DID issuer" }
+                addResult("signer_identifier", requireNotNull(signerDid))
                 require(holderKey.getKeyId() == kid) { "Resolved ES256K DID key does not exactly match kid" }
             }
             addResult("holder_key_source", legacySource)

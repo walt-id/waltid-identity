@@ -162,6 +162,8 @@ When the Wallet POSTs the presentation, the verifier parses the `vp_token`, runs
 
 Verifier2 defaults to `vc_policies: ["signature", "credential-status"]`. Status checking detects IETF Token Status Lists (including mdoc status lists) and supported W3C `credentialStatus` entries, accepting status value `0`. All declared entries must pass; unsupported, malformed, unavailable, or invalidly signed status lists fail verification. Credentials with no status information remain acceptable and report `policy_available: false`. Supplying `vc_policies` replaces these defaults, so keep both policies when customizing them. Explicit status arguments remain supported; omitted `discriminator` selects detection and omitted `value` defaults to `0`.
 
+For `jwt_vc_json`, the default `jwt_vc_json/holder-binding` policy checks every embedded credential against the verified VP signer. An explicit holder confirmation key must match the signing key; otherwise the credential subject must match the signer's DID. Missing or unsupported holder confirmation fails. DCQL `require_cryptographic_holder_binding: true` (the default) enforces this check even when custom VP policies replace the defaults. Intentionally unbound credentials require both an explicit DCQL opt-out and a policy list without holder binding.
+
 
 ```kotlin
 post("/api/v2/verification/{sessionId}/response") {

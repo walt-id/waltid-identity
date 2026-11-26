@@ -20,6 +20,7 @@ object VPVerificationPolicyManager {
         AudienceCheckJwtVcJsonVPPolicy(),
         NonceCheckJwtVcJsonVPPolicy(),
         SignatureJwtVcJsonVPPolicy(),
+        HolderBindingJwtVcJsonVPPolicy(),
         ExpCheckJwtVcJsonVPPolicy(),
         NbfCheckJwtVcJsonVPPolicy(),
     )
