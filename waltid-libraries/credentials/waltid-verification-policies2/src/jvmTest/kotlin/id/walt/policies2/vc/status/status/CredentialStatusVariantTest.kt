@@ -5,6 +5,7 @@ package id.walt.policies2.vc.status.status
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
+import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseKey
 import id.walt.credentials.CredentialParser
@@ -215,12 +216,12 @@ class CredentialStatusVariantTest {
     }
 }
 
-private object MdocIssuerFixture {
+internal object MdocIssuerFixture {
     private const val DOC_TYPE = "org.iso.18013.5.1.mDL"
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val base64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
     private lateinit var issuerKey: Key
-    private lateinit var holderCoseKey: id.walt.cose.CoseKey
+    private lateinit var holderCoseKey: CoseKey
     private lateinit var certificateDer: ByteArray
 
     fun ensureKeys() {
