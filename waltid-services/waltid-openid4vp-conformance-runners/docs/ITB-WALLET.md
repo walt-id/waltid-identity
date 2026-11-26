@@ -41,7 +41,7 @@ Portal UI IDs are not API keys. The manifest pins the deployment to
 `https://dev-i4mlab.aegean.gr/itb`, the system name to `walt.id`, and the exact
 statement, suite and case labels. A different selected system or missing/ambiguous
 label fails before wallet execution. System and actor API keys are not needed.
-The pinned inventory was checked on 2026-11-23 and retains the deployed
+The pinned inventory was checked on 2026-11-26 and retains the deployed
 `[Wallet SUT]` qualifiers. CS-07 explicitly selects its visible `User` actor
 within the configured statement. Newly deployed cases are not selected automatically.
 
@@ -241,18 +241,21 @@ Do not equate the eleven local profile checks with the deployed cases.
 
 ### Deployed catalogue
 
-The authenticated Walt.id catalogue was inspected on 2026-11-23.
-The [case manifest](../src/main/resources/itb/wallet-catalogue.json) records the
-actual suite/case identifiers exposed by the portal's REST API configuration.
+On 2026-11-26 the authenticated **WE BUILD LSP** catalogue listed 87 cases in
+16 suites. The four walt.id conformance statements contain 84 of them. The
+[case manifest](../src/main/resources/itb/wallet-catalogue.json) selects 31
+wallet cases by suite and case ID. These comprise 21 core unattended cases,
+four opt-in reference issuer cases and six attended payments. The [ledger](#blocked-wallet-cases)
+accounts for the other 42 wallet cases and the 14 cases outside wallet coverage.
 The suite metadata versions below are independent of the per-case version in each
 execution report and of the normative specification version.
 
 | Target | Deployed suite ID | Cases | Suite metadata version |
 | --- | --- | --- | --- |
-| CS-01 | `cs01v1` | VCI-001/002/003/005/006/007/008 (7) | 1.4 |
+| CS-01 | `cs01v1` | VCI-001/002/003/005/006/007/008 (7) | 1.5 |
 | CS-02 | `cs02v1` | VP-001/002/003/007/011/012/013 (7) | 1.4 |
 | CS-07 | `cts07` | `tc15` presentation and `tc16` issuance (2) | 1.0 |
-| CS-10 | `cs10-test-suite` | RV-ISS-01/02 (2) | 1.1 |
+| CS-10 | `cs10-test-suite` | RV-ISS-01/02 (2) | 1.2 |
 | CS-12 / TS12 | `ts12` | 3 issuance, 3 payment, 3 DC API payment (9) | 1.0 |
 | OneSpan, opt-in | `onespan_com` | `onespan_vci_01`, `onespan_vci_03` | 1.0 |
 | Reconi, opt-in | `rec` | `recweb_issue_01`, `recweb_issue_02` | 1.0 |
@@ -263,19 +266,20 @@ execution report and of the normative specification version.
 | --- | --- |
 | CS-01 | Seven authorization-code and pre-authorized-code issuance cases cover SD-JWT and mdoc. Each offer uses one holder. |
 | CS-02 | Seven presentation cases cover signed requests and the deployed invocation variants. The base-suite VP-004 transaction-data case is disabled. See the [profile assessment](ITB-CS02-COVERAGE.md) for registration and consent gaps. |
-| CS-04 | The runner supplies synthetic key attestation for issuance. Provider-backed WIA and KA, verification, and the unit lifecycle belong to [WAL-1060](https://linear.app/walt-new/issue/WAL-1060). |
-| CS-06 | [CS-06 v1.1](https://github.com/webuild-consortium/wp4-architecture/pull/287) assigns certificate issuance to the RP and certificate provider. Wallet-side access-certificate validation needs [WAL-1485](https://linear.app/walt-new/issue/WAL-1485) and ITB trust configuration. The 13 Trust Framework wallet cases need separate qualification, including VP-004 transaction-data binding. |
+| CS-04 | No dedicated wallet case is deployed. The runner uses synthetic key attestation. Qualifying provider-backed wallet instance and key attestations and the unit lifecycle requires an interoperable provider and issuer. [WAL-1060](https://linear.app/walt-new/issue/WAL-1060) |
+| CS-06 | [CS-06 v1.1](https://github.com/webuild-consortium/wp4-architecture/pull/287) assigns certificate issuance to the relying party and certificate provider. The catalogue has no dedicated CS-06 wallet case. The separate Trust Framework suite offers issuance and presentation variants. [WAL-1485](https://linear.app/walt-new/issue/WAL-1485) covers signed presentation-request trust. [WAL-1851](https://linear.app/walt-new/issue/WAL-1851) covers issuer trust on receipt. |
 | CS-07 | The app path drives `tc15` through Chrome presentation and `tc16` through Chrome issuance. It verifies the browser response, the new stored PID and the issuer status for that offer. In a control, closing the instructions alone yielded ITB `SUCCESS`. |
 | CS-10 | RV-ISS-01 redeems both offers in one session and checks that the two stored SD-JWTs have one status-list URI, different indices and fresh clear status. RV-ISS-02 requires a fresh `INVALID` result, the SDK's projection of Token Status List value 1. The app run records each card's visible label before and after Check status and requires a new displayed check time before confirming the portal prompt. |
-| CS-12 | The local SCA matrix covers the updated SCA-User credential shape. The [native guide](ITB-NATIVE.md) records the earlier attended runs and the outstanding RP-permission and deployment checks. |
+| CS-12 | All nine wallet cases are selected. All three issuance variants succeeded on the OnePlus. Both payment paths for each variant stopped at review because the wallet could not retrieve payment instructions. The [native guide](ITB-NATIVE.md#sca-user-audience-compatibility) describes the separate SCA-User relying-party permission question. |
 | CS-13 | The inspected statements expose no dedicated [intermediary wallet suite](https://github.com/webuild-consortium/wp4-architecture/blob/d6603effe714411d5dd7e9542d4d7b7d9fe11426/conformance-specs/cs-13-intermediary-services-preflight.md). Coverage needs an intermediary counterpart and the registration material for the wallet to authenticate the intermediary and identify the represented relying party. |
 
 ### Blocked wallet cases
 
-This ledger records the first observed blocker in the 2026-11-23 tenant
-inspection and local Preview runs. Case IDs are scoped to the suite in the
-first column. The Relying Parties suites test an issuer or verifier and sit
-outside the wallet inventory.
+[WAL-1868](https://linear.app/walt-new/issue/WAL-1868) tracks the 42 unselected
+wallet cases below. ITB enables 41 of them and disables base CS-02 VP-004.
+The failures describe the last wallet trials on 2026-11-23. The 2026-11-26
+catalogue check verified case availability. The Trust Framework suite has
+since moved from version 1.4 to 1.5, so its results need a fresh trial.
 
 | Suite | Cases | Observed blocker and what to recheck |
 | --- | --- | --- |
@@ -284,15 +288,38 @@ outside the wallet inventory.
 | OneSpan (`onespan_com`) | `onespan_vci_04` | The offer requires a transaction code and ITB supplied no code. The dialog needs to provide it. |
 | OneSpan (`onespan_com`) | `onespan_vp_01` through `onespan_vp_07` | GET retrieval returned HTTP 200. Wallet validation found no matching trust anchor. The POST-labelled cases (`02`, `05`) also omitted `request_uri_method`, and the DID-labelled cases (`05`, `06`) sent `x509_hash`. Recheck with verified test trust material and fixtures that exercise the stated methods and identifiers. |
 | Namirial (`namiral_suite`) | `nam_issue_01`, `nam_issue_02`, `nam_issue_03`, `vci_006`, `vci_007`, `vci_008`, `nam_vp_01`, `nam_vp_02`, `nam_vp_03`, `vp_001`, `vp_002`, `vp_003`, `vp_004`, `vp_007` | All 14 scan dialogs lacked a usable attachment. Sample issuance and presentation dialogs had empty QR and raw values. Recheck once the fixtures supply wallet input. |
-| Intesi (`generated_suite`) | `webuild_issuer_request_001`, `webuild_issuer_request_002` | The offer endpoint status assertion failed before the wallet had an interaction. These fixtures exercise issuer endpoints. Wallet coverage needs an offer handoff and an assertion about the wallet flow. |
 | Procivis (`ts01`) | `tc001`, `tc002` | The issuer returned HTTP 400 `invalid_client` at token exchange. Recheck the test client's issuer registration and authentication requirements. |
 | Procivis (`ts01`) | `tc003`, `tc004` | Both signed requests failed leaf certificate hash binding. Recheck that `x509_hash` matches the DER-encoded leaf in `x5c`. The deployed cases share a title, so the bridge also needs an unambiguous case selector. |
-| Trust Framework (`tf-test-suite`) | `tc_vci_001`, `tc_vci_005`, `tc_vci_006`, `tc_vci_007`, `tc_vci_008` | The issuer returned HTTP 401 `invalid_client` at token exchange. Recheck test client onboarding before qualifying wallet trust evaluation. |
+| Trust Framework (`tf-test-suite`) | `tc_vci_001`, `tc_vci_005`, `tc_vci_006`, `tc_vci_007`, `tc_vci_008` | The issuer returned HTTP 401 `invalid_client` at token exchange. Confirm the reference issuer's client registration and authentication requirements. Issuer trust on receipt can only be exercised after issuance reaches the wallet. |
 | Trust Framework (`tf-test-suite`) | `tc_vp_001`, `tc_vp_002` | The sessions exposed no usable wallet input. Recheck with a deployed request attachment. |
 | Trust Framework (`tf-test-suite`) | `tc_vp_003`, `tc_vp_004`, `tc_vp_007`, `tc_vp_011`, `tc_vp_012` | Both attempts timed out before an interactive session ID appeared. Recheck portal startup before assessing wallet behavior. |
-| Trust Framework (`tf-test-suite`) | `tc_vp_013` | Request retrieval succeeded. Wallet validation found no matching trust anchor. Qualify this variant with verified test trust configuration and [WAL-1485](https://linear.app/walt-new/issue/WAL-1485). |
-| QES (`cs03_suite`) | `signatrure_01` | The wallet has no CSC remote signing and AdES flow for this case. |
-| TS12 payments (`ts12`) | `ts12_pay_01`, `ts12_pay_02`, `ts12_pay_03`, `ts12_pay_dc_api_01`, `ts12_pay_dc_api_02`, `ts12_pay_dc_api_03` | The cases are selectable in attended mode. Reference issuer DPC type metadata returned HTTP 404 and the wallet could not show the required payment instructions. See [WE BUILD architecture #357](https://github.com/webuild-consortium/wp4-architecture/issues/357). |
+| Trust Framework (`tf-test-suite`) | `tc_vp_013` | POST returned HTTP 200. The demo wallet found no matching trust anchor. Retry this case first with an independently verified test anchor configured in the wallet. [WAL-1485](https://linear.app/walt-new/issue/WAL-1485) adds a registry option for signed requests. The demo can already use static anchors. |
+| QES (`cs03_suite`) | `signatrure_01` | The case requests holder consent and a document signature in AdES format. Qualification needs the wallet signing flow and a qualified remote signing provider. [WAL-1847](https://linear.app/walt-new/issue/WAL-1847) |
+
+**Selected payments awaiting a passing result.** On 2026-11-24 the OnePlus
+reached wallet review for `ts12_pay_01`, `ts12_pay_02`, `ts12_pay_03` and
+their `ts12_pay_dc_api_01`, `ts12_pay_dc_api_02`, `ts12_pay_dc_api_03`
+counterparts. All six recorded “Payment instructions could not be retrieved”
+and ITB `UNDEFINED`. Recheck the reference issuer's type metadata, then rerun
+both paths for SCA-IBAN, SCA-User and SCA-Card with native signing. The portal
+report and device results are on [WAL-1534](https://linear.app/walt-new/issue/WAL-1534).
+[Architecture #357](https://github.com/webuild-consortium/wp4-architecture/issues/357)
+discusses the credential type identifiers and metadata.
+
+**Other cases in the current domain**
+
+| Suite | Cases | What the case exercises |
+| --- | --- | --- |
+| Relying Parties (`rfcv3-rp`, `rps-trust`) | `tc01`, `tc02`, `tc03` in each suite | Issuer or verifier with the reference wallet. |
+| TS12 (`ts12`) | `w01`, `w02`, `w03` | Issuer or verifier with the WE BUILD headless wallet. |
+| Intesi (`generated_suite`) | `webuild_issuer_request_001`, `webuild_issuer_request_002` | Both assert only the issuer's `POST /issuer/request` response. It returned HTTP 404 on 2026-11-24, before any wallet handoff. A wallet case would need an offer and a wallet outcome. |
+| BUC6 (`buc6-rp-v1`) | `tc01`, `tc02` | Verifier under test, with the ITB+ wallet and trust disabled or enabled. |
+| ITB+ harness (`itb-native-wallet-harness`) | `native-wallet-verifier-observations` | Collects observations from the ITB+ Android wallet during an external verifier flow. |
+
+BUC6 and the ITB+ harness are visible under the verifier role outside the four
+walt.id statements. The portal also offers nine statements in a separate
+`WE Build L-OLD` domain. The walt.id account can see their names in the
+statement picker. Its request for the legacy case catalogue returned HTTP 403.
 
 ### Exporting reports
 

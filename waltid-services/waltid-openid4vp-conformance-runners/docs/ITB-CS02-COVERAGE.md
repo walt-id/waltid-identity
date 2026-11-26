@@ -49,7 +49,8 @@ Do not impose CS-02-specific restrictions globally on the multi-profile wallet.
 Complete registration-data support and an explicit ecosystem policy at the shared
 request/trust boundary, then qualify its consumers. Preserve default protocol
 compatibility and add independent rejection vectors for the scoped policy.
-The broader profile work belongs with [WAL-1534](https://linear.app/walt-new/issue/WAL-1534/itb-follow-up-i).
+The shared registration and disclosure policy is tracked in [WAL-1845](https://linear.app/walt-new/issue/WAL-1845).
+Qualification of the remaining deployed wallet cases is tracked in [WAL-1868](https://linear.app/walt-new/issue/WAL-1868).
 
 ## Other newly deployed cases
 

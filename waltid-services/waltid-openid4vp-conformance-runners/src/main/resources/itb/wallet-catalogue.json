@@ -1,5 +1,5 @@
 {
-  "observedOn": "2026-11-23",
+  "observedOn": "2026-11-26",
   "testBed": "https://dev-i4mlab.aegean.gr/itb",
   "testBedVersion": "1.29.5",
   "suites": [
@@ -35,7 +35,7 @@
       "profile": "CS-01",
       "id": "cs01v1",
       "name": "WE BUILD CTS - CS-01 Issuance",
-      "publishedVersion": "1.4",
+      "publishedVersion": "1.5",
       "cases": [
         { "id": "tc_vci_001", "name": "Test Case VCI-001 [Wallet SUT]: WE BUILD - Authorization code flow - sdjwt - x509 signature" },
         { "id": "tc_vci_002", "name": "Test Case VCI-002 [Wallet SUT]: WE BUILD - Authorization code flow - sdjwt - jwk signature" },
@@ -51,7 +51,7 @@
       "profile": "CS-10",
       "id": "cs10-test-suite",
       "name": "WE BUILD CS-10 Attestation Revocation",
-      "publishedVersion": "1.1",
+      "publishedVersion": "1.2",
       "cases": [
         { "id": "rv_iss_01", "name": "RV-ISS-01: Shared status list and public status token [Wallet SUT]", "demoOnly": true },
         { "id": "rv_iss_02", "name": "RV-ISS-02: Wallet receives an already-revoked credential [Wallet SUT]", "demoOnly": true }
