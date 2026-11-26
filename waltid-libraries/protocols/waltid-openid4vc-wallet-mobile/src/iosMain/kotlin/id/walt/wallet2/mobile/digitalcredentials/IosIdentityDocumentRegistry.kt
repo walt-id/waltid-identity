@@ -19,7 +19,7 @@ import platform.Foundation.NSUserDefaults
  * the group and survives app deletion.
  *
  * @property documentIdentifier `MobileDocumentRegistration.documentIdentifier` for this credential.
- * Always the wallet's stable [MobileWalletCredentialRegistryRecord.registryEntryId].
+ * Always the wallet's stable [RegistryEntry.registryEntryId].
  * @property documentType ISO mdoc doctype registered with Apple, for example `org.iso.18013.5.1.mDL`.
  */
 @Serializable
@@ -92,29 +92,29 @@ public sealed interface IosIdentityDocumentProjectionResult {
 public class IosIdentityDocumentRegistry(
     private val appGroupIdentifier: String?,
     private val walletId: String,
-) : MobileWalletCredentialRegistry {
+) : CredentialRegistry {
     /**
      * Publishes one desired Apple registration per presentable mdoc credential in [records].
      *
      * The published state *replaces* whatever the App Group held, including another wallet's
      * projection - see [IosIdentityDocumentProjectionState].
      *
-     * [MobileWalletCredentialRegistrationResult.entryCount] counts desired registrations
+     * [CredentialRegistrationResult.entryCount] counts desired registrations
      * written, not registrations Apple has accepted, because applying them is Swift's job.
      *
      * [registryId] is unused: Apple's store is keyed by document identifier alone.
      */
     override suspend fun replace(
         registryId: String,
-        records: List<MobileWalletCredentialRegistryRecord>,
-    ): MobileWalletCredentialRegistrationResult = projectionMutex.withLock {
+        records: List<RegistryEntry>,
+    ): CredentialRegistrationResult = projectionMutex.withLock {
         currentCoroutineContext().ensureActive()
         val group = appGroupIdentifier
-            ?: return@withLock MobileWalletCredentialRegistrationResult.Unavailable("An App Group is required")
+            ?: return@withLock CredentialRegistrationResult.Unavailable("An App Group is required")
         // Only mdoc reaches Apple: IdentityDocumentServices registers ISO mobile documents, and an
         // SD-JWT VC has no doctype to register under.
         val projection = records
-            .filter { it.format == MobileWalletDigitalCredentialFormat.MDOC }
+            .filter { it.format == DigitalCredentialFormat.MDOC }
             .distinctBy { it.registryEntryId }
             .map {
                 IosIdentityDocumentProjectionRecord(
@@ -125,57 +125,55 @@ public class IosIdentityDocumentRegistry(
 
         val persisted = runCatching { writeProjection(group, projection) }
         persisted.exceptionOrNull()?.let { failure ->
-            return@withLock MobileWalletCredentialRegistrationResult.Unavailable(failure.message ?: "Identity document projection could not be persisted")
+            return@withLock CredentialRegistrationResult.Unavailable(failure.message ?: "Identity document projection could not be persisted")
         }
 
-        return@withLock MobileWalletCredentialRegistrationResult.ProjectionSaved(
+        return@withLock CredentialRegistrationResult.ProjectionSaved(
             entryCount = projection.size,
-            available = capabilities.registrationAvailable,
-            reason = unavailableReason,
+            reason = unavailableReason(registrationStatus),
         )
     }
 
-    override val capabilities: MobileWalletDigitalCredentialCapabilities
+    override val capabilities: DigitalCredentialCapabilities
         get() {
             val status = registrationStatus
             val platformAvailable = ios26Available && status != null && status != IosIdentityDocumentRegistrationStatus.NOT_SUPPORTED
-            val registrationAvailable = platformAvailable &&
-                appGroupIdentifier != null &&
-                status == IosIdentityDocumentRegistrationStatus.AUTHORIZED
-            return MobileWalletDigitalCredentialCapabilities(
+            val reason = unavailableReason(status)
+            val registrationAvailable = reason == null
+            return DigitalCredentialCapabilities(
                 platform = "iOS IdentityDocumentServices",
                 platformAvailable = platformAvailable,
                 minimumOsVersion = "iOS/iPadOS 26",
                 registrationAvailable = registrationAvailable,
                 capabilities = listOf(
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
-                        credentialFormats = listOf(MobileWalletDigitalCredentialFormat.MDOC),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.READER_AUTHENTICATED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.HPKE),
+                    DigitalCredentialCapability(
+                        protocol = DigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+                        credentialFormats = listOf(DigitalCredentialFormat.MDOC),
+                        requestProtection = listOf(DigitalCredentialRequestProtection.READER_AUTHENTICATED),
+                        responseProtection = listOf(DigitalCredentialResponseProtection.HPKE),
                         supported = registrationAvailable,
-                        unsupportedReason = unavailableReason,
+                        unsupportedReason = reason,
                     ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+                    DigitalCredentialCapability(
+                        protocol = DigitalCredentialProtocols.OPENID4VP_UNSIGNED,
                         credentialFormats = emptyList(),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
+                        requestProtection = listOf(DigitalCredentialRequestProtection.UNSIGNED),
                         responseProtection = emptyList(),
                         supported = false,
                         unsupportedReason = "IdentityDocumentServices exposes ISO 18013-7 mobile-document requests, not OpenID4VP",
                     ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                    DigitalCredentialCapability(
+                        protocol = DigitalCredentialProtocols.OPENID4VP_SIGNED,
                         credentialFormats = emptyList(),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.SIGNED),
+                        requestProtection = listOf(DigitalCredentialRequestProtection.SIGNED),
                         responseProtection = emptyList(),
                         supported = false,
                         unsupportedReason = "IdentityDocumentServices does not expose OpenID4VP to third-party wallets",
                     ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
+                    DigitalCredentialCapability(
+                        protocol = DigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
                         credentialFormats = emptyList(),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.MULTISIGNED),
+                        requestProtection = listOf(DigitalCredentialRequestProtection.MULTISIGNED),
                         responseProtection = emptyList(),
                         supported = false,
                         unsupportedReason = "IdentityDocumentServices does not expose OpenID4VP to third-party wallets",
@@ -240,16 +238,15 @@ public class IosIdentityDocumentRegistry(
             ?.stringForKey(REGISTRATION_STATUS_KEY)
             ?.let(IosIdentityDocumentRegistrationStatus::fromStoredValue)
 
-    private val unavailableReason: String?
-        get() = when {
-            !ios26Available -> "IdentityDocumentServices requires iOS/iPadOS 26"
-            appGroupIdentifier == null -> "An App Group is required"
-            registrationStatus == null -> "IdentityDocumentServices runtime status has not been reported"
-            registrationStatus == IosIdentityDocumentRegistrationStatus.NOT_SUPPORTED -> "IdentityDocumentServices is not supported on this device"
-            registrationStatus == IosIdentityDocumentRegistrationStatus.NOT_AUTHORIZED -> "IdentityDocumentServices registration is not authorized"
-            registrationStatus == IosIdentityDocumentRegistrationStatus.NOT_DETERMINED -> "IdentityDocumentServices registration authorization is not determined"
-            else -> null
-        }
+    private fun unavailableReason(status: IosIdentityDocumentRegistrationStatus?): String? = when {
+        !ios26Available -> "IdentityDocumentServices requires iOS/iPadOS 26"
+        appGroupIdentifier == null -> "An App Group is required"
+        status == null -> "IdentityDocumentServices runtime status has not been reported"
+        status == IosIdentityDocumentRegistrationStatus.NOT_SUPPORTED -> "IdentityDocumentServices is not supported on this device"
+        status == IosIdentityDocumentRegistrationStatus.NOT_AUTHORIZED -> "IdentityDocumentServices registration is not authorized"
+        status == IosIdentityDocumentRegistrationStatus.NOT_DETERMINED -> "IdentityDocumentServices registration authorization is not determined"
+        else -> null
+    }
 
     private fun writeProjection(
         group: String,

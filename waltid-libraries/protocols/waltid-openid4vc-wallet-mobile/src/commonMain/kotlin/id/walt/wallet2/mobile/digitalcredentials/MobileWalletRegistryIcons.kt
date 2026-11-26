@@ -26,7 +26,7 @@ internal object MobileWalletRegistryIcons {
     )
 
     suspend fun resolveIconPng(
-        art: MobileWalletCardArt,
+        art: CardArt,
         fetchHttps: suspend (String) -> ByteArray?,
     ): ByteArray {
         art.imageUris.forEach { uri ->
@@ -40,7 +40,7 @@ internal object MobileWalletRegistryIcons {
         metadata: JsonObject?,
         credentialData: JsonObject,
         preferredLocales: List<String> = emptyList(),
-    ): MobileWalletCardArt {
+    ): CardArt {
         val credentialDisplays = metadata.displayObjects("credentialDisplay")
         val issuerDisplays = metadata.displayObjects("issuerDisplay")
         val credentialDisplay = DisplayLocales.select(credentialDisplays, preferredLocales) { it.locale() }
@@ -53,7 +53,7 @@ internal object MobileWalletRegistryIcons {
         val otherUris = (credentialDisplays + issuerDisplays).flatMap { display ->
             listOfNotNull(display.backgroundImageUri(), display.logoUri())
         }
-        return MobileWalletCardArt(
+        return CardArt(
             imageUris = (preferredUris + otherUris).distinct(),
             backgroundColor = credentialDisplay.backgroundColor(),
             fallbackPng = credentialData.portraitBytes()?.takeIf(::isImageBytes),

@@ -12,7 +12,7 @@ final class ReviewSubmissionGateTests: XCTestCase {
         let review = SharingReviewModel(request: .init(requester: nil), credentialOptions: [option])
         let selection = SharingSelection(credentials: [option.selection], disclosures: [])
         func key(_ claimsJSON: String) throws -> SharingSubmissionKey {
-            let prepared = PreparedPresentationReview(credentials: [.init(queryID: option.queryID,
+            let prepared = ReviewedPresentationClaims(credentials: [.init(queryID: option.queryID,
                 credentialID: option.credentialID, format: option.format, claimsJSON: claimsJSON, wholeCredential: false,
                 locations: ["[]", #"["name"]"#].map {
                     .init(sourcePathJSON: $0, receivedPathJSON: $0, sharedBy: [], alwaysCarried: true)

@@ -131,7 +131,7 @@ Point a wallet at a test environment with `baseUrl` (Enterprise API origin), `se
 Kotlin:
 
 ```kotlin
-MobileWalletConfig(
+WalletConfiguration(
     walletId = "consumer-wallet",
     walletProvider = WalletProviderConfig(
         baseUrl = "https://{org}.enterprise-sandbox.waltid.dev",

@@ -77,7 +77,7 @@ final class SharingReviewModelTests: XCTestCase {
         let off = effectivePrepared(#"{"employment":{"job_title":"Engineer"}}"#)
         let on = effectivePrepared(#"{"employment":{"job_title":"Engineer","salary":{"amount":0,"eligible":false,"until":null}}}"#)
         let key = PresentationDisclosureSelection(queryID: "employee", credentialID: "one", path: #""employment"."salary""#)
-        func salary(_ prepared: PreparedPresentationReview, selected: Bool) throws -> EffectiveClaimNode {
+        func salary(_ prepared: ReviewedPresentationClaims, selected: Bool) throws -> EffectiveClaimNode {
             let tree = try effectiveReview(prepared, option, disclosures: selected ? [key] : []).contributions[0].nodes.sharingSection(always: false)
             return try XCTUnwrap(tree.first { $0.label == "Employment" }?.children.first { $0.label == "Salary" })
         }
@@ -105,7 +105,7 @@ final class SharingReviewModelTests: XCTestCase {
         let option = effectiveOption()
         for locations in [[], [.init(sourcePathJSON: "[null]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true)],
                           [.init(sourcePathJSON: "[]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true)]] as [[PresentationClaimLocation]] {
-            let prepared = PreparedPresentationReview(credentials: [.init(queryID: "employee", credentialID: "one",
+            let prepared = ReviewedPresentationClaims(credentials: [.init(queryID: "employee", credentialID: "one",
                 format: option.format, claimsJSON: #"{"name":"Maya"}"#, wholeCredential: false, locations: locations)])
             XCTAssertThrowsError(try effectiveReview(prepared, option))
         }
@@ -209,13 +209,13 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    private func effectiveReview(_ prepared: PreparedPresentationReview, _ option: PresentationCredentialOption,
+    private func effectiveReview(_ prepared: ReviewedPresentationClaims, _ option: PresentationCredentialOption,
                                  disclosures: Set<PresentationDisclosureSelection> = []) throws -> EffectivePresentationReview {
         try .init(prepared: prepared, model: .init(request: .init(requester: nil), credentialOptions: [option]),
             selection: .init(credentials: [option.selection], disclosures: disclosures))
     }
 
-    private func effectivePrepared(_ claims: String) -> PreparedPresentationReview {
+    private func effectivePrepared(_ claims: String) -> ReviewedPresentationClaims {
         var locations: [PresentationClaimLocation] = []
         func encoded(_ path: [ClaimPathExpression.Segment]) -> String {
             let values: [Any] = path.map { switch $0 { case .key(let key): return key; case .index(let index): return index; case .wildcard: return NSNull() } }
@@ -326,8 +326,8 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertNil(review.request.requester)
     }
 
-    func testAnnexCReviewIsHeadedByTheVerifiedOriginTheWalletWillBindTheResponseTo() {
-        let review = annexCPreview(verifiedOrigin: "https://reader.example").sharingReview()
+    func testAnnexCReviewIsHeadedByTheVerifiedOriginTheWalletWillBindTheResponseTo() throws {
+        let review = try annexCPreview(verifiedOrigin: "https://reader.example").sharingReview()
         let requester = try? XCTUnwrap(review.request.requester)
 
         XCTAssertEqual(requester?.fallbackName, "https://reader.example")
@@ -342,8 +342,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testTheReviewDoesNotReinterpretTheOriginTheKMPCanonicalizerReturned() {
-        let review = annexCPreview(verifiedOrigin: "https://Reader.Example:443/").sharingReview()
+    func testTheReviewDoesNotReinterpretTheOriginTheKMPCanonicalizerReturned() throws {
+        let review = try annexCPreview(verifiedOrigin: "https://Reader.Example:443/").sharingReview()
 
         XCTAssertEqual(
             review.request.requester?.verifiedOrigin,
@@ -352,8 +352,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testAnOriginThatHeadsTheRequesterSectionIsCaptionedAsVerifiedAndNotRepeated() {
-        let requester = annexCPreview(verifiedOrigin: "https://reader.example").sharingReview().request.requester
+    func testAnOriginThatHeadsTheRequesterSectionIsCaptionedAsVerifiedAndNotRepeated() throws {
+        let requester = try annexCPreview(verifiedOrigin: "https://reader.example").sharingReview().request.requester
 
         XCTAssertEqual(requester?.identityName, "https://reader.example")
         XCTAssertEqual(
@@ -404,10 +404,10 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testAnUnauthenticatedReaderIsReportedAsAnonymousRatherThanAsAFailure() {
+    func testAnUnauthenticatedReaderIsReportedAsAnonymousRatherThanAsAFailure() throws {
         XCTAssertEqual(ReaderTrust.notAuthenticated.sharingReaderTrust(), .notAuthenticated)
         XCTAssertEqual(
-            annexCPreview(readerTrust: .notAuthenticated).sharingReview().request.readerTrust,
+            try annexCPreview(readerTrust: .notAuthenticated).sharingReview().request.readerTrust,
             .notAuthenticated
         )
     }
@@ -421,25 +421,25 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertNotEqual(ReaderTrust.pendingRawRequest.sharingReaderTrust(), .notAuthenticated)
     }
 
-    func testAnUntrustedReaderCarriesTheTrustPolicyReasonRatherThanASignatureVerdict() {
+    func testAnUntrustedReaderCarriesTheTrustPolicyReasonRatherThanASignatureVerdict() throws {
         XCTAssertEqual(
             ReaderTrust.untrusted(reason: "No configured trust anchor").sharingReaderTrust(),
             .untrusted(reason: "No configured trust anchor")
         )
         XCTAssertEqual(
-            annexCPreview(readerTrust: .untrusted(reason: "No configured trust anchor"))
+            try annexCPreview(readerTrust: .untrusted(reason: "No configured trust anchor"))
                 .sharingReview().request.readerTrust,
             .untrusted(reason: "No configured trust anchor")
         )
     }
 
-    func testATrustedReaderCarriesTheIdentityTheWalletCanVouchFor() {
+    func testATrustedReaderCarriesTheIdentityTheWalletCanVouchFor() throws {
         XCTAssertEqual(
             ReaderTrust.trusted(certificateSubject: "CN=Reader").sharingReaderTrust(),
             .trusted(readerIdentity: "CN=Reader")
         )
         XCTAssertEqual(
-            annexCPreview(readerTrust: .trusted(certificateSubject: "CN=Reader"))
+            try annexCPreview(readerTrust: .trusted(certificateSubject: "CN=Reader"))
                 .sharingReview().request.readerTrust,
             .trusted(readerIdentity: "CN=Reader")
         )
@@ -488,8 +488,8 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(SharingEncryptionMechanism.jwe.displayName, "JWE encrypted response")
     }
 
-    func testAnnexCReportsTheHPKESuiteISO180137MandatesRatherThanAskingWhetherEncryptionWasRequested() {
-        let review = annexCPreview().sharingReview()
+    func testAnnexCReportsTheHPKESuiteISO180137MandatesRatherThanAskingWhetherEncryptionWasRequested() throws {
+        let review = try annexCPreview().sharingReview()
 
         XCTAssertEqual(
             review.request.responseProtection,
@@ -597,8 +597,8 @@ final class SharingReviewModelTests: XCTestCase {
         return try XCTUnwrap(PaymentReviewState.ready(consent).displays(transactions: []).first)
     }
 
-    func testAnnexCHasNoTransactionDataAndNoOpenIDRequestParametersToShow() {
-        let review = annexCPreview().sharingReview()
+    func testAnnexCHasNoTransactionDataAndNoOpenIDRequestParametersToShow() throws {
+        let review = try annexCPreview().sharingReview()
 
         XCTAssertTrue(review.request.transactionData.isEmpty)
         XCTAssertEqual(
@@ -625,7 +625,7 @@ final class SharingReviewModelTests: XCTestCase {
     }
 
     func testARejectedRequestStillDescribesWhoAskedSoTheUserCanDecideWhetherToNotifyThem() {
-        let request = PresentationRequestContext(
+        let request = PartialPresentationRequest(
             clientID: "https://verifier.example",
             requestAuthentication: .unauthenticated,
             responseEncryption: .notRequired,
@@ -645,8 +645,8 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Credential requirements and disclosures
 
-    func testAnnexCRequestsEveryListedDocumentSoEachOneIsItsOwnRequirement() {
-        let review = annexCPreview(
+    func testAnnexCRequestsEveryListedDocumentSoEachOneIsItsOwnRequirement() throws {
+        let review = try annexCPreview(
             documentTypes: ["org.iso.18013.5.1.mDL", "eu.europa.ec.eudi.pid.1"],
             credentialOptions: [
                 option(queryID: "annexC.0", credentialID: "cred-mdl"),
@@ -670,8 +670,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testAnnexCDisclosuresAreReviewedThroughTheNormalRequestedDisclosureVocabulary() {
-        let review = annexCPreview(credentialOptions: [
+    func testAnnexCDisclosuresAreReviewedThroughTheNormalRequestedDisclosureVocabulary() throws {
+        let review = try annexCPreview(credentialOptions: [
             option(
                 queryID: "annexC.0",
                 credentialID: "cred-mdl",
@@ -880,7 +880,7 @@ final class SharingReviewModelTests: XCTestCase {
     ) -> PresentationPreview {
         PresentationPreview(
             previewHandle: try! PresentationPreviewHandle(value: "preview"),
-            request: PresentationRequestInfo(
+            request: PresentationRequest(
                 clientID: "https://verifier.example",
                 requestAuthentication: .unauthenticated,
                 nonce: "nonce-456",

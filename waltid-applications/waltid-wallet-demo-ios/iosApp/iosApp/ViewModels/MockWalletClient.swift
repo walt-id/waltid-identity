@@ -29,7 +29,7 @@ actor MockWalletClient: WalletClient {
     private let transactionCodeRequired: Bool
     private let issuanceGrant: IssuanceGrant
     private let presentationPreviewResultOverride: PresentationPreviewResult?
-    private let claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview)?
+    private let claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> ReviewedPresentationClaims)?
     nonisolated var supportsClaimReview: Bool { claimPreparation != nil }
     private(set) var submittedClaimSelections: [[PresentationDisclosureSelection]] = []
     private let paymentConsent: @Sendable () async throws -> PaymentConsent?
@@ -55,7 +55,7 @@ actor MockWalletClient: WalletClient {
         transactionCodeRequired: Bool = false,
         issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         presentationPreviewResult: PresentationPreviewResult? = nil,
-        claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview)? = nil,
+        claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> ReviewedPresentationClaims)? = nil,
         paymentConsent: @escaping @Sendable () async throws -> PaymentConsent? = { nil },
         paymentTransaction: Bool = true,
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
@@ -230,10 +230,10 @@ actor MockWalletClient: WalletClient {
         return .ready(
             PresentationPreview(
                 previewHandle: try PresentationPreviewHandle(value: "mock-presentation-preview"),
-                request: previewRequestInfo,
+                request: try previewRequest(),
                 credentialOptions: emptyPresentationOptions ? [] : (duplicatePresentationOptions ? try makeDuplicateOptions() : [try makeDefaultOption()]),
                 credentialRequirements: [
-                    PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
+                    try PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
                 ]
             )
         )
@@ -241,7 +241,7 @@ actor MockWalletClient: WalletClient {
 
     func reviewPresentation(previewHandle: PresentationPreviewHandle,
                             selectedCredentialOptions: [PresentationCredentialSelection],
-                            selectedDisclosureOptions: [PresentationDisclosureSelection], did: String?) async throws -> PreparedPresentationReview {
+                            selectedDisclosureOptions: [PresentationDisclosureSelection], did: String?) async throws -> ReviewedPresentationClaims {
         guard let claimPreparation else { throw WalletError.invalidInput("Claim review unavailable") }
         return try await claimPreparation(selectedCredentialOptions, selectedDisclosureOptions)
     }
@@ -352,8 +352,8 @@ actor MockWalletClient: WalletClient {
         try await Task.sleep(nanoseconds: operationDelayNanoseconds)
     }
 
-    private var previewRequestInfo: PresentationRequestInfo {
-        PresentationRequestInfo(
+    private func previewRequest() throws -> PresentationRequest {
+        try PresentationRequest(
             clientID: verifierClientID,
             requestAuthentication: .unauthenticated,
             nonce: "nonce-456",
@@ -405,7 +405,7 @@ actor MockWalletClient: WalletClient {
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
-    private static let paymentAuthorizationTransactionData = PresentationTransactionData(
+    private static let paymentAuthorizationTransactionData = try! PresentationTransactionData(
         type: "org.waltid.transaction-data.payment-authorization",
         displayName: "Payment Authorization",
         credentialQueryIDs: ["pid"],

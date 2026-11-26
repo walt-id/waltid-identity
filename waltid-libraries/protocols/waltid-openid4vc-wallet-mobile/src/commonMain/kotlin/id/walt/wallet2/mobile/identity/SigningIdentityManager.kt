@@ -16,7 +16,6 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
-import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
@@ -30,7 +29,6 @@ import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.mobile.MobileWalletLifecycle
-import id.walt.wallet2.mobile.identity.MobileDidSupport
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
@@ -128,7 +126,7 @@ public class SigningIdentityManager internal constructor(
             val recovery = material?.let { RecoveryRecord(
                 identityId = id, keyId = keyId, did = registered.did, publicJwk = publicJwk,
                 secret = RecoverySecret.Exported(it.data.toByteArray().decodeToString()),
-                constraints = recoveryConstraints(preparing),
+                constraints = configuration.recoveryConstraints(preparing),
             ) }
             val identity = describe(preparing, registered.did, publicJwk, key)
             proveOriginalKey(key, publicJwk)
@@ -205,7 +203,7 @@ public class SigningIdentityManager internal constructor(
             val receipt = submit(provider, reference.recordId, recovery, record)
             val updated = identity.copy(recovery = SigningIdentityRecoveryState.Submitted(reference, receipt))
             journal.write(record.copy(identity = updated, recovery = retained(recovery), backup = reference,
-                recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = requiredConfirmation(record)))
+                recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = configuration.requiredConfirmation(record)))
             SigningIdentityOperationResult.Active(updated)
         } catch (cause: CancellationException) { throw cause }
         catch (cause: Exception) { failed(recoveryProviderFailure(cause)) }
@@ -424,7 +422,7 @@ public class SigningIdentityManager internal constructor(
                 ?: return null
             RecoveryRecord(identityId = identity.id, keyId = identity.keyId, did = identity.did,
                 publicJwk = identity.publicJwk, secret = RecoverySecret.Exported(exported.data.toByteArray().decodeToString()),
-                constraints = recoveryConstraints(record))
+                constraints = configuration.recoveryConstraints(record))
                 .also {
                     val bytes = it.encode()
                     try { decodeRecovery(bytes, identity.id) } finally { bytes.fill(0) }
@@ -457,21 +455,10 @@ public class SigningIdentityManager internal constructor(
         if (attestation is SigningIdentityAttestationRequest.Native && (importing || storage != SigningIdentityKeyStorage.HardwareBacked)) false
         else if (configuration.policy == SigningIdentityKeyPolicy.HardwareGenerated && (importing || storage != SigningIdentityKeyStorage.HardwareBacked)) false
         else if (storage == SigningIdentityKeyStorage.EncryptedDatabase) authorization == KeyUseAuthorizationPolicy.None
-        else if (!nativeSettingsPermitIdentitySigning()) false
+        else if (!configuration.permitsNativeSigning()) false
         else requirements(storage, authorization, attestation).let { required ->
             native.preflight(required) is KeyUseAuthorizationSupport.Supported && (!importing || native.supportsPrivateKeyImport(required))
         }
-    }
-
-    private fun nativeSettingsPermitIdentitySigning(): Boolean {
-        val settings = configuration.platform as? PlatformKeyConfiguration.AndroidKeystore ?: return true
-        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
-        // Identity signatures cover protocol bytes. Protected Confirmation requires signing its own CBOR structure.
-        if (settings.userConfirmationRequired || settings.userPresenceRequired) return false
-        // Activation consumes one signature to prove possession of the original public key.
-        if (settings.maxUsageCount == 1) return false
-        if (settings.validFromEpochMillis?.let { it > now } == true || settings.validUntilEpochMillis?.let { it <= now } == true) return false
-        return true
     }
 
     private fun requirements(storage: SigningIdentityKeyStorage, authorization: KeyUseAuthorizationPolicy = this.authorization,
@@ -568,23 +555,15 @@ public class SigningIdentityManager internal constructor(
             val returned = provider.retrieve(id)?.copyBytes()
             try { check(returned != null && returned.contentEquals(expected)) { "Provider did not preserve the recovery record" } }
             finally { returned?.fill(0) }
-            if (requiredConfirmation(record) == RecoveryConfirmation.ProviderConfirmation) {
+            if (configuration.requiredConfirmation(record) == RecoveryConfirmation.ProviderConfirmation) {
                 if (receipt != RecoveryReceipt.ConfirmedByProvider) throw IdentityProviderException(IdentityProviderFailure.ConfirmationPending)
             }
             return receipt
         } finally { expected.fill(0) }
     }
 
-    private fun recoveryConstraints(record: IdentityRecord) = RecoveryConstraints(
-        record.storage, record.requirements.authorizationPolicy, requiredConfirmation(record))
-
-    private fun requiredConfirmation(record: IdentityRecord): RecoveryConfirmation =
-        if (configuration.recoveryConfirmation == RecoveryConfirmation.ProviderConfirmation ||
-            record.recoveryConfirmation == RecoveryConfirmation.ProviderConfirmation) RecoveryConfirmation.ProviderConfirmation
-        else RecoveryConfirmation.LocalAcceptance
-
     private fun activate(record: IdentityRecord): SigningIdentityOperationResult.Active =
-        SigningIdentityOperationResult.Active(journal.activate(record, retained(record.recovery), requiredConfirmation(record)))
+        SigningIdentityOperationResult.Active(journal.activate(record, retained(record.recovery), configuration.requiredConfirmation(record)))
 
     private suspend fun currentState(): SigningIdentityState {
         val record = journal.read()

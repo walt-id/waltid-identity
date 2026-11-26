@@ -17,7 +17,7 @@ public extension PresentationPreview {
     }
 }
 
-public extension PresentationRequestInfo {
+public extension PresentationRequest {
     /// The request concepts of a normal OpenID4VP presentation request.
     func sharingRequest() -> SharingRequest {
         SharingRequest(
@@ -37,7 +37,7 @@ public extension PresentationRequestInfo {
     }
 }
 
-public extension PresentationRequestContext {
+public extension PartialPresentationRequest {
     /// The request concepts of an OpenID4VP request the wallet refuses to satisfy.
     ///
     /// A rejected request still deserves a review surface: the user has to see who asked before
@@ -65,8 +65,8 @@ public extension PresentationRequestContext {
 /// and disclosure components every other transport uses, which is what makes them comparable.
 public extension AnnexCPresentationPreview {
     /// The review the user is shown for this Annex C presentation request.
-    func sharingReview() -> SharingReviewModel {
-        SharingReviewModel(
+    func sharingReview() throws -> SharingReviewModel {
+        try SharingReviewModel(
             request: SharingRequest(
                 // Annex C proves an origin and nothing else about the caller, so the origin both
                 // heads the section and stays labelled as the verified fact it is.
@@ -99,7 +99,7 @@ public extension AnnexCPresentationPreview {
             credentialRequirements: credentialOptions
                 .map(\.queryID)
                 .distinctPreservingOrder()
-                .map { PresentationCredentialRequirement(options: [[$0]]) }
+                .map { try PresentationCredentialRequirement(options: [[$0]]) }
         )
     }
 

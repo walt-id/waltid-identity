@@ -11,7 +11,7 @@ import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.provider.PendingIntentHandler
 import androidx.credentials.provider.ProviderGetCredentialRequest
 import androidx.credentials.registry.provider.selectedCredentialSet
-import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.Wallet
 import id.waltid.openid4vp.wallet.DcApiWallet
 import java.security.MessageDigest
 import kotlinx.serialization.json.Json
@@ -28,7 +28,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * @property providerRequest Original Credential Manager request needed to complete the response.
  */
 public data class AndroidDigitalCredentialProviderInput(
-    public val request: MobileWalletDigitalCredentialRequest,
+    public val request: DigitalCredentialRequest,
     public val providerRequest: ProviderGetCredentialRequest,
 )
 
@@ -41,7 +41,7 @@ public object AndroidDigitalCredentialProvider {
      * package and signing certificate match [privilegedAppsJson].
      *
      * A selected credential set is mandatory: continuing without one would produce an empty
-     * `selectedRegistryEntryIds`, which [MobileWallet.previewDigitalCredentialPresentation] reads as
+     * `selectedRegistryEntryIds`, which [Wallet.previewDigitalCredentialPresentation] reads as
      * "match the whole wallet".
      */
     public fun extract(
@@ -93,7 +93,7 @@ public object AndroidDigitalCredentialProvider {
      */
     public fun setResponse(
         resultIntent: Intent,
-        response: MobileWalletDigitalCredentialResponse,
+        response: DigitalCredentialResponse,
         providerRequest: ProviderGetCredentialRequest,
     ) {
         val responseJson = Json.encodeToString(
@@ -136,7 +136,7 @@ public object AndroidDigitalCredentialProvider {
         requestJson: String,
         verifiedOrigin: String,
         selection: MatcherSelectedRequest,
-    ): MobileWalletDigitalCredentialRequest {
+    ): DigitalCredentialRequest {
         val requestObject = Json.parseToJsonElement(requestJson).jsonObject
         val requests = requestObject["requests"] as? JsonArray
         val protocolRequests = when {
@@ -194,7 +194,7 @@ public object AndroidDigitalCredentialProvider {
         require(selection.registryEntryIds.isNotEmpty()) {
             "Credential Manager reported a selection with no registry entries"
         }
-        return MobileWalletDigitalCredentialRequest(
+        return DigitalCredentialRequest(
             protocol = protocol,
             dataJson = Json.encodeToString(JsonObject.serializer(), data),
             verifiedOrigin = verifiedOrigin,
@@ -277,7 +277,7 @@ public object AndroidDigitalCredentialProvider {
         }
         val annexCParts = credentialId.split(' ', limit = 3)
         return if (annexCParts.size == 3 && annexCParts[0].toIntOrNull() != null &&
-            annexCParts[1] == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C
+            annexCParts[1] == DigitalCredentialProtocols.ISO_MDOC_ANNEX_C
         ) {
             MatcherCredentialSelection(
                 registryEntryId = annexCParts[2],
@@ -296,9 +296,9 @@ public object AndroidDigitalCredentialProvider {
      * fulfill, and never redirects one protocol to another.
      */
     private val supportedProtocols = setOf(
-        MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
-        MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
-        MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+        DigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+        DigitalCredentialProtocols.OPENID4VP_SIGNED,
+        DigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
     )
 
     /**

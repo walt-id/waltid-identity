@@ -24,7 +24,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     var events: AsyncStream<WalletEvent> {
         AsyncStream(bufferingPolicy: .bufferingNewest(42)) { continuation in
             let task = Task { [self] in
-                let flow = SkieSwiftFlow<MobileWalletEvent>(
+                let flow = SkieSwiftFlow<WalletCore.WalletEvent>(
                     SkieKotlinFlow(bridge.events)
                 )
 
@@ -84,7 +84,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         guard let count = Int32(exactly: count), count > 0 else { throw WalletError.invalidInput("Holder key count must be a positive 32-bit integer") }
         let result = try await bridge.createIssuanceHolderKeys(count: count, keyType: keyType.toKMPKeyType(),
             didMethod: didMethod, keyUseAuthorizationPolicy: policy.toKMPAuthorizationPolicy())
-        return try requiredBridgeArray(Self.successAnyValue(result, operation: "create issuance holder keys"), of: MobileWalletHolderBinding.self)
+        return try requiredBridgeArray(Self.successAnyValue(result, operation: "create issuance holder keys"), of: WalletCore.IssuanceHolderBinding.self)
             .map { IssuanceHolderBinding(keyID: $0.keyId, did: $0.did) }
     }
 
@@ -96,8 +96,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
 
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceOfferReview {
         let result = try await bridge.startIssuance(
-            request: MobileWalletIssuanceRequest(
-                offer: MobileWalletCredentialOfferUri(value: request.offer.absoluteString),
+            request: WalletCore.IssuanceRequest(
+                offer: WalletCore.CredentialOfferInputUri(value: request.offer.absoluteString),
                 keyId: request.keyID,
                 did: request.did,
                 keyPolicy: request.keyPolicy.toKMPSigningIdentityPolicy()
@@ -238,7 +238,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         let result = try await bridge.previewPresentation(requestUrl: request.absoluteString)
         let value = try Self.successValue(
             result,
-            as: MobileWalletPresentationPreviewResult.self,
+            as: WalletCore.PresentationPreviewResult.self,
             operation: "preview presentation"
         )
 
@@ -251,12 +251,12 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         did: String?, owner: Wallet
     ) async throws -> PresentationReview {
         let result = try await bridge.reviewPresentation(
-            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
+            previewHandle: WalletCore.PresentationPreviewHandle(value: previewHandle.value),
             selection: selection.toKMP(),
             did: did
         )
         let value = try Self.successValue(result, as: WalletBridgePresentationReview.self, operation: "review presentation")
-        let claims = PreparedPresentationReview(credentials: value.claims.credentials.map { claim in
+        let claims = ReviewedPresentationClaims(credentials: value.claims.credentials.map { claim in
             PresentationCredentialClaims(queryID: claim.queryId, credentialID: claim.credentialId, format: claim.format,
                 claimsJSON: claim.claimsJson, wholeCredential: claim.wholeCredential, locations: claim.locations.map {
                     PresentationClaimLocation(sourcePathJSON: $0.sourcePathJson, receivedPathJSON: $0.receivedPathJson,
@@ -266,7 +266,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         let statuses = try decodeCredentialStatusSnapshot(value.statusJson).credentials
         return PresentationReview(claims: claims, statuses: statuses, payment: value.payment?.toSwiftPaymentConsent(), owner: owner) { [self] in
             let result = try await bridge.submitReviewedPresentation(review: value)
-            return try Self.successValue(result, as: MobileWalletPresentationResult.self, operation: "submit reviewed presentation").toSwiftPresentationResult()
+            return try Self.successValue(result, as: WalletCore.PresentationResult.self, operation: "submit reviewed presentation").toSwiftPresentationResult()
         }
     }
 
@@ -276,13 +276,13 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         errorDescription: String?
     ) async throws -> PresentationResult {
         let result = try await bridge.rejectPresentation(
-            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value),
+            previewHandle: WalletCore.PresentationPreviewHandle(value: previewHandle.value),
             errorCode: error?.toKMPErrorCode(),
             errorDescription: errorDescription
         )
         let value = try Self.successValue(
             result,
-            as: MobileWalletPresentationResult.self,
+            as: WalletCore.PresentationResult.self,
             operation: "reject presentation"
         )
 
@@ -291,7 +291,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
 
     func discardPresentationPreview(_ previewHandle: PresentationPreviewHandle) async throws {
         let result = try await bridge.discardPresentationPreview(
-            previewHandle: MobileWalletPresentationPreviewHandle(value: previewHandle.value)
+            previewHandle: WalletCore.PresentationPreviewHandle(value: previewHandle.value)
         )
         _ = try Self.successAnyValue(result, operation: "discard presentation preview")
     }
@@ -333,7 +333,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         selectedRegistryEntryIDs: [String]
     ) async throws -> AnnexCPresentationPreview {
         let result = try await bridge.previewAnnexCPresentation(
-            request: MobileWalletAnnexCRequest(
+            request: WalletCore.AnnexCRequest(
                 parsedRequest: parsedRequest.toKMPParsedRequest(),
                 verifiedOrigin: verifiedOrigin,
                 selectedRegistryEntryIds: selectedRegistryEntryIDs,
@@ -343,7 +343,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         return try Self.successValue(
             result,
-            as: MobileWalletAnnexCPreview.self,
+            as: WalletCore.AnnexCPreview.self,
             operation: "preview Annex C presentation"
         ).toSwiftPreview()
     }
@@ -355,7 +355,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         let value = try Self.successValue(
             result,
-            as: MobileWalletDigitalCredentialResponse.self,
+            as: WalletCore.DigitalCredentialResponse.self,
             operation: "submit Annex C presentation"
         )
         return DigitalCredentialResponse(protocolIdentifier: value.protocol, dataJSON: value.dataJson)
@@ -367,7 +367,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         let value = try Self.successValue(
             result,
-            as: MobileWalletDigitalCredentialResponse.self,
+            as: WalletCore.DigitalCredentialResponse.self,
             operation: "submit Annex C presentation"
         )
         return DigitalCredentialResponse(protocolIdentifier: value.protocol, dataJSON: value.dataJson)
@@ -421,10 +421,10 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
 
 
 private extension PresentationSelection {
-    func toKMP() -> MobileWalletPresentationSelection {
-        MobileWalletPresentationSelection(
-            credentials: credentials.map { MobileWalletPresentationCredentialSelection(queryId: $0.queryID, credentialId: $0.credentialID) },
-            disclosures: disclosures?.map { MobileWalletPresentationDisclosureSelection(queryId: $0.queryID, credentialId: $0.credentialID, path: $0.path) }
+    func toKMP() -> WalletCore.PresentationSelection {
+        WalletCore.PresentationSelection(
+            credentials: credentials.map { WalletCore.PresentationCredentialSelection(queryId: $0.queryID, credentialId: $0.credentialID) },
+            disclosures: disclosures?.map { WalletCore.PresentationDisclosureSelection(queryId: $0.queryID, credentialId: $0.credentialID, path: $0.path) }
         )
     }
 }

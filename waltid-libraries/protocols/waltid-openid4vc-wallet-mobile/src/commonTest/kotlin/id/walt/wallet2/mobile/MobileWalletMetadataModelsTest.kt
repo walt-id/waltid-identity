@@ -1,7 +1,7 @@
 package id.walt.wallet2.mobile
 
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.wallet2.mobile.presentation.MobileWalletResponseEncryption
+import id.walt.wallet2.mobile.presentation.PresentationResponseEncryption
 import id.walt.wallet2.mobile.presentation.toMobileResponseEncryption
 import id.walt.wallet2.mobile.presentation.toMobileVerifierMetadata
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
@@ -34,11 +34,11 @@ class MobileWalletMetadataModelsTest {
     @Test
     fun responseEncryptionMapsToTypedMobileStates() {
         assertEquals(
-            MobileWalletResponseEncryption.NotRequired,
+            PresentationResponseEncryption.NotRequired,
             null.toMobileResponseEncryption(),
         )
         assertEquals(
-            MobileWalletResponseEncryption.Required(
+            PresentationResponseEncryption.Required(
                 keyManagementAlgorithm = "ECDH-ES",
                 contentEncryptionAlgorithm = "A256GCM",
                 verifierKeyId = "verifier-key-1",

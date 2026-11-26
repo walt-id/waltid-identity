@@ -18,14 +18,14 @@ final class IssuanceBridgeContractTests: XCTestCase {
         let core = try selection.toKMPSelection()
         XCTAssertEqual(core.credentialConfigurationId, "identity")
         XCTAssertEqual(core.credentialIdentifier, "dataset-a")
-        XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersExisting).bindings.map(\.keyId), ["first", "second"])
-        XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersExisting).bindings.map(\.did), ["did:key:first", nil])
+        XCTAssertEqual((core.holders as! WalletCore.IssuanceHoldersExisting).bindings.map(\.keyId), ["first", "second"])
+        XCTAssertEqual((core.holders as! WalletCore.IssuanceHoldersExisting).bindings.map(\.did), ["did:key:first", nil])
     }
 
     func testGeneratedSelectionPreservesCountAndRejectsInvalidNativeCounts() throws {
         let selection = try IssuanceCredentialSelection(configurationID: "identity", holders: .newKeys(count: 2))
         let core = try selection.toKMPSelection()
-        XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersNewKeys).count, 2)
+        XCTAssertEqual((core.holders as! WalletCore.IssuanceHoldersNewKeys).count, 2)
         for count in [0, -1, Int.max] {
             XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", holders: .newKeys(count: count)).toKMPSelection())
         }
@@ -113,7 +113,7 @@ final class IssuanceBridgeContractTests: XCTestCase {
         guard case let .failed(_, _, _, handles) = try core.toSwiftIssuanceOutcome() else {
             return XCTFail("Expected local save recovery")
         }
-        XCTAssertEqual(handles.map(\.id), ["local-save"])
+        XCTAssertEqual(handles.map(\.id.rawValue), ["local-save"])
         XCTAssertNil(handles.first?.credentialConfigurationID)
         XCTAssertNil(handles.first?.credentialIdentifier)
     }

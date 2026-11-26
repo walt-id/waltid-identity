@@ -2,19 +2,19 @@ package id.walt.walletdemo.compose.logic
 
 import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.readertrust.ReaderTrustDecision
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCDocumentRequest
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCParsedRequest
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCPreview
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialPreview
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequestInfo
-import id.walt.wallet2.mobile.presentation.MobileWalletMetadataDisplay
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
+import id.walt.wallet2.mobile.digitalcredentials.AnnexCDocumentRequest
+import id.walt.wallet2.mobile.digitalcredentials.AnnexCParsedRequest
+import id.walt.wallet2.mobile.digitalcredentials.AnnexCPreview
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialPreview
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialRequestInfo
+import id.walt.wallet2.mobile.presentation.MetadataDisplay
+import id.walt.wallet2.mobile.presentation.PresentationCredentialOption
 import id.walt.wallet2.mobile.presentation.DisclosureDisposition
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationDisclosure
-import id.walt.wallet2.mobile.credentials.MobileWalletCredential
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletReaderAuthentication
-import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataItem
-import id.walt.wallet2.mobile.presentation.MobileWalletVerifierMetadata
+import id.walt.wallet2.mobile.presentation.PresentationDisclosure
+import id.walt.wallet2.mobile.credentials.WalletCredential
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialReaderAuthentication
+import id.walt.wallet2.mobile.presentation.PresentationTransactionData
+import id.walt.wallet2.mobile.presentation.VerifierMetadata
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -155,8 +155,8 @@ class MobileDigitalCredentialSharingReviewTest {
     @Test
     fun verifierMetadataOutranksTheOriginAsRequesterIdentity() {
         val review = digitalCredentialPreview(
-            verifierMetadata = MobileWalletVerifierMetadata(
-                display = MobileWalletMetadataDisplay(
+            verifierMetadata = VerifierMetadata(
+                display = MetadataDisplay(
                     name = "Example Verifier",
                     locale = null,
                     logoUri = null,
@@ -243,16 +243,16 @@ class MobileDigitalCredentialSharingReviewTest {
     fun annexCReaderTrustStatesMapOntoReviewStates() {
         assertEquals(
             WalletDemoReaderTrust.NotAuthenticated,
-            annexCPreview(MobileWalletReaderAuthentication.NOT_AUTHENTICATED).toSharingReview().request.readerTrust,
+            annexCPreview(DigitalCredentialReaderAuthentication.NOT_AUTHENTICATED).toSharingReview().request.readerTrust,
         )
         assertEquals(
             WalletDemoReaderTrust.PendingVerification,
-            annexCPreview(MobileWalletReaderAuthentication.PENDING_RAW_REQUEST).toSharingReview().request.readerTrust,
+            annexCPreview(DigitalCredentialReaderAuthentication.PENDING_RAW_REQUEST).toSharingReview().request.readerTrust,
         )
         assertEquals(
             WalletDemoReaderTrust.Untrusted("No reader trust policy is configured"),
             annexCPreview(
-                MobileWalletReaderAuthentication.VERIFIED,
+                DigitalCredentialReaderAuthentication.VERIFIED,
                 ReaderTrustDecision(ReaderTrustState.VALID_BUT_UNTRUSTED, reason = "No reader trust policy is configured"),
             )
                 .toSharingReview().request.readerTrust,
@@ -260,7 +260,7 @@ class MobileDigitalCredentialSharingReviewTest {
         assertEquals(
             WalletDemoReaderTrust.Trusted("CN=Example Reader"),
             annexCPreview(
-                MobileWalletReaderAuthentication.VERIFIED,
+                DigitalCredentialReaderAuthentication.VERIFIED,
                 ReaderTrustDecision(ReaderTrustState.TRUSTED, displayName = "CN=Example Reader"),
             ).toSharingReview().request.readerTrust,
         )
@@ -272,7 +272,7 @@ class MobileDigitalCredentialSharingReviewTest {
      */
     @Test
     fun annexCReviewStatesItsFixedEncryptionAndRequestedDocuments() {
-        val review = annexCPreview(MobileWalletReaderAuthentication.NOT_AUTHENTICATED).toSharingReview()
+        val review = annexCPreview(DigitalCredentialReaderAuthentication.NOT_AUTHENTICATED).toSharingReview()
 
         val encryption = review.request.responseProtection
         assertTrue(encryption is WalletDemoSharingResponseProtection.Encrypted, "expected encryption, got $encryption")
@@ -290,7 +290,7 @@ class MobileDigitalCredentialSharingReviewTest {
     @Test
     fun annexCRequiresOneCredentialPerRequestedDocument() {
         val review = annexCPreview(
-            readerAuthentication = MobileWalletReaderAuthentication.NOT_AUTHENTICATED,
+            readerAuthentication = DigitalCredentialReaderAuthentication.NOT_AUTHENTICATED,
             credentialOptions = listOf(
                 credentialOption(queryId = MDL_DOC_TYPE, credentialId = "credential-1"),
                 credentialOption(queryId = PHOTO_ID_DOC_TYPE, credentialId = "credential-2"),
@@ -314,17 +314,17 @@ class MobileDigitalCredentialSharingReviewTest {
     }
 
     private fun digitalCredentialPreview(
-        transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
-        verifierMetadata: MobileWalletVerifierMetadata? = null,
+        transactionData: List<PresentationTransactionData> = emptyList(),
+        verifierMetadata: VerifierMetadata? = null,
         responseMode: String? = "dc_api",
-        credentialOptions: List<MobileWalletPresentationCredentialOption> = listOf(credentialOption()),
+        credentialOptions: List<PresentationCredentialOption> = listOf(credentialOption()),
         protocol: String = "openid4vp-v1-unsigned",
         clientId: String? = null,
-    ): MobileWalletDigitalCredentialPreview = MobileWalletDigitalCredentialPreview(
+    ): DigitalCredentialPreview = DigitalCredentialPreview(
         requestId = "request-1",
         protocol = protocol,
         verifiedOrigin = "https://verifier.example",
-        request = MobileWalletDigitalCredentialRequestInfo(
+        request = DigitalCredentialRequestInfo(
             clientId = clientId,
             verifierMetadata = verifierMetadata,
             nonce = "nonce-123",
@@ -333,22 +333,22 @@ class MobileDigitalCredentialSharingReviewTest {
         ),
         credentialOptions = credentialOptions,
         credentialRequirements = emptyList(),
-        readerAuthentication = MobileWalletReaderAuthentication.NOT_APPLICABLE,
+        readerAuthentication = DigitalCredentialReaderAuthentication.NOT_APPLICABLE,
         readerTrust = null,
     )
 
     private fun annexCPreview(
-        readerAuthentication: MobileWalletReaderAuthentication,
+        readerAuthentication: DigitalCredentialReaderAuthentication,
         readerTrust: ReaderTrustDecision? = null,
-        credentialOptions: List<MobileWalletPresentationCredentialOption> = listOf(
+        credentialOptions: List<PresentationCredentialOption> = listOf(
             credentialOption(queryId = MDL_DOC_TYPE),
         ),
-    ): MobileWalletAnnexCPreview = MobileWalletAnnexCPreview(
+    ): AnnexCPreview = AnnexCPreview(
         requestId = "request-1",
         verifiedOrigin = "https://verifier.example",
-        parsedRequest = MobileWalletAnnexCParsedRequest(
+        parsedRequest = AnnexCParsedRequest(
             documents = credentialOptions.map { option ->
-                MobileWalletAnnexCDocumentRequest(
+                AnnexCDocumentRequest(
                     docType = option.queryId,
                     namespaces = mapOf(MDL_NAMESPACE to listOf("given_name")),
                 )
@@ -363,11 +363,11 @@ class MobileDigitalCredentialSharingReviewTest {
         queryId: String = "pid",
         credentialId: String = "credential-1",
         metadataJson: String? = null,
-    ): MobileWalletPresentationCredentialOption = MobileWalletPresentationCredentialOption(
+    ): PresentationCredentialOption = PresentationCredentialOption(
         queryId = queryId,
-        credential = MobileWalletCredential(credentialId, "mso_mdoc", "{}", issuer = "Test Issuer", label = "Driving licence", metadataJson = metadataJson),
+        credential = WalletCredential(credentialId, "mso_mdoc", "{}", issuer = "Test Issuer", label = "Driving licence", metadataJson = metadataJson),
         disclosures = listOf(
-            MobileWalletPresentationDisclosure(
+            PresentationDisclosure(
                 path = "$MDL_NAMESPACE/given_name",
                 name = "given_name",
                 valueJson = "\"Ada\"",
@@ -380,7 +380,7 @@ class MobileDigitalCredentialSharingReviewTest {
     private fun transactionDataItem(
         displayName: String,
         detailsJson: String,
-    ): MobileWalletTransactionDataItem = MobileWalletTransactionDataItem(
+    ): PresentationTransactionData = PresentationTransactionData(
         type = "org.waltid.transaction-data.${displayName.lowercase().replace(' ', '-')}",
         displayName = displayName,
         credentialQueryIds = listOf("pid"),

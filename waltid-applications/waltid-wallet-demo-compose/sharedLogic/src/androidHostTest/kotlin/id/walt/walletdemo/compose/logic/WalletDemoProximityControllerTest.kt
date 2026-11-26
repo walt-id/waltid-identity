@@ -32,7 +32,7 @@ import id.walt.wallet2.mobile.proximity.ProximityHostActionResult
 import id.walt.wallet2.mobile.proximity.ProximityNfcHandover
 import id.walt.wallet2.mobile.proximity.ProximityProfile
 import id.walt.wallet2.mobile.proximity.ProximityReaderPolicy
-import id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettings
+import id.walt.wallet2.mobile.proximity.trust.ProximityReaderTrustSettings
 import id.walt.wallet2.mobile.proximity.ProximityRemediationAction
 import id.walt.wallet2.mobile.proximity.ProximityRequestedElement
 import id.walt.wallet2.mobile.proximity.ProximityReview

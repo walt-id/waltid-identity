@@ -7,11 +7,12 @@ import WalletSDK
     func setup(_ result: SigningIdentityOperationResult)
     func accept(_ offer: IssuanceOfferPreview) async -> Bool
     func code(_ requirement: IssuanceTransactionCode) async -> String
+    func saveAuthorization(_ id: IssuanceAuthorizationID) async throws
     func browser(_ url: URL) async throws -> URL? // Dismissal returns nil.
     func received(_ outcome: IssuanceOutcome)
     func stored(_ credentials: [Credential])
     func choose(_ preview: PresentationPreview) async -> PresentationSelection
-    func confirm(_ claims: PreparedPresentationReview, _ warnings: [CredentialStatusRecord], _ payment: PaymentConsent?) async -> Bool
+    func confirm(_ claims: ReviewedPresentationClaims, _ warnings: [CredentialStatusRecord], _ payment: PaymentConsent?) async -> Bool
     func deliver(_ result: PresentationResult)
     func reviewChanged()
 }
@@ -55,6 +56,7 @@ import WalletSDK
                 outcome = try await grant.accept(transactionCode: code, clientID: clientID)
             case .authorizationCode(let grant):
                 let authorization = try await grant.beginAuthorization(using: registrationFor(grant.authorizationServer))
+                try await ui.saveAuthorization(authorization.id)
                 if let redirected = try await ui.browser(authorization.request.url) {
                     outcome = try await authorization.complete(redirected)
                 } else {
@@ -93,4 +95,12 @@ import WalletSDK
             }
         }
     }
+}
+
+// Called by the application's redirect handler after opening the same wallet.
+private func completeSavedAuthorization(wallet: Wallet, savedID: String, callback: URL) async throws -> IssuanceOutcome {
+    guard let id = IssuanceAuthorizationID(rawValue: savedID) else {
+        throw WalletError.invalidInput("Invalid saved authorization ID")
+    }
+    return try await wallet.completeAuthorization(id, callback: callback)
 }

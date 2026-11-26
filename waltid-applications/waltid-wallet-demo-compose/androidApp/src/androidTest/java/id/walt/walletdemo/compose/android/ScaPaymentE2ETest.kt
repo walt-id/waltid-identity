@@ -9,7 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import id.walt.mobile.test.backend.DemoTestBackend
-import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.Wallet
 import id.walt.wallet2.mobile.identity.SigningIdentityState
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyProtectionLevel
@@ -35,7 +35,7 @@ import id.walt.mobile.test.PhysicalDeviceTest
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalDigitalCredentialApi::class)
 internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
-    override val wallet: MobileWallet get() = provisionedWallet
+    override val wallet: Wallet get() = provisionedWallet
     override val issuedCredentialIds: Set<String> get() = provisionedCredentialIds
     /** Select this physical class explicitly with -e wallet.sca approve. */
     @Test
@@ -86,7 +86,7 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
     }
 
     companion object {
-        private lateinit var provisionedWallet: MobileWallet
+        private lateinit var provisionedWallet: Wallet
         private lateinit var provisionedCredentialIds: Set<String>
         private const val OPERATOR_TIMEOUT = 180_000L
 

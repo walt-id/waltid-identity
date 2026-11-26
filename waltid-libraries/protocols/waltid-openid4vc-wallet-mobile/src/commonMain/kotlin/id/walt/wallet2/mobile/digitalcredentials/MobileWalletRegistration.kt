@@ -14,21 +14,21 @@ import kotlinx.coroutines.sync.withLock
 /** Serializes publication of the current wallet contents to the platform registry. */
 internal class MobileWalletRegistration(
     private val wallet: Wallet,
-    private val credentialRegistry: MobileWalletCredentialRegistry,
+    private val credentialRegistry: CredentialRegistry,
     private val preferredLocales: List<String>,
     private val registrationProjection: MobileWalletRegistryProjection,
     private val onRegistrationChanged: suspend () -> Unit,
 ) {
-    val state: StateFlow<MobileWalletCredentialRegistrationResult?> get() = observations
+    val state: StateFlow<CredentialRegistrationResult?> get() = observations
 
-    suspend fun refresh(): MobileWalletCredentialRegistrationResult = registrationMutex.withLock {
+    suspend fun refresh(): CredentialRegistrationResult = registrationMutex.withLock {
         currentCoroutineContext().ensureActive()
         val records = try {
-            if (credentialRegistry === UnavailableMobileWalletCredentialRegistry) emptyList()
+            if (credentialRegistry === UnavailableCredentialRegistry) emptyList()
             else wallet.registryRecords(preferredLocales, registrationProjection)
         } catch (failure: Exception) {
             if (failure is CancellationException) throw failure
-            lastRegistrationResult.value = MobileWalletCredentialRegistrationResult.Unavailable(failure.message ?: failure::class.simpleName ?: "Credential registration failed")
+            lastRegistrationResult.value = CredentialRegistrationResult.Unavailable(failure.message ?: failure::class.simpleName ?: "Credential registration failed")
             throw failure
         }
         currentCoroutineContext().ensureActive()
@@ -36,7 +36,7 @@ internal class MobileWalletRegistration(
             credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
             if (failure is CancellationException) throw failure
-            MobileWalletCredentialRegistrationResult.Unavailable(failure.message ?: failure::class.simpleName ?: "Credential registration failed")
+            CredentialRegistrationResult.Unavailable(failure.message ?: failure::class.simpleName ?: "Credential registration failed")
         }
         // A completed presentation replacement remains observable if creation is cancelled.
         lastRegistrationResult.value = presentationResult
@@ -67,7 +67,7 @@ internal class MobileWalletRegistration(
     }
 
     private val registrationMutex = Mutex()
-    private val lastRegistrationResult = MutableStateFlow<MobileWalletCredentialRegistrationResult?>(null)
+    private val lastRegistrationResult = MutableStateFlow<CredentialRegistrationResult?>(null)
     private val observations = lastRegistrationResult.asStateFlow()
 
     private fun digitalCredentialRegistryId(): String =

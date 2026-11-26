@@ -62,7 +62,7 @@ public struct ProximityNFCRetrievalConfiguration: Sendable, Hashable {
     }
 
     /// Creates a validated conventional NFC retrieval configuration.
-    /// - Throws: \`WalletError.invalidInput\` for incompatible options or unsupported limits.
+    /// - Throws: `WalletError.invalidInput` for incompatible options or unsupported limits.
     /// - Parameters:
     ///   - maximumCommandDataLength: Maximum command-data length accepted from the reader.
     ///   - maximumResponseDataLength: Maximum response-data length returned to the reader.
@@ -98,7 +98,7 @@ public struct ProximityRetrievalOptions: Sendable, Hashable {
     }
 
     /// Creates a nonempty conventional retrieval configuration.
-    /// - Throws: \`WalletError.invalidInput\` for incompatible options or unsupported limits.
+    /// - Throws: `WalletError.invalidInput` for incompatible options or unsupported limits.
     /// - Parameters:
     ///   - bluetoothLowEnergy: Optional BLE role and bearer configuration.
     ///   - nfc: Optional conventional NFC command/response configuration.
@@ -174,7 +174,7 @@ public struct ProximityNFCV2SessionConfiguration: Sendable, Hashable {
     }
 
     /// Creates an NFCv2 session with optional alternate BLE and QR retrieval.
-    /// - Throws: \`WalletError.invalidInput\` for incompatible options or unsupported limits.
+    /// - Throws: `WalletError.invalidInput` for incompatible options or unsupported limits.
     /// - Parameters:
     ///   - maximumCommandDataLength: Validated NFCv2 command-data limit.
     ///   - bluetoothLowEnergy: Optional alternate BLE bearer.

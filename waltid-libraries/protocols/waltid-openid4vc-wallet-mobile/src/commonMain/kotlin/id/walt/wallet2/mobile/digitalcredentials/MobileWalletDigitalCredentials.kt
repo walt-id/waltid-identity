@@ -2,12 +2,12 @@ package id.walt.wallet2.mobile.digitalcredentials
 
 import id.walt.mdoc.readertrust.ReaderTrustDecision
 import id.walt.mdoc.readertrust.ReaderTrustState
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialRequirement
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationRequestInfo
-import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataItem
-import id.walt.wallet2.mobile.presentation.MobileWalletVerifierMetadata
+import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.presentation.PresentationCredentialOption
+import id.walt.wallet2.mobile.presentation.PresentationCredentialRequirement
+import id.walt.wallet2.mobile.presentation.PresentationRequest
+import id.walt.wallet2.mobile.presentation.PresentationTransactionData
+import id.walt.wallet2.mobile.presentation.VerifierMetadata
 
 /**
  * Platform-neutral request passed by Android Credential Manager or an Apple provider extension.
@@ -17,7 +17,7 @@ import id.walt.wallet2.mobile.presentation.MobileWalletVerifierMetadata
  * @property verifiedOrigin Authenticated origin reported by the platform.
  * @property selectedRegistryEntryIds Entries selected by the platform matcher.
  */
-public data class MobileWalletDigitalCredentialRequest(
+public data class DigitalCredentialRequest(
     public val protocol: String,
     public val dataJson: String,
     public val verifiedOrigin: String,
@@ -28,9 +28,9 @@ public data class MobileWalletDigitalCredentialRequest(
  * Verifier and transaction metadata extracted from an OpenID4VP request received through a
  * Digital Credentials API.
  *
- * Unlike [MobileWalletPresentationRequestInfo], [clientId] is nullable: the OpenID4VP DC API
+ * Unlike [PresentationRequest], [clientId] is nullable: the OpenID4VP DC API
  * requires unsigned requests to omit and ignore `client_id`. The authenticated platform origin
- * is exposed separately by [MobileWalletDigitalCredentialPreview.verifiedOrigin] and is the
+ * is exposed separately by [DigitalCredentialPreview.verifiedOrigin] and is the
  * authoritative requester identity for those requests.
  *
  * @property clientId Authenticated signed-request client identifier, or null for unsigned requests.
@@ -39,12 +39,12 @@ public data class MobileWalletDigitalCredentialRequest(
  * @property responseMode Serialized OpenID4VP DC API response mode, when provided.
  * @property transactionData Decoded transaction data items requested by the verifier.
  */
-public data class MobileWalletDigitalCredentialRequestInfo(
+public data class DigitalCredentialRequestInfo(
     public val clientId: String?,
-    public val verifierMetadata: MobileWalletVerifierMetadata?,
+    public val verifierMetadata: VerifierMetadata?,
     public val nonce: String,
     public val responseMode: String?,
-    public val transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
+    public val transactionData: List<PresentationTransactionData> = emptyList(),
 ) {
     init {
         require(clientId == null || clientId.isNotBlank()) {
@@ -55,7 +55,7 @@ public data class MobileWalletDigitalCredentialRequestInfo(
 }
 
 /**
- * Consent preview retained by the SDK until [MobileWallet.submitDigitalCredentialPresentation].
+ * Consent preview retained by the SDK until [Wallet.submitDigitalCredentialPresentation].
  *
  * @property requestId Opaque identifier binding the later submission to this preview.
  * @property protocol Platform protocol identifier.
@@ -65,16 +65,16 @@ public data class MobileWalletDigitalCredentialRequestInfo(
  * @property credentialRequirements Required credential-query combinations.
  * @property readerAuthentication Whether and how the reader authenticated the request.
  * @property readerTrust Trust policy decision for the authenticated reader; present only when
- * [readerAuthentication] is [MobileWalletReaderAuthentication.VERIFIED].
+ * [readerAuthentication] is [DigitalCredentialReaderAuthentication.VERIFIED].
  */
-public data class MobileWalletDigitalCredentialPreview(
+public data class DigitalCredentialPreview(
     public val requestId: String,
     public val protocol: String,
     public val verifiedOrigin: String,
-    public val request: MobileWalletDigitalCredentialRequestInfo,
-    public val credentialOptions: List<MobileWalletPresentationCredentialOption>,
-    public val credentialRequirements: List<MobileWalletPresentationCredentialRequirement>,
-    public val readerAuthentication: MobileWalletReaderAuthentication,
+    public val request: DigitalCredentialRequestInfo,
+    public val credentialOptions: List<PresentationCredentialOption>,
+    public val credentialRequirements: List<PresentationCredentialRequirement>,
+    public val readerAuthentication: DigitalCredentialReaderAuthentication,
     public val readerTrust: ReaderTrustDecision?,
 )
 
@@ -85,7 +85,7 @@ public data class MobileWalletDigitalCredentialPreview(
  * state at all, so every state here describes a still-processable request. Only [VERIFIED] comes with
  * a trust decision, and only a [ReaderTrustState.TRUSTED] decision means a reader was identified.
  */
-public enum class MobileWalletReaderAuthentication {
+public enum class DigitalCredentialReaderAuthentication {
     /** The protocol carries no reader authentication, as with the OpenID4VP Digital Credentials API. */
     NOT_APPLICABLE,
 
@@ -112,7 +112,7 @@ public enum class MobileWalletReaderAuthentication {
  * @property protocol Protocol identifier from the request.
  * @property dataJson Platform response data encoded as JSON.
  */
-public data class MobileWalletDigitalCredentialResponse(
+public data class DigitalCredentialResponse(
     public val protocol: String,
     public val dataJson: String,
 )
@@ -122,5 +122,5 @@ public data class MobileWalletDigitalCredentialResponse(
  *
  * @property registryEntryId Stale platform registry entry identifier.
  */
-public class MobileWalletStaleRegistryEntryException(public val registryEntryId: String) :
+public class StaleRegistryEntryException(public val registryEntryId: String) :
     IllegalArgumentException("Selected credential registry entry is stale")

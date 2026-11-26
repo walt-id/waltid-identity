@@ -4,11 +4,11 @@ import id.walt.certificate.x509.revocation.CrlTestFixtures
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.wallet2.mobile.proximity.ProximityCertificateRevocationResult
-import id.walt.wallet2.mobile.proximity.ProximityCrlFetchResult
-import id.walt.wallet2.mobile.proximity.ProximityCrlFetcher
-import id.walt.wallet2.mobile.proximity.ProximityCrlRevocationEvaluator
-import id.walt.wallet2.mobile.proximity.ProximityCrlScope
+import id.walt.wallet2.mobile.proximity.trust.ProximityCertificateRevocationResult
+import id.walt.wallet2.mobile.proximity.trust.ProximityCrlFetchResult
+import id.walt.wallet2.mobile.proximity.trust.ProximityCrlFetcher
+import id.walt.wallet2.mobile.proximity.trust.ProximityCrlRevocationEvaluator
+import id.walt.wallet2.mobile.proximity.trust.ProximityCrlScope
 import id.walt.wallet2.mobile.proximity.ProximityReaderAuthenticationScope
 import id.walt.wallet2.mobile.proximity.ProximityReaderEvidence
 import kotlin.test.Test

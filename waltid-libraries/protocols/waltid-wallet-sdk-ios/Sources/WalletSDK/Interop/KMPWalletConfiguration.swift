@@ -108,8 +108,8 @@ private extension WalletClientIDTrustConfiguration {
 }
 
 private extension WalletTransactionDataProfile {
-    func toKMPTransactionDataProfile() -> MobileWalletTransactionDataProfile {
-        MobileWalletTransactionDataProfile(
+    func toKMPTransactionDataProfile() -> WalletCore.TransactionDataProfile {
+        WalletCore.TransactionDataProfile(
             type: type,
             displayName: displayName,
             fields: fields

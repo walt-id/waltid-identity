@@ -4,8 +4,8 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
+import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.WalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import kotlin.test.Test
@@ -20,11 +20,11 @@ class MobileWalletPersistenceSnippetsTest {
     @Test
     fun defaultPersistenceSnippetCompiles() {
         // doc-snippet:start kotlin-default-persistence
-        val config = MobileWalletConfig(walletId = "consumer-wallet")
+        val config = WalletConfiguration(walletId = "consumer-wallet")
         // doc-snippet:end kotlin-default-persistence
 
         assertEquals("consumer-wallet", config.walletId)
-        assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
+        assertIs<WalletDatabaseKey.Managed>(config.persistence.databaseKey)
     }
 
     @Test
@@ -41,25 +41,25 @@ class MobileWalletPersistenceSnippetsTest {
             }
         }
 
-        val config = MobileWalletConfig(
+        val config = WalletConfiguration(
             walletId = "consumer-wallet",
-            persistence = MobileWalletPersistence(
-                databaseKey = MobileWalletDatabaseKey.Provided(
+            persistence = WalletPersistence(
+                databaseKey = WalletDatabaseKey.Provided(
                     provider = KmsDatabaseKeyProvider()
                 )
             )
         )
         // doc-snippet:end kotlin-provided-database-key
 
-        assertIs<MobileWalletDatabaseKey.Provided>(config.persistence.databaseKey)
+        assertIs<WalletDatabaseKey.Provided>(config.persistence.databaseKey)
     }
 
     @Test
     fun customCredentialStoreSnippetCompiles() {
         // doc-snippet:start kotlin-custom-credential-store
-        val config = MobileWalletConfig(
+        val config = WalletConfiguration(
             walletId = "consumer-wallet",
-            persistence = MobileWalletPersistence(
+            persistence = WalletPersistence(
                 credentialStore = appCredentialStore
             )
         )
@@ -71,9 +71,9 @@ class MobileWalletPersistenceSnippetsTest {
     @Test
     fun credentialAndDidStoreOverridesSnippetCompiles() {
         // doc-snippet:start kotlin-store-overrides
-        val config = MobileWalletConfig(
+        val config = WalletConfiguration(
             walletId = "consumer-wallet",
-            persistence = MobileWalletPersistence(
+            persistence = WalletPersistence(
                 credentialStore = appCredentialStore,
                 didStore = appDidStore,
             )

@@ -1155,7 +1155,7 @@ private actor TransactionCodeWalletClient: WalletClient {
         return .ready(
             PresentationPreview(
                 previewHandle: try! PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
-                request: PresentationRequestInfo(
+                request: PresentationRequest(
                     clientID: "https://verifier.example",
                     requestAuthentication: .unauthenticated,
                     nonce: "nonce-1",

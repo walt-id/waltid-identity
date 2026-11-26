@@ -3,29 +3,29 @@ package id.walt.walletdemo.compose.logic
 import id.walt.wallet2.handlers.WalletIssuanceOfferPreview
 import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
+import id.walt.wallet2.mobile.issuance.IssuanceSession
 import id.walt.wallet2.handlers.WalletIssuanceTransactionCode
 import id.walt.wallet2.handlers.WalletDeferredCredential
 import id.walt.wallet2.handlers.WalletIssuanceContinuation
 import id.walt.wallet2.handlers.WalletIssuanceContinuationStatus
 import id.walt.wallet2.handlers.WalletIssuanceErrorCode
-import id.walt.wallet2.mobile.issuance.MobileWalletCredentialSelection
-import id.walt.wallet2.mobile.issuance.MobileWalletHolderBinding
-import id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders
+import id.walt.wallet2.mobile.issuance.IssuanceCredentialSelection
+import id.walt.wallet2.mobile.issuance.IssuanceHolderBinding
+import id.walt.wallet2.mobile.issuance.IssuanceHolders
 
 /** Keeps in-app and platform-provider acceptance on the same SDK batch-selection contract. */
-fun List<WalletDemoCredentialSelection>.toMobileSelections(): List<MobileWalletCredentialSelection> = map { selection ->
-    MobileWalletCredentialSelection(
+fun List<WalletDemoCredentialSelection>.toMobileSelections(): List<IssuanceCredentialSelection> = map { selection ->
+    IssuanceCredentialSelection(
         credentialConfigurationId = selection.credentialConfigurationId,
         holders = when (val holders = selection.holders) {
-            is WalletDemoCredentialHolders.Existing -> MobileWalletCredentialHolders.Existing(holders.bindings.map { MobileWalletHolderBinding(it.keyId, it.did) })
-            is WalletDemoCredentialHolders.NewKeys -> MobileWalletCredentialHolders.NewKeys(holders.count)
+            is WalletDemoCredentialHolders.Existing -> IssuanceHolders.Existing(holders.bindings.map { IssuanceHolderBinding(it.keyId, it.did) })
+            is WalletDemoCredentialHolders.NewKeys -> IssuanceHolders.NewKeys(holders.count)
         },
     )
 }
 
 /** Maps a core issuance session into the demo offer-review model. */
-fun MobileWalletIssuanceSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
+fun IssuanceSession.toDemoIssuanceSession(): WalletDemoIssuanceSession =
     offer.toDemoIssuanceSession(id.value, batchSize, credentialDisplayMetadata)
 
 internal fun WalletIssuanceOfferPreview.toDemoIssuanceSession(

@@ -2,11 +2,11 @@ package id.walt.walletdemo.compose.logic
 
 import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.mdoc.readertrust.ReaderTrustDecision
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCPreview
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialPreview
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialRequirement
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletReaderAuthentication
+import id.walt.wallet2.mobile.digitalcredentials.AnnexCPreview
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialPreview
+import id.walt.wallet2.mobile.presentation.PresentationCredentialOption
+import id.walt.wallet2.mobile.presentation.PresentationCredentialRequirement
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialReaderAuthentication
 
 /**
  * Maps an OpenID4VP Digital Credentials API preview onto the shared sharing-review model.
@@ -14,7 +14,7 @@ import id.walt.wallet2.mobile.digitalcredentials.MobileWalletReaderAuthenticatio
  * The preview's `requestId` and the platform request objects stay with the caller: only what the user
  * has to decide about crosses into the review model.
  */
-fun MobileWalletDigitalCredentialPreview.toSharingReview(): WalletDemoSharingReview =
+fun DigitalCredentialPreview.toSharingReview(): WalletDemoSharingReview =
     WalletDemoSharingReview(
         request = WalletDemoSharingRequest(
             requester = WalletDemoSharingRequester(
@@ -59,7 +59,7 @@ fun MobileWalletDigitalCredentialPreview.toSharingReview(): WalletDemoSharingRev
  * response URI at all. The requested documents and elements are reviewed through the same credential
  * and disclosure components every other transport uses, which is what makes them comparable.
  */
-fun MobileWalletAnnexCPreview.toSharingReview(): WalletDemoSharingReview =
+fun AnnexCPreview.toSharingReview(): WalletDemoSharingReview =
     WalletDemoSharingReview(
         request = WalletDemoSharingRequest(
             requester = WalletDemoSharingRequester(
@@ -93,17 +93,17 @@ fun MobileWalletAnnexCPreview.toSharingReview(): WalletDemoSharingReview =
 /**
  * Translates SDK reader authentication and trust into review states.
  *
- * [MobileWalletReaderAuthentication.NOT_APPLICABLE] becomes null rather than a state, because "this
+ * [DigitalCredentialReaderAuthentication.NOT_APPLICABLE] becomes null rather than a state, because "this
  * protocol has no reader authentication" is answered by omitting the section, not by rendering one.
  * Only a [ReaderTrustState.TRUSTED] decision names the reader; anything else, including a missing
  * decision, is shown as untrusted.
  */
-private fun MobileWalletReaderAuthentication.toDemoReaderTrust(trust: ReaderTrustDecision?): WalletDemoReaderTrust? =
+private fun DigitalCredentialReaderAuthentication.toDemoReaderTrust(trust: ReaderTrustDecision?): WalletDemoReaderTrust? =
     when (this) {
-        MobileWalletReaderAuthentication.NOT_APPLICABLE -> null
-        MobileWalletReaderAuthentication.NOT_AUTHENTICATED -> WalletDemoReaderTrust.NotAuthenticated
-        MobileWalletReaderAuthentication.PENDING_RAW_REQUEST -> WalletDemoReaderTrust.PendingVerification
-        MobileWalletReaderAuthentication.VERIFIED -> {
+        DigitalCredentialReaderAuthentication.NOT_APPLICABLE -> null
+        DigitalCredentialReaderAuthentication.NOT_AUTHENTICATED -> WalletDemoReaderTrust.NotAuthenticated
+        DigitalCredentialReaderAuthentication.PENDING_RAW_REQUEST -> WalletDemoReaderTrust.PendingVerification
+        DigitalCredentialReaderAuthentication.VERIFIED -> {
             val displayName = trust?.displayName
             if (trust?.state == ReaderTrustState.TRUSTED && displayName != null) {
                 WalletDemoReaderTrust.Trusted(displayName)
@@ -113,7 +113,7 @@ private fun MobileWalletReaderAuthentication.toDemoReaderTrust(trust: ReaderTrus
         }
     }
 
-private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): WalletDemoPresentationCredentialOption =
+private fun PresentationCredentialOption.toDemoCredentialOption(): WalletDemoPresentationCredentialOption =
     WalletDemoPresentationCredentialOption(
         queryId = queryId,
         credentialId = credential.id,
@@ -147,7 +147,7 @@ private fun MobileWalletPresentationCredentialOption.toDemoCredentialOption(): W
         },
     )
 
-private fun MobileWalletPresentationCredentialRequirement.toDemoCredentialRequirement():
+private fun PresentationCredentialRequirement.toDemoCredentialRequirement():
     WalletDemoPresentationCredentialRequirement =
     WalletDemoPresentationCredentialRequirement(options = options)
 

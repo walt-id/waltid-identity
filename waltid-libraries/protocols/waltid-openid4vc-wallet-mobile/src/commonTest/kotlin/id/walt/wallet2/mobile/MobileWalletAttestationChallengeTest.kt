@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile
 
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
+import id.walt.wallet2.mobile.issuance.IssuanceSession
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -9,8 +9,8 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.issuance.IssuanceClientRegistration
-import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.issuance.CredentialOfferInput
+import id.walt.wallet2.mobile.issuance.IssuanceRequest
 import id.walt.wallet2.stores.inmemory.*
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationProvider
 import io.ktor.client.HttpClient
@@ -103,7 +103,7 @@ class MobileWalletAttestationChallengeTest {
                     respond(body, status, headers.build())
                 } }
             }
-            fun openWallet() = MobileWallet(walletId = "challenge", keyStore = keys, didStore = dids,
+            fun openWallet() = Wallet(walletId = "challenge", keyStore = keys, didStore = dids,
                 credentialStore = credentials, issuanceSessionStore = records, issuanceHttpClient = http, attestationProvider = provider)
             repeat(2) { iteration ->
                 forms.clear()
@@ -111,16 +111,16 @@ class MobileWalletAttestationChallengeTest {
                 val wallet = openWallet()
                 val grants = if (authorized) """{"authorization_code":{}}""" else
                     """{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"single-use-code"}}"""
-                val session = wallet.startIssuance(MobileWalletIssuanceRequest(
-                    offer = MobileWalletCredentialOffer.InlineJson("""{"credential_issuer":"https://issuer.example","credential_configuration_ids":["identity"],"grants":$grants}"""),
+                val session = wallet.startIssuance(IssuanceRequest(
+                    offer = CredentialOfferInput.InlineJson("""{"credential_issuer":"https://issuer.example","credential_configuration_ids":["identity"],"grants":$grants}"""),
                     keyId = "instance",
                 ))
                 val outcome = if (authorized) {
-                    val authorization = (session as MobileWalletIssuanceSession.AuthorizationCode).beginAuthorization(IssuanceClientRegistration("wallet", "openid://callback"))
+                    val authorization = (session as IssuanceSession.AuthorizationCode).beginAuthorization(IssuanceClientRegistration("wallet", "openid://callback"))
                     assertNotNull(Url(authorization.request.url).parameters["request_uri"])
                     // A new SDK object must recover freshness and PKCE from the persisted session.
                     openWallet().completeAuthorization(authorization.id, "openid://callback?code=code&state=${authorization.request.state}")
-                } else (session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "wallet")
+                } else (session as IssuanceSession.PreAuthorized).accept(clientId = "wallet")
                 assertIs<WalletIssuanceOutcome.Deferred>(outcome)
                 assertEquals(if (discovery) iteration + 1 else 0, discoveries)
                 assertEquals((if (authorized) 2 else 1) * (iteration + 1), attesterCalls)

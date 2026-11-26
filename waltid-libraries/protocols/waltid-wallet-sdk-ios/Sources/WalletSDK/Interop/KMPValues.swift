@@ -62,13 +62,10 @@ func decodedBase64URL(_ value: String, context: String) throws -> Data {
     return data
 }
 
-func swiftSet<T: Hashable>(_ value: Any, of type: T.Type) -> Set<T> {
-    if let values = value as? Set<T> {
-        return values
+func requiredBridgeSet<T: Hashable>(_ value: Any, of type: T.Type) throws -> Set<T> {
+    guard let values = value as? Set<T> else {
+        throw WalletError.internalFailure("Wallet core returned an incompatible set of \(type).")
     }
-    if let values = value as? NSSet {
-        return Set(values.compactMap { $0 as? T })
-    }
-    return []
+    return values
 }
 #endif

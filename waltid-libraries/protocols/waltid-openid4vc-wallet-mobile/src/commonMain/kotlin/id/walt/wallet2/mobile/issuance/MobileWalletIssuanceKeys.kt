@@ -10,7 +10,7 @@ import id.walt.wallet2.handlers.WalletCredentialSelection
 import id.walt.wallet2.handlers.WalletIssuanceBatchSession
 import id.walt.wallet2.handlers.WalletIssuanceOfferRequest
 import id.walt.wallet2.mobile.identity.MobileDidSupport
-import id.walt.wallet2.mobile.identity.MobileWalletKeyType
+import id.walt.wallet2.mobile.identity.WalletKeyType
 import id.walt.wallet2.mobile.identity.SigningIdentityKeyPolicy
 import id.walt.wallet2.mobile.identity.SigningIdentityManager
 import id.walt.wallet2.mobile.identity.SigningIdentityState
@@ -29,9 +29,9 @@ internal class MobileWalletIssuanceKeys(
     private val didStore: WalletDidStore,
     private val signingIdentityManager: SigningIdentityManager?,
     private val defaultKeyUseAuthorizationPolicy: KeyUseAuthorizationPolicy,
-    private val generateAndPersistHolderKey: suspend (MobileWalletKeyType, KeyUseAuthorizationPolicy) -> Key,
+    private val generateAndPersistHolderKey: suspend (WalletKeyType, KeyUseAuthorizationPolicy) -> Key,
 ) {
-    suspend fun offerRequest(request: MobileWalletIssuanceRequest): WalletIssuanceOfferRequest {
+    suspend fun offerRequest(request: IssuanceRequest): WalletIssuanceOfferRequest {
         val (offer, keyId, did, keyPolicy) = request
         val active = if (keyId == null || did == null) signingIdentityManager?.state() else null
         val identity = (active as? SigningIdentityState.Active)?.identity
@@ -44,13 +44,13 @@ internal class MobileWalletIssuanceKeys(
         }
         val selectedDid = did ?: identity?.did ?: didStore.getDefaultDid()
         return when (offer) {
-            is MobileWalletCredentialOffer.Uri -> WalletIssuanceOfferRequest(
+            is CredentialOfferInput.Uri -> WalletIssuanceOfferRequest(
                 offerUrl = Url(offer.value.trim()),
                 offerJson = null,
                 keyId = selectedKeyId,
                 did = selectedDid,
             )
-            is MobileWalletCredentialOffer.InlineJson -> WalletIssuanceOfferRequest(
+            is CredentialOfferInput.InlineJson -> WalletIssuanceOfferRequest(
                 offerUrl = null,
                 offerJson = Json.parseToJsonElement(offer.value).jsonObject,
                 keyId = selectedKeyId,
@@ -61,22 +61,22 @@ internal class MobileWalletIssuanceKeys(
 
     suspend fun create(
         count: Int,
-        keyType: MobileWalletKeyType? = null,
+        keyType: WalletKeyType? = null,
         didMethod: String = "key",
         keyUseAuthorizationPolicy: KeyUseAuthorizationPolicy? = null,
-    ): List<MobileWalletHolderBinding> {
+    ): List<IssuanceHolderBinding> {
         require(count >= 1) { "At least one holder key must be requested" }
         MobileDidSupport.ensureInitialized()
-        val created = mutableListOf<MobileWalletHolderBinding>()
+        val created = mutableListOf<IssuanceHolderBinding>()
         try {
             repeat(count) {
                 currentCoroutineContext().ensureActive()
-                val key = generateAndPersistHolderKey(keyType ?: MobileWalletKeyType.secp256r1,
+                val key = generateAndPersistHolderKey(keyType ?: WalletKeyType.secp256r1,
                     keyUseAuthorizationPolicy ?: defaultKeyUseAuthorizationPolicy)
-                created += MobileWalletHolderBinding(key.id.value)
+                created += IssuanceHolderBinding(key.id.value)
                 currentCoroutineContext().ensureActive()
                 val registered = Crypto2DidService.registerByKey(didMethod, key)
-                created[created.lastIndex] = MobileWalletHolderBinding(key.id.value, registered.did)
+                created[created.lastIndex] = IssuanceHolderBinding(key.id.value, registered.did)
                 didStore.addDid(WalletDidEntry(registered.did, registered.didDocument.toJsonObject()))
             }
             currentCoroutineContext().ensureActive()
@@ -88,14 +88,14 @@ internal class MobileWalletIssuanceKeys(
     }
 
     suspend fun <T> withSelections(
-        credentials: List<MobileWalletCredentialSelection>?,
+        credentials: List<IssuanceCredentialSelection>?,
         operation: suspend (
             suspend (WalletIssuanceBatchSession, List<WalletCredentialSelection>?) -> List<WalletCredentialSelection>?,
             () -> Unit,
         ) -> T,
     ): T {
         val requested = credentials?.toList()
-        val generated = mutableListOf<MobileWalletHolderBinding>()
+        val generated = mutableListOf<IssuanceHolderBinding>()
         var accepted = false
         var failure: Throwable? = null
         try {
@@ -107,22 +107,22 @@ internal class MobileWalletIssuanceKeys(
                     }
                     val holders = selection.holders
                     val count = when (holders) {
-                        is MobileWalletCredentialHolders.Existing -> holders.bindings.size
-                        is MobileWalletCredentialHolders.NewKeys -> holders.count
+                        is IssuanceHolders.Existing -> holders.bindings.size
+                        is IssuanceHolders.NewKeys -> holders.count
                     }
                     require(count in 1..(session.batchSize ?: 1)) { "Requested copies exceed the issuer's batch limit" }
                     if (previous != null) {
                         require(previousSelection != null && previousSelection.holderBindings.size == count) {
                             "Cannot change holder selections after acceptance; start a new issuance session"
                         }
-                        if (holders is MobileWalletCredentialHolders.Existing) require(
+                        if (holders is IssuanceHolders.Existing) require(
                             previousSelection.holderBindings == holders.bindings.map { CredentialHolderBinding(it.keyId, it.did) }
                         ) { "Cannot change holder selections after acceptance; start a new issuance session" }
                         previousSelection
                     } else {
                         val bindings = when (holders) {
-                            is MobileWalletCredentialHolders.Existing -> holders.bindings
-                            is MobileWalletCredentialHolders.NewKeys -> {
+                            is IssuanceHolders.Existing -> holders.bindings
+                            is IssuanceHolders.NewKeys -> {
                                 val active = signingIdentityManager?.state()
                                 val identity = (active as? SigningIdentityState.Active)?.identity
                                 check(active == null || identity != null) { "The wallet requires an active signing identity" }
@@ -148,7 +148,7 @@ internal class MobileWalletIssuanceKeys(
         }
     }
 
-    private suspend fun cleanupHolderKeys(bindings: List<MobileWalletHolderBinding>, cause: Throwable?) =
+    private suspend fun cleanupHolderKeys(bindings: List<IssuanceHolderBinding>, cause: Throwable?) =
         withContext(NonCancellable) {
             var failure = cause
             fun remember(error: Throwable) {

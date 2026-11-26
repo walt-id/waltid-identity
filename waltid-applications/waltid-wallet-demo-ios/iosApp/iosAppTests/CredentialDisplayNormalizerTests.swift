@@ -23,7 +23,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         func location(_ path: String, isBinary: Bool = false, sharedBy: [String] = []) -> PresentationClaimLocation {
             .init(sourcePathJSON: path, receivedPathJSON: path, sharedBy: sharedBy, alwaysCarried: false, isBinary: isBinary)
         }
-        let prepared = PreparedPresentationReview(credentials: [.init(queryID: option.queryID, credentialID: option.credentialID,
+        let prepared = ReviewedPresentationClaims(credentials: [.init(queryID: option.queryID, credentialID: option.credentialID,
             format: option.format,
             claimsJSON: """
                 {"\(namespace)":{"portrait":"\(encoded)","attachment":"\(attachment)","text":"\(attachment)","blob":"\(encoded)","image":[137,80,78,71,4]}}
@@ -92,7 +92,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true, preferredLocales: ["en"])
         XCTAssertEqual(details.groups.first { $0.id == "requested" }?.items.first?.label, "Second IBAN")
         let path = try XCTUnwrap(option.disclosures.first).path
-        let prepared = PreparedPresentationReview(credentials: [.init(queryID: option.queryID, credentialID: option.credentialID,
+        let prepared = ReviewedPresentationClaims(credentials: [.init(queryID: option.queryID, credentialID: option.credentialID,
             format: option.format, claimsJSON: #"{"accounts":[{"iban":"DE456"}]}"#, wholeCredential: false, locations: [
                 .init(sourcePathJSON: "[]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true),
                 .init(sourcePathJSON: #"["accounts"]"#, receivedPathJSON: #"["accounts"]"#, sharedBy: [], alwaysCarried: true),
@@ -1747,7 +1747,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     }
 
     func testTransactionDataGroupsRenderProfileAndDetailsReadably() throws {
-        let request = PresentationRequestInfo(
+        let request = PresentationRequest(
             clientID: "https://verifier.example",
             requestAuthentication: .unauthenticated,
             nonce: "nonce-1",

@@ -154,7 +154,7 @@ reset; plaintext-to-encrypted migration is not performed.
 - ``PresentationPreviewResult``
 - ``PresentationSelection``
 - ``PresentationReview``
-- ``PreparedPresentationReview``
+- ``ReviewedPresentationClaims``
 - ``PresentationResult``
 
 ### Nearby presentation

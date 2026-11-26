@@ -11,8 +11,8 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.mobile.MobileWalletStoreAdapter
 import id.walt.wallet2.mobile.MobileWalletStoreOwner
-import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
+import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.WalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import kotlin.time.Instant
@@ -165,7 +165,7 @@ public interface WalletBridgeDidStore {
 
 internal fun WalletBridgePersistence.toMobileWalletPersistence(
     databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
-): MobileWalletPersistence = MobileWalletPersistence(
+): WalletPersistence = WalletPersistence(
     databaseKey = databaseKey.toMobileWalletDatabaseKey(databaseKeyProvider),
     credentialStore = credentialStore?.let(::BridgeCredentialStore),
     didStore = didStore?.let(::BridgeDidStore),
@@ -173,12 +173,12 @@ internal fun WalletBridgePersistence.toMobileWalletPersistence(
 
 private fun WalletBridgeDatabaseKeyConfiguration.toMobileWalletDatabaseKey(
     databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
-): MobileWalletDatabaseKey = when (this) {
+): WalletDatabaseKey = when (this) {
     WalletBridgeDatabaseKeyConfiguration.Managed ->
-        MobileWalletDatabaseKey.Managed
+        WalletDatabaseKey.Managed
 
     WalletBridgeDatabaseKeyConfiguration.Provided ->
-        MobileWalletDatabaseKey.Provided(
+        WalletDatabaseKey.Provided(
             provider = BridgeDatabaseEncryptionKeyProvider(
                 databaseKeyProvider
                     ?: throw IllegalArgumentException("Provided database-key persistence requires a database key provider"),

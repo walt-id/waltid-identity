@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettingsCodec
+import id.walt.wallet2.mobile.proximity.trust.ProximityReaderTrustSettingsCodec
 import java.io.ByteArrayOutputStream
 
 @Composable

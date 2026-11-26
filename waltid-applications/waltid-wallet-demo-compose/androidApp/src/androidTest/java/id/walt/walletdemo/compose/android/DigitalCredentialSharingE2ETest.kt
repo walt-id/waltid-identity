@@ -2,11 +2,11 @@
 
 package id.walt.walletdemo.compose.android
 
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
+import id.walt.wallet2.mobile.issuance.IssuanceSession
 import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialRegistry
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryField
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.RegistryField
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntry
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialFormat
 import id.walt.wallet2.mobile.digitalcredentials.RegistryEntryDisplay
 import id.walt.mobile.test.DigitalCredentialProviderTest
 
@@ -39,9 +39,9 @@ import id.walt.iso18013.annexc.AnnexCResponseVerifier
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.issuance.CredentialOfferInput
+import id.walt.wallet2.mobile.issuance.IssuanceRequest
 import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
@@ -88,7 +88,7 @@ import org.junit.runner.RunWith
 @DigitalCredentialProviderTest
 @OptIn(ExperimentalDigitalCredentialApi::class)
 internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
-    override val wallet: MobileWallet get() = provisionedWallet
+    override val wallet: Wallet get() = provisionedWallet
     override val issuedCredentialIds: Set<String> get() = provisionedCredentialIds
     /** Real platform matcher boundary: one entry indexed by two allowed VCTs remains one candidate. */
     @Test
@@ -99,13 +99,13 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         val leaf = "https://issuer.example/credentials/leaf"
         val parent = "https://types.example/credentials/parent"
         val title = "Inherited metadata fixture"
-        val record = MobileWalletCredentialRegistryRecord(
+        val record = RegistryEntry(
             registryEntryId = "one-logical-credential",
             credentialId = "one-stored-credential",
-            format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+            format = DigitalCredentialFormat.SD_JWT_VC,
             type = leaf,
             fields = listOf(
-                MobileWalletCredentialRegistryField(
+                RegistryField(
                     path = listOf("given_name"),
                     valueJson = "\"Ada\"",
                     selectivelyDisclosable = false,
@@ -938,7 +938,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
 
     companion object {
         private suspend fun issueFromDemoIssuer(
-            wallet: MobileWallet,
+            wallet: Wallet,
             scenario: DemoTestBackend.CredentialScenario,
         ): List<String> {
             val imageOverrides = buildJsonObject {
@@ -965,11 +965,11 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 runtimeOverrides = imageOverrides.takeIf { scenario.id in setOf("iso-mdl", "eudi-pid-sdjwt") },
             )
             val session = wallet.startIssuance(
-                MobileWalletIssuanceRequest(
-                    offer = MobileWalletCredentialOffer.Uri(offer.offerUrl),
+                IssuanceRequest(
+                    offer = CredentialOfferInput.Uri(offer.offerUrl),
                 )
             )
-            return when (val outcome = (session as MobileWalletIssuanceSession.PreAuthorized).accept(offer.txCode, clientId = "eudiw-abca")) {
+            return when (val outcome = (session as IssuanceSession.PreAuthorized).accept(offer.txCode, clientId = "eudiw-abca")) {
                 is WalletIssuanceOutcome.Stored -> outcome.credentialIds
                 is WalletIssuanceOutcome.Deferred -> error(
                     "Live issuer unexpectedly deferred ${scenario.id}: " +
@@ -1039,7 +1039,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
 
 
 
-        private lateinit var provisionedWallet: MobileWallet
+        private lateinit var provisionedWallet: Wallet
         private lateinit var provisionedCredentialIds: Set<String>
         @JvmStatic
         @BeforeClass

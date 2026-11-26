@@ -2,7 +2,7 @@ import Foundation
 #if canImport(WalletCore) && os(iOS)
 @preconcurrency import WalletCore
 
-extension MobileWalletEvent {
+extension WalletCore.WalletEvent {
     func toSwiftEvent() -> WalletEvent {
         switch self {
         case .issuanceOfferResolved: return .issuanceOfferResolved

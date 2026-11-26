@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile
 
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
+import id.walt.wallet2.mobile.issuance.IssuanceSession
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
@@ -17,8 +17,8 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.proofs.ProofType
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.issuance.CredentialOfferInput
+import id.walt.wallet2.mobile.issuance.IssuanceRequest
 import id.walt.wallet2.mobile.issuance.WalletProviderConfig
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
@@ -59,11 +59,11 @@ class KeyOnlyProviderIssuanceTest {
         val holder = key("holder")
         val trace = Trace()
         val wallet = wallet(holder, trace, anonymous = true, keyAttestation = true)
-        val session = wallet.startIssuance(MobileWalletIssuanceRequest(
-            offer = MobileWalletCredentialOffer.InlineJson(OFFER),
+        val session = wallet.startIssuance(IssuanceRequest(
+            offer = CredentialOfferInput.InlineJson(OFFER),
             keyId = holder.id.value,
         ))
-        val outcome = (session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "wallet-client")
+        val outcome = (session as IssuanceSession.PreAuthorized).accept(clientId = "wallet-client")
         assertIs<WalletIssuanceOutcome.Stored>(outcome, outcome.toString())
         assertEquals(1, wallet.credentials().size)
         assertTrue(trace.providerBodies.none { "\"wia\"" in it || "\"need\":\"wia\"" in it || "\"mint\":\"wia\"" in it }, trace.providerBodies.toString())
@@ -78,11 +78,11 @@ class KeyOnlyProviderIssuanceTest {
         val holder = key("holder")
         val trace = Trace()
         val wallet = wallet(holder, trace, anonymous = false, keyAttestation = false)
-        val session = wallet.startIssuance(MobileWalletIssuanceRequest(
-            offer = MobileWalletCredentialOffer.InlineJson(OFFER),
+        val session = wallet.startIssuance(IssuanceRequest(
+            offer = CredentialOfferInput.InlineJson(OFFER),
             keyId = holder.id.value,
         ))
-        val outcome = (session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "wallet-client")
+        val outcome = (session as IssuanceSession.PreAuthorized).accept(clientId = "wallet-client")
         assertIs<WalletIssuanceOutcome.Failed>(outcome, outcome.toString())
         assertTrue(outcome.storedCredentialIds.isEmpty())
         assertTrue(wallet.credentials().isEmpty())
@@ -96,7 +96,7 @@ class KeyOnlyProviderIssuanceTest {
         trace: Trace,
         anonymous: Boolean,
         keyAttestation: Boolean,
-    ): MobileWallet {
+    ): Wallet {
         val keys = InMemoryMobileWalletKeyStore().apply { addCrypto2Key(holder) }
         val attester = key("attester")
         val certificate = X509CertificateUtil.createSelfSignedCertificate(
@@ -107,7 +107,7 @@ class KeyOnlyProviderIssuanceTest {
         val attesterJwk = Json.parseToJsonElement(
             attester.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(attester.spec).data.toByteArray().decodeToString()
         )
-        return MobileWallet(
+        return Wallet(
             walletId = "key-only",
             keyStore = keys,
             didStore = InMemoryDidStore(),

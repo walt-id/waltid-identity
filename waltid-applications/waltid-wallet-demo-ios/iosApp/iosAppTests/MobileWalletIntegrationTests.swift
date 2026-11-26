@@ -174,7 +174,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         return credentialIDs
     }
 
-    // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
+    // MARK: - Tests (mirror Android WalletCore.WalletIntegrationTest.kt)
 
     func testAppHostedWalletValidatesSignedRequestObjectCertificateChain() async throws {
         let wallet = try await Wallet(

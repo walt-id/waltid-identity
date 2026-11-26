@@ -75,15 +75,15 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
 }
 
 extension IssuanceCredentialSelection {
-    func toKMPSelection() throws -> MobileWalletCredentialSelection {
-        let selection: any MobileWalletCredentialHolders
+    func toKMPSelection() throws -> WalletCore.IssuanceCredentialSelection {
+        let selection: any WalletCore.IssuanceHolders
         switch holders {
         case .existing(let bindings):
-            selection = MobileWalletCredentialHoldersExisting(bindings: bindings.map { MobileWalletHolderBinding(keyId: $0.keyID, did: $0.did) })
+            selection = WalletCore.IssuanceHoldersExisting(bindings: bindings.map { WalletCore.IssuanceHolderBinding(keyId: $0.keyID, did: $0.did) })
         case .newKeys(let count):
-            selection = MobileWalletCredentialHoldersNewKeys(count: Int32(count))
+            selection = WalletCore.IssuanceHoldersNewKeys(count: Int32(count))
         }
-        return MobileWalletCredentialSelection(credentialConfigurationId: configurationID,
+        return WalletCore.IssuanceCredentialSelection(credentialConfigurationId: configurationID,
             holders: selection, credentialIdentifier: credentialIdentifier)
     }
 }

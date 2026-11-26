@@ -26,7 +26,7 @@ internal enum class MobileWalletRegistryProjection { Full, MdocIdentity }
 internal suspend fun Wallet.registryRecords(
     preferredLocales: List<String>,
     projection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
-): List<MobileWalletCredentialRegistryRecord> =
+): List<RegistryEntry> =
     streamAllCredentials().mapNotNull { stored ->
         if (receiptTrust?.permitsRegistration(stored) == false) return@mapNotNull null
         val credential = stored.credential
@@ -37,10 +37,10 @@ internal suspend fun Wallet.registryRecords(
         if (projection == MobileWalletRegistryProjection.MdocIdentity) {
             // IdentityDocumentServices indexes only identity and type. Do not read metadata,
             // serialize claims, or decode images that the native adapter would discard.
-            return@mapNotNull listOf(MobileWalletCredentialRegistryRecord(
+            return@mapNotNull listOf(RegistryEntry(
                 registryEntryId = registryEntryId,
                 credentialId = stored.id,
-                format = MobileWalletDigitalCredentialFormat.MDOC,
+                format = DigitalCredentialFormat.MDOC,
                 type = (credential as MdocsCredential).docType,
                 fields = emptyList(),
                 display = RegistryEntryDisplay(""),
@@ -50,7 +50,7 @@ internal suspend fun Wallet.registryRecords(
         val record = when (credential) {
             is MdocsCredential -> {
                 val display = MobileWalletRegistryDisplay.resolve(
-                    format = MobileWalletDigitalCredentialFormat.MDOC,
+                    format = DigitalCredentialFormat.MDOC,
                     type = credential.docType,
                     credentialData = credential.credentialData,
                     storedLabel = metadata.label,
@@ -61,16 +61,16 @@ internal suspend fun Wallet.registryRecords(
                     metadata = stored.metadata,
                     credentialData = credential.credentialData,
                 )
-                MobileWalletCredentialRegistryRecord(
+                RegistryEntry(
                     registryEntryId = registryEntryId,
                     credentialId = stored.id,
-                    format = MobileWalletDigitalCredentialFormat.MDOC,
+                    format = DigitalCredentialFormat.MDOC,
                     type = credential.docType,
                     fields = credential.credentialData
                         .filterKeys { it != "docType" }
                         .flatMap { (namespace, value) ->
                             value.jsonObject.map { (element, elementValue) ->
-                                MobileWalletCredentialRegistryField(
+                                RegistryField(
                                     path = listOf(namespace, element),
                                     valueJson = Json.encodeToString(JsonElement.serializer(), elementValue),
                                     selectivelyDisclosable = true,
@@ -89,7 +89,7 @@ internal suspend fun Wallet.registryRecords(
                     .mapNotNull { disclosure -> disclosure.location?.toRegistryFieldPath() }
                     .toSet()
                 val display = MobileWalletRegistryDisplay.resolve(
-                    format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                    format = DigitalCredentialFormat.SD_JWT_VC,
                     type = type,
                     credentialData = data,
                     storedLabel = metadata.label,
@@ -100,10 +100,10 @@ internal suspend fun Wallet.registryRecords(
                     metadata = stored.metadata,
                     credentialData = data,
                 )
-                MobileWalletCredentialRegistryRecord(
+                RegistryEntry(
                     registryEntryId = registryEntryId,
                     credentialId = stored.id,
-                    format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                    format = DigitalCredentialFormat.SD_JWT_VC,
                     type = type,
                     fields = data
                         .filterKeys { it !in SD_JWT_INFRASTRUCTURE_CLAIMS }
@@ -118,7 +118,7 @@ internal suspend fun Wallet.registryRecords(
             } else null
         }
         record?.let { entry ->
-            val types = if (entry.format == MobileWalletDigitalCredentialFormat.SD_JWT_VC) {
+            val types = if (entry.format == DigitalCredentialFormat.SD_JWT_VC) {
                 try {
                     stored.resolvedSdJwtVcTypes().ifEmpty { listOf(entry.type) }
                 } catch (cause: CancellationException) {
@@ -145,12 +145,12 @@ private fun List<JsonElement>.toRegistryFieldPath(): List<String> =
 private fun JsonElement.flattenRegistryFields(
     path: List<String>,
     selectivelyDisclosablePaths: Set<List<String>>,
-): List<MobileWalletCredentialRegistryField> = when (this) {
+): List<RegistryField> = when (this) {
     is JsonObject -> entries.flatMap { (name, value) ->
         value.flattenRegistryFields(path + name, selectivelyDisclosablePaths)
     }
     else -> listOf(
-        MobileWalletCredentialRegistryField(
+        RegistryField(
             path = path,
             valueJson = Json.encodeToString(JsonElement.serializer(), this),
             selectivelyDisclosable = path in selectivelyDisclosablePaths,

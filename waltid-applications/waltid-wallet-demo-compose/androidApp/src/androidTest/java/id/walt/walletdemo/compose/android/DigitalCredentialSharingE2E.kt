@@ -16,7 +16,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import id.walt.mobile.test.backend.DemoTestBackend
-import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.Wallet
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
@@ -46,7 +46,7 @@ import org.junit.Before
 /** Shared Credential Manager transport, diagnostics and proof assertions for device E2Es. */
 @OptIn(ExperimentalDigitalCredentialApi::class)
 internal abstract class DigitalCredentialSharingE2E {
-    protected abstract val wallet: MobileWallet
+    protected abstract val wallet: Wallet
     protected abstract val issuedCredentialIds: Set<String>
 
     private val activeRequests = mutableListOf<DigitalCredentialRequestHandle>()

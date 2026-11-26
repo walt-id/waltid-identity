@@ -139,7 +139,7 @@ public final class AnnexCPresentationModel: ObservableObject {
             try Task.checkCancellation()
             guard phase == .preparing else { return }
             preview = prepared
-            let review = prepared.sharingReview()
+            let review = try prepared.sharingReview()
             self.review = review
             // The same opening selection every other transport gets, rather than a provider-specific
             // rule: the choice is visible and changeable in the review, and a wallet that pre-selected

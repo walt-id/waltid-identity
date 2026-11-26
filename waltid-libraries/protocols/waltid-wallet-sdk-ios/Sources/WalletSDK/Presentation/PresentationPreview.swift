@@ -15,7 +15,7 @@ public struct PresentationPreviewError: Equatable, Sendable {
     public let previewHandle: PresentationPreviewHandle
 
     /// Validated response destination and partial request context to show before returning the error.
-    public let request: PresentationRequestContext
+    public let request: PartialPresentationRequest
 
     /// OpenID4VP or OAuth authorization error code selected by the wallet.
     public let code: PresentationErrorCode
@@ -32,7 +32,7 @@ public struct PresentationPreviewError: Equatable, Sendable {
     ///   - message: Local diagnostic that is not sent to the verifier automatically.
     public init(
         previewHandle: PresentationPreviewHandle,
-        request: PresentationRequestContext,
+        request: PartialPresentationRequest,
         code: PresentationErrorCode,
         message: String
     ) {
@@ -67,7 +67,7 @@ public struct PresentationPreview: Equatable, Sendable {
     public let previewHandle: PresentationPreviewHandle
 
     /// Verifier/request information shown to the user.
-    public let request: PresentationRequestInfo
+    public let request: PresentationRequest
 
     /// Credentials that satisfy the request's DCQL queries.
     public let credentialOptions: [PresentationCredentialOption]
@@ -87,7 +87,7 @@ public struct PresentationPreview: Equatable, Sendable {
     ///     that must be satisfied before submission.
     public init(
         previewHandle: PresentationPreviewHandle,
-        request: PresentationRequestInfo,
+        request: PresentationRequest,
         credentialOptions: [PresentationCredentialOption],
         credentialRequirements: [PresentationCredentialRequirement] = []
     ) {

@@ -2,11 +2,6 @@ package id.walt.wallet2.mobile.digitalcredentials
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Bitmap.CompressFormat
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.Drawable
 import android.os.Build
 import androidx.credentials.DigitalCredential
 import androidx.credentials.ExperimentalDigitalCredentialApi
@@ -43,13 +38,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.encodeToByteArray
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -65,16 +55,16 @@ import kotlinx.serialization.json.putJsonObject
  */
 public class AndroidDigitalCredentialRegistry(
     context: Context,
-) : MobileWalletCredentialRegistry {
+) : CredentialRegistry {
     override suspend fun replace(
         registryId: String,
-        records: List<MobileWalletCredentialRegistryRecord>,
-    ): MobileWalletCredentialRegistrationResult = replacementMutex.withLock {
+        records: List<RegistryEntry>,
+    ): CredentialRegistrationResult = replacementMutex.withLock {
         currentCoroutineContext().ensureActive()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             registrationAvailable = false
             creationRegistrationAvailable = false
-            return@withLock MobileWalletCredentialRegistrationResult.Unavailable("Credential Manager requires API 23")
+            return@withLock CredentialRegistrationResult.Unavailable("Credential Manager requires API 23")
         }
         val immediate = records.map { it.withLocalThumbnail() }
         val result = registerRecords(registryId, immediate)
@@ -106,10 +96,10 @@ public class AndroidDigitalCredentialRegistry(
      * credentials it currently holds.
      */
     @OptIn(ExperimentalDigitalCredentialApi::class)
-    override suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult {
+    override suspend fun registerCreationOptions(): CredentialRegistrationResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             creationRegistrationAvailable = false
-            return MobileWalletCredentialRegistrationResult.Unavailable("Credential Manager requires API 23")
+            return CredentialRegistrationResult.Unavailable("Credential Manager requires API 23")
         }
         return runCatching {
             val matcher = applicationContext.assets.open(OPENID4VCI_MATCHER_ASSET).use { it.readBytes() }
@@ -128,15 +118,15 @@ public class AndroidDigitalCredentialRegistry(
                 ) {},
             )
             creationRegistrationAvailable = true
-            MobileWalletCredentialRegistrationResult.Applied(1)
+            CredentialRegistrationResult.Applied(1)
         }.getOrElse { error ->
             if (error is CancellationException) throw error
             creationRegistrationAvailable = false
-            MobileWalletCredentialRegistrationResult.Unavailable(error.message ?: error::class.simpleName ?: "Creation-option registration failed")
+            CredentialRegistrationResult.Unavailable(error.message ?: error::class.simpleName ?: "Creation-option registration failed")
         }
     }
 
-    override val capabilities: MobileWalletDigitalCredentialCapabilities
+    override val capabilities: DigitalCredentialCapabilities
         get() {
             val platformAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
             val runtimeAvailable = platformAvailable && registrationAvailable
@@ -151,68 +141,68 @@ public class AndroidDigitalCredentialRegistry(
                 !creationRegistrationAvailable -> "Credential creation registration has not completed successfully"
                 else -> null
             }
-            return MobileWalletDigitalCredentialCapabilities(
+            return DigitalCredentialCapabilities(
                 platform = "Android Credential Manager",
                 platformAvailable = platformAvailable,
                 minimumOsVersion = "Android 6 (API 23)",
                 registrationAvailable = runtimeAvailable,
                 capabilities = listOf(
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+                    DigitalCredentialCapability(
+                        protocol = DigitalCredentialProtocols.OPENID4VP_UNSIGNED,
                         credentialFormats = listOf(
-                            MobileWalletDigitalCredentialFormat.MDOC,
-                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                            DigitalCredentialFormat.MDOC,
+                            DigitalCredentialFormat.SD_JWT_VC,
                         ),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
+                        requestProtection = listOf(DigitalCredentialRequestProtection.UNSIGNED),
                         // response_mode=dc_api and dc_api.jwt respectively.
                         responseProtection = listOf(
-                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
-                            MobileWalletDigitalCredentialResponseProtection.JWE,
+                            DigitalCredentialResponseProtection.UNENCRYPTED,
+                            DigitalCredentialResponseProtection.JWE,
                         ),
                         supported = runtimeAvailable,
                         unsupportedReason = unavailableReason,
                     ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                    DigitalCredentialCapability(
+                        protocol = DigitalCredentialProtocols.OPENID4VP_SIGNED,
                         credentialFormats = listOf(
-                            MobileWalletDigitalCredentialFormat.MDOC,
-                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                            DigitalCredentialFormat.MDOC,
+                            DigitalCredentialFormat.SD_JWT_VC,
                         ),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.SIGNED),
+                        requestProtection = listOf(DigitalCredentialRequestProtection.SIGNED),
                         responseProtection = listOf(
-                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
-                            MobileWalletDigitalCredentialResponseProtection.JWE,
+                            DigitalCredentialResponseProtection.UNENCRYPTED,
+                            DigitalCredentialResponseProtection.JWE,
                         ),
                         supported = runtimeAvailable,
                         unsupportedReason = unavailableReason,
                     ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
+                    DigitalCredentialCapability(
+                        protocol = DigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
                         credentialFormats = listOf(
-                            MobileWalletDigitalCredentialFormat.MDOC,
-                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                            DigitalCredentialFormat.MDOC,
+                            DigitalCredentialFormat.SD_JWT_VC,
                         ),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.MULTISIGNED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
+                        requestProtection = listOf(DigitalCredentialRequestProtection.MULTISIGNED),
+                        responseProtection = listOf(DigitalCredentialResponseProtection.UNENCRYPTED),
                         supported = false,
                         unsupportedReason = MULTISIGNED_UNSUPPORTED_REASON,
                     ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
-                        credentialFormats = listOf(MobileWalletDigitalCredentialFormat.MDOC),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.READER_AUTHENTICATED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.HPKE),
+                    DigitalCredentialCapability(
+                        protocol = DigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+                        credentialFormats = listOf(DigitalCredentialFormat.MDOC),
+                        requestProtection = listOf(DigitalCredentialRequestProtection.READER_AUTHENTICATED),
+                        responseProtection = listOf(DigitalCredentialResponseProtection.HPKE),
                         supported = runtimeAvailable,
                         unsupportedReason = unavailableReason,
                     ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+                    DigitalCredentialCapability(
+                        protocol = DigitalCredentialProtocols.OPENID4VCI_V1,
                         credentialFormats = listOf(
-                            MobileWalletDigitalCredentialFormat.MDOC,
-                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                            DigitalCredentialFormat.MDOC,
+                            DigitalCredentialFormat.SD_JWT_VC,
                         ),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
+                        requestProtection = listOf(DigitalCredentialRequestProtection.UNSIGNED),
+                        responseProtection = listOf(DigitalCredentialResponseProtection.UNENCRYPTED),
                         supported = creationAvailable,
                         unsupportedReason = creationUnavailableReason,
                     ),
@@ -222,12 +212,12 @@ public class AndroidDigitalCredentialRegistry(
 
     @OptIn(ExperimentalSerializationApi::class)
     internal fun encodeAnnexCCredentialDatabase(
-        records: List<MobileWalletCredentialRegistryRecord>,
+        records: List<RegistryEntry>,
     ): ByteArray = coseCompliantCbor.encodeToByteArray(
         AndroidAnnexCCredentialDatabase(
-            protocols = listOf(MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C),
+            protocols = listOf(DigitalCredentialProtocols.ISO_MDOC_ANNEX_C),
             credentials = records
-                .filter { it.format == MobileWalletDigitalCredentialFormat.MDOC }
+                .filter { it.format == DigitalCredentialFormat.MDOC }
                 .map { record ->
                     AndroidAnnexCCredential(
                         title = record.display.name,
@@ -307,7 +297,7 @@ public class AndroidDigitalCredentialRegistry(
             out.toByteArray()
         }
     }
-    internal fun MobileWalletCredentialRegistryRecord.toAndroidEntry(): DigitalCredentialEntry {
+    internal fun RegistryEntry.toAndroidEntry(): DigitalCredentialEntry {
         val display = setOf(
             VerificationEntryDisplayProperties(
                 this.display.name,
@@ -318,7 +308,7 @@ public class AndroidDigitalCredentialRegistry(
             )
         )
         return when (format) {
-            MobileWalletDigitalCredentialFormat.MDOC -> MdocEntry(
+            DigitalCredentialFormat.MDOC -> MdocEntry(
                 docType = type,
                 fields = fields.map { field ->
                     require(field.path.size == 2) { "mdoc registry fields require namespace and element paths" }
@@ -336,7 +326,7 @@ public class AndroidDigitalCredentialRegistry(
                 id = registryEntryId,
             )
 
-            MobileWalletDigitalCredentialFormat.SD_JWT_VC -> SdJwtEntry(
+            DigitalCredentialFormat.SD_JWT_VC -> SdJwtEntry(
                 verifiableCredentialType = type,
                 claims = fields.map { field ->
                     val value = field.valueJson.registryScalar()
@@ -374,8 +364,8 @@ public class AndroidDigitalCredentialRegistry(
 
     private suspend fun registerRecords(
         registryId: String,
-        records: List<MobileWalletCredentialRegistryRecord>,
-    ): MobileWalletCredentialRegistrationResult {
+        records: List<RegistryEntry>,
+    ): CredentialRegistrationResult {
         val entries = records.map { it.toAndroidEntry() }
         return runCatching {
             // Signed is always advertised. Unsigned is opt-in so Credential Manager does not route
@@ -403,11 +393,11 @@ public class AndroidDigitalCredentialRegistry(
                 )
             )
             registrationAvailable = true
-            MobileWalletCredentialRegistrationResult.Applied(records.map { it.registryEntryId }.distinct().size)
+            CredentialRegistrationResult.Applied(records.map { it.registryEntryId }.distinct().size)
         }.getOrElse { error ->
             if (error is CancellationException) throw error
             registrationAvailable = false
-            MobileWalletCredentialRegistrationResult.Unavailable(error.message ?: error::class.simpleName ?: "Credential registration failed")
+            CredentialRegistrationResult.Unavailable(error.message ?: error::class.simpleName ?: "Credential registration failed")
         }
     }
 
@@ -429,14 +419,14 @@ public class AndroidDigitalCredentialRegistry(
             .toString()
             .ifBlank { applicationContext.packageName }
 
-    private fun MobileWalletCredentialRegistryRecord.withLocalThumbnail(): MobileWalletCredentialRegistryRecord {
+    private fun RegistryEntry.withLocalThumbnail(): RegistryEntry {
         if (display.iconPng != null) return this
         val png = display.cardArt.fallbackPng?.takeIf(::isImageBytes)
             ?: solidColorPng(parseCssRgb(display.cardArt.backgroundColor) ?: MobileWalletRegistryIcons.DefaultCardBlueRgb)
         return copy(display = display.withIcon(png))
     }
 
-    private suspend fun MobileWalletCredentialRegistryRecord.withResolvedThumbnail(): MobileWalletCredentialRegistryRecord {
+    private suspend fun RegistryEntry.withResolvedThumbnail(): RegistryEntry {
         if (display.cardArt.imageUris.isEmpty()) return withLocalThumbnail()
         val png = MobileWalletRegistryIcons.resolveIconPng(
             art = display.cardArt,
@@ -445,98 +435,15 @@ public class AndroidDigitalCredentialRegistry(
         return copy(display = display.withIcon(png))
     }
 
-    private fun MobileWalletCredentialRegistryRecord.entryIconBitmap(): Bitmap =
+    private fun RegistryEntry.entryIconBitmap(): Bitmap =
         this.display.iconPng?.decodeRegistryIcon() ?: applicationIcon
 
-    private fun MobileWalletCredentialRegistryRecord.entryIconPng(): ByteArray {
+    private fun RegistryEntry.entryIconPng(): ByteArray {
         val recordIcon = this.display.iconPng
         return recordIcon?.decodeRegistryIcon()?.toPngBytes()
             ?: recordIcon
             ?: applicationIconPng
     }
-
-    private fun ByteArray.decodeRegistryIcon(): Bitmap? {
-        if (!isImageBytes(this)) return null
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(this, 0, size, bounds)
-        val width = bounds.outWidth.toLong()
-        val height = bounds.outHeight.toLong()
-        if (width <= 0L || height <= 0L) return null
-        if (width * height > REGISTRY_ICON_MAX_PIXELS) return null
-        val bitmap = BitmapFactory.decodeByteArray(this, 0, size) ?: return null
-        return bitmap.scaleToMaxEdge(REGISTRY_ICON_MAX_EDGE_PX)
-    }
-
-    private fun Bitmap.toPngBytes(): ByteArray =
-        ByteArrayOutputStream().use { out ->
-            compress(CompressFormat.PNG, 100, out)
-            out.toByteArray()
-        }
-
-    private fun Bitmap.scaleToMaxEdge(maxEdgePx: Int): Bitmap {
-        val longestEdge = maxOf(width, height)
-        if (longestEdge <= maxEdgePx) return this
-        val scale = maxEdgePx.toFloat() / longestEdge.toFloat()
-        return Bitmap.createScaledBitmap(
-            this,
-            (width * scale).toInt().coerceAtLeast(1),
-            (height * scale).toInt().coerceAtLeast(1),
-            true,
-        )
-    }
-
-    private fun loadApplicationIcon(context: Context): Bitmap {
-        val drawable = context.packageManager.getApplicationIcon(context.applicationInfo)
-        return drawable.toBitmap(maxEdgePx = REGISTRY_ICON_MAX_EDGE_PX)
-    }
-
-    private fun Drawable.toBitmap(maxEdgePx: Int): Bitmap {
-        val source = when {
-            this is BitmapDrawable && bitmap != null && !bitmap.isRecycled -> bitmap
-            else -> {
-                val width = intrinsicWidth.takeIf { it > 0 } ?: maxEdgePx
-                val height = intrinsicHeight.takeIf { it > 0 } ?: maxEdgePx
-                Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
-                    val canvas = Canvas(bitmap)
-                    setBounds(0, 0, canvas.width, canvas.height)
-                    draw(canvas)
-                }
-            }
-        }
-        return source.scaleToMaxEdge(maxEdgePx)
-    }
-
-    // The platform can select a field by its path without knowing its exact value. Keep
-    // compound and embedded media values in wallet storage; a null matcher value cannot satisfy
-    // an exact-value query (MdocField's documented photo behavior). This policy is independent
-    // of claim names and credential formats and applies to both native registry encodings.
-    private fun String.registryScalar(): JsonPrimitive? {
-        // Registry records already contain valid JSON. Avoid constructing a potentially large
-        // tree for compound values that cannot become scalar matcher values.
-        when (firstOrNull { !it.isWhitespace() }) {
-            '[', '{' -> return null
-        }
-        val value = Json.parseToJsonElement(this) as? JsonPrimitive ?: return null
-        if (value === JsonNull) return null
-        if (value.isString) {
-            val prefix = value.content.take(128).trimStart()
-            if (prefix.startsWith("data:", ignoreCase = true) ||
-                EncodedImagePrefixes.any(prefix::startsWith)
-            ) return null
-        }
-        return value
-    }
-
-    private fun JsonPrimitive.toPlatformValue(): Any = when {
-        isString -> content
-        booleanOrNull != null -> requireNotNull(booleanOrNull)
-        longOrNull != null -> requireNotNull(longOrNull)
-        doubleOrNull != null -> requireNotNull(doubleOrNull)
-        else -> content
-    }
-
-    private fun JsonPrimitive.registryDisplayValue(): String =
-        content.take(MAX_FIELD_DISPLAY_LENGTH)
 
     private companion object {
         // A process can have multiple wallet handles (main UI and Credential Manager activities).
@@ -551,12 +458,11 @@ public class AndroidDigitalCredentialRegistry(
 
         // Vendored, not a dependency. See OPENID4VP-MATCHER.md.
         internal const val OPENID4VP_MATCHER_ASSET = "id/walt/wallet2/mobile/openid4vpmatcher.wasm"
-        private const val MAX_MATCHER_VALUE_LENGTH = 128
-        private const val MAX_FIELD_DISPLAY_LENGTH = 128
-        private val EncodedImagePrefixes = listOf("iVBORw0KGgo", "/9j/", "_9j_", "R0lGOD", "UklGR")
-        /** Credential Manager selector icons are small; keep registry PNG payloads modest. */
-        private const val REGISTRY_ICON_MAX_EDGE_PX = 128
-        private const val REGISTRY_ICON_MAX_PIXELS = 2_048L * 2_048L
+
+
+
+
+
         private const val MULTISIGNED_UNSUPPORTED_REASON =
             "The wallet does not support JWS JSON Serialization request objects"
     }

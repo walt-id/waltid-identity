@@ -1,6 +1,6 @@
 package id.walt.walletdemo.compose.android
 
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
+import id.walt.wallet2.mobile.presentation.PresentationSelection
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import id.walt.walletdemo.compose.logic.WalletDemoStatusReadState
 import id.walt.walletdemo.compose.logic.toDemoStatuses
@@ -17,14 +17,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.credentials.provider.ProviderGetCredentialRequest
 import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialProvider
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCPreview
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCRequest
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCSubmission
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialPreview
-import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
-import id.walt.wallet2.mobile.presentation.MobileWalletPresentationDisclosureSelection
+import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.digitalcredentials.AnnexCPreview
+import id.walt.wallet2.mobile.digitalcredentials.AnnexCRequest
+import id.walt.wallet2.mobile.digitalcredentials.AnnexCSubmission
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialPreview
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
+import id.walt.wallet2.mobile.presentation.PresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.PresentationDisclosureSelection
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSharingSelection
 import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
@@ -47,7 +47,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         private set
     var statusReviewNotice by mutableStateOf<String?>(null)
         private set
-    private var statusWallet: MobileWallet? = null
+    private var statusWallet: Wallet? = null
     private var statusObservation: Job? = null
     private var statusReviewEnabled = false
     private val context = context.applicationContext
@@ -90,7 +90,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
                 }
             }
         }
-        if (input.request.protocol == MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
+        if (input.request.protocol == DigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
             val request = wallet.annexCRequest(input.request)
             val preview = wallet.previewAnnexCPresentation(request)
             currentCoroutineContext().ensureActive()
@@ -105,7 +105,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
                 prepareClaimReview = { selection ->
                     wallet.reviewDigitalCredentialPresentation(
                         preview.requestId,
-                        MobileWalletPresentationSelection(
+                        PresentationSelection(
                             credentials = selection.toCredentialSelections(),
                             disclosures = selection.toDisclosureSelections(),
                         ),
@@ -114,7 +114,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
                 preparePaymentConsent = { selection ->
                     wallet.prepareDigitalCredentialPaymentConsent(
                         preview.requestId,
-                        MobileWalletPresentationSelection(
+                        PresentationSelection(
                             credentials = selection.toCredentialSelections(),
                             disclosures = selection.toDisclosureSelections(),
                         ),
@@ -161,15 +161,15 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
     fun back() { if (!submitting) finish() }
 
     private suspend fun submitDigitalCredential(
-        wallet: MobileWallet,
-        preview: MobileWalletDigitalCredentialPreview,
+        wallet: Wallet,
+        preview: DigitalCredentialPreview,
         selection: WalletDemoSharingSelection,
         providerRequest: ProviderGetCredentialRequest,
     ) {
         val response = if (statusReviewEnabled) wallet.submitStatusReviewedDigitalCredentialPresentation(
             reviewedStatus = selection.credentialStatusRevisions,
             requestId = preview.requestId,
-            selection = MobileWalletPresentationSelection(
+            selection = PresentationSelection(
                 credentials = selection.toCredentialSelections(),
                 disclosures = selection.toDisclosureSelections(),
             ),
@@ -177,7 +177,7 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
         )
         else wallet.submitDigitalCredentialPresentation(
             preview.requestId,
-            MobileWalletPresentationSelection(
+            PresentationSelection(
                 credentials = selection.toCredentialSelections(),
                 disclosures = selection.toDisclosureSelections(),
             ),
@@ -189,13 +189,13 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
     }
 
     private suspend fun submitAnnexC(
-        wallet: MobileWallet,
-        preview: MobileWalletAnnexCPreview,
-        request: MobileWalletAnnexCRequest,
+        wallet: Wallet,
+        preview: AnnexCPreview,
+        request: AnnexCRequest,
         selection: WalletDemoSharingSelection,
         providerRequest: ProviderGetCredentialRequest,
     ) {
-        val submission = MobileWalletAnnexCSubmission(
+        val submission = AnnexCSubmission(
                 requestId = preview.requestId,
                 verifiedOrigin = preview.verifiedOrigin,
                 deviceRequestBase64Url = requireNotNull(request.deviceRequestBase64Url),
@@ -225,8 +225,8 @@ internal class DigitalCredentialProviderModel(context: Context) : DigitalCredent
     }
 }
 
-private fun WalletDemoSharingSelection.toCredentialSelections(): List<MobileWalletPresentationCredentialSelection> =
-    credentials.map { MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId) }
+private fun WalletDemoSharingSelection.toCredentialSelections(): List<PresentationCredentialSelection> =
+    credentials.map { PresentationCredentialSelection(it.queryId, it.credentialId) }
 
-private fun WalletDemoSharingSelection.toDisclosureSelections(): List<MobileWalletPresentationDisclosureSelection> =
-    disclosures.map { MobileWalletPresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }
+private fun WalletDemoSharingSelection.toDisclosureSelections(): List<PresentationDisclosureSelection> =
+    disclosures.map { PresentationDisclosureSelection(it.queryId, it.credentialId, it.path) }
