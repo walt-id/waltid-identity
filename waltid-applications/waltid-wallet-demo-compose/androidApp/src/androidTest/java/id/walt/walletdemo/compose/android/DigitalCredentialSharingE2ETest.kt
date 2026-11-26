@@ -7,6 +7,7 @@ import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialRegistr
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryField
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntryDisplay
 import id.walt.mobile.test.DigitalCredentialProviderTest
 
 import android.content.Context
@@ -99,11 +100,18 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         val parent = "https://types.example/credentials/parent"
         val title = "Inherited metadata fixture"
         val record = MobileWalletCredentialRegistryRecord(
-            registryEntryId = "one-logical-credential", credentialId = "one-stored-credential",
+            registryEntryId = "one-logical-credential",
+            credentialId = "one-stored-credential",
             format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
-            type = leaf, fields = listOf(MobileWalletCredentialRegistryField(
-                path = listOf("given_name"), valueJson = "\"Ada\"", selectivelyDisclosable = false,
-            )), displayName = title,
+            type = leaf,
+            fields = listOf(
+                MobileWalletCredentialRegistryField(
+                    path = listOf("given_name"),
+                    valueJson = "\"Ada\"",
+                    selectivelyDisclosable = false,
+                ),
+            ),
+            display = RegistryEntryDisplay(name = title),
         )
         val registration = registry.replace(registryId, listOf(record, record.copy(type = parent)))
         assertTrue("Registry unavailable: ${registration.reason}", registration.available)

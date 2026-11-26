@@ -34,7 +34,11 @@ class SigningIdentityRecoveryDeviceTest {
                 println("Identity destination=$storage security=${created.keyFacts.securityLevel} origin=${created.keyFacts.origin}")
                 if (storage == SigningIdentityKeyStorage.HardwareBacked) assertEquals(KeyOrigin.IMPORTED, created.keyFacts.origin)
                 val reopened = factory.create(originalConfiguration)
-                assertEquals(created, assertIs<SigningIdentityState.Active>(reopened.signingIdentity.state()).identity)
+                try {
+                    assertEquals(created, assertIs<SigningIdentityState.Active>(reopened.signingIdentity.state()).identity)
+                } finally {
+                    reopened.close()
+                }
                 val candidate = destination.signingIdentity.discoverRecovery().candidates.single()
                 val restore = destination.signingIdentity.restorationOptions(candidate).single { it.storage == storage }
                 val restored = assertIs<SigningIdentityOperationResult.Active>(destination.signingIdentity.restore(restore)).identity
