@@ -81,29 +81,47 @@ data class ClientIdTrustConfiguration(
  * trusted for [TrustPurpose.WALLET_PRESENTATION_AUTH_REQUEST], under [TrustRequirement.RegistryFresh]:
  * `TRUSTED` for one of [expectedEntityTypes], from an accepted, `FRESH` source.
  *
+ * @property evaluator owns the path validation. The wallet orders `x5c` only by issuer and subject names
+ *   and, where present, key identifiers; the one signature it verifies is the request's, against the leaf key.
+ *   Before answering `TRUSTED`, an evaluator must cryptographically validate the path from the leaf (the first
+ *   `x5c` certificate) to a certificate listed in an accepted source, and report that listing as the matched
+ *   entity. The wallet then checks its entity type, the source's freshness and its acceptance. The walt.id
+ *   Trust Registry's `resolve/certificate-chain` validates the path with PKIX.
  * @property expectedEntityTypes the registry roles a verifier's chain may match. They come from the
- *   wallet's configuration, never from the request.
+ *   wallet's configuration, never from the request. Copied at construction into a set that rejects changes,
+ *   so neither the caller nor another wallet can change them afterwards.
  * @property requireAuthenticatedSource additionally require an `AUTHENTICATED` trust source.
  */
 class ClientIdX509TrustRegistry(
     val evaluator: TrustDecisionEvaluator,
-    val expectedEntityTypes: Set<TrustedEntityType> = RELYING_PARTY_ENTITY_TYPES,
+    expectedEntityTypes: Set<TrustedEntityType> = RELYING_PARTY_ENTITY_TYPES,
     val requireAuthenticatedSource: Boolean = false,
 ) {
+    val expectedEntityTypes: Set<TrustedEntityType> = expectedEntityTypes.toReadOnlySet()
+
     init {
-        require(expectedEntityTypes.isNotEmpty()) { "expectedEntityTypes must name at least one entity type" }
+        require(this.expectedEntityTypes.isNotEmpty()) { "expectedEntityTypes must name at least one entity type" }
     }
 
     override fun toString(): String =
         "ClientIdX509TrustRegistry(expectedEntityTypes=$expectedEntityTypes, requireAuthenticatedSource=$requireAuthenticatedSource)"
 
     companion object {
-        /** A relying party listed itself, or by the provider of its access certificate. */
+        /** A relying party listed itself, or by the provider of its access certificate. Rejects changes. */
         val RELYING_PARTY_ENTITY_TYPES: Set<TrustedEntityType> = setOf(
             TrustedEntityType.RELYING_PARTY_PROVIDER,
             TrustedEntityType.ACCESS_CERTIFICATE_PROVIDER,
-        )
+        ).toReadOnlySet()
     }
+}
+
+/**
+ * A copy that rejects changes, also through `java.util.Set` from Java: [buildSet] returns a read-only
+ * implementation that throws on any change, while [setOf] and [toSet] return a `LinkedHashSet` that a cast can change.
+ */
+private fun Set<TrustedEntityType>.toReadOnlySet(): Set<TrustedEntityType> {
+    val source = this
+    return buildSet { addAll(source) }
 }
 
 internal fun X509CertificateTrustStore?.isMissing(): Boolean =

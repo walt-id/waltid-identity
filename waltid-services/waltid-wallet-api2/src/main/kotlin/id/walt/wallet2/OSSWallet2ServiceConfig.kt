@@ -85,7 +85,9 @@ data class ClientIdTrustConfig(
  *
  * @property resolveCertificateChainUrl the full URL of a `resolve/certificate-chain` endpoint, for example an
  *   Enterprise `{base}/v1/{target}/trust-registry-api/resolve/certificate-chain`. A resolver on a loopback or
- *   private address must be allowed in `network-fetch-guard.conf`.
+ *   private address must be allowed in `network-fetch-guard.conf`. The wallet verifies no certificate signature
+ *   in the chain, so the resolver must validate the path itself, as the Enterprise Trust Registry does
+ *   (see [ClientIdX509TrustRegistry.evaluator]).
  * @property headers sent with every request, for example `Authorization = "Bearer ..."`.
  * @property expectedEntityTypes the registry roles a verifier's chain may match.
  * @property requireAuthenticatedSource additionally require an authenticated (signed and trusted) source.

@@ -96,6 +96,9 @@ to a pinned anchor:
   The decision must meet `TrustRequirement.RegistryFresh`: `TRUSTED` for a relying-party entity type,
   from an accepted, fresh source. An `UNKNOWN` decision fails with `X509TrustSourceUnavailable`, any
   other denial with `X509TrustAnchorMismatch`.
+  The wallet verifies no certificate signature in the chain. Before answering `TRUSTED`, an evaluator
+  must validate the path from the leaf to a certificate listed in an accepted source. The walt.id Trust
+  Registry does this with PKIX.
 
 ```kotlin
 val trust = ClientIdTrustConfiguration(

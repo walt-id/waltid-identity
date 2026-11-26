@@ -40,10 +40,11 @@ internal object ClientIdX509Trust {
     }
 
     /**
-     * The registry owns the anchors and the path validation. The wallet still requires one chain in leaf-first
-     * order, so that a resolver matching any presented certificate cannot be satisfied by an unrelated trusted
-     * certificate appended to `x5c`, plus every certificate within its validity period and a leaf that may sign
-     * a verifier's request.
+     * The registry owns the anchors and the path validation, certificate signatures included: the leaf-first
+     * check below links certificates only by names and key identifiers (see `ClientIdX509TrustRegistry.evaluator`).
+     * The wallet still requires one chain in leaf-first order, so that a resolver matching any presented
+     * certificate cannot be satisfied by an unrelated trusted certificate appended to `x5c`, plus every
+     * certificate within its validity period and a leaf that may sign a verifier's request.
      */
     private fun localChainViolations(certificates: List<X509Certificate>): List<String> = buildList {
         val chainProblem = try {
