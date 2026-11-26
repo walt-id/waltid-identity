@@ -267,7 +267,10 @@ data class SameDeviceFlowSetup(
     val redirects: Verification2Session.VerificationSessionRedirects // Required for final redirect
 ) : UrlBearingDeviceFlowSetup, OpenID4VP1FlowSetup {
     init {
-        require(redirects.successRedirectUri != null) { "same_device requires redirects.success_redirect_uri." }
+        val successRedirect = requireNotNull(redirects.successRedirectUri) { "same_device requires redirects.success_redirect_uri." }
+        require("response_code" !in successRedirect.parameters) {
+            "same_device redirects.success_redirect_uri must not contain the reserved response_code parameter."
+        }
         require(core.requestedElements == null) { "requestedElements is only supported for ISO 18013-7 DC API. Use dcql_query for OpenID4VP flows." }
     }
 }
