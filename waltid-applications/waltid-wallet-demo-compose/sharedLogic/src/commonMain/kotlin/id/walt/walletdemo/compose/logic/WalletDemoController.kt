@@ -78,7 +78,8 @@ class WalletDemoController(
     private var loadingCancellationJob: Job? = null
     private val loadingGeneration = MutableStateFlow(0L)
     private var receiveJob: Job? = null
-    private var issuanceSession: WalletDemoIssuanceSession? = null
+    private data class ActiveIssuance(val offer: WalletDemoIssuanceSession, val authorizationId: String? = null)
+    private var activeIssuance: ActiveIssuance? = null
     private var pendingAuthorizationCallback: String? = null
     private var presentationJob: Job? = null
     private var paymentConsentJob: Job? = null
@@ -1122,7 +1123,7 @@ class WalletDemoController(
                     )
                 }
                 if (installed) {
-                    issuanceSession = session
+                    activeIssuance = ActiveIssuance(session)
                 } else {
                     wallet.cancelIssuance(session.id)
                 }
@@ -1159,7 +1160,7 @@ class WalletDemoController(
         val ready = current.session as? WalletSessionState.Ready ?: return
         if (!current.acceptOfferEnabled) return
         val preview = current.offerPreview ?: return
-        val session = issuanceSession ?: return
+        val session = activeIssuance?.offer ?: return
         val offerUrl = current.requestDrafts.offerUrl.trim()
         // Only forward a tx_code when the offer actually requested one; issuers now reject
         // an unsolicited tx_code (OpenID4VCI 1.0 §6.3).
@@ -1177,6 +1178,9 @@ class WalletDemoController(
                     )
                     WalletDemoIssuanceGrant.AuthorizationCode -> {
                         val authorization = wallet.beginAuthorizationIssuance(session.id, issuanceRedirectUri, selections)
+                        currentCoroutineContext().ensureActive()
+                        if (!isCurrent(request) || activeIssuance?.offer !== session) return@launch
+                        activeIssuance = ActiveIssuance(session, authorization.id)
                         updateIfCurrent(request, WalletOperationState.Receiving) {
                             it.copy(authorizationRequestUrl = authorization.url, operation = WalletOperationState.OfferPreview)
                         }
@@ -1196,8 +1200,8 @@ class WalletDemoController(
     }
 
     fun declineOffer() {
-        val sessionId = issuanceSession?.id ?: return
-        issuanceSession = null
+        val sessionId = activeIssuance?.offer?.id ?: return
+        activeIssuance = null
         val declineTab = WalletDemoTab.Credentials
         val declined = WalletOperationState.Succeeded(WalletDisplayText.CredentialOfferDeclined, declineTab)
         _state.update {
@@ -1240,7 +1244,7 @@ class WalletDemoController(
         val ids = when (outcome) {
             is WalletDemoIssuanceOutcome.Stored -> outcome.credentialIds
             is WalletDemoIssuanceOutcome.Deferred -> {
-                issuanceSession = null
+                activeIssuance = null
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.copy(
                         offerPreview = null,
@@ -1266,7 +1270,7 @@ class WalletDemoController(
                 return
             }
             WalletDemoIssuanceOutcome.Cancelled -> {
-                issuanceSession = null
+                activeIssuance = null
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.copy(
                         offerPreview = null,
@@ -1286,7 +1290,7 @@ class WalletDemoController(
                 return
             }
             is WalletDemoIssuanceOutcome.Failed -> {
-                if (outcome.offerConsumed) issuanceSession = null
+                if (outcome.offerConsumed) activeIssuance = null
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.copy(
                         offerPreview = if (outcome.offerConsumed) null else it.offerPreview,
@@ -1312,7 +1316,7 @@ class WalletDemoController(
                 return
             }
         }
-        issuanceSession = null
+        activeIssuance = null
         var detailsError: String? = null
         val credentials = try { wallet.listCredentials() }
         catch (cancelled: CancellationException) { throw cancelled }
@@ -1527,11 +1531,9 @@ class WalletDemoController(
 
     private fun continueAuthorization(callbackUri: String) {
         if (!_state.value.canAcceptExternalRequest) return
-        if (issuanceSession == null) {
-            issuanceSession = wallet.pendingAuthorizationIssuance()
-        }
-        val session = issuanceSession
-        if (session == null) {
+        val currentIssuance = activeIssuance
+        val authorizationId = if (currentIssuance == null) wallet.pendingAuthorizationId() else currentIssuance.authorizationId
+        if (authorizationId == null) {
             _state.update { current ->
                 if (canOpenExternalRequest() && current.externalFlow == null && !current.isBusy && current.offerPreview == null && current.presentationReview == null) {
                     current.copy(externalFlow = WalletExternalFlow.UnavailableCallback(callbackUri), selectedTab = WalletDemoTab.Receive)
@@ -1564,7 +1566,7 @@ class WalletDemoController(
                 completeIssuanceOutcome(
                     ready,
                     request,
-                    wallet.continueAuthorizationIssuance(session.id, callbackUri),
+                    wallet.completeAuthorization(authorizationId, callbackUri),
                 )
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -2017,8 +2019,8 @@ class WalletDemoController(
     }
 
     private fun cancelIssuance() {
-        val sessionId = issuanceSession?.id ?: return
-        issuanceSession = null
+        val sessionId = activeIssuance?.offer?.id ?: return
+        activeIssuance = null
         scope.launch(dispatcher) {
             runCatching { wallet.cancelIssuance(sessionId) }
         }

@@ -66,8 +66,8 @@ interface DemoWallet {
         transactionCode: String?,
         credentials: List<WalletDemoCredentialSelection>,
     ): WalletDemoIssuanceOutcome
-    suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
     ): WalletDemoIssuanceOutcome
     suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome
@@ -101,7 +101,7 @@ interface DemoWallet {
 
     /**
      * Web hosts persist authorization-code issuance across a full-page issuer redirect.
-     * Mobile keeps the session in memory, so the default is no pending session.
+     * Return the authorization ID for the active wallet when a redirect has survived a reload.
      */
-    fun pendingAuthorizationIssuance(): WalletDemoIssuanceSession? = null
+    fun pendingAuthorizationId(): String? = null
 }

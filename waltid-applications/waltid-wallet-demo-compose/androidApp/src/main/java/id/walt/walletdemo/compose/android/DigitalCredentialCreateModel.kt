@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.credentials.ExperimentalDigitalCredentialApi
+import id.walt.wallet2.mobile.issuance.IssuanceAuthorizationId
 import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialCreateProvider
 import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialCreateResponse
 import id.walt.walletdemo.compose.logic.*
@@ -27,6 +28,7 @@ internal class DigitalCredentialCreateModel(
     private val context = context.applicationContext
     private val client = client ?: WalletDigitalCredentialCreateClient(context, ::interactionActivity)
     private var session: WalletDemoIssuanceSession? = null
+    private var pendingAuthorizationId: IssuanceAuthorizationId? = null
     private var holder: WalletDemoHolderBinding? = null
     private var protocol: String? = null
     private var completion: Intent? = null
@@ -64,11 +66,12 @@ internal class DigitalCredentialCreateModel(
                 WalletDemoIssuanceGrant.AuthorizationCode -> {
                     val authorization = client.authorize(started.id, selections)
                     currentCoroutineContext().ensureActive()
-                    DigitalCredentialCreateAuthHandoff.register(context, started.id, authorization.state, authorization.redirectUri) { uri ->
+                    pendingAuthorizationId = authorization.id
+                    DigitalCredentialCreateAuthHandoff.register(context, authorization.id.value, authorization.request.state, authorization.request.redirectUri) { uri ->
                         scope.launch { awaitCurrentOperation(); continueAuthorization(uri) }
                     }
                     state = WalletDemoOfferCreateUiState.WaitingForAuthorization()
-                    DigitalCredentialCreateAuthHandoff.openExternalBrowser(context, authorization.url)
+                    DigitalCredentialCreateAuthHandoff.openExternalBrowser(context, authorization.request.url)
                 }
             }
         }
@@ -76,7 +79,7 @@ internal class DigitalCredentialCreateModel(
 
     private fun continueAuthorization(callback: String) {
         val waiting = state as? WalletDemoOfferCreateUiState.WaitingForAuthorization ?: return
-        val id = session?.id ?: return
+        val id = pendingAuthorizationId ?: return
         if (waiting.completing || result != null || released) return
         state = waiting.copy(completing = true)
         // The callback trampoline can be in a different task from the Credential Manager caller.
@@ -88,8 +91,8 @@ internal class DigitalCredentialCreateModel(
         }
         preserveContinuations = true
         perform {
-            try { completeOutcome(client.continueAuthorization(id, callback)) }
-            finally { DigitalCredentialCreateAuthHandoff.clear(context, id) }
+            try { completeOutcome(client.completeAuthorization(id, callback)) }
+            finally { clearAuthorization() }
         }
     }
 
@@ -209,15 +212,20 @@ internal class DigitalCredentialCreateModel(
 
     override fun showFailure(cause: Exception) {
         Log.e("WaltDigitalCredentials", "Digital credential issuance failed (${cause::class.simpleName})", cause)
-        session?.id?.let { DigitalCredentialCreateAuthHandoff.clear(context, it) }
+        clearAuthorization()
         state = WalletDemoOfferCreateUiState.Failure(cause.message ?: "The request could not be completed.")
     }
 
     override suspend fun releaseRequest() {
+        clearAuthorization()
         session?.id?.let { id ->
-            DigitalCredentialCreateAuthHandoff.clear(context, id)
             // Leave both completed and interrupted remote work for the SDK continuation path.
             if (!preserveContinuations) runCatching { client.cancel(id) }
         }
+    }
+
+    private fun clearAuthorization() {
+        pendingAuthorizationId?.let { DigitalCredentialCreateAuthHandoff.clear(context, it.value) }
+        pendingAuthorizationId = null
     }
 }

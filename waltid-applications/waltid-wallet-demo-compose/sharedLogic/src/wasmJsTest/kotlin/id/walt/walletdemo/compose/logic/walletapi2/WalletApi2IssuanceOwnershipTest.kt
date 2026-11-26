@@ -57,7 +57,7 @@ class WalletApi2IssuanceOwnershipTest {
             wallet.cancelIssuance(session)
             pause.release.complete(Unit)
             assertTrue(pending.await().isFailure)
-            assertNull(wallet.pendingAuthorizationIssuance())
+            assertNull(wallet.pendingAuthorizationId())
             assertFailsWith<IllegalStateException> { wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies()) }
             assertTrue(deletedKeys.isEmpty(), "Accepted keys may already be in use and must be retained")
         }
@@ -159,9 +159,9 @@ class WalletApi2IssuanceOwnershipTest {
             val newer = start(authorization = true)
             wallet.beginAuthorizationIssuance(newer, BROWSER_REDIRECT_URI, copies())
             assertIs<WalletDemoIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(older, null, copies()))
-            assertEquals(newer, assertNotNull(wallet.pendingAuthorizationIssuance()).id)
+            assertEquals(newer, assertNotNull(wallet.pendingAuthorizationId()))
             wallet.cancelIssuance(older)
-            assertEquals(newer, assertNotNull(wallet.pendingAuthorizationIssuance()).id)
+            assertEquals(newer, assertNotNull(wallet.pendingAuthorizationId()))
         }
     }
 
@@ -174,9 +174,9 @@ class WalletApi2IssuanceOwnershipTest {
             val accepted = assertNotNull(WalletApi2BrowserSessionStore.loadPendingIssuance())
             assertEquals(registeredRedirectUri, accepted.redirectUri)
             val restored = newWallet()
-            assertEquals(session, assertNotNull(restored.pendingAuthorizationIssuance()).id)
+            assertEquals(session, assertNotNull(restored.pendingAuthorizationId()))
             assertIs<WalletDemoIssuanceOutcome.Stored>(
-                restored.continueAuthorizationIssuance(session, "$registeredRedirectUri?code=code&state=state"),
+                restored.completeAuthorization(session, "$registeredRedirectUri?code=code&state=state"),
             )
             assertEquals(2, generatedKeys)
             val receive = receiveBodies.single()
@@ -238,7 +238,7 @@ class WalletApi2IssuanceOwnershipTest {
                 { start() },
                 { wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies()) },
                 { wallet.continuePreAuthorizedIssuance(session, null, copies()) },
-                { wallet.continueAuthorizationIssuance(session, "$BROWSER_REDIRECT_URI?code=code&state=state") },
+                { wallet.completeAuthorization(session, "$BROWSER_REDIRECT_URI?code=code&state=state") },
                 { wallet.resumeDeferredIssuance("deferred") },
                 { wallet.previewPresentation("request") },
                 { wallet.submitPresentation(handle, emptyList(), emptyList(), null) },
@@ -247,7 +247,7 @@ class WalletApi2IssuanceOwnershipTest {
                 { wallet.deleteWallet() },
             )
             try {
-                assertNull(wallet.pendingAuthorizationIssuance())
+                assertNull(wallet.pendingAuthorizationId())
                 for (operation in operations) assertFailsWith<IllegalStateException> { operation() }
                 assertEquals(requestCount, requests.size, "Rejected operations must not reach HTTP")
             } finally {
@@ -266,7 +266,7 @@ class WalletApi2IssuanceOwnershipTest {
             failWalletDelete = true
             assertFailsWith<WalletApi2Exception> { wallet.deleteWallet() }
             assertEquals(0, walletCreates)
-            assertNull(wallet.pendingAuthorizationIssuance())
+            assertNull(wallet.pendingAuthorizationId())
             assertFailsWith<IllegalStateException> { start() }
             failWalletDelete = false
             wallet.deleteWallet()
@@ -329,11 +329,11 @@ class WalletApi2IssuanceOwnershipTest {
             wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies(1))
             assertEquals("wallet", WalletApi2BrowserSessionStore.loadPendingIssuance()?.walletId)
             val other = walletFor("other-wallet")
-            assertNull(other.pendingAuthorizationIssuance())
+            assertNull(other.pendingAuthorizationId())
             assertFailsWith<IllegalStateException> {
-                other.continueAuthorizationIssuance(session, "$BROWSER_REDIRECT_URI?code=code&state=state")
+                other.completeAuthorization(session, "$BROWSER_REDIRECT_URI?code=code&state=state")
             }
-            assertEquals(session, wallet.pendingAuthorizationIssuance()?.id)
+            assertEquals(session, wallet.pendingAuthorizationId())
             assertTrue(receiveBodies.isEmpty())
         }
     }

@@ -2234,6 +2234,7 @@ class WalletDemoControllerTest {
         controller.handleDeepLink("openid://callback?code=code-1&state=state-1")
         runCurrent()
 
+        assertEquals(listOf("browser-authorization"), wallet.completedAuthorizationIds)
         assertEquals(listOf("openid://callback?code=code-1&state=state-1"), wallet.authorizationCallbackUris)
         assertEquals(listOf("cred-auth"), controller.state.value.lastReceivedCredentialIds)
         assertTrue(controller.state.value.receiveCompleted)
@@ -4447,6 +4448,7 @@ private class FakeDemoWallet(
     var submittedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>? = null
     val cancelledIssuanceSessionIds = mutableListOf<String>()
     val authorizationCallbackUris = mutableListOf<String>()
+    val completedAuthorizationIds = mutableListOf<String>()
     val resumedDeferredCredentialIds = mutableListOf<String>()
     val discardedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
     val rejectedPresentationPreviewHandles = mutableListOf<WalletDemoPresentationPreviewHandle>()
@@ -4500,7 +4502,7 @@ private class FakeDemoWallet(
 
     override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization {
         receivedIssuanceSelections += credentials
-        return WalletDemoIssuanceAuthorization("openid://authorization")
+        return WalletDemoIssuanceAuthorization("browser-authorization", "openid://authorization")
     }
 
     override suspend fun continuePreAuthorizedIssuance(
@@ -4519,10 +4521,11 @@ private class FakeDemoWallet(
         return preAuthorizedOutcome ?: WalletDemoIssuanceOutcome.Stored(receivedCredentialIds)
     }
 
-    override suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    override suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
     ): WalletDemoIssuanceOutcome {
+        completedAuthorizationIds += authorizationId
         authorizationCallbackUris += callbackUri
         return authorizationOutcome
     }

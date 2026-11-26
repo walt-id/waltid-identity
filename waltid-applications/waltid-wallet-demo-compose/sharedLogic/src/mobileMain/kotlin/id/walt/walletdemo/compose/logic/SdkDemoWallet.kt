@@ -262,9 +262,8 @@ internal class SdkDemoWallet(
 
     override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
         (requireNotNull(wallet.resumeIssuance(IssuanceSessionId(sessionId))) as IssuanceSession.AuthorizationCode)
-            .beginAuthorization(IssuanceClientRegistration("eudiw-abca", redirectUri), credentials.toIssuanceSelections()).request.let {
-            WalletDemoIssuanceAuthorization(url = it.url)
-        }
+            .beginAuthorization(IssuanceClientRegistration("eudiw-abca", redirectUri), credentials.toIssuanceSelections())
+            .let { pending -> WalletDemoIssuanceAuthorization(pending.id.value, pending.request.url) }
 
     override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> =
         wallet.listDeferredIssuance().map { it.toDemoDeferredCredential() }
@@ -281,11 +280,11 @@ internal class SdkDemoWallet(
                     clientId = "eudiw-abca".takeIf { offer.clientIdentification == IssuanceClientIdentification.CLIENT_ID_REQUIRED })
             }.toDemoIssuanceOutcome()
 
-    override suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    override suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
     ): WalletDemoIssuanceOutcome =
-        wallet.completeAuthorization(IssuanceAuthorizationId(sessionId), callbackUri).toDemoIssuanceOutcome()
+        wallet.completeAuthorization(IssuanceAuthorizationId(authorizationId), callbackUri).toDemoIssuanceOutcome()
 
     override suspend fun cancelIssuance(sessionId: String): WalletDemoIssuanceOutcome =
         wallet.cancelIssuance(IssuanceSessionId(sessionId)).toDemoIssuanceOutcome()
