@@ -117,11 +117,11 @@ class X509TrustPolicyTest {
         val root = selfSigned("CN=Root CA")
         val leaf = issued(root, "CN=Credential issuer") { addDnsName("issuer.example") }
 
-        // `vc.issuer` is the claimed issuer, but the key resolver reads only `iss`, so the key comes from x5c
+        // A DID issuer must resolve through its DID document, even when x5c is supplied.
         val result = X509TrustPolicy(listOf(der(root)))
             .verify(jwtCredential(leaf, sdJwt = false, issuer = "did:example:issuer"))
 
-        assertContains(result.exceptionOrNull()?.message.orEmpty(), "cannot be bound")
+        assertContains(result.exceptionOrNull()?.message.orEmpty(), "Could not resolve issuer key")
     }
 
     @Test
@@ -158,10 +158,10 @@ class X509TrustPolicyTest {
         val leaf = issued(root, "CN=Credential issuer") { addDnsName("other.example") }
         val policy = X509TrustPolicy(listOf(der(root)))
 
-        val conflicting = policy.verify(
+        val conflicting = assertFailsWith<IllegalArgumentException> {
             jwtCredential(leaf, sdJwt = false, iss = "https://other.example", issuer = "https://victim.example")
-        )
-        assertContains(conflicting.exceptionOrNull()?.message.orEmpty(), "does not equal the credential issuer")
+        }
+        assertContains(conflicting.message.orEmpty(), "Conflicting JWT and credential issuer claims")
 
         val agreeing = policy.verify(
             jwtCredential(leaf, sdJwt = false, iss = "https://other.example", issuer = "https://other.example")

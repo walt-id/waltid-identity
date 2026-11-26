@@ -1,5 +1,9 @@
 package id.walt.credentials
 
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonArray
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.formats.W3C2
 import id.walt.credentials.CredentialDetectorTypes.CredentialPrimaryDataType
 import id.walt.credentials.CredentialDetectorTypes.SignaturePrimaryType
@@ -20,6 +24,34 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class W3CContextParsingTest {
+
+    @Test
+    fun sdJwtFallbackPreservesEnvelopeAndIssuerAcrossNestedVcObjects() = runTest {
+        fun token(payload: JsonObject): String {
+            fun encode(value: JsonObject) = value.toString().encodeToByteArray().encodeToBase64Url()
+            val header = Json.parseToJsonElement("""{"alg":"ES256","typ":"vc+sd-jwt"}""").jsonObject
+            return "${encode(header)}.${encode(payload)}.c2ln~"
+        }
+        for (date in listOf("issuanceDate", "validFrom")) {
+            for (nested in listOf(false, true)) {
+                val inner = Json.parseToJsonElement(
+                    """{"$date":"2026-01-01T00:00:00Z","issuer":{"id":"did:example:issuer"},"credentialSubject":{"id":"did:example:holder"},"_sd":[]}"""
+                ).jsonObject
+                val wrapper = if (nested) JsonObject(mapOf("vc" to inner, "_sd" to JsonArray(emptyList()))) else inner
+                val payload = JsonObject(mapOf("iss" to JsonPrimitive("did:example:issuer"), "vc" to wrapper))
+                val parsed = CredentialParser.parseOnly(token(payload))
+                assertEquals("did:example:issuer", parsed.issuer)
+                assertEquals("did:example:holder", parsed.subject)
+                assertEquals(payload, assertIs<SelectivelyDisclosableVerifiableCredential>(parsed).originalCredentialData)
+                val innerOnly = CredentialParser.parseOnly(token(JsonObject(mapOf("vc" to wrapper))))
+                assertEquals("did:example:issuer", innerOnly.issuer)
+                assertEquals("did:example:holder", innerOnly.subject)
+                assertFailsWith<IllegalArgumentException> {
+                    CredentialParser.parseOnly(token(JsonObject(payload + ("iss" to JsonPrimitive("did:example:other")))))
+                }
+            }
+        }
+    }
 
     @Test
     fun inlineContextObjectDoesNotPreventV2Detection() = runTest {

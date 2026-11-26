@@ -230,7 +230,7 @@ class DidAndCredentialCommandTest {
                 extensionSan { addDnsName("issuer.example") }
             }
             val signed = W3CVC.fromJson(
-                credentialJson("2030-01-01T00:00:00Z").replace("did:example:issuer", "https://issuer.example")
+                credentialJson("2030-01-01T00:00:00Z").replace(fixtureDid, "https://issuer.example")
             ).signJws(
                 issuerKey = issuerKey,
                 algorithm = issuerKey.preferredJwsAlgorithm(),
@@ -265,7 +265,7 @@ class DidAndCredentialCommandTest {
           "@context": ["https://www.w3.org/2018/credentials/v1"],
           "id": "urn:uuid:cli-test",
           "type": ["VerifiableCredential", "ExampleCredential"],
-          "issuer": "did:example:issuer",
+          "issuer": "$fixtureDid",
           "issuanceDate": "$issuance",
           "expirationDate": "$expiration",
           "credentialSubject": {"id": "did:example:holder", "name": "Alice"}
