@@ -1,4 +1,4 @@
-package id.walt.wallet2.mobile
+package id.walt.wallet2.mobile.credentials
 
 import android.content.Context
 import android.database.sqlite.SQLiteException

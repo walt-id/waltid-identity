@@ -7,6 +7,11 @@ import id.walt.credentials.status.StatusTestIssuer
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenancePreference
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceResult
+import id.walt.wallet2.mobile.credentials.StatusMaintenanceEnrollmentStore
+import id.walt.wallet2.mobile.credentials.managedCredentialStatusTrustPolicy
+import id.walt.wallet2.mobile.credentials.runCredentialStatusMaintenance
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightStatusMaintenanceStore

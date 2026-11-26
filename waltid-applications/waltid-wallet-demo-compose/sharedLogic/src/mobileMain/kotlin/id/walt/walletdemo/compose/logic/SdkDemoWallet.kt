@@ -1,5 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceEnrollment
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenancePreference
 import id.walt.wallet2.mobile.issuance.DeferredIssuanceId
 import id.walt.wallet2.handlers.IssuanceClientIdentification
 import id.walt.wallet2.handlers.PresentationReviewChangedException
@@ -237,10 +239,22 @@ internal class SdkDemoWallet(
         }
     }
 
-    override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> =
-        flow { wallet.credentialStatuses.collect { emit(it.toDemoStatuses()) } }
+    override suspend fun reconcileBackgroundStatus(automaticChecks: Boolean, resumePaused: Boolean) =
+        wallet.reconcileCredentialStatusMaintenance(automaticChecks, resumePaused)?.toDemoEnrollment()
 
-    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = wallet.credentialStatusSnapshot().toDemoStatuses()
+    override suspend fun setBackgroundStatusPreference(preference: DemoBackgroundStatusPreference) =
+        wallet.setCredentialStatusMaintenance(CredentialStatusMaintenancePreference.valueOf(preference.name))?.toDemoEnrollment()
+
+    override suspend fun invalidateCredentialStatusSnapshot() = wallet.invalidateCredentialStatusSnapshot()
+
+    override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> =
+        wallet.credentialStatuses.map { it.toDemoStatuses() }
+
+    override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses =
+        wallet.credentialStatusSnapshot().toDemoStatuses()
+
+    override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) =
+        wallet.acknowledgeCredentialStatusNotice(credentialId, version)
 
     override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary =
         wallet.refreshCredentialStatuses(ids?.toList(),
@@ -362,6 +376,9 @@ internal class SdkDemoWallet(
     override suspend fun deleteWallet() {
         wallet.deleteLocalData()
     }
+
+    private fun CredentialStatusMaintenanceEnrollment.toDemoEnrollment() =
+        DemoBackgroundStatusEnrollment(DemoBackgroundStatusPreference.valueOf(preference.name), binding)
 }
 
 /** Additional choices are preflighted by the existing signing-identity setup on each platform. */

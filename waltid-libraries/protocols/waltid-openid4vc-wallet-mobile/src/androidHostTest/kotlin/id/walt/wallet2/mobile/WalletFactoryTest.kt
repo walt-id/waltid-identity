@@ -43,6 +43,7 @@ import id.walt.mdoc.proximity.mobile.BleProximityAvailability
 import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenancePreference
 import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
 import id.walt.wallet2.mobile.credentials.WalletPersistence
 import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
@@ -71,6 +72,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -114,12 +116,15 @@ class WalletFactoryTest {
             val config = WalletConfiguration(walletId = "successor")
             val keys = FakePlatformManagedKeyProvider()
             val first = encryptedWallet(config, db, keys, onClose = {})
+            val binding = assertNotNull(first.setCredentialStatusMaintenance(CredentialStatusMaintenancePreference.ENABLED)?.binding)
             first.close()
             val successor = encryptedWallet(config, db, keys, onClose = {})
             assertFailsWith<IllegalStateException> { first.deleteLocalData() }
+            assertEquals(binding, successor.credentialStatusMaintenanceEnrollment()?.binding)
             assertTrue(successor.credentials().isEmpty())
             successor.close()
             first.deleteLocalData()
+            assertNull(db.queries.selectCredentialStatusMaintenance(config.walletId).executeAsOneOrNull())
             first.deleteLocalData()
         }
     }
@@ -318,6 +323,7 @@ class WalletFactoryTest {
             }
         },
         deleteDatabase = {},
+        maintenanceLocation = { "test-database" },
     )
 
     private suspend fun signedDidRequest(

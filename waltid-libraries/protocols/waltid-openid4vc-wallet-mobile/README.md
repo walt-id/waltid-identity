@@ -36,7 +36,7 @@ session and its lifecycle. Import feature types from these packages under `id.wa
 | Package | Public responsibilities |
 | --- | --- |
 | [identity](src/commonMain/kotlin/id/walt/wallet2/mobile/identity) | Signing identities, key authorization, custody and recovery |
-| [credentials](src/commonMain/kotlin/id/walt/wallet2/mobile/credentials) | Stored credentials, status reads and local persistence settings |
+| [credentials](src/commonMain/kotlin/id/walt/wallet2/mobile/credentials) | Stored credentials, status reads, background checks and local persistence settings |
 | [issuance](src/commonMain/kotlin/id/walt/wallet2/mobile/issuance) | Offers, holder bindings, accepted credentials and attestation settings |
 | [presentation](src/commonMain/kotlin/id/walt/wallet2/mobile/presentation) | Verifier requests, disclosure choices, consent and response delivery |
 | [proximity](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity) | Nearby transport, approval and session state |
@@ -112,6 +112,37 @@ policy that ignores cached responses does not prevent storing new response bodie
 ## Credential status
 
 Read the wallet's local status snapshot, observe updates, and explicitly refresh when the user or app requests a check. The presentation review includes the advisories for its selected credentials. See the [credential status guide](https://docs.walt.id/community-stack/mobile-wallet/security#credential-status).
+
+Managed persistence retains minimal last-known metadata. A matching built-in trust configuration
+can restore an unexpired observation as fresh after reopen. If equivalence is unavailable, it
+restores as dated historical evidence. No-store observations live only in the current session.
+Custom stores need the optional shared snapshot-store capability for durability.
+See [credential-status profiles, trust hooks, cache rules and lifecycle](../../credentials/waltid-credential-status/README.md)
+and the Swift [credential-status guide](../waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/CheckingCredentialStatus.md).
+
+### App-owned background status checks
+
+Use an open, authorized managed wallet to call
+`setCredentialStatusMaintenance(CredentialStatusMaintenancePreference.ENABLED)`. Keep its opaque
+binding only in app-private preferences. When the platform delivers eligible work, call
+`refreshDueStatusesForExistingWallet` with that binding and the original storage namespace.
+The bounded call pages signed credentials using a grant-scoped cursor in existing SQLCipher storage.
+It returns aggregate progress and a flag when it committed a new retainable notice, including
+when its budget expires after a commit. Cancel it when the OS expires or stops the task.
+
+Use `reconcileCredentialStatusMaintenance` when the app loads its automatic-check preference
+or the holder changes it. Pass `resumePaused` as true only after an explicit re-enable. Use
+`OFF` for explicit opt-out. Pausing or opting out retires the current binding before the host
+cancels its request. Resuming creates a new binding. Wallet deletion also retires it. Custom database key providers and
+credential stores use foreground refresh. The app owns the schedule and must get opt-in.
+
+On unlock or resume, read local status first. After a same-process wake,
+`invalidateCredentialStatusSnapshot()` prompts the existing observer to reread the managed
+snapshot. Show the snapshot’s `pendingNotices` in the unlocked app and use
+`acknowledgeCredentialStatusNotice(credentialId, version)` for the displayed notice.
+The app owns OS permission, local alert delivery and navigation after unlock.
+An issuer can restrict caching. A foreground session can show the restricted result. A cold pass
+cannot keep a pending notice from that result after it closes.
 
 ## Receiving and presenting credentials
 

@@ -7,7 +7,7 @@ import android.content.Context
 import androidx.work.Configuration
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import id.walt.wallet2.mobile.CredentialStatusMaintenanceResult
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceResult
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking

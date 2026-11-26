@@ -6,6 +6,10 @@ import id.walt.credentials.status.StatusTestIssuer
 import id.walt.credentials.status.entries
 import id.walt.credentials.status.lastObservation
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenancePreference
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceResult
+import id.walt.wallet2.mobile.credentials.StatusMaintenanceEnrollmentStore
+import id.walt.wallet2.mobile.credentials.runCredentialStatusMaintenance
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import io.ktor.client.HttpClient
@@ -32,7 +36,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
-class MobileCredentialStatusMaintenanceTest {
+class CredentialStatusMaintenanceTest {
     @Test
     fun anExistingGrantCanRefreshAndLeaveADurableObservation() = withWallet { wallet ->
         assertEquals(1, assertIs<CredentialStatusMaintenanceResult.Finished>(wallet.refresh()).checked)
