@@ -34,9 +34,9 @@ internal class MobileWalletStorageLease(
     }
 
     private fun overlaps(other: MobileWalletStorageLease) =
-        database == other.database || keyNamespace == other.keyNamespace || stores.any { ours -> other.stores.any { ours === it } }
+        database == other.database || keyNamespace == other.keyNamespace || stores.any { ours -> other.stores.any(ours::matches) }
 
-    private val stores = stores.map { (it as? MobileWalletStoreAdapter)?.storeOwner ?: it }
+    private val stores = stores.map { (it as? MobileWalletStoreAdapter)?.storeOwner ?: MobileWalletStoreOwner(it) }
     private var erasing = false
 
     private companion object {
@@ -47,7 +47,13 @@ internal class MobileWalletStorageLease(
 
 /** Exposes the original storage owner when a platform integration wraps a host store. */
 internal interface MobileWalletStoreAdapter {
-    val storeOwner: Any
+    val storeOwner: MobileWalletStoreOwner
+}
+
+/** Retains the adapter so its process-local reference identity stays valid for the lifetime of the lease. */
+internal class MobileWalletStoreOwner(private val reference: Any, private val hostIdentity: Long? = null) {
+    fun matches(other: MobileWalletStoreOwner): Boolean =
+        reference === other.reference || hostIdentity != null && hostIdentity == other.hostIdentity
 }
 
 internal class WalletStorageInUseException(message: String) : IllegalStateException(message)
