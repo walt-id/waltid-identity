@@ -2,7 +2,7 @@
 
 `WalletConfiguration()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
 
-Managed signing keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `WalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Credential and DID store overrides are independent; signing keys always remain platform-managed. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
+The database key protects the local database at rest. Use `WalletDatabaseKey.Provided` when the app manages or recovers that key. Credential and DID store overrides are independent of the signing identity. Its `storage` records whether the signing key is hardware-backed, uses native storage or is held in the encrypted database.
 
 `WalletConfiguration()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `presentation.transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
 
@@ -78,7 +78,7 @@ val config = WalletConfiguration(
 ```
 <!-- doc-snippet:end kotlin-custom-credential-store -->
 
-KMP consumers can override credential and DID storage while signing keys remain platform-managed:
+KMP apps can supply credential and DID stores together. The signing identity retains its selected key storage.
 
 <!-- doc-snippet:start kotlin-store-overrides -->
 ```kotlin

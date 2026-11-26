@@ -67,8 +67,7 @@ let wallet = try await Wallet(
 avoid logging, serializing, or otherwise exposing the `material` bytes.
 
 Use ``WalletPersistence/credentialStore`` or ``WalletPersistence/didStore`` when an app owns credential or DID durability. Omitted
-stores use the encrypted local database. Signing keys are always
-platform-managed and remain in the iOS Keychain. This example assumes
+stores use the encrypted local database. The signing identity’s `storage` records whether its key uses hardware, native storage or the encrypted database. This example assumes
 app-defined store types that implement the corresponding protocols.
 
 <!-- doc-snippet:start swift-full-store-overrides -->

@@ -68,7 +68,7 @@ let wallet = try await Wallet(
 ```
 <!-- doc-snippet:end swift-custom-credential-store -->
 
-Apps that own more wallet durability can also provide a DID store. Omitted credential and DID stores use the encrypted local database. Signing keys are always platform-managed and remain in the iOS Keychain. This example assumes `AppDidStore` implements the corresponding store protocol.
+Apps that own more wallet durability can also provide a DID store. Omitted credential and DID stores use the encrypted local database. The signing identity’s `storage` records whether its key uses hardware, native storage or the encrypted database. This example assumes `AppDidStore` implements the corresponding store protocol.
 
 <!-- doc-snippet:start swift-full-store-overrides -->
 ```swift
