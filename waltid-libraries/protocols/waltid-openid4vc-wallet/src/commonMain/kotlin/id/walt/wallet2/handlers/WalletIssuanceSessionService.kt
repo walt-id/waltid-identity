@@ -1,11 +1,8 @@
 package id.walt.wallet2.handlers
 
-import id.walt.wallet2.issuance.CredentialReceiptTrustException
-import id.walt.wallet2.issuance.receiptOrigin
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
-import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.selectJwsAlgorithm
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyUsage
@@ -13,35 +10,39 @@ import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
-import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
+import id.walt.wallet2.issuance.CredentialReceiptTrustException
+import id.walt.wallet2.issuance.receiptOrigin
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
-import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationChallengeContext
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestError
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationChallengeRequestException
 import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
-import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
-import id.waltid.openid4vci.wallet.authorization.RetryablePushedAuthorizationRequestException
 import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
+import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
+import id.waltid.openid4vci.wallet.credential.CredentialEncryption
+import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
+import id.waltid.openid4vci.wallet.credential.acceptCredentialResponse
+import id.waltid.openid4vci.wallet.credential.isApplicationJwt
+import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
 import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
-import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
-import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
+import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.LocalizedMetadata
-import id.waltid.openid4vci.wallet.metadata.MetadataSignerTrustType
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.nonce.NonceRequestError
@@ -59,379 +60,22 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import id.waltid.openid4vci.wallet.credential.CredentialEncryption
-import id.waltid.openid4vci.wallet.credential.acceptCredentialResponse
-import id.waltid.openid4vci.wallet.credential.isApplicationJwt
-import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
-import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.time.Clock
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
 private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
-
-/** Grant selected for a resolved issuance session. */
-@Serializable
-enum class WalletIssuanceGrant {
-    PRE_AUTHORIZED_CODE,
-    AUTHORIZATION_CODE,
-}
-
-/** Typed transaction-code requirement from a pre-authorized offer. */
-@Serializable
-data class WalletIssuanceTransactionCode(
-    val inputMode: String?,
-    val length: Int?,
-    val descriptionText: String?,
-)
-
-/** Issuer display information safe for an app review screen. */
-@Serializable
-data class WalletIssuanceIssuerPreview(
-    val identifier: String,
-    val name: String?,
-    val locale: String?,
-    val logoUri: String?,
-    val logoAltText: String?,
-    /** Whether the issuer metadata was unsigned or verified signed metadata. */
-    val metadataProvenance: WalletIssuanceMetadataProvenance,
-)
-
-/** Verification provenance of issuer metadata retained by an issuance session. */
-@Serializable
-sealed interface WalletIssuanceMetadataProvenance {
-    /** Metadata was received as an unsigned JSON document. */
-    @Serializable
-    data object Unsigned : WalletIssuanceMetadataProvenance
-
-    /** Metadata was received in a JWS verified by the configured trust resolver. */
-    @Serializable
-    data class Signed(
-        /** Exact compact JWS returned by the issuer. */
-        val compactJwt: String,
-        /** JWS algorithm verified by the configured trust resolver. */
-        val algorithm: String,
-        /** Identifier of the trusted verification key, as reported by the trust resolver. */
-        val keyId: String?,
-        /** Authority relationship established by the trust resolver. */
-        val trustType: MetadataSignerTrustType,
-    ) : WalletIssuanceMetadataProvenance
-}
-
-/** Offered credential information safe for an app review screen. */
-@Serializable
-data class WalletIssuanceCredentialPreview(
-    val configurationId: String,
-    val format: String,
-    val name: String?,
-    val descriptionText: String?,
-    val logoUri: String?,
-    val logoAltText: String? = null,
-    val backgroundColor: String? = null,
-    val backgroundImageUri: String? = null,
-    val textColor: String? = null,
-    val vct: String? = null,
-    val doctype: String? = null,
-)
-
-/** Typed offer preview retained by the issuance session. */
-@Serializable
-data class WalletIssuanceOfferPreview(
-    val grant: WalletIssuanceGrant,
-    val issuer: WalletIssuanceIssuerPreview,
-    val credentials: List<WalletIssuanceCredentialPreview>,
-    val transactionCode: WalletIssuanceTransactionCode?,
-)
-
-/** Non-secret PKCE metadata bound to an authorization-code session. */
-@Serializable
-data class WalletIssuancePkceState(
-    val codeChallenge: String,
-    val codeChallengeMethod: String,
-)
-
-/** Browser request and callback binding for an authorization-code session. */
-@Serializable
-data class WalletIssuanceAuthorization(
-    val url: String,
-    val state: String,
-    val redirectUri: String,
-    val pkce: WalletIssuancePkceState,
-    val pushedAuthorizationRequestUsed: Boolean,
-    val requestUriExpiresAtEpochMilliseconds: Long? = null,
-)
-
-/** Public handle returned by [WalletIssuanceSessionService.start]. */
-@Serializable
-data class WalletIssuanceSession(
-    val id: String,
-    val offer: WalletIssuanceOfferPreview,
-)
-
-/** Batch-aware review of a session, sharing the released offer preview. */
-@Serializable
-data class WalletIssuanceBatchSession(
-    val id: String,
-    val offer: WalletIssuanceOfferPreview,
-    val batchSize: Int? = null,
-    /** Ordered/localized display metadata by configuration ID, using the stored credential sidecar shape. */
-    val credentialDisplayMetadata: Map<String, String> = emptyMap(),
-)
-
-/** Input used to start either supported grant from one offer. */
-@Serializable
-data class WalletIssuanceSessionRequest(
-    override val offerUrl: Url? = null,
-    override val offerJson: JsonObject? = null,
-    val key: DirectSerializedKey? = null,
-    val keyId: String? = null,
-    val did: String? = null,
-    val clientId: String = "eudiw-abca",
-    val redirectUri: Url = Url("openid://"),
-    /**
-     * Manual token authentication; see [ReceiveCredentialRequest.tokenRequestHeaders]. Validated
-     * before session creation. PAR authenticates independently; issuer refusals retain the session
-     * outcome contract. A static manual PoP cannot be regenerated for automatic recovery.
-     */
-    val tokenRequestHeaders: Map<String, String> = emptyMap(),
-    val credentialIssuer: String? = null,
-    val credentialConfigurationIds: List<String>? = null,
-) : CredentialOfferSource {
-    /** Retains the released constructor contract. */
-    constructor(
-        offerUrl: Url? = null,
-        offerJson: JsonObject? = null,
-        key: DirectSerializedKey? = null,
-        keyId: String? = null,
-        did: String? = null,
-        clientId: String = "eudiw-abca",
-        redirectUri: Url = Url("openid://"),
-        tokenRequestHeaders: Map<String, String> = emptyMap(),
-    ) : this(
-        offerUrl, offerJson, key, keyId, did, clientId, redirectUri, tokenRequestHeaders, credentialIssuer = null,
-        credentialConfigurationIds = null,
-    )
-
-    /** Retains the released copy contract and preserves the added fields. */
-    fun copy(
-        offerUrl: Url? = this.offerUrl,
-        offerJson: JsonObject? = this.offerJson,
-        key: DirectSerializedKey? = this.key,
-        keyId: String? = this.keyId,
-        did: String? = this.did,
-        clientId: String = this.clientId,
-        redirectUri: Url = this.redirectUri,
-        tokenRequestHeaders: Map<String, String> = this.tokenRequestHeaders,
-    ): WalletIssuanceSessionRequest = WalletIssuanceSessionRequest(
-        offerUrl, offerJson, key, keyId, did, clientId, redirectUri, tokenRequestHeaders,
-        credentialIssuer = this.credentialIssuer, credentialConfigurationIds = this.credentialConfigurationIds,
-    )
-
-    init {
-        if (credentialIssuer == null) checkOfferSource() else {
-            require(offerUrl == null && offerJson == null)
-            require(credentialIssuer.isNotBlank() && !credentialConfigurationIds.isNullOrEmpty())
-        }
-        require(clientId.isNotBlank()) { "clientId cannot be blank" }
-    }
-
-}
-
-/** Callback continuation supplied after the browser returns to the wallet. */
-@Serializable
-data class WalletIssuanceAuthorizationCallback(
-    val sessionId: String,
-    val callbackUri: String,
-)
-
-/** Reference returned by either a deferred outcome or the retained continuation listing. */
-sealed interface WalletDeferredIssuanceReference {
-    val id: String
-}
-
-/** Wallet-local retention policy for uncompleted issuance sessions. */
-@Serializable
-data class WalletIssuanceSessionPolicy(
-    val reviewTtl: Duration = 10.minutes,
-    val authorizationCallbackTtl: Duration = 10.minutes,
-)
-
-/** Released public reference for a credential with a known requested configuration. */
-@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-@Serializable
-data class WalletDeferredCredential(
-    override val id: String,
-    val credentialConfigurationId: String,
-    val intervalSeconds: Long?,
-    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    val credentialIdentifier: String? = null,
-) : WalletDeferredIssuanceReference {
-    constructor(id: String, credentialConfigurationId: String, intervalSeconds: Long?) :
-        this(id, credentialConfigurationId, intervalSeconds, credentialIdentifier = null)
-
-    /** Retains the released copy contract without discarding the dataset identifier. */
-    fun copy(
-        id: String = this.id,
-        credentialConfigurationId: String = this.credentialConfigurationId,
-        intervalSeconds: Long? = this.intervalSeconds,
-    ): WalletDeferredCredential = WalletDeferredCredential(id, credentialConfigurationId, intervalSeconds, credentialIdentifier)
-
-    constructor(continuation: WalletIssuanceContinuation) : this(
-        continuation.id,
-        continuation.credentialConfigurationId ?: throw WalletIssuanceContinuationException(listOf(continuation)),
-        continuation.intervalSeconds,
-        continuation.credentialIdentifier,
-    )
-}
-
-/** Retained issuance work, including local-save recovery whose original configuration may be unknown. */
-@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-@Serializable
-data class WalletIssuanceContinuation(
-    override val id: String,
-    val credentialConfigurationId: String? = null,
-    val intervalSeconds: Long? = null,
-    val credentialIdentifier: String? = null,
-    /** Current retained state when returned by [WalletIssuanceSessionService.listIssuanceContinuations]. */
-    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    val status: WalletIssuanceContinuationStatus = WalletIssuanceContinuationStatus.UNRESOLVED,
-    /** Issuer display metadata only; never credential values or protocol continuation secrets. */
-    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
-    val displayMetadataJson: String? = null,
-) : WalletDeferredIssuanceReference {
-    constructor(deferred: WalletDeferredCredential) : this(
-        deferred.id, deferred.credentialConfigurationId, deferred.intervalSeconds, deferred.credentialIdentifier,
-    )
-}
-
-/** A presentation hint, not permission to bypass the checks performed by resumeDeferred. */
-@Serializable
-enum class WalletIssuanceContinuationStatus {
-    UNRESOLVED,
-    AWAITING_ISSUER,
-    AWAITING_LOCAL_SAVE,
-    REMOTE_OUTCOME_UNCERTAIN,
-    STORAGE_OUTCOME_UNCERTAIN,
-}
-
-/** The released configured-only listing cannot describe every retained local-save handle. */
-class WalletIssuanceContinuationException(val continuations: List<WalletIssuanceContinuation>) : Exception(
-    "Retained local-save work has no configuration metadata; use listIssuanceContinuations."
-)
-
-/** Stable failure categories returned without protocol secrets or response bodies. */
-@Serializable
-enum class WalletIssuanceErrorCode {
-    INVALID_SESSION,
-    INVALID_CALLBACK,
-    INVALID_INPUT,
-    AUTHORIZATION_FAILED,
-    ISSUER_METADATA,
-    ISSUER_RESPONSE,
-    NETWORK,
-    REMOTE_OUTCOME_UNCERTAIN,
-    STORAGE_OUTCOME_UNCERTAIN,
-    CRYPTO,
-    STORAGE,
-    PROTOCOL,
-}
-
-@OptIn(ExperimentalSerializationApi::class)
-@Serializable
-data class WalletIssuanceError(
-    val code: WalletIssuanceErrorCode,
-    val message: String,
-    /** Whether the caller may submit the same reviewed offer again after this transition. */
-    val canRetryOffer: Boolean = false,
-    /** True when [WalletIssuanceErrorCode.ISSUER_RESPONSE] identifies a credential rejected by the host's receipt profile. */
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val issuerTrustFailed: Boolean = false,
-) {
-    init {
-        require(!issuerTrustFailed || code == WalletIssuanceErrorCode.ISSUER_RESPONSE)
-    }
-
-    constructor(code: WalletIssuanceErrorCode, message: String, canRetryOffer: Boolean = false) :
-        this(code, message, canRetryOffer, false)
-
-    constructor(code: WalletIssuanceErrorCode, message: String) : this(code, message, false, false)
-
-    /** Preserves the released copy signatures and the detail for an issuer-response failure. */
-    fun copy(
-        code: WalletIssuanceErrorCode = this.code,
-        message: String = this.message,
-        canRetryOffer: Boolean = this.canRetryOffer,
-    ): WalletIssuanceError = WalletIssuanceError(
-        code, message, canRetryOffer, issuerTrustFailed && code == WalletIssuanceErrorCode.ISSUER_RESPONSE,
-    )
-
-    fun copy(code: WalletIssuanceErrorCode = this.code, message: String = this.message): WalletIssuanceError =
-        copy(code, message, canRetryOffer)
-}
-
-/** Terminal or pending result of an issuance-session transition. */
-@Serializable
-sealed interface WalletIssuanceOutcome {
-    val sessionId: String
-
-    @Serializable
-    @kotlinx.serialization.SerialName("stored")
-    data class Stored(
-        override val sessionId: String,
-        val credentialIds: List<String>,
-    ) : WalletIssuanceOutcome
-
-    @Serializable
-    @kotlinx.serialization.SerialName("deferred")
-    data class Deferred(
-        override val sessionId: String,
-        val storedCredentialIds: List<String>,
-        val credentials: List<WalletDeferredCredential>,
-    ) : WalletIssuanceOutcome
-
-    @Serializable
-    @kotlinx.serialization.SerialName("cancelled")
-    data class Cancelled(
-        override val sessionId: String,
-    ) : WalletIssuanceOutcome
-
-    @Serializable
-    @kotlinx.serialization.SerialName("failed")
-    data class Failed(
-        override val sessionId: String,
-        val error: WalletIssuanceError,
-        val storedCredentialIds: List<String> = emptyList(),
-        val deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
-        val failure: CredentialIssuanceFailure? = null,
-    ) : WalletIssuanceOutcome {
-        constructor(
-            sessionId: String,
-            error: WalletIssuanceError,
-            storedCredentialIds: List<String> = emptyList(),
-        ) : this(sessionId, error, storedCredentialIds, deferredCredentials = emptyList(), failure = null)
-
-        /** Retains the released copy contract and all newly retained progress. */
-        fun copy(
-            sessionId: String = this.sessionId,
-            error: WalletIssuanceError = this.error,
-            storedCredentialIds: List<String> = this.storedCredentialIds,
-        ): Failed = Failed(sessionId, error, storedCredentialIds, deferredCredentials, failure)
-    }
-}
 
 /**
  * Stateful OpenID4VCI 1.0 engine shared by pre-authorized and authorization-code grants.
@@ -812,12 +456,12 @@ class WalletIssuanceSessionService(
                 val persisted = sessionStore?.list().orEmpty().filter { it.sessionId == sessionId }
                 val deferredIds = deferred.values.filter { it.sessionId == sessionId }.map { it.public.id } +
                     persisted.filter { it.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL }
-                        .map { decodePersistedDeferred(it).public.id }
+                        .map { json.decodePersistedDeferred(it).public.id }
                 if (active?.state == SessionState.PROCESSING || deferredIds.any { it in pollingDeferred } ||
                     persisted.any { it.kind == WalletIssuanceSessionRecordKind.ACTIVE_SESSION &&
                         json.decodeFromString<PersistedActiveSession>(it.payload).state == SessionState.PROCESSING } ||
                     persisted.any { it.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL &&
-                        decodePersistedDeferred(it).claimed }) {
+                        json.decodePersistedDeferred(it).claimed }) {
                     return@withLock invalidSession(sessionId)
                 }
                 for (record in persisted) {
@@ -887,7 +531,7 @@ class WalletIssuanceSessionService(
                     }
                     check(close || records.none { it.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL &&
                         // Unreadable records cannot be resumed, but wallet deletion must still remove them.
-                        runCatching { decodePersistedDeferred(it) }
+                        runCatching { json.decodePersistedDeferred(it) }
                             .getOrNull()?.claimed == true }) {
                         "Cannot clear an issuance continuation with an unresolved operation"
                     }
@@ -917,7 +561,7 @@ class WalletIssuanceSessionService(
         persistedRecords.values
             .filter { it.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL }
             .forEach { record ->
-                val persisted = decodePersistedDeferred(record)
+                val persisted = json.decodePersistedDeferred(record)
                 require(record.id == deferredRecordId(persisted.public.id) && record.sessionId == persisted.sessionId) {
                     "Stored deferred credential binding is invalid"
                 }
@@ -1072,7 +716,7 @@ class WalletIssuanceSessionService(
                     record = record.copy(
                         public = record.public.copy(intervalSeconds = pending.interval),
                         content = DeferredContent.Remote(updatedRequest.copy(
-                            nextPollAtEpochMilliseconds = nextDeferredPoll(requireNotNull(pending.interval)))),
+                            nextPollAtEpochMilliseconds = nextDeferredPoll(requireNotNull(pending.interval), nowEpochMilliseconds()))),
                         claimed = false,
                     )
                     retainDeferred(record)
@@ -1415,13 +1059,6 @@ class WalletIssuanceSessionService(
             active.resolved.issuerMetadata.metadata, active.keyMaterial, active.did)
     }
 
-    @Serializable
-    private data class PersistedHolderBinding(val keyId: String?, val did: String?, val publicJwk: String)
-    @Serializable
-    private data class PersistedCredentialSelection(
-        val selection: WalletCredentialSelection,
-        val bindings: List<PersistedHolderBinding>,
-    )
     private suspend fun persistBindings(bindings: List<ResolvedCredentialHolderBinding>): List<PersistedHolderBinding> =
         bindings.map { PersistedHolderBinding(it.material.keyId, it.did, it.material.exportPublicJwkObject().toString()) }
     private suspend fun restoreBindings(bindings: List<PersistedHolderBinding>): List<ResolvedCredentialHolderBinding> =
@@ -2252,7 +1889,7 @@ class WalletIssuanceSessionService(
                 label = label,
                 metadata = metadata,
                 notificationEndpoint = notificationEndpoint,
-                nextPollAtEpochMilliseconds = nextDeferredPoll(requireNotNull(public.intervalSeconds)),
+                nextPollAtEpochMilliseconds = nextDeferredPoll(requireNotNull(public.intervalSeconds), nowEpochMilliseconds()),
                 credentialIssuer = credentialIssuer,
                 issuerMetadataJson = issuerMetadataSnapshot?.let { json.encodeToString(it) },
             )),
@@ -2279,7 +1916,7 @@ class WalletIssuanceSessionService(
         require(record.kind == WalletIssuanceSessionRecordKind.DEFERRED_CREDENTIAL) {
             "Stored deferred credential binding is invalid"
         }
-        val persisted = decodePersistedDeferred(record)
+        val persisted = json.decodePersistedDeferred(record)
         require(persisted.public.id == id && persisted.sessionId == record.sessionId) {
             "Stored deferred credential binding is invalid"
         }
@@ -2479,11 +2116,6 @@ class WalletIssuanceSessionService(
         WalletIssuanceErrorCode.PROTOCOL -> "The issuance response did not satisfy OpenID4VCI 1.0 requirements."
     }
 
-    private fun nextDeferredPoll(intervalSeconds: Long, current: Long = nowEpochMilliseconds()): Long {
-        val delay = intervalSeconds.seconds.inWholeMilliseconds
-        return if (current > Long.MAX_VALUE - delay) Long.MAX_VALUE else current + delay
-    }
-
     private fun nowEpochMilliseconds(): Long = now().toEpochMilliseconds()
 
     internal data class ResolvedOffer(
@@ -2585,32 +2217,6 @@ class WalletIssuanceSessionService(
     )
 
     @Serializable
-    private data class PersistedRequest(
-        val keyId: String?,
-        val did: String?,
-        val clientId: String? = null,
-        val redirectUri: String? = null,
-        val tokenRequestHeaders: Map<String, String>,
-    )
-
-    @Serializable
-    private data class PersistedActiveSession(
-        val selections: List<PersistedCredentialSelection>? = null,
-        val public: WalletIssuanceSession,
-        val request: PersistedRequest,
-        val offer: String? = null,
-        val issuerMetadata: String,
-        val authorizationServerMetadata: String,
-        val selectedPublicJwk: String,
-        val authorization: WalletIssuanceAuthorization? = null,
-        val codeVerifier: String? = null,
-        val state: SessionState,
-        val expiresAtEpochMilliseconds: Long,
-        val attestationChallenge: String? = null,
-        val authorizationServerDpopNonce: String? = null,
-    )
-
-    @Serializable
     internal sealed interface DeferredResponseValidation {
         @Serializable
         @kotlinx.serialization.SerialName("configured")
@@ -2621,100 +2227,6 @@ class WalletIssuanceSessionService(
         @kotlinx.serialization.SerialName("released-single-key")
         data object ReleasedSingleKey : DeferredResponseValidation
     }
-
-    /** Exact flat shape published in 1.1.0; confined to the persistence decoder. */
-    @Serializable
-    private data class ReleasedDeferredRecord(
-        val public: WalletDeferredCredential,
-        val sessionId: String,
-        val endpoint: String,
-        val transactionId: String,
-        val accessToken: String,
-        val tokenType: String,
-        val dpop: Set<String>?,
-        val dpopNonce: String?,
-        val keyId: String?,
-        val selectedPublicJwk: String,
-        val label: String?,
-        val metadata: JsonObject? = null,
-    )
-
-    private fun decodePersistedDeferred(record: WalletIssuanceSessionRecord): PersistedDeferredRecord {
-        val payload = json.parseToJsonElement(record.payload).jsonObject
-        if ("content" in payload) return json.decodeFromJsonElement<PersistedDeferredRecord>(payload)
-        require("claimed" !in payload) { "A claimed continuation must contain its current-format content" }
-        val released = json.decodeFromJsonElement<ReleasedDeferredRecord>(payload)
-        val interval = released.public.intervalSeconds ?: 0
-        require(interval >= 0) { "Stored deferred credential interval is invalid" }
-        return PersistedDeferredRecord(
-            public = WalletIssuanceContinuation(released.public),
-            sessionId = released.sessionId,
-            content = PersistedDeferredContent.Remote(PersistedDeferredRequest(
-                validation = DeferredResponseValidation.ReleasedSingleKey,
-                bindings = listOf(PersistedHolderBinding(released.keyId, null, released.selectedPublicJwk)),
-                nextPollAtEpochMilliseconds = nextDeferredPoll(interval, record.updatedAtEpochMilliseconds),
-                endpoint = released.endpoint, transactionId = released.transactionId,
-                accessToken = released.accessToken, tokenType = released.tokenType,
-                dpop = released.dpop, dpopNonce = released.dpopNonce,
-                keyId = released.keyId, selectedPublicJwk = released.selectedPublicJwk,
-                label = released.label, metadata = released.metadata,
-            )),
-        )
-    }
-
-    @Serializable
-    private data class PersistedDeferredRecord(
-        val content: PersistedDeferredContent,
-        val claimed: Boolean = false,
-        val public: WalletIssuanceContinuation,
-        val sessionId: String,
-        val notificationEndpoint: String? = null,
-        val notificationId: String? = null,
-        val accessToken: String? = null,
-        val tokenType: String? = null,
-        val dpop: Set<String>? = null,
-        val keyId: String? = null,
-        val selectedPublicJwk: String? = null,
-    ) {
-        init {
-            require(content !is PersistedDeferredContent.Remote || public.credentialConfigurationId != null) {
-                "A remote deferred credential must identify its requested configuration"
-            }
-        }
-    }
-
-    @Serializable
-    private sealed interface PersistedDeferredContent {
-        @Serializable
-        @kotlinx.serialization.SerialName("remote")
-        data class Remote(val request: PersistedDeferredRequest) : PersistedDeferredContent
-
-        @Serializable
-        @kotlinx.serialization.SerialName("received")
-        data class Received(val credentials: List<StoredCredential>) : PersistedDeferredContent {
-            init { require(credentials.isNotEmpty()) }
-        }
-    }
-
-    @Serializable
-    private data class PersistedDeferredRequest(
-        val validation: DeferredResponseValidation,
-        val nextPollAtEpochMilliseconds: Long,
-        val bindings: List<PersistedHolderBinding>,
-        val endpoint: String,
-        val transactionId: String,
-        val accessToken: String,
-        val tokenType: String,
-        val dpop: Set<String>?,
-        val dpopNonce: String?,
-        val keyId: String?,
-        val selectedPublicJwk: String,
-        val label: String?,
-        val metadata: JsonObject? = null,
-        val credentialIssuer: String? = null,
-        val issuerMetadataJson: String? = null,
-        val notificationEndpoint: String? = null,
-    )
 
     private suspend fun resolveIssuanceKeyMaterial(
         inlineKey: DirectSerializedKey?,
@@ -2734,7 +2246,6 @@ class WalletIssuanceSessionService(
         val legacy = requireNotNull(legacyKey) { "Key '$keyId' has no usable public representation" }
         return legacy.getPublicKey().exportJWKObject()
     }
-
 
     private class IssuanceStageException(
         val code: WalletIssuanceErrorCode,
