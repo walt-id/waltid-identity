@@ -69,6 +69,10 @@ protocol WalletClient {
 }
 
 extension WalletClient {
+    func reconcileBackgroundStatus(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
+    func invalidateCredentialStatusSnapshot() async throws {}
+
     func submit(_ review: PresentationReview) async throws -> PresentationResult { throw WalletError.invalidInput("Retained review is unavailable") }
     func preparePaymentConsent(
         previewHandle: PresentationPreviewHandle,
@@ -164,6 +168,10 @@ final class SDKWalletClient: WalletClient {
 
     func invalidateCredentialStatusSnapshot() async throws {
         try await cachedWallet?.invalidateCredentialStatusSnapshot()
+    }
+
+    func acknowledgeCredentialStatusNotice(credentialID: String, version: String) async throws {
+        try await cachedWallet?.acknowledgeCredentialStatusNotice(credentialID: credentialID, version: version)
     }
 
     func credentialStatusSnapshot() async throws -> CredentialStatusSnapshot? { try await wallet().credentialStatusSnapshot() }

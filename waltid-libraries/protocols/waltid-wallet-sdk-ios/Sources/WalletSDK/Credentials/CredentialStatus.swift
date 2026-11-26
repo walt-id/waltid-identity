@@ -339,10 +339,14 @@ func decodeCredentialStatusSnapshot(_ json: String) throws -> CredentialStatusSn
     guard Set(wire.credentials.map(\.reference)).count == wire.credentials.count else {
         throw WalletError.internalFailure("Invalid credential status data")
     }
+    let pending = (wire.pendingNotices ?? []).map {
+        PendingCredentialStatusNotice(credentialID: $0.reference.credentialID, version: $0.version,
+            kind: $0.kind, checkedAt: $0.checkedAt, historical: $0.historical)
+    }
     return CredentialStatusSnapshot(evaluatedAt: wire.evaluatedAt, credentials: wire.credentials.map {
         CredentialStatusRecord(credentialID: $0.reference.credentialID, storeIndex: $0.reference.storeIndex,
             value: CredentialStatus(status: $0.status, presentation: $0.presentation, evaluatedAt: wire.evaluatedAt))
-    }, refreshingCredentialIDs: Set(wire.refreshing.map(\.credentialID)), nextRefreshAt: wire.nextRefreshAt)
+    }, refreshingCredentialIDs: Set(wire.refreshing.map(\.credentialID)), nextRefreshAt: wire.nextRefreshAt, pendingNotices: pending)
 }
 
 private func decodeStatusCode<T: RawRepresentable>(_ type: T.Type, from decoder: Decoder, fallback: T) throws -> T where T.RawValue == String {
