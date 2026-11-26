@@ -76,9 +76,10 @@ class CredentialProfileService(
         mapping: JsonObject?,
         idTokenClaimsMapping: Map<String, String>?,
         msoData: MsoData?,
+        canUseLoginClaims: Boolean = true,
     ) {
         if (isMdl(configurationId)) {
-            MdlAgeValidation.validate(credentialData, mapping, idTokenClaimsMapping, msoData?.validFrom)
+            MdlAgeValidation.validate(credentialData, mapping, idTokenClaimsMapping, msoData?.validFrom, canUseLoginClaims)
         }
     }
 

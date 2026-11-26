@@ -5,6 +5,8 @@ import id.walt.credentials.issuance.IssuanceClock
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferCredential
+import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.testsupport.Issuer2AuthorizationRequestMode
@@ -304,6 +306,60 @@ class Issuer2MsoDataWalletFlowTest {
         )
         assertEquals(claims.getValue("mdl"), populatedData.getValue(ISO_MDL_NAMESPACE))
         assertEquals(mapping, assertNotNull(issuance.mapping).mdocNamespaceMapping(populatedData))
+    }
+
+    @Test
+    fun preAuthorizedOfferRejectsBirthDateAvailableOnlyFromLogin() = testApplication {
+        installIssuer2WithConfigFiles(configureProfilesConfig = { config ->
+            val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
+            val profile = config.profiles.getValue(id)
+            val namespace = profile.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject
+            config.copy(profiles = config.profiles + (id to profile.copy(
+                credentialData = JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to JsonObject(namespace - "birth_date"))),
+                idTokenClaimsMapping = mapOf("$.birthdate" to "$.['$ISO_MDL_NAMESPACE'].birth_date"),
+                msoData = MsoData(validFrom = "2027-08-25T00:00:00Z"),
+            )))
+        })
+        val client = apiClient()
+        val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
+        val requests = listOf(
+            CredentialOfferCreateRequest(profileId = id, authMethod = AuthenticationMethod.PRE_AUTHORIZED),
+            MultiCredentialOfferCreateRequest(
+                credentials = listOf(CredentialOfferCredential(id), CredentialOfferCredential(id)),
+                authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            ),
+        )
+        for (request in requests) {
+            val response = client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                when (request) {
+                    is CredentialOfferCreateRequest -> setBody(request)
+                    is MultiCredentialOfferCreateRequest -> setBody(request)
+                }
+            }
+            val body = response.bodyAsText()
+            assertEquals(HttpStatusCode.BadRequest, response.status, body)
+            assertTrue(body.contains("credentialData.$ISO_MDL_NAMESPACE.birth_date"), body)
+            assertTrue(body.contains("profile or runtime overrides"), body)
+            assertTrue(client.listSessions().isEmpty())
+        }
+        val offer = client.createWalletFlowCredentialOffer(
+            scenario = Issuer2CredentialScenarios.isoMdl,
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                credentialData = buildJsonObject {
+                    putJsonObject(ISO_MDL_NAMESPACE) { put("birth_date", "1990-08-26") }
+                },
+            ),
+        )
+        val wallet = Issuer2WalletFlowDriver(client)
+        val resolved = wallet.resolve(offer)
+        val token = wallet.exchangePreAuthorizedCode(resolved, txCode = null)
+        val payload = wallet.requestCredential(resolved, token.access_token, includeDidInProof = false)
+        val namespace = mdocNamespaceJson(payload, ISO_MDL_NAMESPACE)
+        assertEquals("1990-08-26", namespace.getValue("birth_date").jsonPrimitive.content)
+        assertEquals(JsonPrimitive(36), namespace["age_in_years"])
     }
 
     @Test

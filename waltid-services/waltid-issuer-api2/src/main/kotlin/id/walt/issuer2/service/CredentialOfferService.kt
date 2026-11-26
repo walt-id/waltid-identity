@@ -74,7 +74,10 @@ class CredentialOfferService(
             val mapping = overrides?.mapping ?: profile.mapping
             val msoData = (profile.msoData ?: MsoData()).merge(overrides?.msoData).takeUnless { it.isEmpty() }
             try {
-                profileService.validateMdlAge(profile.credentialConfigurationId, credentialData, mapping, idTokenClaimsMapping, msoData)
+                profileService.validateMdlAge(
+                    profile.credentialConfigurationId, credentialData, mapping, idTokenClaimsMapping, msoData,
+                    canUseLoginClaims = request.authMethod == AuthenticationMethod.AUTHORIZED,
+                )
             } catch (e: IllegalArgumentException) {
                 throw BadRequestException(e.message ?: "Invalid mDL age configuration", e)
             }

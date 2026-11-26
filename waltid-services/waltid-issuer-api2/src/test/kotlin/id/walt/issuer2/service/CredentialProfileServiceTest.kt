@@ -246,6 +246,25 @@ class CredentialProfileServiceTest {
         assertEquals(JsonObject(mapOf("age_in_years" to JsonPrimitive(38))), profile.credentialData[MdlAge.NAMESPACE])
     }
 
+    @Test
+    fun `pre-authorized age validation rejects direct and namespace login sources`() {
+        val data = buildJsonObject { putJsonObject(MdlAge.NAMESPACE) {} }
+        val mapping = buildJsonObject {
+            putJsonObject(MdlAge.NAMESPACE) { put("age_in_years", MdlAge.AGE_MAPPING) }
+        }
+        for (destination in listOf(
+            "$.['${MdlAge.NAMESPACE}'].birth_date",
+            "$.['${MdlAge.NAMESPACE}']",
+        )) {
+            val claims = mapOf("$.birthdate" to destination)
+            MdlAgeValidation.validate(data, mapping, claims, "2027-08-25T00:00:00Z", true)
+            val error = assertFailsWith<IllegalArgumentException> {
+                MdlAgeValidation.validate(data, mapping, claims, "2027-08-25T00:00:00Z", false)
+            }
+            assertTrue(error.message.orEmpty().contains("credentialData.${MdlAge.NAMESPACE}.birth_date"))
+        }
+    }
+
     private fun mdlProfileService(
         birthDate: JsonElement? = JsonPrimitive("1988-08-25"),
         age: JsonElement = JsonPrimitive(38),

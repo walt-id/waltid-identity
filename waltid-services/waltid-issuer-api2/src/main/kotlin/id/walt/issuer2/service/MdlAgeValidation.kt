@@ -20,12 +20,13 @@ internal object MdlAgeValidation {
         mapping: JsonObject?,
         idTokenClaimsMapping: Map<String, String>?,
         validFrom: String?,
+        canUseLoginClaims: Boolean,
     ) {
         val namespace = credentialData[MdlAge.NAMESPACE] as? JsonObject
         val namespaceMapping = mapping?.get(MdlAge.NAMESPACE) as? JsonObject
         val credentialBirthDate = namespace?.get(MdlAge.BIRTH_DATE)
         val claimTargets = claimTargets(idTokenClaimsMapping)
-        val birthDateFromClaims = BIRTH_DATE_PATH in claimTargets || NAMESPACE_PATH in claimTargets
+        val birthDateFromClaims = canUseLoginClaims && (BIRTH_DATE_PATH in claimTargets || NAMESPACE_PATH in claimTargets)
         val literalBirthDate = credentialBirthDate
             ?.takeUnless { it == JsonNull && birthDateFromClaims }
             ?.let { MdlAge.parseBirthDate(it, BIRTH_DATE_FIELD) }
@@ -50,7 +51,7 @@ internal object MdlAgeValidation {
         val mappedAge = namespaceMapping?.get(MdlAge.AGE_IN_YEARS)
         if (credentialAge != null || mappedAge != null) {
             require(birthDate != null || mappedBirthDate != null || birthDateFromClaims) {
-                "$BIRTH_DATE_FIELD is required when age_in_years is configured"
+                "$BIRTH_DATE_FIELD is required when age_in_years is configured; supply it in the profile or runtime overrides"
             }
         }
         credentialAge?.let { validateLiteralAge(it, "credentialData", expectedAge) }
