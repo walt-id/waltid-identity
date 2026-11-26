@@ -52,6 +52,4 @@ protocol code and validation message describe the request failure;
 `localizedDescription` includes both reasons for demo and application diagnostics.
 The response-destination safety checks still apply before any remote reporting.
 
-> Important: The current error surface is intentionally small. More structured
-> typed failures can be added without exposing Kotlin bridge internals to iOS
-> app code.
+Inspect ``IssuanceOutcome`` after accepting an offer. Its failed and deferred cases carry any credentials already stored and the remaining continuations. A thrown storage, validation, or key-authorization error describes the operation that threw it. A retained presentation or credential-status review that changed must be shown to the holder again. Host callbacks can throw their own Swift errors, and a cancelled task can throw `CancellationError`.

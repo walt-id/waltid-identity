@@ -60,7 +60,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
                 throw WalletError.internalFailure("Invalid timed key authorization preflight result")
             }
             return .supported(
-                effectivePolicy: policy.toSwiftAuthorizationPolicy(),
+                effectivePolicy: try policy.toSwiftAuthorizationPolicy(),
                 reuseEnforcement: reuseEnforcement.toSwiftAuthorizationReuseEnforcement(),
                 timeoutValidation: timeoutValidation.toSwiftAuthorizationTimeoutValidation()
             )
@@ -69,7 +69,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
                 throw WalletError.internalFailure("Timed key authorization preflight lacks timeout metadata")
             }
             return .supported(
-                effectivePolicy: policy.toSwiftAuthorizationPolicy(),
+                effectivePolicy: try policy.toSwiftAuthorizationPolicy(),
                 reuseEnforcement: nil,
                 timeoutValidation: nil
             )
@@ -84,13 +84,13 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         guard let count = Int32(exactly: count), count > 0 else { throw WalletError.invalidInput("Holder key count must be a positive 32-bit integer") }
         let result = try await bridge.createIssuanceHolderKeys(count: count, keyType: keyType.toKMPKeyType(),
             didMethod: didMethod, keyUseAuthorizationPolicy: policy.toKMPAuthorizationPolicy())
-        return swiftArray(try Self.successAnyValue(result, operation: "create issuance holder keys"), of: MobileWalletHolderBinding.self)
+        return try requiredBridgeArray(Self.successAnyValue(result, operation: "create issuance holder keys"), of: MobileWalletHolderBinding.self)
             .map { IssuanceHolderBinding(keyID: $0.keyId, did: $0.did) }
     }
 
     func listDeferredIssuance() async throws -> [DeferredCredential] {
         let result = try await bridge.listDeferredIssuance()
-        return swiftArray(try Self.successAnyValue(result, operation: "list deferred issuance"),
+        return try requiredBridgeArray(Self.successAnyValue(result, operation: "list deferred issuance"),
             of: Waltid_openid4vc_walletWalletIssuanceContinuation.self).map { $0.toSwiftDeferredCredential() }
     }
 
@@ -214,7 +214,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             reads = values.compactMap { $0 as? WalletBridgeCredentialRead }
             guard reads.count == values.count else { throw WalletError.internalFailure("Invalid credential read result") }
         } else { throw WalletError.internalFailure("Unexpected credentials result type") }
-        return reads.map { $0.toSwiftCredential() }
+        return try reads.map { try $0.toSwiftCredential() }
     }
 
     func deleteCredential(id: String) async throws -> Bool {

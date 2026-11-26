@@ -54,7 +54,7 @@ extension WalletKeyUseAuthorizationPolicy {
 }
 
 extension WalletBridgeKeyUseAuthorizationPolicy {
-    func toSwiftAuthorizationPolicy() -> WalletKeyUseAuthorizationPolicy {
+    func toSwiftAuthorizationPolicy() throws -> WalletKeyUseAuthorizationPolicy {
         switch type {
         case .none: return .none
         case .biometricCurrentSet: return .biometricCurrentSet
@@ -63,7 +63,7 @@ extension WalletBridgeKeyUseAuthorizationPolicy {
         case .biometricOrDeviceCredential: return .biometricOrDeviceCredential(timeoutSeconds: Int(timeoutSeconds?.intValue ?? 0))
         case .biometricTimedReuse:
             guard let timeoutSeconds else {
-                preconditionFailure("Timed biometric reuse preflight omitted its timeout")
+                throw WalletError.internalFailure("Timed biometric reuse preflight omitted its timeout")
             }
             return .biometricTimedReuse(timeoutSeconds: Int(timeoutSeconds.intValue))
         }
