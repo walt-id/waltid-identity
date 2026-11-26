@@ -142,10 +142,12 @@ jobs:
     name: Integration Tests - AWS
     runs-on: ubuntu-latest
     needs: tag
-    timeout-minutes: 300
+    # AWS and Azure share each provider's queue with PR and scheduled tests.
+    # Allow 350 minutes for queuing and execution, then check the result within the six-hour runner limit.
+    timeout-minutes: 360
     env:
       WORKFLOW: integration-test-aws.yml
-      WAIT_MINUTES: '290'
+      WAIT_MINUTES: '350'
     steps: &enterprise_integration_steps
       - name: Dispatch ${{ env.WORKFLOW }}
         id: dispatch
@@ -195,10 +197,10 @@ jobs:
     name: Integration Tests - Azure
     runs-on: ubuntu-latest
     needs: tag
-    timeout-minutes: 260
+    timeout-minutes: 360
     env:
       WORKFLOW: integration-test-azure.yml
-      WAIT_MINUTES: '250'
+      WAIT_MINUTES: '350'
     steps: *enterprise_integration_steps
   integration-test-postgresql:
     name: Integration Tests - PostgreSQL
