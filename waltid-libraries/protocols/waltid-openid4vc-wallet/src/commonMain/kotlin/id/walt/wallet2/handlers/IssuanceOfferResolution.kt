@@ -1,15 +1,6 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-
 package id.walt.wallet2.handlers
 
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.wallet2.data.*
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import kotlinx.serialization.json.*
 
 internal fun ReceiveCredentialRequest.toResolveOfferRequest(): ResolveOfferRequest =
     ResolveOfferRequest(offerUrl = offerUrl, offerJson = offerJson)

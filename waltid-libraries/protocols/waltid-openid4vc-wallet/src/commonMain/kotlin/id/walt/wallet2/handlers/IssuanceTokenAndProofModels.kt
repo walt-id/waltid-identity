@@ -1,23 +1,18 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.handlers
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.openid4vci.proofs.Proofs
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
-import id.walt.wallet2.data.*
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.http.Url
 import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.*
 
 @Serializable
 data class RequestTokenRequest(

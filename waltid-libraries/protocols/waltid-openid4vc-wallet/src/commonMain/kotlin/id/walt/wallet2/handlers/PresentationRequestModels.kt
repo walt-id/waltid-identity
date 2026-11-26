@@ -1,13 +1,10 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-
 package id.walt.wallet2.handlers
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.wallet2.consent.*
 import id.walt.wallet2.data.StoredCredential
-import io.ktor.http.*
+import io.ktor.http.Url
 import kotlinx.serialization.Serializable
 
 /**
