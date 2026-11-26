@@ -16,7 +16,7 @@ import WalletSDK
     func reviewChanged()
 }
 
-@MainActor private func walletJourney(offer: URL, request: URL, client: IssuanceClientRegistration,
+@MainActor private func walletJourney(offer: URL, request: URL, registrationFor: (String) throws -> IssuanceClientRegistration,
                                      trust: WalletClientIDTrustConfiguration, ui: any JourneyScreen) async throws {
     let config = WalletConfiguration(walletID: "member", presentation: .init(verifierTrust: trust))
     func useWallet(_ block: (Wallet) async throws -> Void) async throws {
@@ -50,10 +50,11 @@ import WalletSDK
             switch session.grant {
             case .preAuthorized(let grant):
                 var code: String?
-                if let requirement = session.offer.transactionCode { code = await ui.code(requirement) }
-                outcome = try await grant.accept(transactionCode: code, clientID: grant.clientIdentification == .clientIDRequired ? client.clientID : nil)
+                if let requirement = grant.transactionCode { code = await ui.code(requirement) }
+                let clientID = grant.clientIdentification == .clientIDRequired ? try registrationFor(grant.authorizationServer).clientID : nil
+                outcome = try await grant.accept(transactionCode: code, clientID: clientID)
             case .authorizationCode(let grant):
-                let authorization = try await grant.beginAuthorization(using: client)
+                let authorization = try await grant.beginAuthorization(using: registrationFor(grant.authorizationServer))
                 if let redirected = try await ui.browser(authorization.request.url) {
                     outcome = try await authorization.complete(redirected)
                 } else {

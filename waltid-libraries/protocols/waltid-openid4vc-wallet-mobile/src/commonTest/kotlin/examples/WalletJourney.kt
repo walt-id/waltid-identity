@@ -43,7 +43,8 @@ private interface Screen {
     fun reviewChanged()
 }
 
-private suspend fun walletJourney(factory: MobileWalletFactory, offer: String, request: String, client: IssuanceClientRegistration,
+private suspend fun walletJourney(factory: MobileWalletFactory, offer: String, request: String,
+    registrationFor: (String) -> IssuanceClientRegistration,
     trust: ClientIdTrustConfiguration, ui: Screen) {
     val config = MobileWalletConfig(walletId = "member", presentation = MobileWalletPresentationConfig(verifierTrust = trust))
     suspend fun useWallet(block: suspend (MobileWallet) -> Unit) = coroutineScope {
@@ -68,10 +69,12 @@ private suspend fun walletJourney(factory: MobileWalletFactory, offer: String, r
         val session = wallet.startIssuance(MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offer)))
         val outcome = if (!ui.accept(session.offer)) wallet.cancelIssuance(session.id) else when (session) {
             is MobileWalletIssuanceSession.PreAuthorized -> session.accept(
-                transactionCode = session.offer.transactionCode?.let { ui.code(it) }, clientId = client.clientId,
+                transactionCode = session.transactionCode?.let { ui.code(it) },
+                clientId = if (session.clientIdentification == IssuanceClientIdentification.CLIENT_ID_REQUIRED)
+                    registrationFor(session.authorizationServer).clientId else null,
             )
             is MobileWalletIssuanceSession.AuthorizationCode -> {
-                val authorization = session.beginAuthorization(client)
+                val authorization = session.beginAuthorization(registrationFor(session.authorizationServer))
                 val redirect = ui.browser(authorization.request.url)
                 if (redirect == null) wallet.cancelIssuance(session.id) else authorization.complete(redirect)
             }

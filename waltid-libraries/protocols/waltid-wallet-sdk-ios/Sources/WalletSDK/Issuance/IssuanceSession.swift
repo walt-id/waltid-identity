@@ -1,7 +1,10 @@
 import Foundation
 
 /// Durable reference for cancelling a wallet issuance session.
-public struct IssuanceSessionID: RawRepresentable, Hashable, Codable, Sendable {
+public struct IssuanceSessionID: RawRepresentable, Hashable, Codable, Sendable, CustomStringConvertible {
+    /// Printable form for diagnostics that omits the saved reference.
+    public var description: String { "IssuanceSessionID(<redacted>)" }
+
     /// Persist this value when the app needs to restore the offer.
     public let rawValue: String
     /// Restores a saved session reference.
@@ -10,7 +13,10 @@ public struct IssuanceSessionID: RawRepresentable, Hashable, Codable, Sendable {
 }
 
 /// Browser-grant reference. The wallet validates the retained grant, callback and state on use.
-public struct AuthorizationIssuanceID: RawRepresentable, Hashable, Codable, Sendable {
+public struct AuthorizationIssuanceID: RawRepresentable, Hashable, Codable, Sendable, CustomStringConvertible {
+    /// Printable form for diagnostics that omits the saved reference.
+    public var description: String { "AuthorizationIssuanceID(<redacted>)" }
+
     /// Persist this value before opening the browser.
     public let rawValue: String
     /// Restores a saved browser continuation.
@@ -20,7 +26,9 @@ public struct AuthorizationIssuanceID: RawRepresentable, Hashable, Codable, Send
 
 /// Identification required to accept a pre-authorized offer.
 public enum IssuanceClientIdentification: Sendable {
+    /// The server accepts this wallet without a client identifier.
     case anonymousAllowed
+    /// The host supplies an identifier registered at the selected server.
     case clientIDRequired
 }
 
@@ -32,6 +40,9 @@ public struct AuthorizationCodeOffer: Sendable {
     let wallet: Wallet
 
     /// Accepts the offer and prepares a browser request and its durable callback reference.
+    /// - Parameters:
+    ///   - registration: Client identifier and exact redirect registered at the selected server.
+    ///   - credentials: Credential configurations and holder bindings accepted by the holder.
     public func beginAuthorization(using registration: IssuanceClientRegistration,
                                    credentials: [IssuanceCredentialSelection]? = nil) async throws -> PendingIssuanceAuthorization {
         try await wallet.beginAuthorization(id, registration: registration, credentials: credentials)
@@ -40,13 +51,20 @@ public struct AuthorizationCodeOffer: Sendable {
 
 /// A pre-authorized offer and the inputs required by its selected authorization server.
 public struct PreAuthorizedOffer: Sendable {
+    /// Verified server identifier for choosing a registration.
     public let authorizationServer: String
+    /// Effective identification requirement for this wallet and server.
     public let clientIdentification: IssuanceClientIdentification
+    /// Input requested by the credential issuer when the holder needs a separate code.
     public let transactionCode: IssuanceTransactionCode?
     let id: IssuanceSessionID
     let wallet: Wallet
 
     /// Accepts the offer after the holder reviews the credentials and supplies any requested inputs.
+    /// - Parameters:
+    ///   - transactionCode: Holder-entered code for an offer with a transaction-code prompt.
+    ///   - credentials: Credential configurations and holder bindings accepted by the holder.
+    ///   - clientID: Registered client identifier when identification is required.
     public func accept(transactionCode: String? = nil, credentials: [IssuanceCredentialSelection]? = nil,
                        clientID: String? = nil) async throws -> IssuanceOutcome {
         try await wallet.accept(id, transactionCode: transactionCode, credentials: credentials, clientID: clientID)
@@ -55,7 +73,9 @@ public struct PreAuthorizedOffer: Sendable {
 
 /// The grant selected during discovery and the operation available after review.
 public enum IssuanceGrantSession: Sendable {
+    /// A reviewed offer ready for browser authorization.
     case authorizationCode(AuthorizationCodeOffer)
+    /// A reviewed offer ready for pre-authorized issuance.
     case preAuthorized(PreAuthorizedOffer)
 }
 
@@ -63,7 +83,9 @@ public enum IssuanceGrantSession: Sendable {
 public struct IssuanceSession: Sendable {
     /// Save this reference to reopen or cancel the offer.
     public let id: IssuanceSessionID
+    /// Issuer and credential information to show before acceptance.
     public let offer: IssuanceOfferPreview
+    /// The grant selected by discovery and its available operation.
     public let grant: IssuanceGrantSession
 
     init(_ review: IssuanceOfferReview, wallet: Wallet) {
