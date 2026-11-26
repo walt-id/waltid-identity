@@ -15,8 +15,8 @@ struct WalletDemoApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if #available(iOS 26.0, *), ProcessInfo.processInfo.environment["E2E_ANNEX_C_RETRY"] == "1" {
-                MockAnnexCRetryScene()
+            if #available(iOS 26.0, *), ProcessInfo.processInfo.environment["E2E_ANNEX_C_SCENARIO"] != nil {
+                MockAnnexCScene()
             } else {
                 WalletForegroundScene()
             }

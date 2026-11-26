@@ -27,7 +27,8 @@ public struct SharingReviewScreen: View {
     private let paymentReview: PaymentReviewState
     private let onToggleCredential: (PresentationCredentialSelection) -> Void
     private let onToggleDisclosure: (PresentationDisclosureSelection) -> Void
-    private let onSubmit: ([String: String]) -> Void
+    private let reviewsCredentialStatus: Bool
+    private let onSubmit: ([String: String]?) -> Void
     private let requestIdentity: AnyHashable
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
@@ -46,16 +47,18 @@ public struct SharingReviewScreen: View {
         review: SharingReviewModel?,
         selection: SharingSelection,
         selectionComplete: Bool,
+        reviewsCredentialStatus: Bool = true,
         failure: String? = nil,
         isSubmitting: Bool = false,
         paymentReview: PaymentReviewState = .notRequired,
         onToggleCredential: @escaping (PresentationCredentialSelection) -> Void,
         onToggleDisclosure: @escaping (PresentationDisclosureSelection) -> Void,
-        onSubmit: @escaping ([String: String]) -> Void,
+        onSubmit: @escaping ([String: String]?) -> Void,
         onReject: (() -> Void)? = nil,
         onCancel: @escaping () -> Void,
         statusNotice: String? = nil
     ) {
+        self.reviewsCredentialStatus = reviewsCredentialStatus
         self.statusNotice = statusNotice
         self.title = title
         self.requestIdentity = requestIdentity
@@ -78,18 +81,28 @@ public struct SharingReviewScreen: View {
                 content
             } actions: {
                 if let review, failure == nil {
-                    ReviewActions(
-                        gate: submission,
-                        selectionComplete: selectionComplete && renderedOptions == review.credentialOptions,
-                        isLoading: isSubmitting,
-                        reviewKey: SharingSubmissionKey(requestIdentity: requestIdentity, review: review, selection: selection),
-                        credentialStatuses: statusUI.selectedStatuses(review: review, selection: selection),
-                        onSubmit: onSubmit,
-                        onReject: onReject,
-                        onCancel: onCancel,
-                        paymentReview: paymentReview, isPayment: review.request.hasPaymentTransaction,
-                        showCancelWithReject: false
-                    )
+                    let ready = selectionComplete && renderedOptions == review.credentialOptions
+                    if reviewsCredentialStatus {
+                        ReviewActions(
+                            gate: submission,
+                            selectionComplete: ready,
+                            isLoading: isSubmitting,
+                            reviewKey: SharingSubmissionKey(requestIdentity: requestIdentity, review: review, selection: selection),
+                            credentialStatuses: statusUI.selectedStatuses(review: review, selection: selection),
+                            onSubmit: onSubmit,
+                            onReject: onReject,
+                            onCancel: onCancel,
+                            paymentReview: paymentReview, isPayment: review.request.hasPaymentTransaction,
+                            showCancelWithReject: false
+                        )
+                    } else {
+                        WalletActions(
+                            primary: WalletAction(String(localized: "Share", bundle: .module), enabled: ready && !isSubmitting,
+                                identifier: WalletAccessibilityID.presentationSubmitButton) { onSubmit(nil) },
+                            secondary: WalletAction(String(localized: "Cancel", bundle: .module), enabled: !isSubmitting,
+                                identifier: WalletAccessibilityID.presentationCancelButton, perform: onCancel)
+                        )
+                    }
                 } else if let failure {
                     Text(failure).font(.subheadline).foregroundStyle(.red)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -122,6 +135,7 @@ public struct SharingReviewScreen: View {
                 onCancel: onCancel,
                 compact: true,
                 showActions: false,
+                showsCredentialStatus: reviewsCredentialStatus,
                 paymentReview: paymentReview
             )
         } else {

@@ -35,7 +35,7 @@ struct SettingsView: View {
                     destination = .nearby
                 }
                 SettingsDestinationRow("Digital Credentials API", systemImage: "person.text.rectangle",
-                    summary: viewModel.showDcApiPresentationPreview ? String(localized: "Review and status checks on") : String(localized: "One-tap sharing"),
+                    summary: viewModel.showDcApiPresentationPreview ? String(localized: "Review and status checks on") : String(localized: "Status checks off"),
                     identifier: "wallet.settingsDigitalCredentialsApi") {
                     destination = .digitalCredentials
                 }

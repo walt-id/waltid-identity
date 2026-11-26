@@ -895,7 +895,7 @@
     {
       "id": "settings.dc_api.enabled",
       "requirements": [
-        "One-tap DC API is off and the wallet shows its review and status checks"
+        "The wallet shows credential status during Digital Credentials API review"
       ],
       "composeTest": "settingsDcApiEnabled",
       "swiftTest": "testSettingsDcApiEnabled"
@@ -903,7 +903,7 @@
     {
       "id": "settings.dc_api.disabled",
       "requirements": [
-        "One-tap DC API is on and the wallet skips its review and advisory status checks"
+        "Status checks are skipped; iOS still requires Share for each request"
       ],
       "composeTest": "settingsDcApiDisabled",
       "swiftTest": "testSettingsDcApiDisabled"

@@ -3,17 +3,19 @@ import XCTest
 
 @MainActor
 final class MockWalletUITests: XCTestCase {
-    func testOneTapAnnexCFailureRequiresAnExplicitReviewedShare() throws {
+    func testDirectAnnexCFailureRequiresAnExplicitReviewedShare() throws {
         guard #available(iOS 26.0, *) else { throw XCTSkip("Identity document presentation requires iOS 26") }
         let app = XCUIApplication()
         defer { app.terminate() }
         WalletE2EUI(app: app).launch(environment: [
-            "E2E_ANNEX_C_RETRY": "1", "E2E_MOCK_WALLET": "1", "E2E_MOCK_STATUS": "revoked_current",
+            "E2E_ANNEX_C_SCENARIO": "retry", "E2E_MOCK_WALLET": "1", "E2E_MOCK_STATUS": "revoked_current",
         ], unlock: false)
 
         let share = app.buttons["wallet.presentationSubmitButton"]
         XCTAssertTrue(share.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Direct response failed"].exists)
+        XCTAssertTrue(app.staticTexts["Response calls: 0"].exists)
+        share.tap()
+        XCTAssertTrue(app.staticTexts["Direct response failed"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Revoked"].exists)
         XCTAssertTrue(app.staticTexts["Mobile Driving Licence"].exists)
         XCTAssertTrue(app.staticTexts["Delivered responses: 0"].exists)
@@ -24,6 +26,36 @@ final class MockWalletUITests: XCTestCase {
         confirm.tap()
         XCTAssertTrue(app.staticTexts["Delivered responses: 1"].waitForExistence(timeout: 5))
         XCTAssertFalse(share.isEnabled)
+    }
+
+    func testDirectAnnexCRequiresShareForThisRequest() throws {
+        let app = try openDirectAnnexCRequest()
+        defer { app.terminate() }
+        app.buttons["wallet.presentationSubmitButton"].tap()
+        XCTAssertTrue(app.staticTexts["Delivered responses: 1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Response calls: 1"].exists)
+    }
+
+    func testCancellingDirectAnnexCReleasesNothing() throws {
+        let app = try openDirectAnnexCRequest()
+        defer { app.terminate() }
+        app.buttons["wallet.presentationCancelButton"].tap()
+        XCTAssertTrue(app.staticTexts["Cancelled: yes"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Response calls: 0"].exists)
+    }
+
+    private func openDirectAnnexCRequest() throws -> XCUIApplication {
+        guard #available(iOS 26.0, *) else { throw XCTSkip("Identity document presentation requires iOS 26") }
+        let app = XCUIApplication()
+        WalletE2EUI(app: app).launch(environment: [
+            "E2E_ANNEX_C_SCENARIO": "direct", "E2E_MOCK_WALLET": "1", "E2E_MOCK_STATUS": "revoked_current",
+        ], unlock: false)
+        XCTAssertTrue(app.staticTexts["Mobile Driving Licence"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "reader.example")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["Family name"].exists)
+        XCTAssertFalse(app.staticTexts["Revoked"].exists)
+        XCTAssertTrue(app.staticTexts["Response calls: 0"].exists)
+        return app
     }
 
     func testStatusNotificationOpensCredentialAfterUnlockAndAcknowledgesIt() {

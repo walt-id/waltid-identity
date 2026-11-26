@@ -52,7 +52,7 @@ public final class AnnexCPresentationModel: ObservableObject {
     @Published public private(set) var preview: AnnexCPresentationPreview?
     /// User-facing failure text, if the flow cannot continue.
     @Published public private(set) var failure: String?
-    /// A failed one-tap response keeps this request in explicit wallet review.
+    /// A failed direct response keeps this request in explicit wallet review.
     @Published public private(set) var directSubmissionFailure: String?
     /// Locks interaction once a response is being sealed or the platform request has ended.
     public var isSubmitting: Bool { phase == .submitting || phase == .finished }
