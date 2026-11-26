@@ -124,7 +124,7 @@ class MobileWalletMetadataChainTest {
             assertEquals(setOf(leaf, parent, "https://types.example/sca"), publishedRecords.map { it.type }.toSet())
             assertEquals(1, publishedRecords.map { it.registryEntryId }.distinct().size)
             assertTrue(publishedRecords.none { it.credentialId == "legacy-invalid-reference" })
-            assertEquals(setOf("Bank attestation"), publishedRecords.map { it.display.name }.toSet())
+            assertEquals(setOf(metadata.display.single().name), publishedRecords.map { it.display.name }.toSet())
             assertTrue(publishedRecords.flatMap { it.fields }.none { it.path == listOf("vct#integrity") },
                 "The type metadata pin is protocol data, not a matchable user claim")
             val request = """{"response_type":"vp_token","response_mode":"dc_api","nonce":"chain-nonce","dcql_query":{"credentials":[{"id":"account","format":"dc+sd-jwt","meta":{"vct_values":["$parent"]}}]}}"""
