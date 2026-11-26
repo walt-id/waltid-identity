@@ -10,6 +10,7 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.mobile.MobileWalletStoreAdapter
+import id.walt.wallet2.mobile.MobileWalletStoreOwner
 import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
@@ -91,10 +92,10 @@ public data class WalletBridgeStoredCredential(
     public val metadataJson: String? = null,
 )
 
-/** Stable object identifying the host storage behind a Swift credential or DID store adapter. */
+/** Identifies the live host storage behind a Swift credential or DID store adapter. */
 public interface WalletBridgeStoreIdentity {
-    /** Retained by the open wallet for comparing overlapping local erasure requests. */
-    public val storageOwner: Any
+    /** Process-local identity shared by adapters for the same host store. Zero groups value-type stores. */
+    public val storageOwnerId: Long
 }
 
 /**
@@ -204,7 +205,7 @@ private class BridgeDatabaseEncryptionKeyProvider(
 private class BridgeCredentialStore(
     private val bridgeStore: WalletBridgeCredentialStore,
 ) : WalletCredentialStore, MobileWalletStoreAdapter {
-    override val storeOwner: Any = (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwner ?: bridgeStore
+    override val storeOwner = MobileWalletStoreOwner(bridgeStore, (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwnerId)
 
     override suspend fun getCredential(id: String): StoredCredential? =
         bridgeStore.getCredential(id)?.toStoredCredential()
@@ -223,7 +224,7 @@ private class BridgeCredentialStore(
 private class BridgeDidStore(
     private val bridgeStore: WalletBridgeDidStore,
 ) : WalletDidStore, MobileWalletStoreAdapter {
-    override val storeOwner: Any = (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwner ?: bridgeStore
+    override val storeOwner = MobileWalletStoreOwner(bridgeStore, (bridgeStore as? WalletBridgeStoreIdentity)?.storageOwnerId)
 
     override suspend fun getDid(did: String): WalletDidEntry? =
         bridgeStore.getDid(did)?.toWalletDidEntry()

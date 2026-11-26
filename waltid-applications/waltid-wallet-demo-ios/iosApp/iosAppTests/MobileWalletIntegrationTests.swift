@@ -350,21 +350,18 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testErasingOneWalletRequiresClosingTheOtherOwnerOfItsSwiftStore() async throws {
-        let store = RecordingWalletCredentialStore()
-        let persistence = WalletPersistence(credentialStore: store)
-        let first = try await Wallet(configuration: .init(walletID: testWalletId, persistence: persistence))
-        let other = try await Wallet(configuration: .init(walletID: testWalletId + "-other", persistence: persistence))
-        addTeardownBlock { try await first.close() }
-        addTeardownBlock { try await other.close() }
-        do {
-            try await first.deleteLocalData()
-            XCTFail("A second wallet still owns the shared credential store")
-        } catch {
-            guard case WalletError.storage = error else { throw error }
-        }
-        try await other.close()
-        try await first.deleteLocalData()
-        try await other.deleteLocalData()
+        let sharedActor = RecordingWalletCredentialStore()
+        try await verifyErasureOwnership(
+            firstStore: sharedActor, secondStore: sharedActor, suffix: "-actor"
+        )
+    }
+
+    func testErasingSwiftValueStoresRequiresClosingTheirPeers() async throws {
+        let backing = RecordingWalletCredentialStore()
+        try await verifyErasureOwnership(
+            firstStore: ValueCredentialStore(backing: backing),
+            secondStore: ValueCredentialStore(backing: backing), suffix: "-value"
+        )
     }
 
     func testProvidedDatabaseKeyProviderBootstrapsAcrossRecreationAndDeletesProviderKey() async throws {
@@ -422,6 +419,36 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
         _ = try await checkEudiPidStatus(wallet, ids: credentialIDs)
+    }
+
+    private func verifyErasureOwnership(
+        firstStore: any WalletCredentialStore, secondStore: any WalletCredentialStore, suffix: String
+    ) async throws {
+        let base = testWalletId + suffix
+        let first = try await Wallet(configuration: .init(
+            walletID: base, persistence: WalletPersistence(credentialStore: firstStore)
+        ))
+        addTeardownBlock { try await first.close() }
+        let other = try await Wallet(configuration: .init(
+            walletID: base + "-other", persistence: WalletPersistence(credentialStore: secondStore)
+        ))
+        addTeardownBlock { try await other.close() }
+        let independent = try await Wallet(configuration: .init(
+            walletID: base + "-independent",
+            persistence: WalletPersistence(credentialStore: RecordingWalletCredentialStore())
+        ))
+        addTeardownBlock { try await independent.close() }
+        try await independent.deleteLocalData()
+
+        do {
+            try await first.deleteLocalData()
+            XCTFail("A second wallet still owns the shared credential store")
+        } catch {
+            guard case WalletError.storage = error else { throw error }
+        }
+        try await other.close()
+        try await first.deleteLocalData()
+        try await other.deleteLocalData()
     }
 
     private func checkEudiPidStatus(_ wallet: Wallet, ids: [String]) async throws -> [CredentialStatusRecord] {
@@ -1038,6 +1065,15 @@ private actor RecordingWalletCredentialStore: WalletCredentialStore {
     func removeCredential(id: String) async throws -> Bool {
         false
     }
+}
+
+private struct ValueCredentialStore: WalletCredentialStore {
+    let backing: RecordingWalletCredentialStore
+
+    func credential(id: String) async throws -> StoredCredential? { try await backing.credential(id: id) }
+    func credentials() async throws -> [StoredCredential] { try await backing.credentials() }
+    func addCredential(_ credential: StoredCredential) async throws { try await backing.addCredential(credential) }
+    func removeCredential(id: String) async throws -> Bool { try await backing.removeCredential(id: id) }
 }
 
 private actor RecordingWalletDatabaseKeyProvider: WalletDatabaseKeyProvider {

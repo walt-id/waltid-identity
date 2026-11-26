@@ -57,10 +57,11 @@ private final class KMPWalletDatabaseKeyProviderAdapter: WalletBridgeDatabaseEnc
 }
 
 private final class KMPWalletCredentialStoreAdapter: WalletBridgeCredentialStore, WalletBridgeStoreIdentity, @unchecked Sendable {
-    var storageOwner: Any { hostStoreOwner(store) }
+    let storageOwnerId: Int64
 
     init(store: any WalletCredentialStore) {
         self.store = store
+        self.storageOwnerId = hostStoreID(store)
     }
 
     func __getCredential(id: String) async throws -> WalletBridgeStoredCredential? {
@@ -83,10 +84,11 @@ private final class KMPWalletCredentialStoreAdapter: WalletBridgeCredentialStore
 }
 
 private final class KMPWalletDidStoreAdapter: WalletBridgeDidStore, WalletBridgeStoreIdentity, @unchecked Sendable {
-    var storageOwner: Any { hostStoreOwner(store) }
+    let storageOwnerId: Int64
 
     init(store: any WalletDidStore) {
         self.store = store
+        self.storageOwnerId = hostStoreID(store)
     }
 
     func __getDid(did: String) async throws -> WalletBridgeStoredDid? {
@@ -151,13 +153,11 @@ private extension WalletBridgeStoredDid {
         )
     }
 }
-// Swift value stores can share a backing resource without exposing reference identity.
-private final class ValueStoreOwner: @unchecked Sendable {
-    static let shared = ValueStoreOwner()
-}
 
-private func hostStoreOwner(_ store: Any) -> AnyObject {
-    if type(of: store) is AnyClass { return store as AnyObject }
-    return ValueStoreOwner.shared
+// The adapter retains the Swift store for the lease lifetime. Only its identity crosses into Kotlin.
+private func hostStoreID(_ store: Any) -> Int64 {
+    // Value-type adapters can share a backing store without exposing a reference identity.
+    guard type(of: store) is AnyClass else { return 0 }
+    return Int64(Int(bitPattern: ObjectIdentifier(store as AnyObject)))
 }
 #endif
