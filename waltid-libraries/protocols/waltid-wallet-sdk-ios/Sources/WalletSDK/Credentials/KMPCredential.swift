@@ -3,19 +3,19 @@ import Foundation
 @preconcurrency import WalletCore
 
 extension WalletBridgeCredentialRead {
-    func toSwiftCredential() -> Credential {
+    func toSwiftCredential() throws -> Credential {
         // Advisory decoding cannot remove an otherwise readable credential. The status snapshot /
         // stream still reports invalid status data explicitly; nil is never a clear assessment.
-        credential.toSwiftCredential(status: try? decodeCredentialStatus(CredentialStatus.self, json: statusJson))
+        try credential.toSwiftCredential(status: try? decodeCredentialStatus(CredentialStatus.self, json: statusJson))
     }
 }
 
 extension MobileWalletCredential {
-    func toSwiftCredential(status: CredentialStatus? = nil) -> Credential {
+    func toSwiftCredential(status: CredentialStatus? = nil) throws -> Credential {
         Credential(
             id: id,
             format: format,
-            credentialDataJSON: requiredCredentialDataJSON(credentialDataJson),
+            credentialDataJSON: try requiredCredentialDataJSON(credentialDataJson),
             issuer: issuer,
             subject: subject,
             label: label,

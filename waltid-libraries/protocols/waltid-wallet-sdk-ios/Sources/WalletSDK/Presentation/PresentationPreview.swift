@@ -48,8 +48,10 @@ public struct PresentationPreviewHandle: Equatable, Sendable, CustomStringConver
     /// Creates a handle for bridge adapters and test fixtures. Production handles come from preview operations.
     ///
     /// - Parameter value: Nonempty opaque handle value supplied by wallet core.
-    public init(value: String) {
-        precondition(!value.isEmpty, "Presentation preview handle must not be empty.")
+    public init(value: String) throws {
+        guard isPresentationIdentifierNonBlank(value) else {
+            throw WalletError.invalidInput("A presentation preview handle must contain a non-blank value.")
+        }
         self.value = value
     }
 

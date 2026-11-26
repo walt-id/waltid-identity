@@ -6,12 +6,12 @@ extension MobileWalletPresentationPreviewResult {
     func toSwiftPreviewResult() throws -> PresentationPreviewResult {
         switch self {
         case let result as MobileWalletPresentationPreviewResultReady:
-            return .ready(result.preview.toSwiftPreview())
+            return .ready(try result.preview.toSwiftPreview())
         case let result as MobileWalletPresentationPreviewResultInvalid:
             return .invalid(
                 PresentationPreviewError(
-                    previewHandle: PresentationPreviewHandle(value: result.previewHandle.value),
-                    request: result.request.toSwiftRequestContext(),
+                    previewHandle: try PresentationPreviewHandle(value: result.previewHandle.value),
+                    request: try result.request.toSwiftRequestContext(),
                     code: result.errorCode.toSwiftErrorCode(),
                     message: result.message
                 )
@@ -23,41 +23,38 @@ extension MobileWalletPresentationPreviewResult {
 }
 
 extension MobileWalletPresentationPreview {
-    func toSwiftPreview() -> PresentationPreview {
+    func toSwiftPreview() throws -> PresentationPreview {
         PresentationPreview(
-            previewHandle: PresentationPreviewHandle(value: previewHandle.value),
-            request: request.toSwiftRequestInfo(),
-            credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self)
-                .map { $0.toSwiftCredentialOption() },
-            credentialRequirements: swiftArray(credentialRequirements, of: MobileWalletPresentationCredentialRequirement.self)
-                .map { $0.toSwiftCredentialRequirement() }
+            previewHandle: try PresentationPreviewHandle(value: previewHandle.value),
+            request: try request.toSwiftRequestInfo(),
+            credentialOptions: try requiredBridgeArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self)
+                .map { try $0.toSwiftCredentialOption() },
+            credentialRequirements: try requiredBridgeArray(credentialRequirements, of: MobileWalletPresentationCredentialRequirement.self)
+                .map { try $0.toSwiftCredentialRequirement() }
         )
     }
 }
 
 extension MobileWalletPresentationCredentialOption {
-    func toSwiftCredentialOption() -> PresentationCredentialOption {
+    func toSwiftCredentialOption() throws -> PresentationCredentialOption {
         PresentationCredentialOption(
             queryID: queryId,
             credentialID: credentialId,
             format: format,
-            credentialDataJSON: requiredCredentialDataJSON(credentialDataJson),
+            credentialDataJSON: try requiredCredentialDataJSON(credentialDataJson),
             multiple: multiple,
             issuer: issuer,
             subject: subject,
             label: label,
-            disclosures: swiftArray(disclosures, of: MobileWalletPresentationDisclosure.self)
+            disclosures: try requiredBridgeArray(disclosures, of: MobileWalletPresentationDisclosure.self)
                 .map { $0.toSwiftDisclosure() },
             metadataJSON: metadataJson
         )
     }
 }
 
-func requiredCredentialDataJSON(_ value: String?) -> String {
-    guard let value else {
-        assertionFailure("KMP wallet returned nil credential data JSON for a non-null SDK field")
-        return "{}"
-    }
+func requiredCredentialDataJSON(_ value: String?) throws -> String {
+    guard let value else { throw WalletError.internalFailure("Wallet core omitted credential data") }
     return value
 }
 
@@ -158,38 +155,38 @@ extension MobileWalletPresentationResult {
 }
 
 private extension MobileWalletPresentationRequestContext {
-    func toSwiftRequestContext() -> PresentationRequestContext {
+    func toSwiftRequestContext() throws -> PresentationRequestContext {
         PresentationRequestContext(
             clientID: clientId,
-            requestAuthentication: requestAuthentication.toSwiftRequestAuthentication(),
+            requestAuthentication: try requestAuthentication.toSwiftRequestAuthentication(),
             verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             nonce: nonce,
-            responseEncryption: responseEncryption.toSwiftResponseEncryption()
+            responseEncryption: try responseEncryption.toSwiftResponseEncryption()
         )
     }
 }
 
 private extension MobileWalletPresentationRequestInfo {
-    func toSwiftRequestInfo() -> PresentationRequestInfo {
+    func toSwiftRequestInfo() throws -> PresentationRequestInfo {
         PresentationRequestInfo(
             clientID: clientId,
-            requestAuthentication: requestAuthentication.toSwiftRequestAuthentication(),
+            requestAuthentication: try requestAuthentication.toSwiftRequestAuthentication(),
             nonce: nonce,
-            responseEncryption: responseEncryption.toSwiftResponseEncryption(),
+            responseEncryption: try responseEncryption.toSwiftResponseEncryption(),
             verifierMetadata: verifierMetadata?.toSwiftVerifierMetadata(),
             responseURI: responseUri.flatMap(URL.init(string:)),
             state: state,
             responseMode: responseMode,
-            transactionData: swiftArray(transactionData, of: MobileWalletTransactionDataItem.self)
-                .map { $0.toSwiftTransactionData() }
+            transactionData: try requiredBridgeArray(transactionData, of: MobileWalletTransactionDataItem.self)
+                .map { try $0.toSwiftTransactionData() }
         )
     }
 }
 
 private extension MobileWalletRequestAuthentication {
-    func toSwiftRequestAuthentication() -> PresentationRequestAuthentication {
+    func toSwiftRequestAuthentication() throws -> PresentationRequestAuthentication {
         switch self {
         case is MobileWalletRequestAuthenticationUnauthenticated:
             return .unauthenticated
@@ -201,7 +198,7 @@ private extension MobileWalletRequestAuthentication {
                 clientIDScheme: authenticated.clientIdScheme.toSwiftClientIDScheme()
             )
         default:
-            preconditionFailure("Unsupported request authentication: \(type(of: self))")
+            throw WalletError.internalFailure("Unsupported request authentication: \(type(of: self))")
         }
     }
 }
@@ -228,12 +225,12 @@ private extension MobileWalletClientIdScheme {
 }
 
 private extension MobileWalletResponseEncryption {
-    func toSwiftResponseEncryption() -> PresentationResponseEncryption {
+    func toSwiftResponseEncryption() throws -> PresentationResponseEncryption {
         guard isRequired else { return .notRequired }
         guard let keyManagementAlgorithm,
               let contentEncryptionAlgorithm,
               let verifierKeyThumbprint else {
-            preconditionFailure("Required response encryption is missing selected metadata")
+            throw WalletError.internalFailure("Required response encryption is missing selected metadata")
         }
         return .required(
             ResponseEncryptionDetails(
@@ -273,39 +270,41 @@ private extension MobileWalletVerifierMetadata {
 }
 
 private extension MobileWalletPresentationCredentialRequirement {
-    func toSwiftCredentialRequirement() -> PresentationCredentialRequirement {
-        PresentationCredentialRequirement(options: swiftStringMatrix(options))
-    }
-}
-
-private func swiftStringMatrix(_ value: Any) -> [[String]] {
-    swiftArray(value, of: Any.self).map { option in
-        swiftArray(option, of: String.self)
+    func toSwiftCredentialRequirement() throws -> PresentationCredentialRequirement {
+        let options = try requiredBridgeArray(options, of: [String].self)
+        guard PresentationCredentialRequirement.hasValidOptions(options) else { throw WalletError.internalFailure("Invalid credential requirement") }
+        return PresentationCredentialRequirement(options: options)
     }
 }
 
 private extension MobileWalletPresentationDisclosure {
     func toSwiftDisclosure() -> PresentationDisclosure {
-        PresentationDisclosure(
+        let inclusion: DisclosureDisposition
+        switch disposition {
+        case .additionalCleartext: inclusion = .additionalCleartext
+        case .requiredCleartext: inclusion = .requiredCleartext
+        case .optionalCleartext: inclusion = .optionalCleartext
+        case .requiredSelective: inclusion = .requiredSelective
+        case .fixedSelective: inclusion = .fixedSelective
+        case .selectable: inclusion = .selectable
+        }
+        return PresentationDisclosure(
             path: path,
-            name: name,
             valueJSON: valueJson,
-            displayValue: displayValue,
-            selectivelyDisclosable: selectivelyDisclosable,
-            required: required,
-            selectable: selectable,
-            requested: requested
+            disposition: inclusion,
+            name: name,
+            displayValue: displayValue
         )
     }
 }
 
 private extension MobileWalletTransactionDataItem {
-    func toSwiftTransactionData() -> PresentationTransactionData {
+    func toSwiftTransactionData() throws -> PresentationTransactionData {
         PresentationTransactionData(
             type: type,
             displayName: displayName,
-            credentialQueryIDs: swiftArray(credentialQueryIds, of: String.self),
-            supportedFields: swiftArray(supportedFields, of: String.self),
+            credentialQueryIDs: try requiredBridgeArray(credentialQueryIds, of: String.self),
+            supportedFields: try requiredBridgeArray(supportedFields, of: String.self),
             rawJSON: rawJson,
             detailsJSON: detailsJson
         )

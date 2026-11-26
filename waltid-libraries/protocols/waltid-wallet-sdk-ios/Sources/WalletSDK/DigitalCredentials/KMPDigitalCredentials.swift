@@ -39,16 +39,16 @@ extension MobileWalletDigitalCredentialCapabilities {
 }
 
 extension MobileWalletAnnexCPreview {
-    func toSwiftPreview() -> AnnexCPresentationPreview {
+    func toSwiftPreview() throws -> AnnexCPresentationPreview {
         AnnexCPresentationPreview(
             requestID: requestId,
             verifiedOrigin: verifiedOrigin,
             parsedRequest: AnnexCParsedRequest(
-                documents: swiftArray(parsedRequest.documents, of: MobileWalletAnnexCDocumentRequest.self).map {
+                documents: try requiredBridgeArray(parsedRequest.documents, of: MobileWalletAnnexCDocumentRequest.self).map {
                     AnnexCDocumentRequest(documentType: $0.docType, namespaces: $0.namespaces)
                 }
             ),
-            credentialOptions: swiftArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self).map { $0.toSwiftCredentialOption() },
+            credentialOptions: try requiredBridgeArray(credentialOptions, of: MobileWalletPresentationCredentialOption.self).map { try $0.toSwiftCredentialOption() },
             readerTrust: readerAuthentication.toSwiftReaderTrust(decision: readerTrust)
         )
     }

@@ -9,7 +9,9 @@ import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialPr
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequestInfo
 import id.walt.wallet2.mobile.presentation.MobileWalletMetadataDisplay
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
+import id.walt.wallet2.mobile.presentation.DisclosureDisposition
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationDisclosure
+import id.walt.wallet2.mobile.credentials.MobileWalletCredential
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletReaderAuthentication
 import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataItem
 import id.walt.wallet2.mobile.presentation.MobileWalletVerifierMetadata
@@ -363,22 +365,16 @@ class MobileDigitalCredentialSharingReviewTest {
         metadataJson: String? = null,
     ): MobileWalletPresentationCredentialOption = MobileWalletPresentationCredentialOption(
         queryId = queryId,
-        credentialId = credentialId,
-        format = "mso_mdoc",
-        issuer = "Test Issuer",
-        subject = null,
-        label = "Driving licence",
-        credentialDataJson = "{}",
+        credential = MobileWalletCredential(credentialId, "mso_mdoc", "{}", issuer = "Test Issuer", label = "Driving licence", metadataJson = metadataJson),
         disclosures = listOf(
             MobileWalletPresentationDisclosure(
                 path = "$MDL_NAMESPACE/given_name",
                 name = "given_name",
                 valueJson = "\"Ada\"",
                 displayValue = "Ada",
-                selectivelyDisclosable = false,
+                disposition = DisclosureDisposition.RequiredCleartext,
             ),
         ),
-        metadataJson = metadataJson,
     )
 
     private fun transactionDataItem(

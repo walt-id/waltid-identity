@@ -199,26 +199,30 @@ struct WalletVisualFixtures {
         let all = try array(value, "credentials")
         let candidates = includeAlternatives ? (multiple ? all : Array(all.prefix(2))) : (payment ? all : Array(all.prefix(1)))
         let options: [PresentationCredentialOption] = try candidates.map { item in
-            PresentationCredentialOption(
-                queryID: try text(item, "queryId"),
-                credentialID: try text(item, "credentialId"),
-                format: try text(item, "format"),
-                credentialDataJSON: try json(object(item, "data")),
-                issuer: try text(item, "issuer"),
-                subject: nil,
-                label: try text(item, "title"),
+            try PresentationCredentialOption(
+                queryID: try text(item, "queryId"), credential: .init(id: try text(item, "credentialId"), format: try text(item, "format"), credentialDataJSON: try json(object(item, "data")), issuer: try text(item, "issuer"), subject: nil, label: try text(item, "title"), metadataJSON: try (item["backgroundColor"] as? String).map {
+                    try json(["credentialDisplay": [["name": try text(item, "title"), "background_color": $0]]])
+                }),
                 disclosures: try array(item, "disclosures").map { claim in
                     let value = try XCTUnwrap(claim["value"])
                     let encoded = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])
-                    return PresentationDisclosure(path: try text(claim, "path"), name: try text(claim, "label"),
+                    let disposition: DisclosureDisposition
+                    switch (try XCTUnwrap(claim["selective"] as? Bool), try XCTUnwrap(claim["required"] as? Bool), try XCTUnwrap(claim["selectable"] as? Bool), claim["requested"] as? Bool ?? true) {
+                    case (false, false, false, false): disposition = .additionalCleartext
+                    case (false, true, false, true): disposition = .requiredCleartext
+                    case (false, false, false, true): disposition = .optionalCleartext
+                    case (true, true, false, true): disposition = .requiredSelective
+                    case (true, false, false, true): disposition = .fixedSelective
+                    case (true, false, true, true): disposition = .selectable
+                    default: throw WalletError.invalidInput("Invalid fixture disclosure")
+                    }
+                    return PresentationDisclosure(
+                        path: try text(claim, "path"),
                         valueJSON: try XCTUnwrap(String(data: encoded, encoding: .utf8)),
-                        displayValue: (value as? String) ?? String(data: encoded, encoding: .utf8),
-                        selectivelyDisclosable: try XCTUnwrap(claim["selective"] as? Bool),
-                        required: try XCTUnwrap(claim["required"] as? Bool), selectable: try XCTUnwrap(claim["selectable"] as? Bool),
-                        requested: try XCTUnwrap(claim["requested"] as? Bool))
-                },
-                metadataJSON: try (item["backgroundColor"] as? String).map {
-                    try json(["credentialDisplay": [["name": try text(item, "title"), "background_color": $0]]])
+                        disposition: disposition,
+                        name: try text(claim, "label"),
+                        displayValue: (value as? String) ?? String(data: encoded, encoding: .utf8)
+                    )
                 }
             )
         }

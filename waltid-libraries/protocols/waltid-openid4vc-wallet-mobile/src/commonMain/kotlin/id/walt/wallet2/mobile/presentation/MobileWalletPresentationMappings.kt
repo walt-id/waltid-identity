@@ -48,10 +48,7 @@ internal fun PresentationCredentialOption.toMobileCredentialOption(): MobileWall
                 name = disclosure.name,
                 valueJson = Json.encodeToString(JsonElement.serializer(), disclosure.value),
                 displayValue = disclosure.value.displayValue(),
-                selectivelyDisclosable = disclosure.selectivelyDisclosable,
-                required = disclosure.required,
-                selectable = disclosure.selectable,
-                requested = disclosure.requested,
+                disposition = disclosureDisposition(disclosure.selectivelyDisclosable, disclosure.required, disclosure.selectable, disclosure.requested),
             )
         },
         metadataJson = metadata?.encodeJsonObject(),
