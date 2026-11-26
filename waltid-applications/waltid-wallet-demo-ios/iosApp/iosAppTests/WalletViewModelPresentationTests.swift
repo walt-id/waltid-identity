@@ -154,7 +154,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
                 name: "Given name"
             )]
         )
-        let preview = PresentationPreview(previewHandle: try .init(value: "claim-preview"),
+        let preview = try PresentationPreview(previewHandle: .init(value: "claim-preview"),
             request: .init(clientID: "https://verifier.example", requestAuthentication: .unauthenticated,
                 nonce: "fixture", responseEncryption: .notRequired), credentialOptions: [option])
         return MockWalletClient(presentationPreviewResult: .ready(preview), claimPreparation: { credentials, disclosures in
