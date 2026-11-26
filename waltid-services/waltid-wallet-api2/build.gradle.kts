@@ -76,6 +76,12 @@ application {
     mainClass.set("id.walt.wallet2.MainKt")
 }
 
+tasks.processTestResources {
+    from(layout.projectDirectory.file("../../docker-compose/wallet-api2/config/wallet2-persistence.conf")) {
+        rename { "compose-wallet2-persistence.conf" }
+    }
+}
+
 buildConfig {
     packageName("id.walt.wallet2")
 }
