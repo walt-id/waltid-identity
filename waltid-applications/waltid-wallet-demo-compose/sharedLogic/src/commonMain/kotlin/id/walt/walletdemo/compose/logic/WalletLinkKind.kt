@@ -2,6 +2,8 @@ package id.walt.walletdemo.compose.logic
 
 import io.ktor.http.Url
 
+internal val walletPresentationSchemes = setOf("openid4vp", "eu-eaap", "haip-vp")
+
 /** Routing hints only. The existing protocol client still validates the resolved request. */
 enum class WalletLinkKind {
     Empty, Offer, Presentation, Web, AuthorizationCallback, FidoHybrid, Unsupported;
@@ -15,7 +17,7 @@ enum class WalletLinkKind {
             if (value.any(Char::isWhitespace)) return Unsupported
             return when (scheme) {
                 "openid-credential-offer" -> Offer
-                "openid4vp" -> Presentation
+                in walletPresentationSchemes -> Presentation
                 "openid" -> AuthorizationCallback
                 "http", "https" -> {
                     if (!value.startsWith("$scheme://", ignoreCase = true)) return Unsupported

@@ -31,6 +31,8 @@
 				<string>openid</string>
 				<string>openid-credential-offer</string>
 				<string>openid4vp</string>
+				<string>eu-eaap</string>
+				<string>haip-vp</string>
 			</array>
 		</dict>
 	</array>

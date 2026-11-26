@@ -21,6 +21,7 @@ internal fun demoWalletConfig(): DemoWalletConfig = DemoWalletConfig(
     attestationHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
     transactionDataProfilesUrl = BuildConfig.TRANSACTION_DATA_PROFILES_URL,
     signingProtectionMode = WalletDemoSigningProtectionMode.parse(BuildConfig.WALLET_SIGNING_PROTECTION_MODE),
+    paymentCredentialIssuerKeys = if (BuildConfig.ITB_PAYMENT_TRUST) itbPaymentCredentialIssuerKeys else emptyMap(),
 )
 
 internal fun DemoWalletConfig.signingProtectionStore(context: Context): WalletDemoSigningProtectionStore =
@@ -36,3 +37,9 @@ internal fun DemoWalletConfig.selectedSigningProtection(context: Context): Walle
             WalletDemoSigningProtectionMode.Disabled,
             -> signingProtectionMode.defaultSelection
         }
+
+// TS-12 credential signing key from the reference issuer's x509EC/client_certificate.crt.
+private val itbPaymentCredentialIssuerKeys = mapOf(
+    "https://dev-i4mlab.aegean.gr/rfc-issuer" to
+        """{"kty":"EC","crv":"P-256","x":"dMLtMHM-bYdiJRHJmfA7ypihS8JDAmci4q3FOeLy6mA","y":"8ZXh3dOsLoJFT1Y6F--HgR6uBjsOifnTIiiVnQfgoWs"}""",
+)

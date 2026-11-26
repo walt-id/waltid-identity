@@ -12,6 +12,8 @@ import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.RequestConfiguration
 import id.waltid.openid4vp.wallet.PresentationRequestValidator
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.client.*
@@ -450,6 +452,34 @@ class AuthorizationRequestResolverJvmTest {
             JwsAlgorithm.entries.filterNot { it == JwsAlgorithm.ED448 }.map { it.identifier },
             metadata.getValue("request_object_signing_alg_values_supported").jsonArray.map { it.jsonPrimitive.content },
         )
+    }
+
+    @Test
+    fun `request URI negotiation advertises only the representations supported by each policy`() = runBlocking {
+        val jwt = "application/oauth-authz-req+jwt"
+        val configuration = WebDataFetchingConfiguration(
+            request = RequestConfiguration(headers = mapOf(HttpHeaders.Accept to "application/json")),
+        )
+        val requests = mutableListOf<Pair<HttpMethod, List<String>?>>()
+        HttpClient(MockEngine { request ->
+            requests += request.method to request.headers.getAll(HttpHeaders.Accept)
+            respond("request-object", headers = headersOf(HttpHeaders.ContentType, jwt))
+        }) { configuration.applyConfigurationToHttpClient(this) }.use { client ->
+            val fetcher = WebDataFetcher.wrapping(client, "negotiation-test", configuration)
+            for (method in listOf(null, RequestUriHttpMethod.GET, RequestUriHttpMethod.POST)) {
+                for (policy in AuthorizationRequestResolver.UnsignedRequestObjectPolicy.entries) {
+                    AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        fetcher, "https://verifier.example/request", method,
+                        sendWalletMetadata = false, unsignedRequestObjectPolicy = policy,
+                    )
+                    val post = method == RequestUriHttpMethod.POST
+                    val accept = if (post || policy == AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED)
+                        jwt else "$jwt, application/json;q=0.9"
+                    assertEquals((if (post) HttpMethod.Post else HttpMethod.Get) to listOf(accept), requests.single())
+                    requests.clear()
+                }
+            }
+        }
     }
 
     @Test

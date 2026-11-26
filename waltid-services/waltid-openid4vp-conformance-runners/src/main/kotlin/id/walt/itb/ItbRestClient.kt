@@ -6,10 +6,12 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.IOException
 import java.time.Instant
 
 /** GITB 1.29.5 status, report and cleanup API for sessions created by the portal bridge. */
@@ -31,8 +33,13 @@ class ItbRestClient(
         }
     }
 
-    class HttpFailure(operation: String, val statusCode: Int) :
+    class HttpFailure(internal val operation: String, val statusCode: Int) :
         IllegalStateException("ITB $operation request failed (HTTP $statusCode)")
+
+    internal class TransportFailure(val operation: String, detail: String) :
+        IllegalStateException("ITB $operation request failed ($detail)")
+
+    internal class InvalidStatusResponse : IllegalStateException("ITB status returned an invalid response")
 
     @Serializable
     data class SessionStatus(
@@ -63,7 +70,14 @@ class ItbRestClient(
     suspend fun status(sessionIds: List<String>, withReports: Boolean = false): List<SessionStatus> {
         validateSessions(sessionIds)
         val body = json.encodeToString(StatusRequest(sessionIds, withReports))
-        val sessions = decode<StatusResponse>("status", request("status", HttpMethod.Post, body)).sessions
+        val response = request("status", HttpMethod.Post, body)
+        val sessions = try {
+            json.decodeFromString<StatusResponse>(response).sessions
+        } catch (_: SerializationException) {
+            throw InvalidStatusResponse()
+        } catch (_: Exception) {
+            throw IllegalStateException("ITB status returned an invalid response")
+        }
         require(sessions.map { it.session }.toSet() == sessionIds.toSet() && sessions.size == sessionIds.size) {
             "ITB status response has missing, duplicate or unexpected sessions"
         }
@@ -83,7 +97,7 @@ class ItbRestClient(
 
     private suspend fun request(operation: String, method: HttpMethod, body: String? = null, sessionId: String? = null): String {
         try {
-            return withTimeout(30_000) {
+            return withTimeoutOrNull(30_000) {
                 val response = httpClient.request(URLBuilder(apiUrl).apply {
                     appendPathSegments("tests", operation)
                     sessionId?.let { appendPathSegments(it, encodeSlash = true) }
@@ -100,22 +114,20 @@ class ItbRestClient(
                 }
                 if (!response.status.isSuccess()) throw HttpFailure(operation, response.status.value)
                 response.bodyAsText()
-            }
+            } ?: throw TransportFailure(operation, "timeout")
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: HttpFailure) {
             throw failure
+        } catch (failure: TransportFailure) {
+            throw failure
+        } catch (error: IOException) {
+            throw TransportFailure(operation, error.javaClass.simpleName)
         } catch (error: Exception) {
             // Server bodies and client exceptions can include credentials or protocol payloads.
             // Expose the operation and error class without echoing those values into CI reports.
             throw IllegalStateException("ITB $operation request failed (${error::class.simpleName})")
         }
-    }
-
-    private inline fun <reified T> decode(operation: String, body: String): T = try {
-        json.decodeFromString<T>(body)
-    } catch (_: Exception) {
-        throw IllegalStateException("ITB $operation returned an invalid response")
     }
 
     private fun validateSessions(sessionIds: List<String>) {

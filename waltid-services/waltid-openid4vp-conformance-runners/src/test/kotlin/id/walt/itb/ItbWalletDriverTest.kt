@@ -11,6 +11,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
+import java.net.URI
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 
@@ -33,7 +34,7 @@ class ItbWalletDriverTest {
             authorize = { _, _ -> error("No authorization callback expected") },
         )
         assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
-            driver.execute(ItbWalletInteraction.Presentation(url))
+            driver.execute(ItbWalletInteraction.Presentation(URI(url.toString())))
         }
     }
 }

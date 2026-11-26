@@ -25,5 +25,16 @@ fi
 
 for module in androidApp androidE2eTests; do
   python3 "$script_dir/verify_test_results.py" \
-    --reports "$identity_dir/waltid-applications/waltid-wallet-demo-compose/$module/build/outputs/androidTest-results/**/*.xml"
+    --reports "$identity_dir/waltid-applications/waltid-wallet-demo-compose/$module/build/outputs/androidTest-results/connected/debug/flavors/production/**/*.xml"
 done
+
+# Exercise the Preview-only ITB driver against a blocked review without starting a live session.
+itb_test_class=id.walt.walletdemo.compose.android.ItbDemoWalletTest
+"$identity_dir/gradlew" -p "$identity_dir" \
+  :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedPreviewDebugAndroidTest \
+  "-Pandroid.testInstrumentationRunnerArguments.class=$itb_test_class#blockedPaymentWithoutSelectableCredentialsReportsTheWalletReason" \
+  --info
+
+python3 "$script_dir/verify_test_results.py" \
+  --reports "$identity_dir/waltid-applications/waltid-wallet-demo-compose/androidApp/build/outputs/androidTest-results/connected/debug/flavors/preview/**/*.xml" \
+  --require-class "$itb_test_class"
