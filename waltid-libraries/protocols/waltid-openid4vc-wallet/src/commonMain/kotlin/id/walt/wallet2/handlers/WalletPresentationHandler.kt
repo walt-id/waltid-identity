@@ -5,6 +5,7 @@ package id.walt.wallet2.handlers
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.signatures.sdjwt.locatedDisclosures
 import id.walt.dcql.models.meta.SdJwtVcMeta
+import id.walt.wallet2.status.WalletCredentialStatusSnapshot
 import id.walt.wallet2.status.reviewGuard
 import kotlinx.coroutines.withContext
 import id.waltid.openid4vp.wallet.presentation.PresentationReviewGuard
@@ -43,6 +44,8 @@ import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.publicKeyThumbprint
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.data.resolveKeyMaterial
@@ -389,6 +392,7 @@ class InvalidPresentationTransactionDataException(val reason: String) :
  */
 object WalletPresentationHandler {
     internal sealed interface PreviewedPresentation {
+        val owner: Wallet?
         val requestUrl: Url
         val resolvedAuthorizationRequest: ResolvedAuthorizationRequest
 
@@ -400,7 +404,9 @@ object WalletPresentationHandler {
              * key so that the request was validated against the key that actually signs the response.
              */
             val keyId: String,
+            override val owner: Wallet? = null,
         ) : PreviewedPresentation {
+            internal var review: RetainedPresentationReview? = null
             internal val paymentConsent = RetainedPaymentConsent()
         }
 
@@ -408,6 +414,7 @@ object WalletPresentationHandler {
             override val requestUrl: Url,
             override val resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
             val error: PresentationRequestError,
+            override val owner: Wallet? = null,
         ) : PreviewedPresentation
     }
 
@@ -417,6 +424,7 @@ object WalletPresentationHandler {
         PreviewSessionStore<PreviewedDcApiRequest>(sessionName = "Digital Credentials presentation")
 
     private data class PreviewedDcApiRequest(
+        val owner: Wallet,
         val request: ResolvedDcApiRequest,
         val allowedCredentialIds: Set<String>,
     ) {
@@ -828,6 +836,7 @@ object WalletPresentationHandler {
             val handle = rememberPreviewedAuthorizationRequest(
                 wallet = wallet,
                 preview = PreviewedPresentation.Invalid(
+                    owner = wallet,
                     requestUrl = request.requestUrl,
                     resolvedAuthorizationRequest = resolvedAuthorizationRequest,
                     error = validation.error,
@@ -872,6 +881,7 @@ object WalletPresentationHandler {
             val handle = rememberPreviewedAuthorizationRequest(
                 wallet = wallet,
                 preview = PreviewedPresentation.Invalid(
+                    owner = wallet,
                     requestUrl = request.requestUrl,
                     resolvedAuthorizationRequest = resolvedAuthorizationRequest,
                     error = availabilityError,
@@ -902,6 +912,7 @@ object WalletPresentationHandler {
         val handle = rememberPreviewedAuthorizationRequest(
             wallet = wallet,
             preview = PreviewedPresentation.Ready(
+                owner = wallet,
                 requestUrl = request.requestUrl,
                 resolvedAuthorizationRequest = resolvedAuthorizationRequest,
                 keyId = executionKey().keyId,
@@ -1081,6 +1092,65 @@ object WalletPresentationHandler {
         )
     }
 
+    /** Captures the complete remote disclosure under one exclusive preview lease. */
+    suspend fun retainPresentationReview(
+        wallet: Wallet, selection: SubmitPresentationRequest, policy: PaymentConsentPolicy,
+    ): RetainedPresentationReview = previewedAuthorizationRequests.prepare(wallet.id, selection.previewHandle.value) { preview ->
+        require(preview is PreviewedPresentation.Ready && preview.owner === wallet) { "Presentation belongs to another wallet instance" }
+        preview.review = null
+        require(selection.keyId == null || selection.keyId == preview.keyId) { "The signing key must match the preview" }
+        val request = selection.copy(selectedCredentialOptions = selection.selectedCredentialOptions.toList(),
+            selectedDisclosureOptions = selection.selectedDisclosureOptions?.toList())
+        val authorization = preview.resolvedAuthorizationRequest.authorizationRequest
+        val query = requireNotNull(authorization.dcqlQuery)
+        suspend fun currentSelection() = selectReviewedCredentials(wallet, query, request.selectedCredentialOptions, request.selectedDisclosureOptions)
+        val selected = currentSelection()
+        validateSelectedTransactionDataCredentials(authorization.transactionData.orEmpty(), selected.matches.keys)
+        val claims = preparePresentationReview(selected.matches)
+        val identities = selected.credentialIdentities()
+        val metadata = selected.typeMetadataSnapshots.mapValues { it.value.toString() }
+        val did = request.did ?: wallet.defaultDid()
+        val key = requireNotNull(wallet.resolveKeyMaterial(preview.keyId, setOf(KeyUsage.SIGN))) { "Reviewed signing key is unavailable" }
+        val thumbprint = key.publicKeyThumbprint()
+        val ids = request.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }
+        val statusService = wallet.credentialStatuses()
+        val snapshot = statusService.snapshot()
+        val statuses = snapshot.credentials.filter { it.reference.credentialId in ids }
+        val statusGuard = statusService.reviewGuard(ids, statuses.associate { it.reference.credentialId to it.presentation.advisoryRevision })
+        statusGuard.check()
+        val payment = preview.paymentConsent.prepare(authorization, selected.matches, request.selectedCredentialOptions,
+            request.selectedDisclosureOptions, key, policy, holderDid = did,
+            requiresUnsignedRequestWarning = preview.resolvedAuthorizationRequest !is ResolvedAuthorizationRequest.AuthenticatedRequestObject,
+            typeMetadataSnapshots = selected.typeMetadataSnapshots)
+        val guard = PresentationReviewGuard {
+            statusGuard.check()
+            val currentKey = wallet.resolveKeyMaterial(preview.keyId, setOf(KeyUsage.SIGN))
+            if (currentKey == null || currentKey.publicKeyThumbprint() != thumbprint || (request.did ?: wallet.defaultDid()) != did)
+                throw PresentationReviewChangedException()
+            val current = try {
+                currentSelection()
+            } catch (_: IllegalArgumentException) {
+                throw PresentationReviewChangedException()
+            } catch (failure: IllegalStateException) {
+                if (failure is CancellationException) throw failure
+                throw PresentationReviewChangedException()
+            }
+            if (current.credentialIdentities() != identities || current.typeMetadataSnapshots.mapValues { it.value.toString() } != metadata ||
+                preparePresentationReview(current.matches).credentials != claims.credentials) throw PresentationReviewChangedException()
+            preview.paymentConsent.confirm(payment?.revision, authorization, current.matches, request.selectedCredentialOptions,
+                request.selectedDisclosureOptions, currentKey, policy, holderDid = did, consume = false)
+        }
+        RetainedPresentationReview(claims, WalletCredentialStatusSnapshot(snapshot.evaluatedAt, statuses), payment, wallet, request.copy(paymentConsentRevision = payment?.revision), guard)
+            .also { preview.review = it }
+    }
+
+    private fun CredentialSelection.credentialIdentities(): Map<String, List<Pair<String, String>>> =
+        matches.mapValues { (_, results) -> results.map { match ->
+            val raw = match.credential as RawDcqlCredential
+            val credential = raw.originalCredential as DigitalCredential
+            raw.id to ((credential as? SdJwtCredential)?.signedWithDisclosures ?: credential.signed ?: credential.credentialData.toString())
+        } }
+
     /** Recomputes effective claims under the existing preview lease without signing or consuming it. */
     suspend fun reviewPresentation(
         wallet: Wallet,
@@ -1215,15 +1285,36 @@ object WalletPresentationHandler {
         transactionDataTypeRegistry: TransactionDataTypeRegistry,
         scaAuthorizer: WalletScaPresentationAuthorizer?,
         paymentConsentPolicy: PaymentConsentPolicy? = null,
+    ): WalletPresentResult = submitResolvedPresentation(wallet, request, onEvent, transactionDataTypeRegistry, scaAuthorizer, paymentConsentPolicy, null)
+
+    /** Submits precisely the wallet-issued review with freshness checks before signing and delivery. */
+    suspend fun submitReviewedPresentation(
+        wallet: Wallet, review: RetainedPresentationReview,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry, scaAuthorizer: WalletScaPresentationAuthorizer?,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    ): WalletPresentResult {
+        require(review.owner === wallet) { "Review belongs to another wallet instance" }
+        return withContext(review.guard) {
+            submitResolvedPresentation(wallet, review.request, onEvent, transactionDataTypeRegistry, scaAuthorizer, null, review)
+        }
+    }
+
+    private suspend fun submitResolvedPresentation(
+        wallet: Wallet, request: SubmitPresentationRequest, onEvent: suspend (WalletSessionEvent) -> Unit,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry, scaAuthorizer: WalletScaPresentationAuthorizer?,
+        paymentConsentPolicy: PaymentConsentPolicy?, review: RetainedPresentationReview?,
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
         val statusReviewed = currentCoroutineContext()[PresentationReviewGuard] != null
         suspend fun execute(block: suspend (PreviewedPresentation) -> WalletPresentResult): WalletPresentResult =
-            if (statusReviewed) previewedAuthorizationRequests.useStatusReviewedOnce(wallet.id, request.previewHandle.value, block)
+            if (statusReviewed) previewedAuthorizationRequests.useStatusReviewedOnce(wallet.id, request.previewHandle.value, validate = {
+                if (review != null && (it as? PreviewedPresentation.Ready)?.review !== review) throw PresentationReviewChangedException()
+            }, block = block)
             else previewedAuthorizationRequests.useOnce(wallet.id, request.previewHandle.value, validate = { cached ->
                 require(cached is PreviewedPresentation.Ready) { "Cannot submit an invalid presentation request; reject it or dismiss it locally" }
             }, block = block)
         return execute { preview ->
+            review?.guard?.check()
             val ready = preview as? PreviewedPresentation.Ready
                 ?: error("Unexpected presentation preview state")
             require(request.keyId == null || request.keyId == ready.keyId) { "The signing key must match the reviewed key" }
@@ -2306,6 +2397,11 @@ object WalletPresentationHandler {
     }
 
     /** Clears every presentation preview and tombstone owned by [wallet] during wallet deletion. */
+    suspend fun closeInstancePreviews(wallet: Wallet) {
+        previewedAuthorizationRequests.clearInstance(wallet.id) { it.owner === wallet }
+        previewedDcApiRequests.clearInstance(wallet.id) { it.owner === wallet }
+    }
+
     suspend fun clearPreviews(wallet: Wallet) {
         previewedAuthorizationRequests.clearWallet(wallet.id)
         previewedDcApiRequests.clearWallet(wallet.id)
@@ -2315,7 +2411,7 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: ResolvedDcApiRequest,
         allowedCredentialIds: Set<String>,
-    ): String = previewedDcApiRequests.create(wallet.id, PreviewedDcApiRequest(request, allowedCredentialIds))
+    ): String = previewedDcApiRequests.create(wallet.id, PreviewedDcApiRequest(wallet, request, allowedCredentialIds))
 
     internal fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
         val plan = originalQuery.claimSelectionPlan()

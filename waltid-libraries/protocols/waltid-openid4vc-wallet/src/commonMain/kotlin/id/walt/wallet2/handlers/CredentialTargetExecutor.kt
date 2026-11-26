@@ -117,7 +117,7 @@ internal suspend fun executeCredentialTargets(
                         val value = it.credential
                         if (value is JsonPrimitive) value.content else value.toString()
                     }, selected.bindings, label, metadata, proofRequired = algorithms != null,
-                        expectedConfiguration = configuration, typeMetadataHttpClient = httpClient)
+                        expectedConfiguration = configuration, typeMetadataHttpClient = httpClient, credentialIssuer = issuerMetadata.credentialIssuer)
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {

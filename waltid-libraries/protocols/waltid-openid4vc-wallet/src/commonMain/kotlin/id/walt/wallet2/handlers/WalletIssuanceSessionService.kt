@@ -1,5 +1,7 @@
 package id.walt.wallet2.handlers
 
+import id.walt.wallet2.issuance.CredentialReceiptTrustException
+import id.walt.wallet2.issuance.receiptOrigin
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
@@ -36,6 +38,7 @@ import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
+import id.waltid.openid4vci.wallet.metadata.ResolvedAuthorizationServerMetadata
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.LocalizedMetadata
@@ -254,6 +257,11 @@ data class WalletIssuanceAuthorizationCallback(
     val callbackUri: String,
 )
 
+/** Reference returned by either a deferred outcome or the retained continuation listing. */
+sealed interface WalletDeferredIssuanceReference {
+    val id: String
+}
+
 /** Wallet-local retention policy for uncompleted issuance sessions. */
 @Serializable
 data class WalletIssuanceSessionPolicy(
@@ -265,12 +273,12 @@ data class WalletIssuanceSessionPolicy(
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class WalletDeferredCredential(
-    val id: String,
+    override val id: String,
     val credentialConfigurationId: String,
     val intervalSeconds: Long?,
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val credentialIdentifier: String? = null,
-) {
+) : WalletDeferredIssuanceReference {
     constructor(id: String, credentialConfigurationId: String, intervalSeconds: Long?) :
         this(id, credentialConfigurationId, intervalSeconds, credentialIdentifier = null)
 
@@ -293,7 +301,7 @@ data class WalletDeferredCredential(
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
 data class WalletIssuanceContinuation(
-    val id: String,
+    override val id: String,
     val credentialConfigurationId: String? = null,
     val intervalSeconds: Long? = null,
     val credentialIdentifier: String? = null,
@@ -303,7 +311,7 @@ data class WalletIssuanceContinuation(
     /** Issuer display metadata only; never credential values or protocol continuation secrets. */
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val displayMetadataJson: String? = null,
-) {
+) : WalletDeferredIssuanceReference {
     constructor(deferred: WalletDeferredCredential) : this(
         deferred.id, deferred.credentialConfigurationId, deferred.intervalSeconds, deferred.credentialIdentifier,
     )
@@ -339,6 +347,7 @@ enum class WalletIssuanceErrorCode {
     CRYPTO,
     STORAGE,
     PROTOCOL,
+    ISSUER_TRUST,
 }
 
 @Serializable
@@ -464,13 +473,25 @@ class WalletIssuanceSessionService(
     suspend fun start(
         request: WalletIssuanceSessionRequest,
         preferredLocales: List<String> = emptyList(),
-    ): WalletIssuanceSession = startSession(request, preferredLocales).public
+    ): WalletIssuanceSession = startSession(request.offerRequest(), preferredLocales, request.clientId, request.redirectUri.toString()).public
 
     /** Starts the same retained session and also exposes the issuer's batch capability. */
     suspend fun startBatch(
         request: WalletIssuanceSessionRequest,
         preferredLocales: List<String> = emptyList(),
-    ): WalletIssuanceBatchSession = startSession(request, preferredLocales).toBatchSession()
+    ): WalletIssuanceBatchSession = startSession(request.offerRequest(), preferredLocales, request.clientId, request.redirectUri.toString()).toBatchSession()
+
+    /** Resolves the offer without requiring a browser registration or a pre-authorized client identity. */
+    suspend fun startBatch(
+        request: WalletIssuanceOfferRequest,
+        preferredLocales: List<String> = emptyList(),
+    ): WalletIssuanceBatchSession = startSession(request, preferredLocales, null, null).toBatchSession()
+
+    /** Returns the retained offer while it still awaits the holder's acceptance. */
+    suspend fun reviewBatch(sessionId: String): WalletIssuanceBatchSession? {
+        val active = loadActive(sessionId) ?: return null
+        return mutex.withLock { active.takeIf { sessions[sessionId] === it && it.state == SessionState.AWAITING_ACCEPTANCE }?.toBatchSession() }
+    }
 
     private fun ActiveSession.toBatchSession(): WalletIssuanceBatchSession = WalletIssuanceBatchSession(
         public.id, public.offer, resolved.issuerMetadata.metadata.batchCredentialIssuance?.batchSize,
@@ -481,19 +502,19 @@ class WalletIssuanceSessionService(
     )
 
     private suspend fun startSession(
-        request: WalletIssuanceSessionRequest,
+        request: WalletIssuanceOfferRequest,
         preferredLocales: List<String>,
+        clientId: String?,
+        redirectUri: String?,
     ): ActiveSession {
         parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         ensureOpen()
         val keyMaterial = resolveIssuanceKeyMaterial(request.key, request.keyId)
         val resolved = resolve(request, preferredLocales, keyMaterial)
-        val grant = resolved.grantType
-            ?: error("Credential offer does not contain a supported grant")
         val sessionId = Uuid.random().toString()
         val publicSession = WalletIssuanceSession(
             id = sessionId,
-            offer = resolved.toPreview(grant, preferredLocales),
+            offer = resolved.toPreview(preferredLocales),
         )
         val selectedKeyId = request.keyId ?: if (request.key == null) {
             keyMaterial.keyId.takeIf { it.isNotBlank() }
@@ -505,6 +526,8 @@ class WalletIssuanceSessionService(
         val active = ActiveSession(
             public = publicSession,
             request = request,
+            clientId = clientId,
+            redirectUri = redirectUri,
             resolved = resolved,
             keyMaterial = keyMaterial,
             keyId = selectedKeyId,
@@ -569,13 +592,25 @@ class WalletIssuanceSessionService(
         sessionId: String,
         prepareCredentials: suspend (WalletIssuanceBatchSession, List<WalletCredentialSelection>?) -> List<WalletCredentialSelection>?,
         onCredentialsAccepted: () -> Unit,
+    ): WalletIssuanceAuthorization = beginAuthorization(sessionId, null, prepareCredentials, onCredentialsAccepted)
+
+    /** Binds the exact registered redirect and client at the accepted browser grant. */
+    suspend fun beginAuthorization(
+        sessionId: String,
+        registration: ClientConfiguration?,
+        prepareCredentials: suspend (WalletIssuanceBatchSession, List<WalletCredentialSelection>?) -> List<WalletCredentialSelection>?,
+        onCredentialsAccepted: () -> Unit,
     ): WalletIssuanceAuthorization {
-        check(loadActive(sessionId)?.public?.offer?.grant == WalletIssuanceGrant.AUTHORIZATION_CODE) {
-            "Issuance session does not use the authorization-code grant"
-        }
-        val active = beginTransition(sessionId, SessionState.AWAITING_ACCEPTANCE)
-            ?: throw IllegalStateException("Issuance session is not awaiting acceptance")
+        val active = beginTransition(sessionId, SessionState.AWAITING_ACCEPTANCE, WalletIssuanceGrant.AUTHORIZATION_CODE)
+            ?: throw IllegalStateException("Issuance session is not awaiting browser acceptance")
         try {
+            val client = registration ?: active.clientConfiguration()
+            val redirect = client.primaryRedirectUri
+            check(redirect.isNotBlank() && redirect == redirect.trim()) { "Invalid registered redirect URI" }
+            check(active.clientId == null || active.clientId == client.clientId) { "Issuance client changed" }
+            check(active.redirectUri == null || active.redirectUri == redirect) { "Issuance redirect changed" }
+            active.clientId = client.clientId
+            active.redirectUri = redirect
             acceptSelections(active, prepareCredentials(active.toBatchSession(), active.selections?.map { it.selection }))
             onCredentialsAccepted()
             persistActive(active)
@@ -619,9 +654,18 @@ class WalletIssuanceSessionService(
         transactionCode: String?,
         prepareCredentials: suspend (WalletIssuanceBatchSession, List<WalletCredentialSelection>?) -> List<WalletCredentialSelection>?,
         onCredentialsAccepted: () -> Unit,
+    ): WalletIssuanceOutcome = continuePreAuthorized(sessionId, transactionCode, null, prepareCredentials, onCredentialsAccepted)
+
+    /** Accepts a pre-authorized grant with the registered client when the server requires one. */
+    suspend fun continuePreAuthorized(
+        sessionId: String,
+        transactionCode: String?,
+        clientId: String?,
+        prepareCredentials: suspend (WalletIssuanceBatchSession, List<WalletCredentialSelection>?) -> List<WalletCredentialSelection>?,
+        onCredentialsAccepted: () -> Unit,
     ): WalletIssuanceOutcome {
         val active = try {
-            beginTransition(sessionId, SessionState.AWAITING_ACCEPTANCE)
+            beginTransition(sessionId, SessionState.AWAITING_ACCEPTANCE, WalletIssuanceGrant.PRE_AUTHORIZED_CODE)
         } catch (error: CancellationException) {
             throw error
         } catch (error: IssuanceStageException) {
@@ -633,6 +677,19 @@ class WalletIssuanceSessionService(
         } ?: return invalidSession(sessionId)
         val grant = active.resolved.offer?.grants?.preAuthorizedCode
             ?: return failAndRemove(active, WalletIssuanceErrorCode.INVALID_SESSION)
+        if (clientId != null && (clientId.isBlank() || active.clientId?.let { it != clientId } == true)) {
+            return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.INVALID_INPUT)
+        }
+        val effectiveClientId = clientId ?: active.clientId
+        val metadata = active.resolved.authorizationServerMetadata
+        val requiresClient = metadata.preAuthorizedGrantAnonymousAccessSupported != true ||
+            active.request.tokenRequestHeaders.isNotEmpty() ||
+            (attestationAssembler != null && metadata.tokenEndpointAuthMethodsSupported
+                ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true)
+        if (requiresClient && effectiveClientId == null) {
+            return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.INVALID_INPUT)
+        }
+        active.clientId = effectiveClientId
         val requirement = grant.txCode
         if (requirement != null && transactionCode.isNullOrBlank()) {
             return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.INVALID_INPUT)
@@ -683,7 +740,7 @@ class WalletIssuanceSessionService(
             AuthorizationResponseParser.parseAuthorizationResponse(
                 redirectUri = callback.callbackUri,
                 expectedState = authorization.public.state,
-                expectedRedirectUri = active.request.redirectUri.toString(),
+                expectedRedirectUri = authorization.public.redirectUri,
                 expectedIssuer = active.resolved.authorizationServerMetadata.issuer,
                 requireIssuer = active.resolved.authorizationServerMetadata.authorizationResponseIssParameterSupported == true,
             )
@@ -1005,7 +1062,7 @@ class WalletIssuanceSessionService(
                     val value = it.credential
                     if (value is JsonPrimitive) value.content else value.toString()
                 }, bindings, request.label, request.metadata, configured?.proofRequired ?: false,
-                    expectedConfiguration = configured?.configuration, typeMetadataHttpClient = httpClient)
+                    expectedConfiguration = configured?.configuration, typeMetadataHttpClient = httpClient, credentialIssuer = request.credentialIssuer)
                 record = record.copy(
                     content = DeferredContent.Received(prepared),
                     claimed = false,
@@ -1025,6 +1082,7 @@ class WalletIssuanceSessionService(
             record = record.copy(claimed = true)
             retainDeferred(record)
             currentCoroutineContext().ensureActive()
+            wallet.receiptTrust?.let { policy -> received.credentials.forEach { policy.verify(it.receiptOrigin(), it.credential) } }
             val pendingWrites = mutableListOf<StoredCredential>()
             for (credential in received.credentials) {
                 if (wallet.findCredential(credential.id) == null) pendingWrites += credential
@@ -1063,6 +1121,9 @@ class WalletIssuanceSessionService(
             deliverCredentialNotification(httpClient, notificationTarget, NotificationEvent.CREDENTIAL_ACCEPTED)
             removeDeferred(record)
             WalletIssuanceOutcome.Stored(record.sessionId, storedIds)
+        } catch (error: CredentialReceiptTrustException) {
+            removeDeferred(record)
+            failed(record.sessionId, WalletIssuanceErrorCode.ISSUER_TRUST, storedIds)
         } catch (error: CancellationException) {
             retainInterruptedDeferred(record)
             throw error
@@ -1149,7 +1210,7 @@ class WalletIssuanceSessionService(
             log.warn {
                 "Issuance token request failed: status=${error.statusCode}, " +
                         "oauthError=${error.oauthError}, grant=${active.public.offer.grant}, " +
-                        "clientId=${active.request.clientId}, dpopAdvertised=${active.dpopAlgorithms() != null}"
+                        "clientId=${active.clientId}, dpopAdvertised=${active.dpopAlgorithms() != null}"
             }
             val code = if (error.statusCode == 0) WalletIssuanceErrorCode.NETWORK else WalletIssuanceErrorCode.ISSUER_RESPONSE
             if (retryTokenRejection && storedIds.isEmpty() && error.oauthError == "invalid_grant") {
@@ -1179,8 +1240,8 @@ class WalletIssuanceSessionService(
                 wallet, httpClient, metadata,
                 grantedCredentialSelections(metadata, requireNotNull(active.selections), token.authorization_details, token.scope),
                 CredentialIssuanceAccess(token.access_token, active.keyMaterial, dpopAlgorithms,
-                    active.request.clientId.takeUnless { active.tokenRequestAnonymous },
-                    walletClientId = active.request.clientId),
+                    active.clientId.takeUnless { active.tokenRequestAnonymous },
+                    walletClientId = active.clientId),
                 sessions = this, sessionId = active.public.id,
                 labelFor = { active.public.offer.credentialName(it) },
                 ensureOwned = { ensureContinuationOwned(active.persistedSnapshot) },
@@ -1200,6 +1261,7 @@ class WalletIssuanceSessionService(
                     NonceRequestError.INVALID_RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
                 }
                 error.failure.stage == CredentialIssuanceStage.PROOF -> WalletIssuanceErrorCode.CRYPTO
+                cause is CredentialReceiptTrustException -> WalletIssuanceErrorCode.ISSUER_TRUST
                 cause is CredentialEndpointException -> WalletIssuanceErrorCode.ISSUER_RESPONSE
                 cause is IllegalArgumentException || error.failure.stage == CredentialIssuanceStage.RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
                 error.failure.stage == CredentialIssuanceStage.STORAGE -> WalletIssuanceErrorCode.STORAGE
@@ -1226,7 +1288,7 @@ class WalletIssuanceSessionService(
         val anonymous = metadata.preAuthorizedGrantAnonymousAccessSupported == true &&
             active.request.tokenRequestHeaders.isEmpty() && attestationJwt == null
         active.tokenRequestAnonymous = anonymous
-        val token = TokenRequestBuilder(active.clientConfiguration(), httpClient).exchangePreAuthorizedCode(
+        val token = TokenRequestBuilder.forPreAuthorizedGrant(active.clientId, httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthorizedCode,
             txCode = transactionCode,
@@ -1332,15 +1394,13 @@ class WalletIssuanceSessionService(
 
     private suspend fun buildAuthorization(active: ActiveSession): AuthorizationState {
         val resolved = active.resolved
-        val request = active.request
+        val client = active.clientConfiguration()
         val keyMaterial = active.keyMaterial
         val metadata = resolved.authorizationServerMetadata
         val endpoint = requireNotNull(metadata.authorizationEndpoint) {
             "Authorization server has no authorization endpoint"
         }
-        val builder = AuthorizationRequestBuilder(
-            ClientConfiguration(request.clientId, listOf(request.redirectUri.toString()))
-        )
+        val builder = AuthorizationRequestBuilder(client)
         val credentialConfigurationIds = requireNotNull(active.selections).map { it.selection.credentialConfigurationId }.distinct()
         val issuerState = resolved.offer?.grants?.authorizationCode?.issuerState
         val parEndpoint = metadata.pushedAuthorizationRequestEndpoint
@@ -1360,7 +1420,7 @@ class WalletIssuanceSessionService(
                 issuerState = issuerState,
                 usePKCE = true,
                 metadata = metadata,
-                redirectUri = request.redirectUri.toString(),
+                redirectUri = client.primaryRedirectUri,
                 dpopJkt = dpopJkt,
             )
             val attestationJwt = obtainAttestationJwt(active)
@@ -1379,7 +1439,7 @@ class WalletIssuanceSessionService(
                 },
             )
             val browserUrl = URLBuilder(endpoint).apply {
-                parameters.append("client_id", request.clientId)
+                parameters.append("client_id", client.clientId)
                 parameters.append("request_uri", par.requestUri)
             }.buildString()
             val pkce = requireNotNull(pushed.pkceData)
@@ -1387,7 +1447,7 @@ class WalletIssuanceSessionService(
                 public = WalletIssuanceAuthorization(
                     url = browserUrl,
                     state = pushed.state,
-                    redirectUri = request.redirectUri.toString(),
+                    redirectUri = client.primaryRedirectUri,
                     pkce = WalletIssuancePkceState(
                         codeChallenge = pkce.codeChallenge,
                         codeChallengeMethod = pkce.codeChallengeMethod.value,
@@ -1409,7 +1469,7 @@ class WalletIssuanceSessionService(
             issuerState = issuerState,
             usePKCE = true,
             metadata = metadata,
-            redirectUri = request.redirectUri.toString(),
+            redirectUri = client.primaryRedirectUri,
             dpopJkt = dpopJkt,
         )
         val pkce = requireNotNull(direct.pkceData)
@@ -1417,7 +1477,7 @@ class WalletIssuanceSessionService(
             public = WalletIssuanceAuthorization(
                 url = direct.url,
                 state = direct.state,
-                redirectUri = request.redirectUri.toString(),
+                redirectUri = client.primaryRedirectUri,
                 pkce = WalletIssuancePkceState(
                     codeChallenge = pkce.codeChallenge,
                     codeChallengeMethod = pkce.codeChallengeMethod.value,
@@ -1441,7 +1501,7 @@ class WalletIssuanceSessionService(
     }
 
     private suspend fun resolve(
-        request: WalletIssuanceSessionRequest,
+        request: WalletIssuanceOfferRequest,
         preferredLocales: List<String>,
         keyMaterial: WalletKeyStoreEntry,
     ): ResolvedOffer {
@@ -1463,53 +1523,64 @@ class WalletIssuanceSessionService(
         require(issuerMetadata.metadata.credentialIssuer == (request.credentialIssuer ?: requireNotNull(offer).credentialIssuer)) {
             "Credential issuer metadata identifier does not match the offer"
         }
-        val grantAuthorizationServer = when (offer?.getGrantType()) {
-            is GrantType.AuthorizationCode -> offer.grants?.authorizationCode?.authorizationServer
-            is GrantType.PreAuthorizedCode -> offer.grants?.preAuthorizedCode?.authorizationServer
-            else -> null
-        }
-        val selectedAuthorizationServer = selectAuthorizationServer(issuerMetadata.metadata, grantAuthorizationServer)
-        val asResolution = resolver.resolveAuthorizationServerMetadataDetailed(selectedAuthorizationServer)
+        val (grant, asResolution) = resolveGrant(offer, issuerMetadata.metadata, resolver)
         val authorizationServerMetadata = asResolution.metadata
-        require(authorizationServerMetadata.issuer == selectedAuthorizationServer) {
-            "Authorization server metadata issuer does not match the selected server"
-        }
 
         val offered = if (offer != null) OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
             else requireNotNull(request.credentialConfigurationIds).map {
                 OfferedCredentialResolver.ResolvedCredentialOffer(it, issuerMetadata.metadata.credentialConfigurationsSupported.getValue(it))
             }
         require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
-        return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered, asResolution.headers)
+        return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered, grant, asResolution.headers)
     }
 
-    private fun selectAuthorizationServer(
+    private suspend fun resolveGrant(
+        offer: CredentialOffer?,
         issuerMetadata: CredentialIssuerMetadata,
-        grantAuthorizationServer: String?,
-    ): String {
-        val declared = issuerMetadata.authorizationServerIssuers()
-        if (grantAuthorizationServer == null) return declared.first()
-        require(issuerMetadata.authorizationServers?.size?.let { it > 1 } == true) {
-            "Offer authorization_server is only valid when issuer metadata declares multiple servers"
+        resolver: IssuerMetadataResolver,
+    ): Pair<WalletIssuanceGrant, ResolvedAuthorizationServerMetadata> {
+        val offered = offer?.getGrantTypes().orEmpty()
+        // A pre-authorized exchange needs a code from the offer. Discovery alone cannot supply one.
+        val candidates = offered.ifEmpty { listOf(GrantType.AuthorizationCode) }
+        val resolvedServers = mutableMapOf<String, ResolvedAuthorizationServerMetadata>()
+        for (candidate in candidates) {
+            val grant = if (candidate == GrantType.AuthorizationCode) WalletIssuanceGrant.AUTHORIZATION_CODE
+                else WalletIssuanceGrant.PRE_AUTHORIZED_CODE
+            for (server in grantServers(offer, grant, issuerMetadata)) {
+                val resolution = resolvedServers.getOrPut(server) {
+                    resolver.resolveAuthorizationServerMetadataDetailed(server).also {
+                        require(it.metadata.issuer == server) { "Authorization server metadata issuer does not match the selected server" }
+                    }
+                }
+                // Retain explicit single-grant interoperability when servers omit their grant advertisement.
+                if (offered.size == 1 || (resolution.metadata.grantTypesSupported?.contains(candidate.value) != false &&
+                        (grant != WalletIssuanceGrant.AUTHORIZATION_CODE || resolution.metadata.authorizationEndpoint != null))) {
+                    return grant to resolution
+                }
+            }
         }
-        require(grantAuthorizationServer in declared) {
-            "Offer authorization_server is not declared by the credential issuer"
-        }
-        return grantAuthorizationServer
+        error("No usable issuance grant is supported by the advertised authorization servers")
     }
 
-    private fun ResolvedOffer.toPreview(
-        grant: GrantType,
-        preferredLocales: List<String>,
-    ): WalletIssuanceOfferPreview {
+    private fun grantServers(
+        offer: CredentialOffer?, grant: WalletIssuanceGrant, issuerMetadata: CredentialIssuerMetadata,
+    ): List<String> {
+        val declared = issuerMetadata.authorizationServerIssuers()
+        val server = when (grant) {
+            WalletIssuanceGrant.AUTHORIZATION_CODE -> offer?.grants?.authorizationCode?.authorizationServer
+            WalletIssuanceGrant.PRE_AUTHORIZED_CODE -> offer?.grants?.preAuthorizedCode?.authorizationServer
+        } ?: return declared.toList()
+        require(declared.size > 1 && server in declared) {
+            "Offer authorization_server must identify one of multiple declared authorization servers"
+        }
+        return listOf(server)
+    }
+
+    private fun ResolvedOffer.toPreview(preferredLocales: List<String>): WalletIssuanceOfferPreview {
         val issuerDisplay = LocalizedMetadata.select(issuerMetadata.metadata.display, preferredLocales) { it.locale }
-        val txCode = offer?.grants?.preAuthorizedCode?.txCode
+        val txCode = offer?.grants?.preAuthorizedCode?.txCode?.takeIf { grant == WalletIssuanceGrant.PRE_AUTHORIZED_CODE }
         return WalletIssuanceOfferPreview(
-            grant = when (grant) {
-                is GrantType.AuthorizationCode -> WalletIssuanceGrant.AUTHORIZATION_CODE
-                is GrantType.PreAuthorizedCode -> WalletIssuanceGrant.PRE_AUTHORIZED_CODE
-                else -> error("Unsupported credential offer grant")
-            },
+            grant = grant,
             issuer = WalletIssuanceIssuerPreview(
                 identifier = issuerMetadata.metadata.credentialIssuer,
                 name = issuerDisplay?.name,
@@ -1654,7 +1725,7 @@ class WalletIssuanceSessionService(
             }
         }
         val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
-        return assembler.obtainAttestationJwt(crypto2Key, active.request.clientId).also { attestationJwt ->
+        return assembler.obtainAttestationJwt(crypto2Key, requireNotNull(active.clientId)).also { attestationJwt ->
             advertisedAttestationAlgorithms?.let { advertised ->
                 validateClientAttestationAlgorithm(attestationJwt, advertised)
             }
@@ -1684,7 +1755,7 @@ class WalletIssuanceSessionService(
             throw IssuanceStageException(code, error)
         }
         val crypto2Key = active.keyMaterial.requireCrypto2SigningKey()
-        val popJwt = assembler.buildPopJwt(crypto2Key, active.request.clientId, metadata.issuer, context.challenge)
+        val popJwt = assembler.buildPopJwt(crypto2Key, requireNotNull(active.clientId), metadata.issuer, context.challenge)
         return ClientAttestationHeaders(attestationJwt, popJwt)
     }
 
@@ -1704,7 +1775,7 @@ class WalletIssuanceSessionService(
 
     private suspend fun challengeContext(active: ActiveSession): ClientAttestationChallengeContext =
         active.challengeContext ?: runtime.challengeContext(
-            active.resolved.authorizationServerMetadata.issuer, active.request.clientId,
+            active.resolved.authorizationServerMetadata.issuer, active.clientId,
             active.keyMaterial.jwkThumbprint(),
             active.attestationChallenge, active.authorizationServerDpopNonce, flowId = active.public.id,
         ).also { active.challengeContext = it }
@@ -1724,12 +1795,14 @@ class WalletIssuanceSessionService(
     }
 
     private fun ActiveSession.clientConfiguration() =
-        ClientConfiguration(request.clientId, listOf(request.redirectUri.toString()))
+        ClientConfiguration(checkNotNull(clientId), listOf(checkNotNull(redirectUri)))
 
-    private suspend fun beginTransition(sessionId: String, expected: SessionState): ActiveSession? {
+    private suspend fun beginTransition(
+        sessionId: String, expected: SessionState, grant: WalletIssuanceGrant? = null,
+    ): ActiveSession? {
         val active = loadActive(sessionId) ?: return null
         val marked = mutex.withLock {
-            if (sessions[sessionId] !== active || active.state != expected) return@withLock false
+            if (sessions[sessionId] !== active || active.state != expected || (grant != null && active.resolved.grant != grant)) return@withLock false
             active.state = SessionState.PROCESSING
             active.expiresAtEpochMilliseconds = PROCESSING_EXPIRY
             true
@@ -1804,17 +1877,15 @@ class WalletIssuanceSessionService(
         val offeredCredentials = if (offer != null) OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
             else persisted.public.offer.credentials.map { OfferedCredentialResolver.ResolvedCredentialOffer(it.configurationId,
                 issuerMetadata.metadata.credentialConfigurationsSupported.getValue(it.configurationId)) }
-        val resolved = ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offeredCredentials)
+        val resolved = ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offeredCredentials, persisted.public.offer.grant)
         validatePersistedResolution(persisted.public, resolved)
 
-        val request = WalletIssuanceSessionRequest(
+        val request = WalletIssuanceOfferRequest(
             offerJson = persisted.offer?.let { Json.parseToJsonElement(it).jsonObject },
             credentialIssuer = issuerMetadata.metadata.credentialIssuer.takeIf { offer == null },
             credentialConfigurationIds = offeredCredentials.map { it.credentialConfigurationId }.takeIf { offer == null },
             keyId = persisted.request.keyId,
             did = persisted.request.did,
-            clientId = persisted.request.clientId,
-            redirectUri = Url(persisted.request.redirectUri),
             tokenRequestHeaders = persisted.request.tokenRequestHeaders,
         )
         val keyMaterial = resolvePersistedKeyMaterial(persisted.request.keyId, persisted.selectedPublicJwk)
@@ -1833,6 +1904,9 @@ class WalletIssuanceSessionService(
             SessionState.PROCESSING -> Unit
         }
         val authorization = persisted.authorization?.let { public ->
+            require(!persisted.request.clientId.isNullOrBlank() && persisted.request.redirectUri == public.redirectUri) {
+                "Stored browser registration does not match the authorization"
+            }
             val codeVerifier = requireNotNull(persisted.codeVerifier)
             val method = requireNotNull(PKCEManager.CodeChallengeMethod.fromString(public.pkce.codeChallengeMethod)) {
                 "Stored issuance session contains an unsupported PKCE method"
@@ -1852,6 +1926,8 @@ class WalletIssuanceSessionService(
         val active = ActiveSession(
             public = persisted.public,
             request = request,
+            clientId = persisted.request.clientId,
+            redirectUri = persisted.request.redirectUri,
             resolved = resolved,
             keyMaterial = keyMaterial,
             keyId = persisted.request.keyId,
@@ -1889,12 +1965,16 @@ class WalletIssuanceSessionService(
             resolved.offeredCredentials.map { it.credentialConfigurationId } ==
                     public.offer.credentials.map { it.configurationId }
         ) { "Stored offered credential binding is invalid" }
-        val resolvedGrant = when (resolved.grantType) {
-            is GrantType.AuthorizationCode -> WalletIssuanceGrant.AUTHORIZATION_CODE
-            is GrantType.PreAuthorizedCode -> WalletIssuanceGrant.PRE_AUTHORIZED_CODE
-            else -> error("Stored issuance grant is unsupported")
+        // The released record already stores the selected grant and its resolved server.
+        val offered = resolved.offer?.getGrantTypes().orEmpty()
+        val grant = resolved.grant
+        val supported = if (grant == WalletIssuanceGrant.AUTHORIZATION_CODE) GrantType.AuthorizationCode else GrantType.PreAuthorizedCode
+        require(if (offered.isEmpty()) grant == WalletIssuanceGrant.AUTHORIZATION_CODE else supported in offered) {
+            "Stored issuance grant binding is invalid"
         }
-        require(public.offer.grant == resolvedGrant) { "Stored issuance grant binding is invalid" }
+        require(resolved.authorizationServerMetadata.issuer in grantServers(resolved.offer, grant, resolved.issuerMetadata.metadata)) {
+            "Stored grant authorization server binding is invalid"
+        }
     }
 
     private suspend fun resolvePersistedKeyMaterial(
@@ -1926,8 +2006,8 @@ class WalletIssuanceSessionService(
             request = PersistedRequest(
                 keyId = active.keyId,
                 did = active.did,
-                clientId = active.request.clientId,
-                redirectUri = active.request.redirectUri.toString(),
+                clientId = active.clientId,
+                redirectUri = active.redirectUri,
                 tokenRequestHeaders = active.request.tokenRequestHeaders,
             ),
             offer = active.resolved.offer?.let { json.encodeToString(it) },
@@ -2390,6 +2470,7 @@ class WalletIssuanceSessionService(
         WalletIssuanceErrorCode.INVALID_INPUT -> "The issuance continuation input is incomplete or invalid."
         WalletIssuanceErrorCode.AUTHORIZATION_FAILED -> "The authorization server rejected the authorization request."
         WalletIssuanceErrorCode.ISSUER_METADATA -> "The issuer metadata is incomplete or inconsistent."
+        WalletIssuanceErrorCode.ISSUER_TRUST -> "The credential did not match a trusted issuing authority."
         WalletIssuanceErrorCode.ISSUER_RESPONSE -> "The issuer returned an invalid or unsuccessful response."
         WalletIssuanceErrorCode.NETWORK -> "The issuer could not be reached."
         WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN -> "A deferred request is still in progress or its response was lost. The wallet will not automatically repeat it."
@@ -2411,10 +2492,9 @@ class WalletIssuanceSessionService(
         val issuerMetadata: ResolvedCredentialIssuerMetadata,
         val authorizationServerMetadata: AuthorizationServerMetadata,
         val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
+        val grant: WalletIssuanceGrant,
         val discoveryHeaders: io.ktor.http.Headers = io.ktor.http.Headers.Empty,
-    ) {
-        val grantType: GrantType? get() = if (offer == null) GrantType.AuthorizationCode else offer.getGrantType()
-    }
+    )
 
     internal data class AuthorizationState(
         val public: WalletIssuanceAuthorization,
@@ -2423,7 +2503,9 @@ class WalletIssuanceSessionService(
 
     internal data class ActiveSession(
         val public: WalletIssuanceSession,
-        val request: WalletIssuanceSessionRequest,
+        val request: WalletIssuanceOfferRequest,
+        var clientId: String?,
+        var redirectUri: String?,
         val resolved: ResolvedOffer,
         var keyMaterial: WalletKeyStoreEntry,
         val keyId: String?,
@@ -2507,8 +2589,8 @@ class WalletIssuanceSessionService(
     private data class PersistedRequest(
         val keyId: String?,
         val did: String?,
-        val clientId: String,
-        val redirectUri: String,
+        val clientId: String? = null,
+        val redirectUri: String? = null,
         val tokenRequestHeaders: Map<String, String>,
     )
 

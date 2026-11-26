@@ -91,13 +91,16 @@ class TokenRequestException(
  * not retried automatically. Callers must supply a fresh PoP on their next attempt. A fresh-PoP
  * factory enables the existing bounded recovery, including for refresh-token requests.
  *
- * @property clientConfig The OAuth 2.0 client configuration
  * @property httpClient The HTTP client for token requests
  */
-class TokenRequestBuilder(
-    private val clientConfig: ClientConfiguration,
+class TokenRequestBuilder private constructor(
+    private val clientId: String?,
+    private val redirectUri: String?,
     private val httpClient: HttpClient,
 ) {
+
+    constructor(clientConfig: ClientConfiguration, httpClient: HttpClient) :
+        this(clientConfig.clientId, clientConfig.primaryRedirectUri, httpClient)
 
     /**
      * Token response from the authorization server
@@ -191,8 +194,8 @@ class TokenRequestBuilder(
         val parameters = Parameters.build {
             append("grant_type", GrantType.AuthorizationCode.value)
             append("code", code)
-            append("redirect_uri", clientConfig.primaryRedirectUri)
-            append("client_id", clientConfig.clientId)
+            append("redirect_uri", requireNotNull(redirectUri))
+            append("client_id", requireNotNull(clientId) { "This token request requires a registered client ID" })
             codeVerifier?.let {
                 append("code_verifier", it)
                 log.trace { "Including PKCE code verifier in token request" }
@@ -303,7 +306,7 @@ class TokenRequestBuilder(
             append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
             append("pre-authorized_code", preAuthorizedCode)
             if (!anonymous) {
-                append("client_id", clientConfig.clientId)
+                append("client_id", requireNotNull(clientId) { "This token request requires a registered client ID" })
             }
             txCode?.let {
                 append("tx_code", it)
@@ -407,7 +410,7 @@ class TokenRequestBuilder(
             append("grant_type", GrantType.RefreshToken.value)
             append("refresh_token", refreshToken)
             if (!anonymous) {
-                append("client_id", clientConfig.clientId)
+                append("client_id", requireNotNull(clientId) { "This token request requires a registered client ID" })
             }
             additionalParameters.forEach { (k, v) -> append(k, v) }
         }
@@ -628,7 +631,11 @@ private suspend fun HttpResponse.oauthError(): OAuthError? {
         dpopProof?.let { header(DPOP_HEADER, it) }
     }
 
-    private companion object {
-        val REDIRECT_STATUS_CODES = setOf(307, 308)
+    companion object {
+        /** A pre-authorized token exchange has no browser callback. */
+        fun forPreAuthorizedGrant(clientId: String?, httpClient: HttpClient): TokenRequestBuilder =
+            TokenRequestBuilder(clientId, null, httpClient)
+
+        private val REDIRECT_STATUS_CODES = setOf(307, 308)
     }
 }

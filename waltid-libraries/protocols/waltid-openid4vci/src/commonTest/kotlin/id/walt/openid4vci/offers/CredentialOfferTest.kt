@@ -152,6 +152,15 @@ class CredentialOfferTest {
     }
 
     @Test
+    fun `both advertised grants survive serialization`() {
+        val offer = CredentialOffer("https://issuer.example", listOf("pid"),
+            CredentialOfferGrants(AuthorizationCodeGrant(), PreAuthorizedCodeGrant("code")))
+        val restored = json.decodeFromString(CredentialOffer.serializer(), json.encodeToString(CredentialOffer.serializer(), offer))
+        assertEquals(listOf(GrantType.AuthorizationCode, GrantType.PreAuthorizedCode), restored.getGrantTypes())
+        assertEquals(GrantType.AuthorizationCode, restored.getGrantType())
+    }
+
+    @Test
     fun `credential offer exposes grant type`() {
         val noGrant = CredentialOffer(
             credentialIssuer = "https://issuer.example",

@@ -2,6 +2,7 @@ package id.walt.wallet2.data
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
+import id.walt.wallet2.issuance.CredentialReceiptTrust
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key as Crypto2Key
@@ -162,6 +163,13 @@ data class Wallet(
         issuanceSessionService ?: WalletIssuanceSessionService(this, runtimeState = issuanceSessionState, httpClient = httpClient)
             .also { issuanceSessionService = it }
     }
+
+    /** Optional policy applied to credential receipt and platform registration. */
+    var receiptTrust: CredentialReceiptTrust? = null
+        private set
+
+    /** Configures the receipt policy on a newly constructed wallet. */
+    fun attachReceiptTrust(policy: CredentialReceiptTrust?): Wallet = apply { receiptTrust = policy }
 
     /** Attach a runtime wallet-provider service without persisting it in the wallet model. */
     fun attachKeyAttestationProvider(provider: KeyAttestationProvider): Wallet = apply {
