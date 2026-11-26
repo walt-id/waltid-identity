@@ -37,7 +37,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
                         let reopened = try await makeWallet(walletId: walletID, attestation: offer.attestation)
                         _ = try await initializeSigningIdentity(reopened)
                         let callback = try await followChallengeAuthorization(authorization.request.url, redirect: redirect)
-                        outcome = try await reopened.continueAuthorizationIssuance(sessionID: authorization.id, callbackURI: callback)
+                        outcome = try await reopened.completeAuthorization(authorization.id, callback: callback)
                     } else {
                         guard case .preAuthorized(let grantID) = session.grant else {
                             throw WalletError.invalidInput("Unexpected grant for this test offer")

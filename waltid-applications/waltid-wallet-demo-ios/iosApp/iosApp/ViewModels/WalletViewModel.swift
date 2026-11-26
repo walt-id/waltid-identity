@@ -260,7 +260,7 @@ class WalletViewModel: ObservableObject {
     private var statusDismissedKey: String?
     private var statusHideTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
-    private var pendingAuthorizationID: AuthorizationIssuanceID?
+    private var pendingAuthorizationID: IssuanceAuthorizationID?
     private var issuanceSession: ReviewedIssuanceOffer? {
         didSet { pendingAuthorizationID = nil }
     }

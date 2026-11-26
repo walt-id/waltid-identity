@@ -181,6 +181,19 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(preview.display.textColor, "#FFFFFF")
     }
 
+    func testIssuanceReferencesRejectBlankRestorationAndPreserveTheirEncodedValue() throws {
+        let decoder = JSONDecoder()
+        let encoder = JSONEncoder()
+        let blank = try encoder.encode("  ")
+        XCTAssertNil(IssuanceSessionID(rawValue: ""))
+        XCTAssertNil(IssuanceAuthorizationID(rawValue: "  "))
+        XCTAssertThrowsError(try decoder.decode(IssuanceSessionID.self, from: blank))
+        XCTAssertThrowsError(try decoder.decode(IssuanceAuthorizationID.self, from: blank))
+        let saved = try encoder.encode("retained")
+        let id = try decoder.decode(IssuanceAuthorizationID.self, from: saved)
+        XCTAssertEqual(try encoder.encode(id), saved)
+    }
+
     func testIssuancePreviewTypePayloadDrivesFriendlyTitle() {
         let preview = IssuanceCredentialPreview(
             configurationID: "org.iso.18013.5.1.mDL",
@@ -748,10 +761,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(browser.authorizationServer, "https://browser.example")
         let authorization = try await browser.beginAuthorization(using: .init(clientID: "ios-client", redirectURI: URL(string: "wallet.example:/callback")!), credentials: selections)
         let callbackURL = URL(string: "wallet.example:/callback?code=authorization-code")!
-        let authorizationOutcome = try await wallet.continueAuthorizationIssuance(
-            sessionID: authorization.id,
-            callbackURI: callbackURL
-        )
+        let authorizationOutcome = try await wallet.completeAuthorization(authorization.id, callback: callbackURL)
         let cancellationOutcome = try await wallet.cancelIssuance(sessionID: session.id)
         let deferredOutcome = try await wallet.resumeDeferredIssuance(.init(id: "deferred-1", credentialConfigurationID: nil, intervalSeconds: nil))
 
@@ -1119,7 +1129,7 @@ final class WalletAPITests: XCTestCase {
         let url = try XCTUnwrap(URL(string: "https://issuer.example/offer/" + token))
         XCTAssertFalse(String(describing: IssuanceRequest(offer: url)).contains(token))
         XCTAssertFalse(String(describing: IssuanceSessionID(rawValue: token)).contains(token))
-        XCTAssertFalse(String(describing: AuthorizationIssuanceID(rawValue: token)).contains(token))
+        XCTAssertFalse(String(describing: IssuanceAuthorizationID(rawValue: token)).contains(token))
     }
 
     func testPresentationModelValidationRejectsInvalidStates() {

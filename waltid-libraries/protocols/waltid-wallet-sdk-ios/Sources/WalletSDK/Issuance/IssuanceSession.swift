@@ -9,19 +9,27 @@ public struct IssuanceSessionID: RawRepresentable, Hashable, Codable, Sendable, 
     public let rawValue: String
     /// Restores a saved session reference.
     /// - Parameter rawValue: Previously saved reference from this wallet.
-    public init(rawValue: String) { self.rawValue = rawValue }
+    public init?(rawValue: String) {
+        guard !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        self.rawValue = rawValue
+    }
 }
 
 /// Browser-grant reference. The wallet validates the retained grant, callback and state on use.
-public struct AuthorizationIssuanceID: RawRepresentable, Hashable, Codable, Sendable, CustomStringConvertible {
+public struct IssuanceAuthorizationID: RawRepresentable, Hashable, Codable, Sendable, CustomStringConvertible {
     /// Printable form for diagnostics that omits the saved reference.
-    public var description: String { "AuthorizationIssuanceID(<redacted>)" }
+    public var description: String { "IssuanceAuthorizationID(<redacted>)" }
 
     /// Persist this value before opening the browser.
     public let rawValue: String
     /// Restores a saved browser continuation.
     /// - Parameter rawValue: Previously saved reference from this wallet.
-    public init(rawValue: String) { self.rawValue = rawValue }
+    public init?(rawValue: String) {
+        guard !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        self.rawValue = rawValue
+    }
+
+    init(session: IssuanceSessionID) { rawValue = session.rawValue }
 }
 
 /// Identification required to accept a pre-authorized offer.
@@ -90,8 +98,11 @@ public struct IssuanceSession: Sendable {
     /// The grant selected by discovery and its available operation.
     public let grant: IssuanceGrantSession
 
-    init(_ review: IssuanceOfferReview, wallet: Wallet) {
-        id = .init(rawValue: review.id)
+    init(_ review: IssuanceOfferReview, wallet: Wallet) throws {
+        guard let id = IssuanceSessionID(rawValue: review.id) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid issuance session ID")
+        }
+        self.id = id
         offer = review.offer
         switch offer.grant {
         case .authorizationCode:
@@ -106,14 +117,14 @@ public struct IssuanceSession: Sendable {
 /// A browser request paired with the callback continuation that created it.
 public struct PendingIssuanceAuthorization: Sendable {
     /// Durable callback reference for a reopened wallet.
-    public let id: AuthorizationIssuanceID
+    public let id: IssuanceAuthorizationID
     /// Browser URL, PKCE challenge and expected redirect.
     public let request: IssuanceAuthorization
 
     /// Completes this authorization after the browser returns to the app.
     /// - Parameter callback: URI delivered to the host by the browser.
     public func complete(_ callback: URL) async throws -> IssuanceOutcome {
-        try await wallet.continueAuthorizationIssuance(sessionID: id, callbackURI: callback)
+        try await wallet.completeAuthorization(id, callback: callback)
     }
 
     let wallet: Wallet
