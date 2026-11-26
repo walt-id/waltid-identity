@@ -20,13 +20,14 @@ class MultiplePresentationsTest {
     private val nonce = "nonce-1582"
     private val clientId = "redirect_uri:https://verifier.example/response"
 
+    // Nonce/aggregation fixtures use an unresolved example DID rather than a cryptographic identity.
     private fun session() = Json.decodeFromString<Verification2Session>(
         // language=JSON
         """
         {
           "id": "session-1582",
           "setup": {"flow_type": "cross_device", "core_flow": {"dcql_query": {"credentials": [
-            {"id": "ids", "format": "jwt_vc_json", "multiple": true, "meta": {"type_values": [["VerifiedID"]]}}
+            {"id": "ids", "format": "jwt_vc_json", "require_cryptographic_holder_binding": false, "multiple": true, "meta": {"type_values": [["VerifiedID"]]}}
           ]}}},
           "creationDate": "2026-10-19T08:00:00Z",
           "status": "IN_USE",
@@ -37,7 +38,7 @@ class MultiplePresentationsTest {
             "response_uri": "https://verifier.example/response", "nonce": "$nonce",
             "client_metadata": {"vp_formats_supported": {"jwt_vc_json": {}}},
             "dcql_query": {"credentials": [
-              {"id": "ids", "format": "jwt_vc_json", "multiple": true, "meta": {"type_values": [["VerifiedID"]]}}
+              {"id": "ids", "format": "jwt_vc_json", "require_cryptographic_holder_binding": false, "multiple": true, "meta": {"type_values": [["VerifiedID"]]}}
             ]}
           },
           "policies": {
