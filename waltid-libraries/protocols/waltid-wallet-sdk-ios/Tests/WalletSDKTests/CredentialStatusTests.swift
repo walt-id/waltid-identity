@@ -50,6 +50,22 @@ final class CredentialStatusTests: XCTestCase {
         XCTAssertTrue(record.value.status.hasCheckError)
     }
 
+    func testSnapshotRetainsTheVersionNeededToAcknowledgeAPendingNotice() throws {
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(Self.snapshot.utf8)) as? [String: Any])
+        XCTAssertTrue(try decodeCredentialStatusSnapshot(Self.snapshot).pendingNotices.isEmpty)
+        payload["pendingNotices"] = [[
+            "reference": ["storeIndex": 2, "credentialId": "identity"],
+            "version": "notice-42", "kind": "REVOKED",
+            "checkedAt": "2026-11-12T09:00:00Z", "historical": true
+        ]]
+        let json = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: payload), encoding: .utf8))
+        let snapshot = try decodeCredentialStatusSnapshot(json)
+        XCTAssertEqual(snapshot.pendingNotices, [PendingCredentialStatusNotice(
+            credentialID: "identity", version: "notice-42", kind: .revoked,
+            checkedAt: try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-11-12T09:00:00Z")), historical: true
+        )])
+    }
+
     func testFuturePresentationCodesRemainConservativeWithoutChangingTheProducerRevision() throws {
         let future = Self.snapshot.replacingOccurrences(of: #""kind":"REVOKED""#, with: #""kind":"FUTURE_STATUS""#)
             .replacingOccurrences(of: #""issue":"REVOKED""#, with: #""issue":"FUTURE_ISSUE""#)

@@ -10,6 +10,8 @@ public final class id/walt/wallet2/mobile/AndroidWalletNfcConfiguration {
 }
 
 public final class id/walt/wallet2/mobile/Wallet {
+	public synthetic fun <init> (Ljava/lang/String;Lid/walt/wallet2/persistence/keys/PolicyAwareWalletKeyStore;Lid/walt/wallet2/data/WalletDidStore;Lid/walt/wallet2/data/WalletCredentialStore;Lid/walt/wallet2/handlers/WalletIssuanceSessionStore;Lkotlin/jvm/functions/Function3;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lkotlin/jvm/functions/Function3;Lid/walt/wallet2/mobile/issuance/WalletAttestationConfig;Lid/waltid/openid4vci/wallet/attestation/WalletAttestationProvider;Lid/walt/wallet2/mobile/issuance/WalletProviderConfig;Ljava/util/List;Lid/walt/wallet2/issuance/CredentialReceiptTrust;Ljava/util/List;Lid/walt/openid4vp/clientidprefix/ClientIdTrustConfiguration;Lid/waltid/openid4vci/wallet/metadata/CredentialIssuerMetadataTrustResolver;Lid/walt/wallet2/mobile/digitalcredentials/CredentialRegistry;Lid/walt/wallet2/mobile/digitalcredentials/RegistryProjection;Lid/walt/mdoc/readertrust/ReaderTrustEvaluator;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;Lid/walt/wallet2/mobile/WalletPersistenceOwner;Lkotlin/jvm/functions/Function1;Lid/walt/wallet2/mobile/credentials/StatusMaintenanceEnrollmentStore;ZLid/walt/mdoc/proximity/mobile/BleProximityTransportFactory;Lid/walt/mdoc/proximity/mobile/NfcHostPlatformAdapter;Lid/walt/mdoc/proximity/mobile/WifiAwareProximityTransportFactory;Lio/ktor/client/HttpClient;Lid/walt/wallet2/handlers/WalletScaPresentationAuthorizer;Ljava/util/List;Lio/ktor/client/HttpClient;Lkotlin/jvm/functions/Function2;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun acknowledgeCredentialStatusNotice (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun annexCRequest (Lid/walt/wallet2/mobile/digitalcredentials/DigitalCredentialRequest;)Lid/walt/wallet2/mobile/digitalcredentials/AnnexCRequest;
 	public final fun attachKeyAttestationProvider (Lid/walt/wallet2/handlers/KeyAttestationProvider;)Lid/walt/wallet2/mobile/Wallet;
 	public final fun attachKeyAttestationProviderResolver (Lid/walt/wallet2/handlers/KeyAttestationProviderResolver;)Lid/walt/wallet2/mobile/Wallet;
@@ -32,6 +34,7 @@ public final class id/walt/wallet2/mobile/Wallet {
 	public final fun getDigitalCredentialRegistration ()Lkotlinx/coroutines/flow/StateFlow;
 	public final fun getEvents ()Lkotlinx/coroutines/flow/Flow;
 	public final fun getSigningIdentity ()Lid/walt/wallet2/mobile/identity/SigningIdentityManager;
+	public final fun invalidateCredentialStatusSnapshot (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun keyUseAuthorizationPreflight (Lid/walt/wallet2/mobile/identity/WalletKeyType;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun keyUseAuthorizationPreflight$default (Lid/walt/wallet2/mobile/Wallet;Lid/walt/wallet2/mobile/identity/WalletKeyType;Lid/walt/crypto2/keys/KeyUseAuthorizationPolicy;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun listDeferredIssuance (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -43,6 +46,8 @@ public final class id/walt/wallet2/mobile/Wallet {
 	public final fun previewPresentation (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun proximityPresentationCapabilities (Lid/walt/wallet2/mobile/proximity/ProximityConfiguration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun proximityPresentationCapabilities$default (Lid/walt/wallet2/mobile/Wallet;Lid/walt/wallet2/mobile/proximity/ProximityConfiguration;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun reconcileCredentialStatusMaintenance (ZZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun reconcileCredentialStatusMaintenance$default (Lid/walt/wallet2/mobile/Wallet;ZZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun refreshCredentialStatuses (Ljava/util/List;Lid/walt/wallet2/status/CredentialStatusRefreshMode;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun refreshCredentialStatuses$default (Lid/walt/wallet2/mobile/Wallet;Ljava/util/List;Lid/walt/wallet2/status/CredentialStatusRefreshMode;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun refreshDigitalCredentialRegistration (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -54,6 +59,7 @@ public final class id/walt/wallet2/mobile/Wallet {
 	public static synthetic fun reviewDigitalCredentialPresentation$default (Lid/walt/wallet2/mobile/Wallet;Ljava/lang/String;Lid/walt/wallet2/mobile/presentation/PresentationSelection;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun reviewPresentation (Lid/walt/wallet2/mobile/presentation/PresentationPreviewHandle;Lid/walt/wallet2/mobile/presentation/PresentationSelection;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun reviewPresentation$default (Lid/walt/wallet2/mobile/Wallet;Lid/walt/wallet2/mobile/presentation/PresentationPreviewHandle;Lid/walt/wallet2/mobile/presentation/PresentationSelection;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun setCredentialStatusMaintenance (Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenancePreference;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun startIssuance (Lid/walt/wallet2/mobile/issuance/IssuanceRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun startProximityPresentation (Lid/walt/wallet2/mobile/proximity/ProximityConfiguration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun startProximityPresentation$default (Lid/walt/wallet2/mobile/Wallet;Lid/walt/wallet2/mobile/proximity/ProximityConfiguration;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
@@ -130,6 +136,60 @@ public final class id/walt/wallet2/mobile/WalletFactory {
 	public synthetic fun <init> (Landroid/content/Context;Lkotlin/jvm/functions/Function0;Lid/walt/wallet2/mobile/AndroidWalletNfcConfiguration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun open (Lid/walt/wallet2/mobile/WalletConfiguration;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun open$default (Lid/walt/wallet2/mobile/WalletFactory;Lid/walt/wallet2/mobile/WalletConfiguration;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/mobile/credentials/AndroidCredentialStatusMaintenanceKt {
+	public static final fun refreshDueStatusesForExistingWallet-zkXUZaI (Landroid/content/Context;Ljava/lang/String;IJLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun refreshDueStatusesForExistingWallet-zkXUZaI$default (Landroid/content/Context;Ljava/lang/String;IJLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class id/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceEnrollment {
+	public final fun getBinding ()Ljava/lang/String;
+	public final fun getPreference ()Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenancePreference;
+}
+
+public final class id/walt/wallet2/mobile/credentials/CredentialStatusMaintenancePreference : java/lang/Enum {
+	public static final field ENABLED Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenancePreference;
+	public static final field OFF Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenancePreference;
+	public static final field PAUSED Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenancePreference;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenancePreference;
+	public static fun values ()[Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenancePreference;
+}
+
+public abstract interface class id/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult {
+}
+
+public final class id/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult$Deferred : id/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult {
+	public static final field INSTANCE Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult$Deferred;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult$Finished : id/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult {
+	public fun <init> (IIIZ)V
+	public synthetic fun <init> (IIIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()Z
+	public final fun copy (IIIZ)Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult$Finished;
+	public static synthetic fun copy$default (Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult$Finished;IIIZILjava/lang/Object;)Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult$Finished;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChecked ()I
+	public final fun getHasNewNotice ()Z
+	public final fun getRemaining ()I
+	public final fun getUnchanged ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class id/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult$Ineligible : id/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult {
+	public static final field INSTANCE Lid/walt/wallet2/mobile/credentials/CredentialStatusMaintenanceResult$Ineligible;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class id/walt/wallet2/mobile/credentials/CredentialWithStatus {
