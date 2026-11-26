@@ -10,11 +10,13 @@ precondition(!(physicalFixtures && bridgeFixtures), "Select only one isolated te
 let package = Package(
     name: "WalletSDK",
     platforms: [.iOS("15.4")],
-    // Optional products share the SDK runtime instead of embedding another copy in their consumers.
     products: [
         .library(name: "WalletSDK", targets: ["WalletSDK"]),
+        .library(name: "WalletSDKShared", type: .dynamic, targets: ["WalletSDKShared"]),
         .library(name: "WalletSDKKeychainRecovery", type: .dynamic, targets: ["WalletSDKKeychainRecovery"]),
+        .library(name: "WalletSDKKeychainRecoveryStatic", type: .static, targets: ["WalletSDKKeychainRecovery"]),
         .library(name: "WalletSDKEnterpriseCustody", type: .dynamic, targets: ["WalletSDKEnterpriseCustody"]),
+        .library(name: "WalletSDKEnterpriseCustodyStatic", type: .static, targets: ["WalletSDKEnterpriseCustody"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0"),
@@ -36,6 +38,7 @@ let package = Package(
                 .product(name: "SQLCipher", package: "SQLCipher.swift", condition: .when(platforms: [.iOS])),
             ]
         ),
+        .target(name: "WalletSDKShared", dependencies: ["WalletSDK"]),
         .target(name: "WalletSDKKeychainRecovery", dependencies: ["WalletSDK"]),
         .target(name: "WalletSDKEnterpriseCustody", dependencies: ["WalletSDK"]),
         .testTarget(

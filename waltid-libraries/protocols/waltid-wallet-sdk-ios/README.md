@@ -43,6 +43,18 @@ reviewed sharing, persistence and lifecycle examples.
 
 ## Local Build
 
+Use the `WalletSDK` product for an app with one executable. For an app and a credential-provider
+extension, link `WalletSDKShared` in both targets and choose **Embed & Sign** in the containing app.
+The extension loads its frameworks from `@executable_path/../../Frameworks`. Swift source can
+continue to use `import WalletSDK`. Xcode may also embed `WalletSDK.framework` when an adapter
+depends on the SDK. Check the archived application and extension together with
+`python3 scripts/check-shared-runtime.py <path/to/App.app> <path/to/Provider.appex>` from this package.
+
+For a single-executable app using Keychain recovery or enterprise custody, select
+`WalletSDKKeychainRecoveryStatic` or `WalletSDKEnterpriseCustodyStatic` to link the adapter
+into the executable. Use one product per adapter. The imports and provider registration calls
+are identical to those for the existing dynamic products.
+
 Generate the KMP core XCFramework before building an iOS consumer:
 
 ```bash

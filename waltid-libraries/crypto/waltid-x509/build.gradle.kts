@@ -1,3 +1,5 @@
+import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
+
 plugins {
     id("waltid.full.library")
     id("waltid.publish.maven")
@@ -5,6 +7,15 @@ plugins {
 }
 
 group = "id.walt.crypto"
+
+if (enableAndroidBuild) {
+    extensions.configure<KotlinMultiplatformAndroidComponentsExtension>("androidComponents") {
+        finalizeDsl { android ->
+            android.optimization.consumerKeepRules.file("consumer-rules.pro")
+            android.optimization.consumerKeepRules.publish = true
+        }
+    }
+}
 
 kotlin {
 

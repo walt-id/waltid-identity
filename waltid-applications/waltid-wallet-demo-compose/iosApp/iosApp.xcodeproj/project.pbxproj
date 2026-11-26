@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A18660000000000000000001 /* WalletSDKShared in Embed Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001011 /* WalletSDKShared */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A13330000000000000000021 /* WalletIssuanceUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13330000000000000000022 /* WalletIssuanceUI.swift */; };
 		A14440000000000000000003 /* EnterpriseMobileFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14440000000000000000004 /* EnterpriseMobileFixture.swift */; };
 		A14440000000000000000001 /* BatchIssuanceE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14440000000000000000002 /* BatchIssuanceE2ETests.swift */; };
@@ -23,20 +24,31 @@
 		C0DE00000000000000000107 /* DemoBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000008 /* DemoBackend.swift */; };
 		C0DE00000000000000000108 /* EudiOfferFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000009 /* EudiOfferFlow.swift */; };
 		CEB46067C0B18C64C703CB04 /* KotlinMultiplatformLinkedPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 048F7E5AEC614F5A89E08F1D /* KotlinMultiplatformLinkedPackage */; };
-		C0DE00000000000000001021 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001011 /* WalletSDK */; };
+		C0DE00000000000000001021 /* WalletSDKShared in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001011 /* WalletSDKShared */; };
 		C0DE00000000000000001022 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001012 /* WalletDemoIdentityDocumentSupport */; };
 		B17530000000000000000001 /* WalletDemoBackgroundStatus in Frameworks */ = {isa = PBXBuildFile; productRef = B17530000000000000000002 /* WalletDemoBackgroundStatus */; };
-		C0DE00000000000000001023 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001013 /* WalletSDK */; };
+		C0DE00000000000000001023 /* WalletSDKShared in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001013 /* WalletSDKShared */; };
 		C0DE00000000000000001024 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001014 /* WalletDemoIdentityDocumentSupport */; };
 		C0DE00000000000000001041 /* IdentityDocumentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001033 /* IdentityDocumentProvider.swift */; };
 		C0DE00000000000000001042 /* IdentityDocumentProvider.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001032 /* IdentityDocumentProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C0DE00000000000000001111 /* SharedWalletConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001101 /* SharedWalletConfigurationTests.swift */; };
 		C0DE00000000000000001112 /* SharedWalletConfigurationAssertions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001102 /* SharedWalletConfigurationAssertions.swift */; };
-		C0DE00000000000000001113 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001141 /* WalletSDK */; };
+		C0DE00000000000000001113 /* WalletSDKShared in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001141 /* WalletSDKShared */; };
 		C0DE00000000000000001114 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001142 /* WalletDemoIdentityDocumentSupport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		A18660000000000000000002 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				A18660000000000000000001 /* WalletSDKShared in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C0DE00000000000000001074 /* Embed ExtensionKit Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -109,7 +121,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CEB46067C0B18C64C703CB04 /* KotlinMultiplatformLinkedPackage in Frameworks */,
-				C0DE00000000000000001021 /* WalletSDK in Frameworks */,
+				C0DE00000000000000001021 /* WalletSDKShared in Frameworks */,
 				C0DE00000000000000001022 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 				B17530000000000000000001 /* WalletDemoBackgroundStatus in Frameworks */,
 			);
@@ -126,7 +138,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C0DE00000000000000001023 /* WalletSDK in Frameworks */,
+				C0DE00000000000000001023 /* WalletSDKShared in Frameworks */,
 				C0DE00000000000000001024 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -135,7 +147,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C0DE00000000000000001113 /* WalletSDK in Frameworks */,
+				C0DE00000000000000001113 /* WalletSDKShared in Frameworks */,
 				C0DE00000000000000001114 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -234,6 +246,7 @@
 				B33B17E22C2C394F001A32F7 /* Sources */,
 				B33B17E32C2C394F001A32F7 /* Frameworks */,
 				B33B17E42C2C394F001A32F7 /* Resources */,
+				A18660000000000000000002 /* Embed Frameworks */,
 				C0DE00000000000000001074 /* Embed ExtensionKit Extensions */,
 			);
 			buildRules = (
@@ -244,7 +257,7 @@
 			name = iosApp;
 			packageProductDependencies = (
 				048F7E5AEC614F5A89E08F1D /* KotlinMultiplatformLinkedPackage */,
-				C0DE00000000000000001011 /* WalletSDK */,
+				C0DE00000000000000001011 /* WalletSDKShared */,
 				C0DE00000000000000001012 /* WalletDemoIdentityDocumentSupport */,
 				B17530000000000000000002 /* WalletDemoBackgroundStatus */,
 			);
@@ -266,7 +279,7 @@
 			);
 			name = IdentityDocumentProvider;
 			packageProductDependencies = (
-				C0DE00000000000000001013 /* WalletSDK */,
+				C0DE00000000000000001013 /* WalletSDKShared */,
 				C0DE00000000000000001014 /* WalletDemoIdentityDocumentSupport */,
 			);
 			productName = IdentityDocumentProvider;
@@ -304,7 +317,7 @@
 			);
 			name = iosAppTests;
 			packageProductDependencies = (
-				C0DE00000000000000001141 /* WalletSDK */,
+				C0DE00000000000000001141 /* WalletSDKShared */,
 				C0DE00000000000000001142 /* WalletDemoIdentityDocumentSupport */,
 			);
 			productName = iosAppTests;
@@ -847,30 +860,30 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = KotlinMultiplatformLinkedPackage;
 		};
-		C0DE00000000000000001011 /* WalletSDK */ = {
+		C0DE00000000000000001011 /* WalletSDKShared */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C0DE00000000000000001001 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
-			productName = WalletSDK;
+			productName = WalletSDKShared;
 		};
 		C0DE00000000000000001012 /* WalletDemoIdentityDocumentSupport */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C0DE00000000000000001002 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
 			productName = WalletDemoIdentityDocumentSupport;
 		};
-		C0DE00000000000000001013 /* WalletSDK */ = {
+		C0DE00000000000000001013 /* WalletSDKShared */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C0DE00000000000000001001 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
-			productName = WalletSDK;
+			productName = WalletSDKShared;
 		};
 		C0DE00000000000000001014 /* WalletDemoIdentityDocumentSupport */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C0DE00000000000000001002 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
 			productName = WalletDemoIdentityDocumentSupport;
 		};
-		C0DE00000000000000001141 /* WalletSDK */ = {
+		C0DE00000000000000001141 /* WalletSDKShared */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C0DE00000000000000001001 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
-			productName = WalletSDK;
+			productName = WalletSDKShared;
 		};
 		C0DE00000000000000001142 /* WalletDemoIdentityDocumentSupport */ = {
 			isa = XCSwiftPackageProductDependency;
