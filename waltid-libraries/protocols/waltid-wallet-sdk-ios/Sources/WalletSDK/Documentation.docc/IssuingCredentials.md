@@ -71,7 +71,7 @@ The default receipt operation parses and stores credentials with the expected co
 
 Each authority binds an exact OpenID4VCI credential issuer identifier and format to a P-256 public JWK. The SD-JWT VC profile checks the ES256 issuer signature, signed issuer, credential type, disclosures and validity bounds. The mdoc profile checks ES256 issuer authentication, the document signer key and certificate profile, MSO validity, document type and item digests. Provision rollover keys alongside the existing key. An empty configured list accepts no credentials.
 
-A trust failure stops the affected issuance target before storage or system registration. Earlier stored targets remain visible in the result. The same policy applies to deferred receipt and local-save recovery. Existing credentials stay in the wallet. With the profile enabled, system registration requires recorded receipt origin and successful verification with a currently configured key.
+A trust failure stops the affected issuance target before storage or system registration. Swift reports this rejection as `.issuerTrust`. Earlier stored targets remain visible in the result. The same policy applies to deferred receipt and local-save recovery. Existing credentials stay in the wallet. With the profile enabled, system registration requires recorded receipt origin and successful verification with a currently configured key.
 
 ### Keep Partial and Deferred Progress
 
