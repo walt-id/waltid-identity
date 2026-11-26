@@ -17,6 +17,20 @@ class ReleasedAuthorizationApiTest {
     }
 
     @Test
+    fun receiptTrustPreservesReleasedErrorCodesAndWireDefaults() {
+        val json = Json { encodeDefaults = true }
+        val ordinary = WalletIssuanceError(WalletIssuanceErrorCode.ISSUER_RESPONSE, "Rejected", false)
+        val encoded = json.encodeToJsonElement(ordinary).jsonObject
+        assertFalse("issuerTrustFailed" in encoded)
+        assertEquals(ordinary, json.decodeFromString<WalletIssuanceError>("""{"code":"ISSUER_RESPONSE","message":"Rejected"}"""))
+
+        val denied = ordinary.copy(issuerTrustFailed = true)
+        assertEquals(denied, json.decodeFromJsonElement<WalletIssuanceError>(json.encodeToJsonElement(denied)))
+        assertTrue(denied.copy(message = "Reworded").issuerTrustFailed)
+        assertFalse(denied.copy(code = WalletIssuanceErrorCode.NETWORK).issuerTrustFailed)
+    }
+
+    @Test
     fun releasedScopeSwitchAndFirstConfigurationApplyToRedirectAndPar() = runTest {
         val fixture = batchTestFixture(true)
         for (pushed in listOf(false, true)) for (useScope in listOf(false, true)) {

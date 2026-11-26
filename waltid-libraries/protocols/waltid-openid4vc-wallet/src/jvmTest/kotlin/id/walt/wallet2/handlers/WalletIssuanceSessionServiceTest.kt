@@ -1925,7 +1925,8 @@ class WalletIssuanceSessionServiceTest {
                     }
                 }
                 val failure = assertIs<WalletIssuanceOutcome.Failed>(denied)
-                assertEquals(WalletIssuanceErrorCode.ISSUER_TRUST, failure.error.code, stage)
+                assertEquals(WalletIssuanceErrorCode.ISSUER_RESPONSE, failure.error.code, stage)
+                assertTrue(failure.error.issuerTrustFailed, stage)
                 assertTrue(failure.storedCredentialIds.isEmpty())
                 assertTrue(open().listIssuanceContinuations().isEmpty())
                 assertEquals(1, credentialRequests)

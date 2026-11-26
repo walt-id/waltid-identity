@@ -71,6 +71,8 @@ import id.waltid.openid4vci.wallet.credential.acceptCredentialResponse
 import id.waltid.openid4vci.wallet.credential.isApplicationJwt
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
 import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
@@ -347,21 +349,39 @@ enum class WalletIssuanceErrorCode {
     CRYPTO,
     STORAGE,
     PROTOCOL,
-    ISSUER_TRUST,
 }
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class WalletIssuanceError(
     val code: WalletIssuanceErrorCode,
     val message: String,
     /** Whether the caller may submit the same reviewed offer again after this transition. */
     val canRetryOffer: Boolean = false,
+    /** True when [WalletIssuanceErrorCode.ISSUER_RESPONSE] identifies a credential rejected by the host's receipt profile. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val issuerTrustFailed: Boolean = false,
 ) {
-    constructor(code: WalletIssuanceErrorCode, message: String) : this(code, message, false)
+    init {
+        require(!issuerTrustFailed || code == WalletIssuanceErrorCode.ISSUER_RESPONSE)
+    }
 
-    /** Preserves the released copy signature and the session's retry decision. */
+    constructor(code: WalletIssuanceErrorCode, message: String, canRetryOffer: Boolean = false) :
+        this(code, message, canRetryOffer, false)
+
+    constructor(code: WalletIssuanceErrorCode, message: String) : this(code, message, false, false)
+
+    /** Preserves the released copy signatures and the detail for an issuer-response failure. */
+    fun copy(
+        code: WalletIssuanceErrorCode = this.code,
+        message: String = this.message,
+        canRetryOffer: Boolean = this.canRetryOffer,
+    ): WalletIssuanceError = WalletIssuanceError(
+        code, message, canRetryOffer, issuerTrustFailed && code == WalletIssuanceErrorCode.ISSUER_RESPONSE,
+    )
+
     fun copy(code: WalletIssuanceErrorCode = this.code, message: String = this.message): WalletIssuanceError =
-        WalletIssuanceError(code, message, canRetryOffer)
+        copy(code, message, canRetryOffer)
 }
 
 /** Terminal or pending result of an issuance-session transition. */
@@ -1123,7 +1143,7 @@ class WalletIssuanceSessionService(
             WalletIssuanceOutcome.Stored(record.sessionId, storedIds)
         } catch (error: CredentialReceiptTrustException) {
             removeDeferred(record)
-            failed(record.sessionId, WalletIssuanceErrorCode.ISSUER_TRUST, storedIds)
+            failed(record.sessionId, WalletIssuanceErrorCode.ISSUER_RESPONSE, storedIds, receiptFailure = error)
         } catch (error: CancellationException) {
             retainInterruptedDeferred(record)
             throw error
@@ -1219,7 +1239,7 @@ class WalletIssuanceSessionService(
                 failAndRemove(active, code, storedIds)
             }
         } catch (error: IssuanceStageException) {
-            failAndRemove(active, error.code, storedIds, deferredResults, error.failure)
+            failAndRemove(active, error.code, storedIds, deferredResults, error.failure, error.receiptFailure)
         } catch (_: IllegalArgumentException) {
             failAndRemove(active, WalletIssuanceErrorCode.PROTOCOL, storedIds, deferredResults)
         } catch (_: Exception) {
@@ -1261,8 +1281,7 @@ class WalletIssuanceSessionService(
                     NonceRequestError.INVALID_RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
                 }
                 error.failure.stage == CredentialIssuanceStage.PROOF -> WalletIssuanceErrorCode.CRYPTO
-                cause is CredentialReceiptTrustException -> WalletIssuanceErrorCode.ISSUER_TRUST
-                cause is CredentialEndpointException -> WalletIssuanceErrorCode.ISSUER_RESPONSE
+                cause is CredentialReceiptTrustException || cause is CredentialEndpointException -> WalletIssuanceErrorCode.ISSUER_RESPONSE
                 cause is IllegalArgumentException || error.failure.stage == CredentialIssuanceStage.RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
                 error.failure.stage == CredentialIssuanceStage.STORAGE -> WalletIssuanceErrorCode.STORAGE
                 else -> WalletIssuanceErrorCode.NETWORK
@@ -1271,7 +1290,7 @@ class WalletIssuanceSessionService(
             if (code == WalletIssuanceErrorCode.STORAGE && error.storageOutcome == null) {
                 log.error(error) { "Could not store issuance progress for session '${active.public.id}'" }
             }
-            throw IssuanceStageException(code, error, error.failure)
+            throw IssuanceStageException(code, error, error.failure, cause as? CredentialReceiptTrustException)
         }
     }
 
@@ -2422,9 +2441,10 @@ class WalletIssuanceSessionService(
         storedIds: List<String> = emptyList(),
         deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
         failure: CredentialIssuanceFailure? = null,
+        receiptFailure: CredentialReceiptTrustException? = null,
     ): WalletIssuanceOutcome.Failed {
         invalidateActiveSessionBestEffort(active.public.id, expected = active)
-        return failed(active.public.id, code, storedIds, deferredCredentials, failure)
+        return failed(active.public.id, code, storedIds, deferredCredentials, failure, receiptFailure = receiptFailure)
     }
 
     private suspend fun failed(
@@ -2434,11 +2454,17 @@ class WalletIssuanceSessionService(
         deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
         failure: CredentialIssuanceFailure? = null,
         canRetryOffer: Boolean = false,
+        receiptFailure: CredentialReceiptTrustException? = null,
     ): WalletIssuanceOutcome.Failed {
         emitEvent(WalletSessionEvent.issuance_failed)
         return WalletIssuanceOutcome.Failed(
             sessionId = sessionId,
-            error = WalletIssuanceError(code, code.publicDescription(), canRetryOffer),
+            error = WalletIssuanceError(
+                code = code,
+                message = receiptFailure?.message ?: code.publicDescription(),
+                canRetryOffer = canRetryOffer,
+                issuerTrustFailed = receiptFailure != null,
+            ),
             storedCredentialIds = storedIds.toList(),
             deferredCredentials = deferredCredentials.toList(),
             failure = failure,
@@ -2470,7 +2496,6 @@ class WalletIssuanceSessionService(
         WalletIssuanceErrorCode.INVALID_INPUT -> "The issuance continuation input is incomplete or invalid."
         WalletIssuanceErrorCode.AUTHORIZATION_FAILED -> "The authorization server rejected the authorization request."
         WalletIssuanceErrorCode.ISSUER_METADATA -> "The issuer metadata is incomplete or inconsistent."
-        WalletIssuanceErrorCode.ISSUER_TRUST -> "The credential did not match a trusted issuing authority."
         WalletIssuanceErrorCode.ISSUER_RESPONSE -> "The issuer returned an invalid or unsuccessful response."
         WalletIssuanceErrorCode.NETWORK -> "The issuer could not be reached."
         WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN -> "A deferred request is still in progress or its response was lost. The wallet will not automatically repeat it."
@@ -2741,6 +2766,7 @@ class WalletIssuanceSessionService(
         val code: WalletIssuanceErrorCode,
         cause: Throwable? = null,
         val failure: CredentialIssuanceFailure? = null,
+        val receiptFailure: CredentialReceiptTrustException? = null,
     ) : Exception(code.name, cause)
 
     @Serializable

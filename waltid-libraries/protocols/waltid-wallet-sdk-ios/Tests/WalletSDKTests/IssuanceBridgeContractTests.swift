@@ -51,6 +51,18 @@ final class IssuanceBridgeContractTests: XCTestCase {
         }
     }
 
+    func testReceiptTrustDenialIsDistinctFromAnOrdinaryIssuerRejection() throws {
+        for denied in [false, true] {
+            let core = Waltid_openid4vc_walletWalletIssuanceOutcomeFailed(sessionId: "session",
+                error: .init(code: .issuerResponse, message: "Rejected", canRetryOffer: false, issuerTrustFailed: denied),
+                storedCredentialIds: [], deferredCredentials: [], failure: nil)
+            guard case let .failed(_, error, _, _) = try core.toSwiftIssuanceOutcome() else {
+                return XCTFail("Expected an issuer rejection")
+            }
+            XCTAssertEqual(error.code, denied ? .issuerTrust : .issuerResponse)
+        }
+    }
+
     func testUncertainOutcomesRemainDistinctFromNetworkAndStorageFailures() throws {
         let codes: [(Waltid_openid4vc_walletWalletIssuanceErrorCode, IssuanceErrorCode)] = [
             (.network, .network), (.storage, .storage),

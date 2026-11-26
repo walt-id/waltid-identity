@@ -55,7 +55,7 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
             return .failed(
                 sessionID: value.sessionId,
                 error: IssuanceFailure(
-                    code: value.error.code.toSwiftIssuanceErrorCode(),
+                    code: value.error.issuerTrustFailed ? .issuerTrust : value.error.code.toSwiftIssuanceErrorCode(),
                     message: value.error.message,
                     canRetryOffer: value.error.canRetryOffer,
                     targetFailure: value.failure?.toSwiftTargetFailure()
@@ -216,7 +216,6 @@ private extension Waltid_openid4vc_walletWalletIssuanceErrorCode {
         case .authorizationFailed: return .authorizationFailed
         case .issuerMetadata: return .issuerMetadata
         case .issuerResponse: return .issuerResponse
-        case .issuerTrust: return .issuerTrust
         case .network: return .network
         case .remoteOutcomeUncertain: return .remoteOutcomeUncertain
         case .storageOutcomeUncertain: return .storageOutcomeUncertain
