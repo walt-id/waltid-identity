@@ -13,7 +13,7 @@ struct DigitalCredentialsSettingsView: View {
                     .accessibilityIdentifier(WalletAccessibilityID.settingsShowDcApiPreview)
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("The wallet skips warnings about suspended or revoked credentials.")
+                    Text("When enabled, the wallet skips warnings about suspended or revoked credentials.")
                     Text("Review the requester and requested data, then tap Share. Requires iOS 26 or later and a compatible app or browser.")
                 }
             }

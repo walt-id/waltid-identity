@@ -16,7 +16,7 @@
     <string name="settings_skip_review">Skip credential status checks</string>
     <string name="settings_review_on">Review and status checks on</string>
     <string name="settings_review_off">Status checks off</string>
-    <string name="settings_review_description">The wallet skips warnings about suspended or revoked credentials.</string>
+    <string name="settings_review_description">When enabled, the wallet skips warnings about suspended or revoked credentials.</string>
     <string name="settings_lock">Lock wallet</string>
     <string name="settings_reset">Reset wallet</string>
     <string name="settings_reset_question">Reset wallet?</string>
