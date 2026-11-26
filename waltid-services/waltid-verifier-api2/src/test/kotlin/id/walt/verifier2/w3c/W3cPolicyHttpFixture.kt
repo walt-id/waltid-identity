@@ -167,7 +167,8 @@ internal fun runW3cPolicyHttpCases(cases: List<W3cPolicyHttpCase>, port: Int = 0
                     assertFalse(vp in Json.encodeToString(session))
                     assertFalse(credential in Json.encodeToString(session))
                     webhook?.let { recorder ->
-                        val terminal = recorder.received().last { it.target == created.sessionId && it.event == SessionEvent.credential_policy_results_available.name }
+                        val terminal = recorder.awaitEvents(created.sessionId, event = SessionEvent.credential_policy_results_available)
+                            .last { it.event == SessionEvent.credential_policy_results_available.name }
                         val notified = Json.decodeFromJsonElement<Verification2Session>(terminal.session)
                         assertEquals(session.statusReason, notified.statusReason)
                         assertEquals(Json.encodeToJsonElement(session.failure), Json.encodeToJsonElement(notified.failure))
