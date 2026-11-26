@@ -1747,13 +1747,13 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
     }
 
     func testTransactionDataGroupsRenderProfileAndDetailsReadably() throws {
-        let request = PresentationRequest(
+        let request = try PresentationRequest(
             clientID: "https://verifier.example",
             requestAuthentication: .unauthenticated,
             nonce: "nonce-1",
             responseEncryption: .notRequired,
             transactionData: [
-                PresentationTransactionData(
+                try PresentationTransactionData(
                     type: "org.waltid.transaction-data.payment-authorization",
                     displayName: "Payment Authorization",
                     credentialQueryIDs: ["pid", "payment"],

@@ -176,7 +176,7 @@ public actor Wallet {
     ///   - id: Browser continuation saved before leaving the wallet.
     ///   - callback: Exact URI returned to the application.
     public func completeAuthorization(_ id: IssuanceAuthorizationID, callback: URL) async throws -> IssuanceOutcome {
-        try await bridge.continueAuthorizationIssuance(sessionID: id.rawValue, callbackURI: callback)
+        try await bridge.completeAuthorization(id.rawValue, callback: callback)
     }
 
     /// Cancels the retained offer and discards its authorization material.

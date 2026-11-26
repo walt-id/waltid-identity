@@ -161,10 +161,10 @@ final class WalletIntegrationTests: XCTestCase {
         transactionCode: String? = nil
     ) async throws -> [String] {
         let session = try await startIssuance(wallet: wallet, offerURL: offerURL)
-        guard case .preAuthorized(let grantID) = session.grant else {
+        guard case .preAuthorized(let grant) = session.grant else {
             throw WalletError.invalidInput("Unexpected grant for this test offer")
         }
-        let outcome = try await grantID.accept(transactionCode: transactionCode, clientID: "eudiw-abca")
+        let outcome = try await grant.accept(transactionCode: transactionCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
@@ -406,10 +406,10 @@ final class WalletIntegrationTests: XCTestCase {
             !$0.configurationID.isEmpty && !$0.format.isEmpty
         })
         XCTAssertNotNil(session.offer.transactionCode, "EUDI offer should require a transaction code")
-        guard case .preAuthorized(let grantID) = session.grant else {
+        guard case .preAuthorized(let grant) = session.grant else {
             throw WalletError.invalidInput("Unexpected grant for this test offer")
         }
-        let outcome = try await grantID.accept(transactionCode: offer.txCode, clientID: "eudiw-abca")
+        let outcome = try await grant.accept(transactionCode: offer.txCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
@@ -502,10 +502,10 @@ final class WalletIntegrationTests: XCTestCase {
         XCTAssertNotNil(issuerProvenance.keyID)
         XCTAssertEqual(.trustedIssuer, issuerProvenance.trustType)
 
-        guard case .preAuthorized(let grantID) = issuanceSession.grant else {
+        guard case .preAuthorized(let grant) = issuanceSession.grant else {
             throw WalletError.invalidInput("Unexpected grant for this test offer")
         }
-        let outcome = try await grantID.accept(transactionCode: offer.txCode, clientID: "eudiw-abca")
+        let outcome = try await grant.accept(transactionCode: offer.txCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")

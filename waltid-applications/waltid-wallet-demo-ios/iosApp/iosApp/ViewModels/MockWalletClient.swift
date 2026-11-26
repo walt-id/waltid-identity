@@ -208,13 +208,13 @@ actor MockWalletClient: WalletClient {
         try await finishIssuance(sessionID.rawValue)
     }
 
-    func continueAuthorizationIssuance(sessionID: IssuanceAuthorizationID, callbackURI: URL) async throws -> IssuanceOutcome {
-        try await finishIssuance(sessionID.rawValue)
+    func completeAuthorization(_ authorizationID: IssuanceAuthorizationID, callback: URL) async throws -> IssuanceOutcome {
+        try await finishIssuance(authorizationID.rawValue)
     }
 
     func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome { .cancelled(sessionID: sessionID.rawValue) }
 
-    func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome {
+    func resumeDeferredIssuance(_ id: DeferredIssuanceID) async throws -> IssuanceOutcome {
         .failed(
             sessionID: "mock-session",
             error: .init(code: .invalidSession, message: "No mock deferred credential"),

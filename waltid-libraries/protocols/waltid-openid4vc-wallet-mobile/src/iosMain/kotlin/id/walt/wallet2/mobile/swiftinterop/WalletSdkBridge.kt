@@ -229,11 +229,11 @@ public class WalletSdkBridge private constructor(
         walletBridgeCall { operations.continuePreAuthorizedIssuance(sessionId, transactionCode, credentials, clientId) }
 
     /** Continues one authorization-code issuance session after its browser callback. */
-    public suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    public suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
     ): WalletBridgeResult<WalletIssuanceOutcome> =
-        walletBridgeCall { operations.continueAuthorizationIssuance(sessionId, callbackUri) }
+        walletBridgeCall { operations.completeAuthorization(authorizationId, callbackUri) }
 
     /** Cancels one active issuance session and discards its continuation material. */
     public suspend fun cancelIssuance(
