@@ -117,7 +117,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
                     profile: profile, session: session,
                     readerPolicy: profile == .eudiARF3FCAF202608 ? .requireTrusted : .allowAnonymousOrUntrusted
                 )
-                XCTAssertEqual(swiftSession(configuration.toKMPConfiguration().session), session)
+                XCTAssertEqual(try swiftSession(configuration.toKMPConfiguration().session), session)
             }
         }
     }
