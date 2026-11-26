@@ -46,16 +46,15 @@ internal class MobileWalletRegistration(
                 reason = failure.message ?: failure::class.simpleName ?: "Credential registration failed",
             )
         }
+        // A completed presentation replacement remains observable if creation is cancelled.
+        lastRegistrationResult.value = presentationResult
         currentCoroutineContext().ensureActive()
-        // Creation options advertise issuance capability and must not share the presentation
-        // replace lifecycle; failures here do not roll back a successful presentation projection.
         runCatching {
             credentialRegistry.registerCreationOptions()
         }.onFailure { failure ->
             if (failure is CancellationException) throw failure
         }
         currentCoroutineContext().ensureActive()
-        lastRegistrationResult.value = presentationResult
         presentationResult
     }
 

@@ -173,6 +173,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -1040,7 +1042,7 @@ class MobileWalletTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun cancelledRefreshCannotPublishAResultAndReleasesLifecycleForDeletion() = runTest {
+    fun completedReplacementRemainsObservableWhenCancellationPrecedesCreation() = runTest {
         val gate = CompletableDeferred<Unit>()
         val published = RecordingMetadataRegistry()
         var calls = 0
@@ -1062,10 +1064,55 @@ class MobileWalletTest {
         first.cancel()
         gate.complete(Unit)
         first.join()
-        assertNull(wallet.digitalCredentialRegistration.value)
+        assertTrue(first.isCancelled)
+        assertEquals(MobileWalletCredentialRegistrationResult(true, 0), wallet.digitalCredentialRegistration.value)
         assertEquals(0, creationCalls)
         wallet.deleteWallet()
         assertEquals(0, wallet.digitalCredentialRegistration.value?.registeredEntryCount)
+    }
+
+    @Test
+    fun cancellationKeepsTheLastCompletedPresentationReplacement() = runTest {
+        val creating = CompletableDeferred<Unit>()
+        val replacing = CompletableDeferred<Unit>()
+        val published = RecordingMetadataRegistry()
+        val registry = object : MobileWalletCredentialRegistry by published {
+            override suspend fun replace(
+                registryId: String,
+                records: List<MobileWalletCredentialRegistryRecord>,
+            ): MobileWalletCredentialRegistrationResult {
+                if (creating.isCompleted) {
+                    replacing.complete(Unit)
+                    awaitCancellation()
+                }
+                return published.replace(registryId, records)
+            }
+
+            override suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult {
+                creating.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        val wallet = MobileWallet(
+            walletId = "registration-cancellation",
+            keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(),
+            credentialStore = RecordingCredentialStore(),
+            credentialRegistry = registry,
+        )
+        val first = launch { wallet.refreshDigitalCredentialRegistration() }
+        creating.await()
+        val expected = MobileWalletCredentialRegistrationResult(available = true, registeredEntryCount = 0)
+        assertEquals(expected, wallet.digitalCredentialRegistration.value)
+        first.cancelAndJoin()
+        assertEquals(expected, wallet.digitalCredentialRegistration.value)
+
+        val next = launch { wallet.refreshDigitalCredentialRegistration() }
+        replacing.await()
+        next.cancelAndJoin()
+        assertEquals(1, published.replacements.size)
+        assertEquals(expected, wallet.digitalCredentialRegistration.value)
+        wallet.close()
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

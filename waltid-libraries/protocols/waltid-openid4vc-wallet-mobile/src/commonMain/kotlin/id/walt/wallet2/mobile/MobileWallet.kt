@@ -186,8 +186,9 @@ public class MobileWallet internal constructor(
     /**
      * Last result of replacing the platform's presentation records, or null before the first attempt.
      * Credential storage commits first. Retry [refreshDigitalCredentialRegistration] to rebuild the projection.
-     * Creation-option registration and the host notification run independently. This StateFlow retains its
-     * last value after close. The host owns and cancels its collection.
+     * The completed replacement is published before creation-option registration or host notification.
+     * Cancelling either later operation preserves that result. The StateFlow retains its last value after
+     * close. The host owns and cancels its collection.
      */
     public val digitalCredentialRegistration: StateFlow<MobileWalletCredentialRegistrationResult?>
         get() = registration.state
