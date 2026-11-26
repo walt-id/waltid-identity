@@ -71,12 +71,12 @@ private struct WalletForegroundRoot: View {
             let imageCredential = Self.mockImageCredential(environment: env)
             let statusSnapshot = MockWalletClient.uiTestCredentialStatusSnapshot(env["E2E_MOCK_STATUS_JSON"])
             var seededCredentials = env["E2E_MOCK_STATUS_NOTIFICATION"] == "1" ? [
-                Credential(id: "cred-1", format: "jwt_vc_json", issuer: "Example Issuer",
-                    subject: nil, label: "Travel credential", addedAt: nil, credentialDataJSON: #"{"given_name":"Ada"}"#)
+                Credential(id: "cred-1", format: "jwt_vc_json",
+                    credentialDataJSON: #"{"given_name":"Ada"}"#, issuer: "Example Issuer", label: "Travel credential")
             ] : []
             if env["E2E_MOCK_STATUS_NOTIFICATION"] == "1", env["E2E_MOCK_STATUS_QUEUE"] == "1" {
-                seededCredentials.append(Credential(id: "photo-id-1", format: "jwt_vc_json", issuer: "Example Issuer",
-                    subject: nil, label: "Access credential", addedAt: nil, credentialDataJSON: #"{"given_name":"Ada"}"#))
+                seededCredentials.append(Credential(id: "photo-id-1", format: "jwt_vc_json",
+                    credentialDataJSON: #"{"given_name":"Ada"}"#, issuer: "Example Issuer", label: "Access credential"))
             }
             let registrationUpdate: (@Sendable () async throws -> Void)? = {}
             #else
