@@ -183,6 +183,54 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun retainedAndStatelessOffersReviewTheirSelectedServerAndTransactionCode() = runTest {
+        val browser = "https://browser.example"
+        val preAuthorized = "https://pre-authorized.example"
+        val offer = JsonObject(requireNotNull(authRequest().offerJson) + ("grants" to json.parseToJsonElement(
+            """{"authorization_code":{"authorization_server":"$browser"},"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"offered","authorization_server":"$preAuthorized","tx_code":{"length":6}}}"""
+        )))
+        for (servers in listOf(listOf(browser, preAuthorized), listOf(preAuthorized, browser))) {
+            val http = client { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false).replace(
+                        "\"credential_endpoint\":", "\"authorization_servers\":[${servers.joinToString { "\"$it\"" }}],\"credential_endpoint\":"
+                    ))
+                    "$browser/.well-known/oauth-authorization-server" ->
+                        jsonResponse(authorizationServerMetadata().replace(ISSUER, browser))
+                    "$preAuthorized/.well-known/oauth-authorization-server" ->
+                        jsonResponse(authorizationServerMetadata(authorizationCode = false).replace(ISSUER, preAuthorized))
+                    else -> error("Review only requires discovery")
+                }
+            }
+            val wallet = Wallet("review", staticKey = JWKKey.generate(KeyType.secp256r1))
+            val sessions = WalletIssuanceSessionService(wallet = wallet, httpClient = http)
+            val retained = sessions.start(authRequest().copy(offerJson = offer))
+            assertEquals(WalletIssuanceGrant.AUTHORIZATION_CODE, retained.offer.grant)
+            assertNull(retained.offer.transactionCode)
+            assertEquals(browser.removePrefix("https://"), Url(sessions.beginAuthorization(retained.id).url).host)
+            val summary = WalletIssuanceHandler.resolveOfferDetailed(ResolveOfferRequest(offerJson = offer), http)
+            assertEquals("pre-authorized_code", summary.summary.grantType)
+            assertEquals("offered", summary.summary.preAuthorizedCode)
+            assertEquals(preAuthorized.removePrefix("https://"), summary.summary.tokenEndpoint?.host)
+            assertEquals(6, summary.transactionCode?.length)
+            assertTrue(summary.summary.txCodeRequired)
+            http.close()
+        }
+    }
+
+    @Test
+    fun aSoleOfferedGrantCannotOverrideAnExplicitlyConflictingCapability() = runTest {
+        val sessions = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = true))
+                else -> error("Only discovery is expected")
+            }
+        }
+        assertFailsWith<IllegalStateException> { sessions.start(preAuthorizedRequest()) }
+    }
+
+    @Test
     fun malformedManualAttestationIsRejectedBeforeDiscoveryOrSessionPersistence() = runTest {
         val records = RecordingSessionStore()
         val provider = StaticAttestationProvider()
@@ -3079,8 +3127,8 @@ class WalletIssuanceSessionServiceTest {
           ${if (authorizationCode || !advertiseSelectedGrant) "\"authorization_endpoint\":\"$AUTHORIZATION_ENDPOINT\"," else ""}
           "token_endpoint":"$TOKEN_ENDPOINT",
           "authorization_details_types_supported":["openid_credential"],
-          "response_types_supported":["code"],
-          "grant_types_supported":["${if (authorizationCode || !advertiseSelectedGrant) "authorization_code" else "urn:ietf:params:oauth:grant-type:pre-authorized_code"}"]
+          "response_types_supported":["code"]
+          ${if (advertiseSelectedGrant) ""","grant_types_supported":["${if (authorizationCode) "authorization_code" else "urn:ietf:params:oauth:grant-type:pre-authorized_code"}"]""" else ""}
           ${if (dpop) ",\"dpop_signing_alg_values_supported\":[${(dpopAlgorithms ?: listOf("ES256")).joinToString(",") { "\"$it\"" }}]" else ""}
           ${if (responseIssuer) ",\"authorization_response_iss_parameter_supported\":true" else ""}
           ${if (anonymousPreAuthorized) ",\"pre-authorized_grant_anonymous_access_supported\":true" else ""}
