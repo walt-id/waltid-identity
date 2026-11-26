@@ -22,7 +22,7 @@ import id.walt.itb.ItbWalletInteraction
 import id.walt.itb.ItbWalletRejection
 import id.walt.itb.ItbWalletResult
 import id.walt.itb.checkStatusListReferences
-import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.credentials.WalletCredential
 import id.walt.wallet2.mobile.identity.SigningIdentityState
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResourceAfterScrolling
@@ -31,7 +31,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
 import id.walt.walletdemo.compose.logic.WalletDemoSharingReview
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.openAndroidDemoWallet
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewScreen
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewTestTags
 import io.github.oshai.kotlinlogging.DirectLoggerFactory
@@ -142,7 +142,7 @@ class ItbDemoWalletTest {
                 ItbDeviceWire.authenticate(init, token)
                 instrumentation.sendStatus(2, Bundle().apply { putString("itb_state", "wallet_setup") })
                 val origin = ItbDeviceWire.approvedOrigin(init.getValue("origin").jsonPrimitive.content)
-                val wallet = createAndroidDemoMobileWallet(context, config).wallet
+                val wallet = openAndroidDemoWallet(context, config).wallet
                 try {
                     check(wallet.credentials().isEmpty()) { "Use a fresh Preview installation for live ITB" }
                     try {
@@ -178,7 +178,7 @@ class ItbDemoWalletTest {
 private class DemoInteractions(
     private val context: Context,
     private val device: UiDevice,
-    private val readCredentials: suspend () -> List<MobileWalletCredential>,
+    private val readCredentials: suspend () -> List<WalletCredential>,
     private val attended: Boolean,
     private val itbHost: String,
 ) {
@@ -548,7 +548,7 @@ private class DemoInteractions(
 
     private suspend fun storedIds(): Set<String> = readCredentials().mapTo(mutableSetOf()) { it.id }
 
-    private suspend fun newCredential(before: Set<String>): MobileWalletCredential = withTimeout(15_000) {
+    private suspend fun newCredential(before: Set<String>): WalletCredential = withTimeout(15_000) {
         var added = readCredentials().filter { it.id !in before }
         while (added.isEmpty()) {
             delay(250)
