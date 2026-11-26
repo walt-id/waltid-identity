@@ -29,7 +29,7 @@ import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.RejectPresentationRequest
 import id.walt.wallet2.handlers.SubmitDcApiPresentationRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
-import id.walt.wallet2.handlers.WalletDeferredIssuanceReference
+import id.walt.wallet2.mobile.issuance.DeferredIssuanceId
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
 import id.walt.wallet2.handlers.WalletIssuanceContinuation
@@ -279,12 +279,12 @@ public class MobileWallet internal constructor(
      * The callback target, OAuth state, authorization code, PKCE verifier, issuer metadata, and
      * selected holder key are all taken from or checked against the authoritative session record.
      */
-    public suspend fun continueAuthorizationIssuance(
-        sessionId: MobileWalletAuthorizationId,
+    public suspend fun completeAuthorization(
+        id: MobileWalletAuthorizationId,
         callbackUri: String,
     ): WalletIssuanceOutcome = lifecycle.use {
         issuanceSessions.continueAuthorization(
-            WalletIssuanceAuthorizationCallback(sessionId = sessionId.value, callbackUri = callbackUri),
+            WalletIssuanceAuthorizationCallback(sessionId = id.value, callbackUri = callbackUri),
         ).alsoRefreshDigitalCredentialRegistration()
     }
 
@@ -300,9 +300,9 @@ public class MobileWallet internal constructor(
 
     /** Polls a typed deferred credential result returned by a previous issuance continuation. */
     public suspend fun resumeDeferredIssuance(
-        continuation: WalletDeferredIssuanceReference,
+        id: DeferredIssuanceId,
     ): WalletIssuanceOutcome = lifecycle.use {
-        issuanceSessions.resumeDeferred(continuation.id).alsoRefreshDigitalCredentialRegistration()
+        issuanceSessions.resumeDeferred(id.value).alsoRefreshDigitalCredentialRegistration()
     }
 
     /**

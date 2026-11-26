@@ -74,7 +74,7 @@ public class AndroidDigitalCredentialRegistry(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             registrationAvailable = false
             creationRegistrationAvailable = false
-            return@withLock MobileWalletCredentialRegistrationResult(false, 0, "Credential Manager requires API 23")
+            return@withLock MobileWalletCredentialRegistrationResult.Unavailable("Credential Manager requires API 23")
         }
         val immediate = records.map { it.withLocalThumbnail() }
         val result = registerRecords(registryId, immediate)
@@ -109,11 +109,7 @@ public class AndroidDigitalCredentialRegistry(
     override suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             creationRegistrationAvailable = false
-            return MobileWalletCredentialRegistrationResult(
-                available = false,
-                registeredEntryCount = 0,
-                reason = "Credential Manager requires API 23",
-            )
+            return MobileWalletCredentialRegistrationResult.Unavailable("Credential Manager requires API 23")
         }
         return runCatching {
             val matcher = applicationContext.assets.open(OPENID4VCI_MATCHER_ASSET).use { it.readBytes() }
@@ -132,15 +128,11 @@ public class AndroidDigitalCredentialRegistry(
                 ) {},
             )
             creationRegistrationAvailable = true
-            MobileWalletCredentialRegistrationResult(available = true, registeredEntryCount = 1)
+            MobileWalletCredentialRegistrationResult.Applied(1)
         }.getOrElse { error ->
             if (error is CancellationException) throw error
             creationRegistrationAvailable = false
-            MobileWalletCredentialRegistrationResult(
-                available = false,
-                registeredEntryCount = 0,
-                reason = error.message ?: error::class.simpleName ?: "Creation-option registration failed",
-            )
+            MobileWalletCredentialRegistrationResult.Unavailable(error.message ?: error::class.simpleName ?: "Creation-option registration failed")
         }
     }
 
@@ -411,15 +403,11 @@ public class AndroidDigitalCredentialRegistry(
                 )
             )
             registrationAvailable = true
-            MobileWalletCredentialRegistrationResult(true, records.map { it.registryEntryId }.distinct().size)
+            MobileWalletCredentialRegistrationResult.Applied(records.map { it.registryEntryId }.distinct().size)
         }.getOrElse { error ->
             if (error is CancellationException) throw error
             registrationAvailable = false
-            MobileWalletCredentialRegistrationResult(
-                available = false,
-                registeredEntryCount = 0,
-                reason = error.message ?: error::class.simpleName ?: "Credential registration failed",
-            )
+            MobileWalletCredentialRegistrationResult.Unavailable(error.message ?: error::class.simpleName ?: "Credential registration failed")
         }
     }
 

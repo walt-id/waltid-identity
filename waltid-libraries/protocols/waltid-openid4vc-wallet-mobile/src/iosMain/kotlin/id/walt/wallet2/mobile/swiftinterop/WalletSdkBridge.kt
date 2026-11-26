@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.wallet2.mobile.issuance.DeferredIssuanceId
 import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSessionId
 import id.walt.wallet2.mobile.issuance.MobileWalletAuthorizationId
 import id.walt.wallet2.mobile.issuance.IssuanceClientRegistration
@@ -548,7 +549,7 @@ internal class MobileWalletSdkBridgeOperations(
         sessionId: String,
         callbackUri: String,
     ): WalletIssuanceOutcome =
-        wallet.continueAuthorizationIssuance(MobileWalletAuthorizationId(sessionId), callbackUri)
+        wallet.completeAuthorization(MobileWalletAuthorizationId(sessionId), callbackUri)
 
     override suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome =
         wallet.cancelIssuance(MobileWalletIssuanceSessionId(sessionId))
@@ -556,7 +557,7 @@ internal class MobileWalletSdkBridgeOperations(
     override suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation> = wallet.listDeferredIssuance()
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome =
-        wallet.resumeDeferredIssuance(WalletIssuanceContinuation(deferredCredentialId))
+        wallet.resumeDeferredIssuance(DeferredIssuanceId(deferredCredentialId))
 
     override suspend fun credentials(): List<MobileWalletCredential> = wallet.credentials()
     override suspend fun credentialReads(): List<MobileWalletCredentialRead> = wallet.credentialReads()

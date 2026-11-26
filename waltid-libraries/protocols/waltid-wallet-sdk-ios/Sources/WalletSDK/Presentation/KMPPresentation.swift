@@ -39,16 +39,16 @@ extension MobileWalletPresentationCredentialOption {
     func toSwiftCredentialOption() throws -> PresentationCredentialOption {
         PresentationCredentialOption(
             queryID: queryId,
-            credentialID: credentialId,
-            format: format,
-            credentialDataJSON: try requiredCredentialDataJSON(credentialDataJson),
+            credentialID: credential.id,
+            format: credential.format,
+            credentialDataJSON: try requiredCredentialDataJSON(credential.credentialDataJson),
             multiple: multiple,
-            issuer: issuer,
-            subject: subject,
-            label: label,
+            issuer: credential.issuer,
+            subject: credential.subject,
+            label: credential.label,
             disclosures: try requiredBridgeArray(disclosures, of: MobileWalletPresentationDisclosure.self)
                 .map { $0.toSwiftDisclosure() },
-            metadataJSON: metadataJson
+            metadataJSON: credential.metadataJson
         )
     }
 }

@@ -110,7 +110,7 @@ class IosIdentityDocumentRegistryTest {
             )
 
             assertTrue(result.available)
-            assertEquals(2, result.registeredEntryCount)
+            assertEquals(2, result.entryCount)
             assertContentEquals(
                 listOf(
                     IosIdentityDocumentProjectionRecord("dc-a", MDL),
@@ -241,7 +241,7 @@ class IosIdentityDocumentRegistryTest {
 
             val result = registry.replace("registry-1", emptyList())
 
-            assertEquals(0, result.registeredEntryCount)
+            assertEquals(0, result.entryCount)
             // Published-and-empty, not Missing: the reconciler unregisters on the first and leaves Apple's
             // store alone on the second, and a wallet whose last mdoc was deleted means the former.
             assertEquals(emptyList(), published(suite).registrations)

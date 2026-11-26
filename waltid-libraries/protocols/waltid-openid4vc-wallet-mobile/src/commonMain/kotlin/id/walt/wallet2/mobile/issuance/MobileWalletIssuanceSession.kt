@@ -91,5 +91,5 @@ public class MobileWalletAuthorization internal constructor(
 ) {
     /** Validates the returned callback and continues issuance. */
     public suspend fun complete(callbackUri: String): WalletIssuanceOutcome =
-        wallet.continueAuthorizationIssuance(id, callbackUri)
+        wallet.completeAuthorization(id, callbackUri)
 }

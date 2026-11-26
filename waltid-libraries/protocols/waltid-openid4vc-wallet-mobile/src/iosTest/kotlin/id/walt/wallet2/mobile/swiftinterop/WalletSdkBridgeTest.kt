@@ -664,13 +664,13 @@ class WalletSdkBridgeTest {
         )
 
         events.emit(
-            MobileWalletEvent.presentation_completed
+            MobileWalletEvent.PresentationCompleted
         )
         val event = bridge.events.first()
 
-        assertEquals(MobileWalletEventPhase.presentation, event.phase)
-        assertEquals(MobileWalletEventStatus.completed, event.status)
-        assertEquals("presentation_completed", event.name)
+        assertEquals(MobileWalletEventPhase.Presentation, event.phase)
+        assertEquals(MobileWalletEventStatus.Completed, event.status)
+        assertEquals("presentation_completed", event.identifier)
     }
 
     private class FakeWalletSdkBridgeOperations(
@@ -805,13 +805,14 @@ class WalletSdkBridgeTest {
                 credentialOptions = listOf(
                     MobileWalletPresentationCredentialOption(
                         queryId = "pid",
-                        credentialId = "credential-1",
+                        credential = MobileWalletCredential(
+                            id = "credential-1",
+                            format = "vc+sd-jwt",
+                            credentialDataJson = """{"given_name":"Ada"}""",
+                            issuer = "https://issuer.example",
+                            label = "PID",
+                        ),
                         multiple = true,
-                        format = "vc+sd-jwt",
-                        issuer = "https://issuer.example",
-                        subject = null,
-                        label = "PID",
-                        credentialDataJson = """{"given_name":"Ada"}""",
                         disclosures = emptyList(),
                     )
                 ),

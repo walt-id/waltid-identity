@@ -99,7 +99,7 @@ public class IosIdentityDocumentRegistry(
      * The published state *replaces* whatever the App Group held, including another wallet's
      * projection - see [IosIdentityDocumentProjectionState].
      *
-     * [MobileWalletCredentialRegistrationResult.registeredEntryCount] counts desired registrations
+     * [MobileWalletCredentialRegistrationResult.entryCount] counts desired registrations
      * written, not registrations Apple has accepted, because applying them is Swift's job.
      *
      * [registryId] is unused: Apple's store is keyed by document identifier alone.
@@ -110,7 +110,7 @@ public class IosIdentityDocumentRegistry(
     ): MobileWalletCredentialRegistrationResult = projectionMutex.withLock {
         currentCoroutineContext().ensureActive()
         val group = appGroupIdentifier
-            ?: return@withLock MobileWalletCredentialRegistrationResult(false, 0, "An App Group is required")
+            ?: return@withLock MobileWalletCredentialRegistrationResult.Unavailable("An App Group is required")
         // Only mdoc reaches Apple: IdentityDocumentServices registers ISO mobile documents, and an
         // SD-JWT VC has no doctype to register under.
         val projection = records
@@ -125,16 +125,12 @@ public class IosIdentityDocumentRegistry(
 
         val persisted = runCatching { writeProjection(group, projection) }
         persisted.exceptionOrNull()?.let { failure ->
-            return@withLock MobileWalletCredentialRegistrationResult(
-                available = false,
-                registeredEntryCount = 0,
-                reason = failure.message ?: "Identity document projection could not be persisted",
-            )
+            return@withLock MobileWalletCredentialRegistrationResult.Unavailable(failure.message ?: "Identity document projection could not be persisted")
         }
 
-        return@withLock MobileWalletCredentialRegistrationResult(
+        return@withLock MobileWalletCredentialRegistrationResult.ProjectionSaved(
+            entryCount = projection.size,
             available = capabilities.registrationAvailable,
-            registeredEntryCount = projection.size,
             reason = unavailableReason,
         )
     }

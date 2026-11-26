@@ -236,7 +236,7 @@ public actor Wallet {
     }
 
     /// Prepares the effective claims for this selection without signing or sending credentials.
-    /// Recompute after selection changes and submit the same selection snapshot that was displayed.
+    /// Recompute after a selection change and submit the returned review after holder confirmation.
     /// - Parameters:
     ///   - previewHandle: Handle identifying the retained, wallet-bound presentation request.
     ///   - selection: The credentials and disclosures captured for this review.

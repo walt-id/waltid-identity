@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.issuance.deferredId
 import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.SdJwtExamples
@@ -275,7 +276,7 @@ class MobileWalletCredentialEncryptionTest {
         val deferred = assertIs<WalletIssuanceOutcome.Deferred>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
         kotlinx.coroutines.runBlocking { delay(1_100) }
         val outcome = assertIs<WalletIssuanceOutcome.Stored>(
-            wallet().resumeDeferredIssuance(deferred.credentials.single()),
+            wallet().resumeDeferredIssuance(deferred.credentials.single().deferredId),
         )
         val stored = requireNotNull(credentials.getCredential(outcome.credentialIds.single()))
 

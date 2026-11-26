@@ -124,7 +124,7 @@ internal class ScaPaymentE2ETest : DigitalCredentialSharingE2E() {
             assertEquals(active, provisionedWallet.signingIdentity.state())
             assertEquals(provisionedCredentialIds, provisionedWallet.credentials().map { it.id }.toSet())
             val registration = provisionedWallet.refreshDigitalCredentialRegistration()
-            check(registration.available && registration.registeredEntryCount == 1) { "Credential registration failed: $registration" }
+            check(registration.available && registration.entryCount == 1) { "Credential registration failed: $registration" }
             device.pressHome()
         }
     }
