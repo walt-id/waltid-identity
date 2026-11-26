@@ -41,9 +41,11 @@ class W3CContextParsingTest {
                 val payload = JsonObject(mapOf("iss" to JsonPrimitive("did:example:issuer"), "vc" to wrapper))
                 val parsed = CredentialParser.parseOnly(token(payload))
                 assertEquals("did:example:issuer", parsed.issuer)
+                assertEquals("did:example:holder", parsed.subject)
                 assertEquals(payload, assertIs<SelectivelyDisclosableVerifiableCredential>(parsed).originalCredentialData)
                 val innerOnly = CredentialParser.parseOnly(token(JsonObject(mapOf("vc" to wrapper))))
                 assertEquals("did:example:issuer", innerOnly.issuer)
+                assertEquals("did:example:holder", innerOnly.subject)
                 assertFailsWith<IllegalArgumentException> {
                     CredentialParser.parseOnly(token(JsonObject(payload + ("iss" to JsonPrimitive("did:example:other")))))
                 }
