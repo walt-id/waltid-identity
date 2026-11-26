@@ -52,6 +52,11 @@ continue to use `import WalletSDK`. Xcode may also embed `WalletSDK.framework` w
 depends on the SDK. Check the archived application and extension together with
 `python3 scripts/check-shared-runtime.py <path/to/App.app> <path/to/Provider.appex>` from this package.
 
+An app-hosted XCTest bundle that imports `WalletCore` directly can also link a static copy of the
+Kotlin runtime. For that test target, add `-Xfrontend -disable-autolink-framework -Xfrontend WalletCore`
+to **Other Swift Flags** so the bundle uses the framework loaded by its host. The same packaging
+check on a build for testing inspects the embedded test bundles.
+
 For a single-executable app using Keychain recovery or enterprise custody, select
 `WalletSDKKeychainRecoveryStatic` or `WalletSDKEnterpriseCustodyStatic` to link the adapter
 into the executable. Use one product per adapter. The imports and provider registration calls

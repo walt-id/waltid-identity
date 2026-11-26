@@ -4,6 +4,7 @@
 import argparse
 from pathlib import Path
 import plistlib
+import re
 import subprocess
 
 
@@ -13,11 +14,15 @@ def linked_wallet_frameworks(image):
     return {Path(path.removeprefix("@rpath/")) for path in paths if path.startswith("@rpath/WalletSDK")}
 
 
-def wallet_runtime(bundle, frameworks):
+def executable_images(bundle):
     with (bundle / "Info.plist").open("rb") as info:
         executable = plistlib.load(info)["CFBundleExecutable"]
     # Xcode can put the executable's code and dependencies in a sibling dylib in Debug.
-    images = [bundle / executable, *bundle.glob(f"{executable}.debug.dylib")]
+    return [bundle / executable, *bundle.glob(f"{executable}.debug.dylib")]
+
+
+def wallet_runtime(bundle, frameworks):
+    images = executable_images(bundle)
     loaded = set()
     while images:
         for dependency in linked_wallet_frameworks(images.pop()) - loaded:
@@ -27,6 +32,12 @@ def wallet_runtime(bundle, frameworks):
             loaded.add(dependency)
             images.append(image)
     return loaded
+
+
+def defines_wallet_core(image):
+    # Objective-C class definitions survive symbol stripping in a release archive.
+    metadata = subprocess.check_output(["xcrun", "dyld_info", "-objc", str(image)], text=True)
+    return re.search(r"^\s*@interface WalletCoreBase\s*:", metadata, re.MULTILINE) is not None
 
 
 def main():
@@ -41,9 +52,21 @@ def main():
     runtime = Path("WalletSDK.framework/WalletSDK")
     if not (frameworks / runtime).is_file():
         runtime = Path("WalletSDKShared.framework/WalletSDKShared")
+    runtime_image = frameworks / runtime
+    consumer_images = set()
     for bundle in (args.app, args.extension):
-        if runtime not in wallet_runtime(bundle, frameworks):
+        dependencies = wallet_runtime(bundle, frameworks)
+        if runtime not in dependencies:
             raise SystemExit(f"{bundle.name} does not load the shared runtime {runtime}")
+        consumer_images.update(executable_images(bundle))
+        consumer_images.update(frameworks / path for path in dependencies)
+    for test_bundle in (args.app / "PlugIns").glob("*.xctest"):
+        consumer_images.update(executable_images(test_bundle))
+    if not defines_wallet_core(runtime_image):
+        raise SystemExit(f"{runtime_image} does not contain WalletCore")
+    for image in sorted(consumer_images - {runtime_image}):
+        if defines_wallet_core(image):
+            raise SystemExit(f"{image} links a second copy of WalletCore alongside {runtime}")
     print(f"{args.app.name} and {args.extension.name} load {runtime}")
 
 

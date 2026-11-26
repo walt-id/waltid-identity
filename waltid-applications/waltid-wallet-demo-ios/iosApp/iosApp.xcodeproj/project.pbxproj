@@ -1273,7 +1273,8 @@
 		D6B7A3502FD94CC3009C69E7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS";
+				/* Resolve Kotlin types from the wallet framework already loaded by the test host. */
+				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS -Xfrontend -disable-autolink-framework -Xfrontend WalletCore";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1299,7 +1300,8 @@
 		D6B7A3512FD94CC3009C69E7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS";
+				/* Resolve Kotlin types from the wallet framework already loaded by the test host. */
+				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS -Xfrontend -disable-autolink-framework -Xfrontend WalletCore";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
