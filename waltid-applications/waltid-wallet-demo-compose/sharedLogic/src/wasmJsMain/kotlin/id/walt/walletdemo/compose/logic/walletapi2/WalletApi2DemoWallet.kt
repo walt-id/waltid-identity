@@ -142,11 +142,12 @@ internal class WalletApi2DemoWallet(
     ): WalletDemoIssuanceAuthorization = withIssuance(sessionId) { session ->
         val selections = prepareSelections(sessionId, credentials)
         val configurationIds = selections.map { it.credentialConfigurationId }
-        val result = client.authorizationUrl(walletId, session.offerUrl, redirectUri.ifBlank { session.redirectUri }, configurationIds)
+        val registeredRedirectUri = redirectUri.ifBlank { session.redirectUri }
+        val result = client.authorizationUrl(walletId, session.offerUrl, registeredRedirectUri, configurationIds)
         check(result.credentialConfigurationIds.toSet() == configurationIds.toSet()) { "Authorization changed the selected configurations" }
         checkIssuanceActive(sessionId)
         val updated = session.copy(
-            redirectUri = redirectUri.ifBlank { session.redirectUri },
+            redirectUri = registeredRedirectUri,
             codeVerifier = result.codeVerifier,
             authorizationState = result.state,
             credentials = selections,

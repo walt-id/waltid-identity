@@ -52,13 +52,13 @@ class WalletApi2IssuanceOwnershipTest {
         withFixture {
             val session = start(authorization = true)
             val pause = pauseRequests { request -> request.url.encodedPath.endsWith("authorization-url/batch") }
-            val pending = async { runCatching { wallet.beginAuthorizationIssuance(session, "openid://", copies()) } }
+            val pending = async { runCatching { wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies()) } }
             pause.entered.await()
             wallet.cancelIssuance(session)
             pause.release.complete(Unit)
             assertTrue(pending.await().isFailure)
             assertNull(wallet.pendingAuthorizationIssuance())
-            assertFailsWith<IllegalStateException> { wallet.beginAuthorizationIssuance(session, "openid://", copies()) }
+            assertFailsWith<IllegalStateException> { wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies()) }
             assertTrue(deletedKeys.isEmpty(), "Accepted keys may already be in use and must be retained")
         }
     }
@@ -157,7 +157,7 @@ class WalletApi2IssuanceOwnershipTest {
         withFixture {
             val older = start()
             val newer = start(authorization = true)
-            wallet.beginAuthorizationIssuance(newer, "openid://", copies())
+            wallet.beginAuthorizationIssuance(newer, BROWSER_REDIRECT_URI, copies())
             assertIs<WalletDemoIssuanceOutcome.Stored>(wallet.continuePreAuthorizedIssuance(older, null, copies()))
             assertEquals(newer, assertNotNull(wallet.pendingAuthorizationIssuance()).id)
             wallet.cancelIssuance(older)
@@ -169,16 +169,20 @@ class WalletApi2IssuanceOwnershipTest {
     fun browserRestorationUsesAcceptedBindingsForAuthorizationCallback() = runTest {
         withFixture {
             val session = start(authorization = true)
-            wallet.beginAuthorizationIssuance(session, "openid://", copies())
-            val accepted = assertNotNull(WalletApi2BrowserSessionStore.loadPendingIssuance()).credentials
+            val registeredRedirectUri = "https://wallet.example/authorized"
+            wallet.beginAuthorizationIssuance(session, registeredRedirectUri, copies())
+            val accepted = assertNotNull(WalletApi2BrowserSessionStore.loadPendingIssuance())
+            assertEquals(registeredRedirectUri, accepted.redirectUri)
             val restored = newWallet()
             assertEquals(session, assertNotNull(restored.pendingAuthorizationIssuance()).id)
             assertIs<WalletDemoIssuanceOutcome.Stored>(
-                restored.continueAuthorizationIssuance(session, "https://wallet.example/callback?code=code&state=state"),
+                restored.continueAuthorizationIssuance(session, "$registeredRedirectUri?code=code&state=state"),
             )
             assertEquals(2, generatedKeys)
-            val bindings = receiveBodies.single()["credentials"]!!.jsonArray.single().jsonObject["holderBindings"]!!.jsonArray
-            assertEquals(accepted.single().holderBindings.map { it.keyId }, bindings.map { it.jsonObject["keyId"].toString().trim('"') })
+            val receive = receiveBodies.single()
+            assertEquals(registeredRedirectUri, receive.getValue("redirectUri").jsonPrimitive.content)
+            val bindings = receive["credentials"]!!.jsonArray.single().jsonObject["holderBindings"]!!.jsonArray
+            assertEquals(accepted.credentials.single().holderBindings.map { it.keyId }, bindings.map { it.jsonObject["keyId"].toString().trim('"') })
             assertNull(WalletApi2BrowserSessionStore.loadPendingIssuance())
             assertTrue(deletedKeys.isEmpty())
         }
@@ -221,7 +225,7 @@ class WalletApi2IssuanceOwnershipTest {
     fun admittedResetRejectsNewOperationsAndConcurrentReset() = runTest {
         withFixture {
             val session = start(authorization = true)
-            wallet.beginAuthorizationIssuance(session, "openid://", copies())
+            wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies())
             val pause = pauseRequests { request -> request.method == HttpMethod.Delete && request.url.encodedPath == "/wallet/wallet" }
             val reset = async { wallet.deleteWallet() }
             pause.entered.await()
@@ -232,9 +236,9 @@ class WalletApi2IssuanceOwnershipTest {
                 { wallet.listCredentials() },
                 { wallet.listDeferredIssuance() },
                 { start() },
-                { wallet.beginAuthorizationIssuance(session, "openid://", copies()) },
+                { wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies()) },
                 { wallet.continuePreAuthorizedIssuance(session, null, copies()) },
-                { wallet.continueAuthorizationIssuance(session, "https://wallet.example/callback?code=code&state=state") },
+                { wallet.continueAuthorizationIssuance(session, "$BROWSER_REDIRECT_URI?code=code&state=state") },
                 { wallet.resumeDeferredIssuance("deferred") },
                 { wallet.previewPresentation("request") },
                 { wallet.submitPresentation(handle, emptyList(), emptyList(), null) },
@@ -250,7 +254,7 @@ class WalletApi2IssuanceOwnershipTest {
                 pause.release.complete(Unit)
             }
             reset.await()
-            assertFailsWith<IllegalStateException> { wallet.beginAuthorizationIssuance(session, "openid://", copies()) }
+            assertFailsWith<IllegalStateException> { wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies()) }
         }
     }
 
@@ -258,7 +262,7 @@ class WalletApi2IssuanceOwnershipTest {
     fun deletionFailureClosesWalletUntilExplicitResetRetry() = runTest {
         withFixture {
             val session = start(authorization = true)
-            wallet.beginAuthorizationIssuance(session, "openid://", copies())
+            wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies())
             failWalletDelete = true
             assertFailsWith<WalletApi2Exception> { wallet.deleteWallet() }
             assertEquals(0, walletCreates)
@@ -322,12 +326,12 @@ class WalletApi2IssuanceOwnershipTest {
     fun authorizationCallbackIsNotDeliveredToADifferentWallet() = runTest {
         withFixture {
             val session = start(authorization = true)
-            wallet.beginAuthorizationIssuance(session, "openid://", copies(1))
+            wallet.beginAuthorizationIssuance(session, BROWSER_REDIRECT_URI, copies(1))
             assertEquals("wallet", WalletApi2BrowserSessionStore.loadPendingIssuance()?.walletId)
             val other = walletFor("other-wallet")
             assertNull(other.pendingAuthorizationIssuance())
             assertFailsWith<IllegalStateException> {
-                other.continueAuthorizationIssuance(session, "https://wallet.example/callback?code=code&state=state")
+                other.continueAuthorizationIssuance(session, "$BROWSER_REDIRECT_URI?code=code&state=state")
             }
             assertEquals(session, wallet.pendingAuthorizationIssuance()?.id)
             assertTrue(receiveBodies.isEmpty())
@@ -366,14 +370,14 @@ class WalletApi2IssuanceOwnershipTest {
             WalletApi2Client("https://wallet-api.example", "token", WalletApiKind.Enterprise, http),
             WalletApiKind.Enterprise,
             "tenant.wallet",
-            "https://wallet.example/callback",
+            BROWSER_REDIRECT_URI,
         ) {}
         try {
             val identity = wallet.bootstrap(WalletDemoSigningProtection.None)
             assertEquals("key-1", identity.keyId)
             assertEquals("did:jwk:one", identity.did)
             assertTrue(identity.publicJwk.contains("x1"))
-            val session = wallet.startIssuance("openid-credential-offer://offer", "https://wallet.example/callback", identity.did)
+            val session = wallet.startIssuance("openid-credential-offer://offer", BROWSER_REDIRECT_URI, identity.did)
             assertEquals(2, session.preview.batchSize)
             assertEquals(2, session.preview.holderKeyBudget)
             assertFailsWith<IllegalArgumentException> { wallet.continuePreAuthorizedIssuance(session.id, null, copies(3)) }
@@ -490,20 +494,22 @@ class WalletApi2IssuanceOwnershipTest {
             client,
             WalletApiKind.OpenSource,
             id,
-            "https://wallet.example/callback",
+            BROWSER_REDIRECT_URI,
         ) {}
         fun newWallet() = WalletApi2DemoWallet(
             client,
             WalletApiKind.OpenSource,
             "wallet",
-            "https://wallet.example/callback",
+            BROWSER_REDIRECT_URI,
         ) { id ->
             publishedWalletIds += id
             check(!failPublication) { "Browser storage unavailable" }
         }
         suspend fun start(authorization: Boolean = false): String {
             authorizationOffer = authorization
-            return wallet.startIssuance("openid-credential-offer://offer", "https://wallet.example/callback", "did:example:holder").id
+            return wallet.startIssuance("openid-credential-offer://offer", BROWSER_REDIRECT_URI, "did:example:holder").id
         }
     }
 }
+
+private const val BROWSER_REDIRECT_URI = "https://wallet.example/callback"
