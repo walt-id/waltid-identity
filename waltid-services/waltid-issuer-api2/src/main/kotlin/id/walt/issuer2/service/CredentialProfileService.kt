@@ -6,6 +6,7 @@ import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.CredentialStatusConfiguration
 import id.walt.openid4vci.CredentialFormat
+import id.walt.credentials.issuance.MdlAgeValidation
 import id.walt.credentials.issuance.MdlLoginClaimMapping
 import id.walt.mdoc.issuance.MdlAge
 import id.walt.mdoc.issuance.MsoData
@@ -80,7 +81,12 @@ class CredentialProfileService(
         canUseLoginClaims: Boolean = true,
     ) {
         if (isMdl(configurationId)) {
-            MdlAgeValidation.validate(credentialData, mapping, idTokenClaimsMapping, msoData?.validFrom, canUseLoginClaims)
+            MdlAgeValidation.validateConfiguration(
+                credentialData = credentialData,
+                mapping = mapping,
+                loginClaimDestinations = if (canUseLoginClaims) idTokenClaimsMapping.orEmpty().values else emptyList(),
+                validFrom = msoData?.validFrom,
+            )
         }
     }
 

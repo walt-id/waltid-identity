@@ -1,5 +1,6 @@
 package id.walt.issuer2.service
 
+import id.walt.credentials.issuance.MdlAgeValidation
 import id.walt.issuer2.config.CredentialProfileConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
@@ -250,16 +251,15 @@ class CredentialProfileServiceTest {
     fun `pre-authorized age validation rejects direct and namespace login sources`() {
         val data = buildJsonObject { putJsonObject(MdlAge.NAMESPACE) {} }
         val mapping = buildJsonObject {
-            putJsonObject(MdlAge.NAMESPACE) { put("age_in_years", MdlAge.AGE_MAPPING) }
+            putJsonObject(MdlAge.NAMESPACE) { put("age_in_years", 36) }
         }
         for (destination in listOf(
             "$.['${MdlAge.NAMESPACE}'].birth_date",
             "$.['${MdlAge.NAMESPACE}']",
         )) {
-            val claims = mapOf("$.birthdate" to destination)
-            MdlAgeValidation.validate(data, mapping, claims, "2027-08-25T00:00:00Z", true)
+            MdlAgeValidation.validateConfiguration(data, mapping, listOf(destination), "2027-08-25T00:00:00Z")
             val error = assertFailsWith<IllegalArgumentException> {
-                MdlAgeValidation.validate(data, mapping, claims, "2027-08-25T00:00:00Z", false)
+                MdlAgeValidation.validateConfiguration(data, mapping, emptyList(), "2027-08-25T00:00:00Z")
             }
             assertTrue(error.message.orEmpty().contains("credentialData.${MdlAge.NAMESPACE}.birth_date"))
         }

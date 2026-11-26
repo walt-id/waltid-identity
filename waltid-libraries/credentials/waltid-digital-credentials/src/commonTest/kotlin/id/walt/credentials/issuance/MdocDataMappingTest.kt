@@ -2,6 +2,7 @@ package id.walt.credentials.issuance
 
 import id.walt.mdoc.issuance.MdlAge
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -11,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.time.Instant
 
 class MdocDataMappingTest {
@@ -21,14 +23,14 @@ class MdocDataMappingTest {
     }
     private val mapping = buildJsonObject {
         putJsonObject(MdlAge.NAMESPACE) {
-            put(MdlAge.AGE_IN_YEARS, MdlAge.AGE_MAPPING)
+            put(MdlAge.AGE_IN_YEARS, 37)
             put(MdlAge.BIRTH_DATE, "1990-08-26")
             put("issued_at", "<timestamp>")
         }
     }
 
     @Test
-    fun derivesMdlAgeFromMappedBirthDateAndUsesTheIssuanceClockForTemplates() = runTest {
+    fun validatesSuppliedAgeAgainstMappedBirthDateAndUsesTheIssuanceClockForTemplates() = runTest {
         val resolved = MdocDataMapping.resolve(
             credentialData = data,
             dataMapping = mapping,
@@ -43,16 +45,40 @@ class MdocDataMappingTest {
     }
 
     @Test
-    fun appliesOrdinaryTemplateRulesToOtherDocumentTypes() = runTest {
+    fun leavesAgeAbsentWhenOmitted() = runTest {
+        val resolved = MdocDataMapping.resolve(data, null, MdlAge.DOC_TYPE, validFrom, InstantClock(issuedAt)) { emptyMap() }
+        assertSame(data, resolved)
+    }
+
+    @Test
+    fun rejectsWrongAgeAfterMapping() = runTest {
         val error = assertFailsWith<IllegalArgumentException> {
             MdocDataMapping.resolve(
                 credentialData = data,
                 dataMapping = mapping,
-                docType = "org.example.document",
-                validFrom = validFrom,
+                docType = MdlAge.DOC_TYPE,
+                validFrom = issuedAt,
                 clock = InstantClock(issuedAt),
             ) { emptyMap() }
         }
-        assertContains(error.message.orEmpty(), "Unknown dynamic data function \"age-in-years\"")
+        assertContains(error.message.orEmpty(), "credentialData.${MdlAge.NAMESPACE}.age_in_years must be 36")
+    }
+
+    @Test
+    fun rejectsInvalidAgeWithoutMappingAndLeavesOtherDocTypesAlone() = runTest {
+        for (age in listOf(JsonPrimitive(37), JsonPrimitive("39"), JsonNull)) {
+            val supplied = buildJsonObject {
+                putJsonObject(MdlAge.NAMESPACE) {
+                    put(MdlAge.BIRTH_DATE, "1988-08-25")
+                    put(MdlAge.AGE_IN_YEARS, age)
+                }
+            }
+            val error = assertFailsWith<IllegalArgumentException> {
+                MdocDataMapping.resolve(supplied, null, MdlAge.DOC_TYPE, validFrom, InstantClock(issuedAt)) { emptyMap() }
+            }
+            assertContains(error.message.orEmpty(), "credentialData.${MdlAge.NAMESPACE}.age_in_years")
+            val other = MdocDataMapping.resolve(supplied, null, "org.example.document", validFrom, InstantClock(issuedAt)) { emptyMap() }
+            assertSame(supplied, other)
+        }
     }
 }

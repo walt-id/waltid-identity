@@ -5,8 +5,6 @@ import id.walt.credentials.issuance.CredentialDataMergeUtils.mergeMdocPayloadWit
 import id.walt.mdoc.issuance.MdlAge
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -20,29 +18,19 @@ object MdocDataMapping {
         clock: Clock,
         context: () -> Map<String, JsonElement>,
     ): JsonObject {
-        val namespaceMapping = dataMapping?.mdocNamespaceMapping(credentialData) ?: return credentialData
-        val mdlAgeMapping = (namespaceMapping[MdlAge.NAMESPACE] as? JsonObject)?.takeIf {
-            docType == MdlAge.DOC_TYPE && it[MdlAge.AGE_IN_YEARS] == JsonPrimitive(MdlAge.AGE_MAPPING)
+        val namespaceMapping = dataMapping?.mdocNamespaceMapping(credentialData)
+        val mappedData = namespaceMapping?.let {
+            credentialData.mergeMdocPayloadWithMapping(
+                mapping = it,
+                context = context(),
+                data = dataFunctionsFor(clock),
+            )
+        } ?: credentialData
+        if (docType == MdlAge.DOC_TYPE) {
+            (mappedData[MdlAge.NAMESPACE] as? JsonObject)?.let {
+                MdlAge.validate(it, validFrom, "credentialData.${MdlAge.NAMESPACE}")
+            }
         }
-        val mapping = if (mdlAgeMapping == null) {
-            namespaceMapping
-        } else {
-            val otherElements = JsonObject(mdlAgeMapping - MdlAge.AGE_IN_YEARS)
-            JsonObject(namespaceMapping + (MdlAge.NAMESPACE to otherElements))
-        }
-        val mappedData = credentialData.mergeMdocPayloadWithMapping(
-            mapping = mapping,
-            context = context(),
-            data = dataFunctionsFor(clock),
-        )
-        if (mdlAgeMapping == null) return mappedData
-
-        // Derive age from the final birth date and the MSO validity start.
-        val mdlData = mappedData.getValue(MdlAge.NAMESPACE).jsonObject
-        val birthDatePath = "credentialData.${MdlAge.NAMESPACE}.${MdlAge.BIRTH_DATE}"
-        val birthDate = MdlAge.parseBirthDate(mdlData[MdlAge.BIRTH_DATE], birthDatePath)
-        val age = MdlAge.completedYears(birthDate, validFrom, birthDatePath)
-        val mdlDataWithAge = JsonObject(mdlData + (MdlAge.AGE_IN_YEARS to JsonPrimitive(age)))
-        return JsonObject(mappedData + (MdlAge.NAMESPACE to mdlDataWithAge))
+        return mappedData
     }
 }

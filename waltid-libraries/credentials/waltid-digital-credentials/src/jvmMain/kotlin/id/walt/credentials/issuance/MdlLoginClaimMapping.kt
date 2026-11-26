@@ -10,10 +10,14 @@ import kotlinx.serialization.json.JsonPrimitive
 /** The mDL destinations a configured external login can populate. */
 class MdlLoginClaimMapping private constructor(
     private val mapsBirthDate: Boolean,
+    private val mapsAge: Boolean,
     private val mapsNamespace: Boolean,
 ) {
     val canSupplyBirthDate: Boolean
         get() = mapsBirthDate || mapsNamespace
+
+    internal val canSupplyAge: Boolean
+        get() = mapsAge || mapsNamespace
 
     /** Supply a temporary value for the JSONPath mapper, which writes into existing destinations. */
     fun prepareDestination(credentialData: JsonObject): JsonObject {
@@ -35,6 +39,7 @@ class MdlLoginClaimMapping private constructor(
     companion object {
         private const val NAMESPACE_PATH = "$['${MdlAge.NAMESPACE}']"
         private const val BIRTH_DATE_PATH = "$NAMESPACE_PATH['${MdlAge.BIRTH_DATE}']"
+        private const val AGE_PATH = "$NAMESPACE_PATH['${MdlAge.AGE_IN_YEARS}']"
 
         fun forDestinations(paths: Collection<String>): MdlLoginClaimMapping {
             val targets = paths.mapNotNullTo(mutableSetOf()) { path ->
@@ -44,7 +49,7 @@ class MdlLoginClaimMapping private constructor(
                     null
                 }
             }
-            return MdlLoginClaimMapping(BIRTH_DATE_PATH in targets, NAMESPACE_PATH in targets)
+            return MdlLoginClaimMapping(BIRTH_DATE_PATH in targets, AGE_PATH in targets, NAMESPACE_PATH in targets)
         }
     }
 }

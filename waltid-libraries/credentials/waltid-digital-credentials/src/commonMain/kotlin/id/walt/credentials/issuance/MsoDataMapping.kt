@@ -56,7 +56,7 @@ object MsoDataMapping {
         return parseInstant(resolved, fieldName)
     }
 
-    private fun parseInstant(element: JsonElement, fieldName: String): Instant {
+    internal fun parseInstant(element: JsonElement, fieldName: String): Instant {
         val primitive = element as? JsonPrimitive
             ?: throw IllegalArgumentException("msoData.$fieldName must resolve to a timestamp")
         primitive.longOrNull?.let { return Instant.fromEpochSeconds(it) }
