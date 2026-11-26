@@ -39,12 +39,12 @@ class WalletIssuanceSessionState(
     private val challengeSweepInterval = 1.minutes
     private val challengeAccess = mutableMapOf<ChallengeScope, Long>()
     @Serializable
-    private data class ChallengeScope(val issuer: String, val clientId: String, val keyThumbprint: String, val flowId: String)
+    private data class ChallengeScope(val issuer: String, val clientId: String?, val keyThumbprint: String, val flowId: String)
     @Serializable
     private data class PersistedFreshness(val scope: ChallengeScope, val challenge: String?, val dpopNonce: String?, val prepared: Boolean = false)
 
     internal suspend fun challengeContext(
-        issuer: String, clientId: String, keyThumbprint: String,
+        issuer: String, clientId: String?, keyThumbprint: String,
         initialChallenge: String? = null, initialDpopNonce: String? = null,
         flowId: String,
     ): ClientAttestationChallengeContext = challengeMutex.withLock {

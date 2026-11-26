@@ -26,11 +26,14 @@ data class CredentialOffer(
         validateCredentialIssuer(credentialIssuer)
     }
 
-    fun getGrantType(): GrantType? = when {
-        grants?.authorizationCode != null -> GrantType.AuthorizationCode
-        grants?.preAuthorizedCode != null -> GrantType.PreAuthorizedCode
-        else -> null
+    /** All explicitly offered grants in wallet preference order. An empty list requires discovery. */
+    fun getGrantTypes(): List<GrantType> = buildList {
+        if (grants?.authorizationCode != null) add(GrantType.AuthorizationCode)
+        if (grants?.preAuthorizedCode != null) add(GrantType.PreAuthorizedCode)
     }
+
+    /** Preferred explicitly offered grant for callers that support a single choice. */
+    fun getGrantType(): GrantType? = getGrantTypes().firstOrNull()
 
     companion object {
         fun withAuthorizationCodeGrant(
@@ -95,13 +98,7 @@ data class CredentialOfferGrants(
     val authorizationCode: AuthorizationCodeGrant? = null,
     @SerialName(GRANT_TYPE_PRE_AUTHORIZED_CODE)
     val preAuthorizedCode: PreAuthorizedCodeGrant? = null,
-) {
-    init {
-        require(!(authorizationCode != null && preAuthorizedCode != null)) {
-            "Credential offer grants must not include both authorization_code and pre-authorized_code"
-        }
-    }
-}
+)
 
 @Serializable
 data class AuthorizationCodeGrant(
