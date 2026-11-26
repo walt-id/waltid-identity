@@ -33,6 +33,7 @@ import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
+import id.walt.policies2.vp.policies.HolderBindingJwtVcJsonVPPolicy
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.transactiondata.decodeList
@@ -230,7 +231,14 @@ object PresentationVerificationEngine {
                 verificationTime = verificationTime,
             )
 
-            query.id to policyResults
+            // DCQL holder binding is mandatory even when custom policies replace the defaults.
+            val binding = HolderBindingJwtVcJsonVPPolicy()
+            // Missing vp is rejected by the structural guard before credentials are published below.
+            val enforcedResults = if (presentation is JwtVcJsonPresentation && presentation.vp != null &&
+                query.requireCryptographicHolderBinding && binding.id !in policyResults) {
+                policyResults + (binding.id to binding.runPolicy(presentation, null))
+            } else policyResults
+            query.id to enforcedResults
         }
 
         return combinePolicyResultsByQuery(verifiedPresentations)
