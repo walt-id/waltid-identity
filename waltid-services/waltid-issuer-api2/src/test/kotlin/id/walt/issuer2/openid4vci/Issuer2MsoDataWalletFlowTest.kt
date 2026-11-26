@@ -79,6 +79,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import java.time.LocalDate
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -278,11 +279,10 @@ class Issuer2MsoDataWalletFlowTest {
         val body = rejected.bodyAsText()
         assertEquals(HttpStatusCode.InternalServerError, rejected.status, body)
         assertTrue(body.contains("server_error"), body)
-        redeem(
-            offer(assertNotNull(Issuer2RequestExamples.PRE_AUTHORIZED_MDL_OFFER_WITH_AGE_OVERRIDE.runtimeOverrides)),
-            age = 36,
-            validFrom = birthday,
-        )
+        val documentedOffer = Issuer2RequestExamples.preAuthorizedMdlOfferWithAgeOverride(LocalDate.parse("2027-08-25"))
+        val documentedOverrides = assertNotNull(documentedOffer.runtimeOverrides)
+        assertNull(documentedOverrides.msoData)
+        redeem(offer(documentedOverrides), age = 36, validFrom = birthday)
         redeem(
             offer(CredentialOfferRuntimeOverrides(
                 mapping = buildJsonObject {

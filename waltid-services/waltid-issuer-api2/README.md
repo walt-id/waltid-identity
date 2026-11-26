@@ -77,8 +77,8 @@ Configuration files live in `config/`:
 | `authentication-service.conf` | External OAuth login for credential subjects in authorization code flows |
 
 The bundled mDL profiles omit optional `age_in_years`. The Swagger mDL age override
-example supplies an integer with a birth date and a fixed `msoData.validFrom`.
-Use the holder's completed years on the UTC date of your own MSO validity start.
+example supplies the age in completed years for its sample birth date on the current UTC date.
+When the profile and offer omit `msoData.validFrom`, validity starts at the MSO signing timestamp.
 
 Set `KEYCLOAK_CLIENT_SECRET` to the Keycloak client secret when using
 external OAuth authentication. The service and Docker Compose configuration files

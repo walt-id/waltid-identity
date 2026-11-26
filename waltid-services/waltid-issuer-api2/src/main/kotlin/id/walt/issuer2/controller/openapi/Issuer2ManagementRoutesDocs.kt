@@ -113,6 +113,7 @@ object Issuer2ManagementRoutesDocs {
             - The mDL `age_in_years` claim is optional. Supply it as a nonnegative integer in the profile or
               runtime overrides. The issuer checks it against the final `birth_date` and the UTC date of MSO
               `validFrom` before signing. Offers with fixed values are also checked at creation.
+              Leave `msoData.validFrom` unset in the profile and offer to start validity at the MSO signing timestamp.
             - Non-empty `runtimeOverrides.msoData` is accepted only for `mso_mdoc`. Blank validity values are rejected.
               Null `expectedUpdate` clears the profile value; null `validFrom` or `validUntil` inherits it.
             - Validity must satisfy `signed <= validFrom < validUntil`. `expectedUpdate` is optional;
