@@ -34,8 +34,7 @@ Apps that own database-key recovery can pass ``WalletPersistence`` with
 ``WalletDatabaseKeyProvider`` implementation.
 
 Apps can provide ``WalletPersistence/credentialStore`` or ``WalletPersistence/didStore`` when they own credential or DID durability.
-Omitted stores use the encrypted local database. Signing keys are always
-platform-managed and remain in the iOS Keychain. Credential and DID stores can
+Omitted stores use the encrypted local database. The signing identity’s `storage` records whether its key uses hardware, native storage or the encrypted database. Credential and DID stores can
 be supplied independently. This example assumes app-defined store types that
 implement the corresponding protocols.
 

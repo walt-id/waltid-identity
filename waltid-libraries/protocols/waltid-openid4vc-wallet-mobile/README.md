@@ -43,6 +43,11 @@ session and its lifecycle. Import feature types from these packages under `id.wa
 | [proximity.trust](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity/trust) | Reader trust, revocation policies and saved trust settings |
 | [digitalcredentials](src/commonMain/kotlin/id/walt/wallet2/mobile/digitalcredentials) | OS registration, digital credential requests and Annex C responses |
 
+For example, import `id.walt.wallet2.mobile.issuance.IssuanceRequest` to start issuance
+and `id.walt.wallet2.mobile.presentation.PresentationSelection` to review a holder’s choices.
+Some results expose shared Wallet2 types directly. The grant’s client-identification policy
+uses `id.walt.wallet2.handlers.IssuanceClientIdentification`.
+
 Configuration captures device language preferences by default on Android and iOS. Pass
 an explicit empty list to skip preferred-language lookup. Key protection, issuer integrations,
 verifier trust and OS credential registration each have their own settings. Opening a default

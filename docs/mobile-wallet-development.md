@@ -133,11 +133,13 @@ Kotlin:
 ```kotlin
 WalletConfiguration(
     walletId = "consumer-wallet",
-    walletProvider = WalletProviderConfig(
-        baseUrl = "https://{org}.enterprise-sandbox.waltid.dev",
-        servicePath = "{org}.{tenant}.wallet-provider",
-        bearerToken = enterpriseSessionToken,
-        composition = WalletProviderConfig.Composition.WalletInstanceAndKey,
+    issuance = IssuanceConfiguration(
+        walletProvider = WalletProviderConfig(
+            baseUrl = "https://{org}.enterprise-sandbox.waltid.dev",
+            servicePath = "{org}.{tenant}.wallet-provider",
+            bearerToken = enterpriseSessionToken,
+            composition = WalletProviderConfig.Composition.WalletInstanceAndKey,
+        ),
     ),
 )
 ```
@@ -147,11 +149,13 @@ Swift:
 ```swift
 WalletConfiguration(
     walletID: "consumer-wallet",
-    walletProvider: WalletProviderConfiguration(
-        baseURL: "https://{org}.enterprise-sandbox.waltid.dev",
-        servicePath: "{org}.{tenant}.wallet-provider",
-        bearerToken: enterpriseSessionToken,
-        composition: .walletInstanceAndKey
+    issuance: .init(
+        walletProvider: WalletProviderConfiguration(
+            baseURL: "https://{org}.enterprise-sandbox.waltid.dev",
+            servicePath: "{org}.{tenant}.wallet-provider",
+            bearerToken: enterpriseSessionToken,
+            composition: .walletInstanceAndKey
+        )
     )
 )
 ```
@@ -162,7 +166,7 @@ The Compose demo turns this on through `DemoWalletConfig`. `walletProviderEnable
 |-----|-----------------|
 | Compose Android | `demoWalletConfig()` in `waltid-applications/waltid-wallet-demo-compose/androidApp/src/main/java/id/walt/walletdemo/compose/android/DemoWalletConfiguration.kt` |
 | Compose iOS | `DemoWalletConfig(...)` in `waltid-applications/waltid-wallet-demo-compose/sharedUI/src/iosMain/kotlin/id/walt/walletdemo/compose/ui/WalletDemoIos.kt` |
-| Native iOS | `walletProvider:` on `WalletConfiguration` in `waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/ViewModels/WalletViewModel.swift` |
+| Native iOS | `WalletConfiguration.Issuance.walletProvider` in `waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/ViewModels/WalletViewModel.swift` |
 
 Do not enable the hosted demo constants. They name a provider that is not deployed.
 
