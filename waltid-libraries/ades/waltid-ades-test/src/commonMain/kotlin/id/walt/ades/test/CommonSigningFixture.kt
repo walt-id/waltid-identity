@@ -16,10 +16,11 @@ object CommonSigningFixture {
 
     suspend fun credentials(): AdesSigningCredentials {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
+        // Android software providers import private JWKs but intentionally reject PKCS#8.
         val key = runtime.restore(StoredKey.Software(
             StoredKey.CURRENT_VERSION, KeyId("public-ades-test"), certificate.publicKey.keySpec,
             setOf(KeyUsage.SIGN, KeyUsage.VERIFY),
-            EncodedKey.Pkcs8Der(BinaryData("308187020100301306072a8648ce3d020106082a8648ce3d030107046d306b0201010420675905ce20d5c54e6720c3f9d71c9d0e383cbb874d7bad798d9618743d73f398a144034200040f68b589a7c3c52286e84f4c846a584616480255d4cb38608c205eae7d68cf421f1598886b2168ea8aa1f3b7021d58f8ff97ff35cb4fc97b6864bbfd60488698".hexToByteArray())),
+            EncodedKey.Jwk(BinaryData("""{"kty":"EC","crv":"P-256","x":"D2i1iafDxSKG6E9MhGpYRhZIAlXUyzhgjCBern1oz0I","y":"HxWYiGshaOqKofO3Ah1Y-P-X_zXLT8l7aGS7_WBIhpg","d":"Z1kFziDVxU5nIMP51xydDjg8u4dNe615jZYYdD1z85g"}""".encodeToByteArray()), privateMaterial = true),
         ))
         return AdesSigningCredentials(key, listOf(certificate))
     }
