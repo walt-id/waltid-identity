@@ -62,10 +62,8 @@ internal class MobileWalletRegistration(
     /**
      * Synchronizes the platform registry after the wallet store has already changed.
      *
-     * The credential change is committed by the time this runs, so neither a registry nor a host
-     * failure may turn a completed operation into a failed one; the outcome is reported through
-     * [state] instead. The host is notified even when publishing failed,
-     * because an earlier projection may still be pending.
+     * The store has committed. [state] describes presentation replacement. Creation-option registration
+     * is attempted independently, and the host is notified even after a presentation failure.
      */
     suspend fun afterMutation() {
         runCatching { refresh() }.onFailure { failure ->

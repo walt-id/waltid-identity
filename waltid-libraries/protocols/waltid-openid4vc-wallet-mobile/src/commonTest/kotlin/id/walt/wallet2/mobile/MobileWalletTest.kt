@@ -89,6 +89,7 @@ import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCSubmission
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistrationResult
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntryDisplay
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequest
@@ -108,6 +109,8 @@ import id.walt.wallet2.mobile.presentation.MobileWalletPresentationConfig
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialRequirement
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.DisclosureDisposition
+import id.walt.wallet2.mobile.presentation.disclosureDisposition
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationDisclosure
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreview
@@ -193,6 +196,18 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 class MobileWalletTest {
+    @Test
+    fun reviewCollectionsAndOfferDiagnosticsPreserveTheirBoundaries() {
+        val inner = mutableListOf("identity")
+        val outer = mutableListOf<List<String>>(inner)
+        val requirement = MobileWalletPresentationCredentialRequirement(outer)
+        inner.clear()
+        outer.clear()
+        assertEquals(listOf(listOf("identity")), requirement.options)
+        assertFalse(MobileWalletCredentialOffer.InlineJson("private-offer").toString().contains("private-offer"))
+        assertFalse(MobileWalletCredentialOffer.Uri("private-offer").toString().contains("private-offer"))
+    }
+
     @Test
     fun closingWalletCompletesEventCollectionAndRejectsNewOperations() = runTest {
         val wallet = walletWithTrust(ClientIdTrustConfiguration())
@@ -924,7 +939,7 @@ class MobileWalletTest {
                             name = "given_name",
                             valueJson = """"Ada"""",
                             displayValue = "Ada",
-                            selectivelyDisclosable = true,
+                            disposition = DisclosureDisposition.Selectable,
                         )
                     ),
                 )
@@ -981,7 +996,7 @@ class MobileWalletTest {
         assertTrue(fullMdoc.fields.isNotEmpty())
         assertEquals(full.first, minimal.first)
         assertEquals(
-            fullMdoc.copy(fields = emptyList(), displayName = "", subtitle = ""),
+            fullMdoc.copy(fields = emptyList(), display = RegistryEntryDisplay("")),
             minimal.second.single(),
         )
         assertEquals(minimal, records(MobileWalletRegistryProjection.MdocIdentity))
@@ -1116,9 +1131,9 @@ class MobileWalletTest {
         assertEquals(listOf(listOf("given_name")), record.fields.map { it.path })
         assertFalse(record.fields.any { it.path.singleOrNull() == "iss" })
         assertFalse(record.fields.single().selectivelyDisclosable)
-        assertNull(record.iconPng)
-        assertTrue(record.cardArtImageUris.isEmpty())
-        assertNull(record.cardArtBackgroundColor)
+        assertNull(record.display.iconPng)
+        assertTrue(record.display.cardArt.imageUris.isEmpty())
+        assertNull(record.display.cardArt.backgroundColor)
     }
 
     @Test
@@ -1511,6 +1526,34 @@ class MobileWalletTest {
         assertEquals(listOf("pid-1"), credentialStore.removedCredentialIds)
         assertEquals(1, reconciliationRequests)
         assertFalse(assertNotNull(wallet.digitalCredentialRegistration.value).available)
+    }
+
+    @Test
+    fun successfulPresentationRegistrationSurvivesCreationAndNotificationFailures() = runTest {
+        val published = RecordingMetadataRegistry()
+        val registry = object : MobileWalletCredentialRegistry by published {
+            override suspend fun registerCreationOptions(): MobileWalletCredentialRegistrationResult =
+                MobileWalletCredentialRegistrationResult(false, 0, "Creation unavailable")
+        }
+        var notified = false
+        val store = InMemoryCredentialStore()
+        store.addCredential(StoredCredential(id = "pid-1",
+            credential = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2).second))
+        val wallet = MobileWallet(
+            walletId = "presentation-registration",
+            keyStore = InMemoryMobileWalletKeyStore(),
+            didStore = InMemoryDidStore(),
+            credentialStore = store,
+            credentialRegistry = registry,
+            onDigitalCredentialRegistryChanged = {
+                notified = true
+                error("Host unavailable")
+            },
+        )
+        assertTrue(wallet.deleteCredential("pid-1"))
+        assertTrue(notified)
+        assertTrue(assertNotNull(wallet.digitalCredentialRegistration.value).available)
+        assertEquals(0, wallet.refreshDigitalCredentialRegistration().registeredEntryCount)
     }
 
     @Test
@@ -2314,9 +2357,7 @@ class MobileWalletTest {
         name = "claim",
         valueJson = "true",
         displayValue = "true",
-        selectivelyDisclosable = selectivelyDisclosable,
-        required = required,
-        selectable = selectable,
+        disposition = disclosureDisposition(selectivelyDisclosable, required, selectable, true),
     )
 
     private fun walletWithTrust(trustConfiguration: ClientIdTrustConfiguration): MobileWallet = MobileWallet(
