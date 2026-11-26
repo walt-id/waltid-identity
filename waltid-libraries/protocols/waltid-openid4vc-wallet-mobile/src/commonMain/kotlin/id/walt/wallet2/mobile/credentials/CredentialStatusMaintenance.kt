@@ -1,8 +1,9 @@
-package id.walt.wallet2.mobile
+package id.walt.wallet2.mobile.credentials
 
 import app.cash.sqldelight.db.SqlDriver
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.wallet2.mobile.identity.WalletDidSupport
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.wallet2.persistence.stores.SqlDelightStatusMaintenanceStore
@@ -115,9 +116,6 @@ internal class StatusMaintenanceEnrollmentStore(
     }
 }
 
-private fun isValidMaintenanceWalletId(id: String): Boolean =
-    id.isNotBlank() && id.none { it == '/' || it == '\\' || it == '\u0000' }
-
 // Bump the version if the built-in status authorization or resolver configuration changes.
 internal suspend fun managedCredentialStatusTrustPolicy(): String? {
     val methods = DidService.resolverMethods.toMap()
@@ -156,7 +154,7 @@ internal suspend fun runCredentialStatusMaintenance(
                 var itemInProgress = false
                 var newNotice = false
                 val completed = withTimeoutOrNull(budget - started.elapsedNow()) {
-                    MobileDidSupport.ensureInitialized()
+                    WalletDidSupport.ensureInitialized()
                     WalletCredentialStatusService.refreshMaintenancePage(
                         session.inventory, session.scanIds(), maxItems, httpClient, ::managedCredentialStatusTrustPolicy,
                         advance = { id -> session.advance(id).also { itemInProgress = it } },
@@ -188,3 +186,6 @@ internal suspend fun runCredentialStatusMaintenance(
         CredentialStatusMaintenanceResult.Deferred
     }
 }
+
+private fun isValidMaintenanceWalletId(id: String): Boolean =
+    id.isNotBlank() && id.none { it == '/' || it == '\\' || it == '\u0000' }

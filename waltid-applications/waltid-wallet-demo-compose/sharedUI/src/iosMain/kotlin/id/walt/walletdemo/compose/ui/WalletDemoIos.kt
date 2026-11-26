@@ -2,8 +2,12 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.ui.window.ComposeUIViewController
 import androidx.compose.runtime.DisposableEffect
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceResult
+import id.walt.wallet2.mobile.credentials.refreshDueStatusesForExistingWallet
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import id.walt.wallet2.mobile.digitalcredentials.WalletAppGroupAccess
@@ -22,6 +26,8 @@ import id.walt.walletdemo.compose.logic.createIosDemoReaderTrustSettingsStore
 import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.createIosDemoSigningProtectionStore
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import platform.UIKit.UIViewController
 
 private var iosControllerScope: CoroutineScope? = null
@@ -229,7 +235,7 @@ fun startWalletDemoBackgroundStatus(
     var outcome = ComposeBackgroundStatusOutcome.DEFERRED
     try {
         outcome = when (val result = refreshDueStatusesForExistingWallet(
-            binding, MobileWalletCrossProcessAccess(appGroupIdentifier, keychainAccessGroup),
+            binding, WalletAppGroupAccess(appGroupIdentifier, keychainAccessGroup),
         )) {
             is CredentialStatusMaintenanceResult.Finished -> if (result.hasNewNotice) ComposeBackgroundStatusOutcome.FINISHED_WITH_NOTICE
                 else ComposeBackgroundStatusOutcome.FINISHED

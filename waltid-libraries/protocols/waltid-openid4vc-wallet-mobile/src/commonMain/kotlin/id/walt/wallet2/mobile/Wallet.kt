@@ -38,8 +38,12 @@ import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.walt.wallet2.handlers.WalletScaPresentationAuthorizer
 import id.walt.wallet2.issuance.CredentialReceiptTrust
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceEnrollment
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenancePreference
 import id.walt.wallet2.mobile.credentials.CredentialWithStatus
+import id.walt.wallet2.mobile.credentials.StatusMaintenanceEnrollmentStore
 import id.walt.wallet2.mobile.credentials.WalletCredential
+import id.walt.wallet2.mobile.credentials.managedCredentialStatusTrustPolicy
 import id.walt.wallet2.mobile.credentials.toWalletCredential
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCParsedRequest
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCPreview
@@ -98,6 +102,7 @@ import id.walt.wallet2.persistence.keys.PolicyAwareWalletKeyStore
 import id.walt.wallet2.status.CredentialStatusRefreshMode
 import id.walt.wallet2.status.CredentialStatusRefreshResult
 import id.walt.wallet2.status.WalletCredentialReference
+import id.walt.wallet2.status.WalletCredentialStatusService
 import id.walt.wallet2.status.WalletCredentialStatusSnapshot
 import id.walt.wallet2.status.reviewGuard
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationProvider
@@ -715,6 +720,7 @@ public class Wallet internal constructor(
     }
 
     private suspend fun clearLocalStores() {
+        statusMaintenance?.retire()
         wallet.closeCredentialStatusService()
         issuanceSessions.closeSessions()
         proximityCoordinator.shutdown()
@@ -747,6 +753,9 @@ public class Wallet internal constructor(
         didStore = didStore,
         credentialStores = listOf(credentialStore),
     ).attachReceiptTrust(receiptTrust).attachIssuanceSessionState(issuanceSessionState).also { created ->
+        if (managedCredentialStatus) created.configureCredentialStatusService {
+            WalletCredentialStatusService.managed(it, ::managedCredentialStatusTrustPolicy)
+        }
         if (issuanceProviders.walletProviderClient != null && issuanceProviders.walletProviderComposition != WalletProviderConfig.Composition.WalletInstance) {
             created.attachKeyAttestationProvider(issuanceProviders.walletProviderClient)
         }

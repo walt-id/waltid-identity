@@ -6,6 +6,8 @@ import id.walt.wallet2.handlers.WalletIssuanceAuthorization
 import id.walt.wallet2.handlers.WalletIssuanceContinuation
 import id.walt.wallet2.handlers.WalletIssuanceOfferReview
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceEnrollment
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenancePreference
 import id.walt.wallet2.mobile.credentials.CredentialWithStatus
 import id.walt.wallet2.mobile.credentials.WalletCredential
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCPreview
@@ -97,6 +99,15 @@ internal interface WalletSdkBridgeOperations {
     suspend fun credentialReads(): List<CredentialWithStatus>
     val credentialStatuses: Flow<WalletCredentialStatusSnapshot>
     suspend fun credentialStatusSnapshot(): WalletCredentialStatusSnapshot
+    suspend fun credentialStatusMaintenanceEnrollment(): CredentialStatusMaintenanceEnrollment? = null
+    suspend fun setCredentialStatusMaintenance(preference: CredentialStatusMaintenancePreference): CredentialStatusMaintenanceEnrollment? = null
+    suspend fun reconcileCredentialStatusMaintenance(
+        automaticChecks: Boolean, resumePaused: Boolean,
+    ): CredentialStatusMaintenanceEnrollment? = null
+
+    suspend fun invalidateCredentialStatusSnapshot() {}
+    suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) {}
+
     suspend fun refreshCredentialStatuses(credentialIds: List<String>?, mode: CredentialStatusRefreshMode): List<CredentialStatusRefreshResult>
     suspend fun close()
 

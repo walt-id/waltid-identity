@@ -42,8 +42,11 @@ internal fun CredentialWithStatus.toStatusBridgeRead(): WalletBridgeCredentialRe
         CredentialStatusPayload(status, presentation.toData(), evaluatedAt.toString())),
 )
 
-internal fun WalletCredentialStatusSnapshot.toStatusBridgeSnapshot(): String =
-    credentialStatusJson.encodeToString(WalletCredentialStatusSnapshotResponse.serializer(), toResponse())
+internal fun WalletCredentialStatusSnapshot.toStatusBridgeSnapshot(): String {
+    val status = credentialStatusJson.encodeToJsonElement(toResponse()).jsonObject
+    val notices = credentialStatusJson.encodeToJsonElement(pendingNotices)
+    return JsonObject(status + ("pendingNotices" to notices)).toString()
+}
 
 @Serializable
 @SerialName("id.walt.wallet2.mobile.credentials.MobileWalletCredentialStatusValue")

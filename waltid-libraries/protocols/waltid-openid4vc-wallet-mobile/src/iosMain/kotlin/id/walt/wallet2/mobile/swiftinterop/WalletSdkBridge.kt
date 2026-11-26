@@ -6,6 +6,7 @@ import id.walt.wallet2.handlers.WalletIssuanceOfferReview
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.Wallet
 import id.walt.wallet2.mobile.WalletEvent
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenancePreference
 import id.walt.wallet2.mobile.credentials.WalletCredential
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCPreview
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCRequest

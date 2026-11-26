@@ -9,8 +9,8 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
-import id.walt.wallet2.mobile.CredentialStatusMaintenanceResult
-import id.walt.wallet2.mobile.refreshDueStatusesForExistingWallet
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceResult
+import id.walt.wallet2.mobile.credentials.refreshDueStatusesForExistingWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import java.util.UUID
 import java.util.concurrent.TimeUnit

@@ -8,6 +8,7 @@ import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.wallet2.data.WalletDidStore
+import id.walt.wallet2.mobile.credentials.StatusMaintenanceEnrollmentStore
 import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
 import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistry
 import id.walt.wallet2.mobile.digitalcredentials.UnavailableCredentialRegistry
@@ -48,6 +49,7 @@ internal suspend fun openEncryptedSqlDelightWallet(
     deleteDatabase: (databaseName: String) -> Unit,
     registry: CredentialRegistry = config.digitalCredentials.registry ?: UnavailableCredentialRegistry,
     registrationProjection: RegistryProjection = RegistryProjection.Full,
+    maintenanceLocation: (databaseName: String) -> String? = { null },
     databaseLocation: String = "wallet_${config.walletId}",
     keyNamespace: String = config.walletId,
 ): Wallet {
@@ -81,6 +83,7 @@ internal suspend fun openEncryptedSqlDelightWallet(
                 proximityTransportFactory = proximityTransportFactory,
                 proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
                 proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
+                maintenanceLocation = { maintenanceLocation(databaseName) },
                 persistenceOwner = WalletPersistenceOwner(driver::close, { open(null) }, owner),
                 deleteLocalPersistence = {
                     deleteDatabase(databaseName)
@@ -110,11 +113,13 @@ internal fun openSqlDelightWallet(
     proximityWifiAwareTransportFactory: WifiAwareProximityTransportFactory? = null,
     didService: Crypto2DidService = Crypto2DidService,
     deleteLocalPersistence: suspend () -> Unit,
+    maintenanceLocation: () -> String? = { null },
     persistenceOwner: WalletPersistenceOwner? = null,
     registry: CredentialRegistry = config.digitalCredentials.registry ?: UnavailableCredentialRegistry,
     registrationProjection: RegistryProjection = RegistryProjection.Full,
 ): Wallet {
     val queries = db.walletPersistenceQueries
+    val managedStatus = config.persistence.databaseKey == WalletDatabaseKey.Managed && config.persistence.credentialStore == null
     val keyStore = SqlDelightKeyStore(keyProvider, queries, config.walletId)
     val credentialStore = config.persistence.credentialStore ?: SqlDelightCredentialStore(queries)
     val didStore = config.persistence.didStore?.let { delegate ->
@@ -135,6 +140,10 @@ internal fun openSqlDelightWallet(
         },
         keyStore = keyStore,
         didStore = didStore,
+        managedCredentialStatus = managedStatus,
+        statusMaintenance = StatusMaintenanceEnrollmentStore(config.walletId, queries) {
+            if (managedStatus) maintenanceLocation() else null
+        },
         credentialStore = credentialStore,
         issuanceSessionStore = issuanceSessionStore,
         runKeyUseAuthorizationPreflight = { keyType, policy ->

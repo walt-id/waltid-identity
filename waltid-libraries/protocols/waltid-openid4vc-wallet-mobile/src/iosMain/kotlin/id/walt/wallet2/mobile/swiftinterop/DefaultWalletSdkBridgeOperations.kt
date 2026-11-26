@@ -7,6 +7,7 @@ import id.walt.wallet2.handlers.WalletIssuanceContinuation
 import id.walt.wallet2.handlers.WalletIssuanceOfferReview
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenancePreference
 import id.walt.wallet2.mobile.credentials.CredentialWithStatus
 import id.walt.wallet2.mobile.credentials.WalletCredential
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCPreview
@@ -113,6 +114,15 @@ internal class DefaultWalletSdkBridgeOperations(
     override suspend fun credentialReads(): List<CredentialWithStatus> = wallet.credentialReads()
     override val credentialStatuses: Flow<WalletCredentialStatusSnapshot> get() = wallet.credentialStatuses
     override suspend fun credentialStatusSnapshot(): WalletCredentialStatusSnapshot = wallet.credentialStatusSnapshot()
+    override suspend fun credentialStatusMaintenanceEnrollment() = wallet.credentialStatusMaintenanceEnrollment()
+    override suspend fun setCredentialStatusMaintenance(preference: CredentialStatusMaintenancePreference) =
+        wallet.setCredentialStatusMaintenance(preference)
+    override suspend fun reconcileCredentialStatusMaintenance(automaticChecks: Boolean, resumePaused: Boolean) =
+        wallet.reconcileCredentialStatusMaintenance(automaticChecks, resumePaused)
+    override suspend fun invalidateCredentialStatusSnapshot() = wallet.invalidateCredentialStatusSnapshot()
+    override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) =
+        wallet.acknowledgeCredentialStatusNotice(credentialId, version)
+
     override suspend fun refreshCredentialStatuses(credentialIds: List<String>?, mode: CredentialStatusRefreshMode): List<CredentialStatusRefreshResult> =
         wallet.refreshCredentialStatuses(credentialIds, mode)
     override suspend fun close(): Unit = wallet.close()
