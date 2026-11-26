@@ -36,6 +36,8 @@ public actual class MobileWalletFactory(
         }
         return createEncryptedSqlDelightMobileWallet(
             config = config,
+            databaseLocation = "${sharedAccess?.appGroupIdentifier.orEmpty()}/wallet_${config.walletId}.db",
+            keyNamespace = "${sharedAccess?.keychainAccessGroup.orEmpty()}/${config.walletId}",
             registry = registry,
             registrationProjection = if (registry is IosIdentityDocumentRegistry) {
                 MobileWalletRegistryProjection.MdocIdentity

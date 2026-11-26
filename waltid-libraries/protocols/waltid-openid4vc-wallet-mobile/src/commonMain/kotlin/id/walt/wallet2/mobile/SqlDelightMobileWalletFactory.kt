@@ -27,6 +27,8 @@ import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 import id.walt.wallet2.persistence.stores.SqlDelightIssuanceSessionStore
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import kotlin.uuid.Uuid
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
@@ -46,6 +48,8 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
     deleteDatabase: (databaseName: String) -> Unit,
     registry: MobileWalletCredentialRegistry = config.digitalCredentials.registry ?: UnavailableMobileWalletCredentialRegistry,
     registrationProjection: MobileWalletRegistryProjection = MobileWalletRegistryProjection.Full,
+    databaseLocation: String = "wallet_${config.walletId}",
+    keyNamespace: String = config.walletId,
 ): MobileWallet {
     // Resolver state belongs to this process, including when all wallet keys already exist.
     MobileDidSupport.ensureInitialized()
@@ -54,7 +58,9 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
         is MobileWalletDatabaseKey.Managed -> managedDatabaseKeyProvider
         is MobileWalletDatabaseKey.Provided -> databaseKey.provider
     }
-    suspend fun open(): MobileWallet {
+    val lease = MobileWalletStorageLease(databaseLocation, keyNamespace,
+        listOfNotNull(config.persistence.credentialStore, config.persistence.didStore))
+    suspend fun open(owner: MobileWalletStorageLease?): MobileWallet {
         val encryptionKey = databaseKeyProvider.getOrCreateKey(config.walletId, databaseName)
         // An app-provided key source may complete normally after its caller has cancelled.
         currentCoroutineContext().ensureActive()
@@ -75,7 +81,7 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
                 proximityTransportFactory = proximityTransportFactory,
                 proximityNfcHostPlatformAdapter = proximityNfcHostPlatformAdapter,
                 proximityWifiAwareTransportFactory = proximityWifiAwareTransportFactory,
-                persistenceOwner = MobileWalletPersistenceOwner(driver::close, ::open),
+                persistenceOwner = MobileWalletPersistenceOwner(driver::close, { open(null) }, owner),
                 deleteLocalPersistence = {
                     deleteDatabase(databaseName)
                     databaseKeyProvider.deleteKey(config.walletId, databaseName)
@@ -86,7 +92,13 @@ internal suspend fun createEncryptedSqlDelightMobileWallet(
             throw failure
         }
     }
-    return open()
+    lease.open()
+    return try {
+        open(lease)
+    } catch (failure: Throwable) {
+        withContext(NonCancellable) { lease.close() }
+        throw failure
+    }
 }
 
 internal fun createSqlDelightMobileWallet(
@@ -167,4 +179,5 @@ internal fun createSqlDelightMobileWallet(
 internal class MobileWalletPersistenceOwner(
     val close: () -> Unit,
     val openForDeletion: suspend () -> MobileWallet,
+    val storageLease: MobileWalletStorageLease? = null,
 )

@@ -54,6 +54,8 @@ public actual class MobileWalletFactory(
         }
         return createEncryptedSqlDelightMobileWallet(
             config = config,
+            databaseLocation = applicationContext.getDatabasePath("wallet_${config.walletId}.db").canonicalPath,
+            keyNamespace = "${applicationContext.packageName}/${config.walletId}",
             registry = registry,
             managedDatabaseKeyProvider = AndroidDatabaseEncryptionKeyProvider(applicationContext),
             platformKeyProvider = AndroidPlatformKeyProvider(applicationContext, interactionContextProvider),

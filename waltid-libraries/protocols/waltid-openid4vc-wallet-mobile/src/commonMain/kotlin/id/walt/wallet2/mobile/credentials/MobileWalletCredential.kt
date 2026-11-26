@@ -1,6 +1,9 @@
 package id.walt.wallet2.mobile.credentials
 
-import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.mobile.presentation.encodeJsonObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Credential entry suitable for mobile UI lists and detail display.
@@ -28,3 +31,11 @@ public data class MobileWalletCredential(
     public val addedAt: String? = null,
     public val metadataJson: String? = null,
 )
+
+internal fun StoredCredential.toMobileWalletCredential(): MobileWalletCredential {
+    val meta = toMetadata()
+    return MobileWalletCredential(id = meta.id, format = meta.format, issuer = meta.issuer,
+        subject = meta.subject, label = meta.label, addedAt = meta.addedAt?.toString(),
+        credentialDataJson = credential.credentialData.encodeJsonObject(),
+        metadataJson = metadata?.let { Json.encodeToString(JsonObject.serializer(), it) })
+}

@@ -3,11 +3,8 @@
 package id.walt.wallet2.mobile
 
 import id.walt.wallet2.issuance.CredentialReceiptTrust
-import id.walt.certificate.x509.X509CertificateUtil
-import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
@@ -43,6 +40,7 @@ import id.walt.wallet2.handlers.WalletIssuanceSessionStore
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.walt.wallet2.handlers.WalletScaPresentationAuthorizer
 import id.walt.wallet2.mobile.credentials.MobileWalletCredential
+import id.walt.wallet2.mobile.credentials.toMobileWalletCredential
 import id.walt.wallet2.mobile.credentials.MobileWalletCredentialRead
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCEngine
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletAnnexCParsedRequest
@@ -74,6 +72,7 @@ import id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders
 import id.walt.wallet2.mobile.issuance.MobileWalletCredentialSelection
 import id.walt.wallet2.mobile.issuance.MobileWalletHolderBinding
 import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceProviders
 import id.walt.wallet2.mobile.issuance.WalletAttestationConfig
 import id.walt.wallet2.mobile.issuance.WalletProviderConfig
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationReview
@@ -101,10 +100,6 @@ import id.walt.wallet2.status.CredentialStatusRefreshResult
 import id.walt.wallet2.status.WalletCredentialReference
 import id.walt.wallet2.status.WalletCredentialStatusSnapshot
 import id.walt.wallet2.status.reviewGuard
-import id.walt.wallet2.walletprovider.WalletProviderHttpClient
-import id.walt.wallet2.walletprovider.walletProviderVerificationKey
-import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
-import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import id.waltid.openid4vci.wallet.attestation.WalletAttestationProvider
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vp.wallet.DcApiRequestProtocol
@@ -189,12 +184,10 @@ public class MobileWallet internal constructor(
         get() = lifecycle.observe(statusUpdates)
 
     /**
-     * Outcome of the most recent platform registry synchronization, or null before the first one.
-     *
-     * Signing-key activation/initialization and credential storage/removal synchronize the registry afterwards
-     * and does not fail if that synchronization does not succeed, so this is where an application
-     * learns that the platform projection is stale. Recover by calling
-     * [refreshDigitalCredentialRegistration] again; the wallet store it projects is unaffected.
+     * Last result of replacing the platform's presentation records, or null before the first attempt.
+     * Credential storage commits first. Retry [refreshDigitalCredentialRegistration] to rebuild the projection.
+     * Creation-option registration and the host notification run independently. This StateFlow retains its
+     * last value after close. The host owns and cancels its collection.
      */
     public val digitalCredentialRegistration: StateFlow<MobileWalletCredentialRegistrationResult?>
         get() = registration.state
@@ -211,8 +204,8 @@ public class MobileWallet internal constructor(
     public fun attachKeyAttestationProviderResolver(
         resolver: KeyAttestationProviderResolver,
     ): MobileWallet = apply {
-        val fallback = walletProviderClient?.takeIf {
-            walletProviderComposition != WalletProviderConfig.Composition.WalletInstance
+        val fallback = issuanceProviders.walletProviderClient?.takeIf {
+            issuanceProviders.walletProviderComposition != WalletProviderConfig.Composition.WalletInstance
         }
         wallet.attachKeyAttestationProviderResolver(
             if (fallback == null) resolver else KeyAttestationProviderResolver { issuer ->
@@ -377,6 +370,7 @@ public class MobileWallet internal constructor(
         wallet.closeCredentialStatusService()
         proximityCoordinator.shutdown()
         closePersistence()
+        persistenceOwner?.storageLease?.close()
     }
 
     /** Returns the native adapter's current runtime capability snapshot. */
@@ -625,7 +619,7 @@ public class MobileWallet internal constructor(
 
     /** Discards a reviewed presentation after local dismissal. */
     public suspend fun discardPresentationPreview(previewHandle: MobileWalletPresentationPreviewHandle): Unit = lifecycle.use {
-        WalletPresentationHandler.discardPreview(
+        WalletPresentationHandler.discardInstancePreview(
             wallet = wallet,
             handle = PresentationPreviewHandle(previewHandle.value),
         )
@@ -637,7 +631,7 @@ public class MobileWallet internal constructor(
         errorCode: MobileWalletPresentationErrorCode? = null,
         errorDescription: String? = null,
     ): MobileWalletPresentationResult = lifecycle.use {
-        WalletPresentationHandler.rejectPresentation(
+        WalletPresentationHandler.rejectInstancePresentation(
             wallet = wallet,
             request = RejectPresentationRequest(
                 previewHandle = PresentationPreviewHandle(previewHandle.value),
@@ -652,11 +646,12 @@ public class MobileWallet internal constructor(
      * Deletes local wallet material owned by this mobile wallet instance.
      *
      * A running wallet or signing-identity operation rejects deletion before changing anything.
-     * Once admitted, the instance is permanently closed and cleanup survives caller cancellation.
+     * Close other in-process wallets that share this storage before deletion. Hosts sharing storage with
+     * another process must coordinate erasure across processes. Once admitted, cleanup survives cancellation.
      * Platform key/database removal cannot roll back. On failure, retry this method on the same
      * instance; other operations remain closed. Successful deletion is idempotent.
      */
-    public suspend fun deleteWallet(): Unit = lifecycle.delete {
+    public suspend fun deleteWallet(): Unit = lifecycle.delete(admit = { persistenceOwner?.storageLease?.beginErase() }) {
         if (!localStoresCleared) {
             val owner = persistenceOwner
             if (persistenceClosed && owner != null) {
@@ -673,6 +668,7 @@ public class MobileWallet internal constructor(
         }
         closePersistence()
         deleteLocalPersistence()
+        persistenceOwner?.storageLease?.finishErase()
     }
 
     /**
@@ -712,6 +708,7 @@ public class MobileWallet internal constructor(
     private fun closePersistence() {
         if (persistenceClosed) return
         persistenceOwner?.close?.invoke()
+        issuanceProviders.close()
         persistenceClosed = true
     }
 
@@ -738,39 +735,7 @@ public class MobileWallet internal constructor(
 
     private val eventStream = MobileWalletEventStream()
 
-    private val walletProviderClient: WalletProviderHttpClient? = walletProviderConfig?.let { config ->
-        WalletProviderHttpClient(
-            baseUrl = config.baseUrl,
-            servicePath = config.servicePath,
-            bearerToken = config.bearerToken,
-            hostHeader = config.hostHeader,
-            composition = config.composition.wireValue,
-            httpClient = issuanceHttpClient ?: HttpClient(),
-            verificationKeyFromJwt = { jwt ->
-                walletProviderVerificationKey(jwt) { pem ->
-                    X509CertificateUtil.parseCertificatePem(pem)
-                        .restoreSubjectPublicKey(CryptoRuntime(defaultSoftwareKeyProviders()))
-                }
-            },
-        )
-    }
-
-    private val walletProviderComposition = walletProviderConfig?.composition
-
-    private val attestationAssembler: ClientAttestationAssembler? = when {
-        walletProviderClient != null && walletProviderComposition != WalletProviderConfig.Composition.Key ->
-            ClientAttestationAssembler(walletProviderClient)
-        attestationProvider != null -> ClientAttestationAssembler(attestationProvider)
-        attestationConfig != null -> ClientAttestationAssembler(
-            HttpWalletAttestationProvider(
-                baseUrl = attestationConfig.baseUrl,
-                attesterPath = attestationConfig.attesterPath,
-                bearerToken = attestationConfig.bearerToken,
-                hostHeader = attestationConfig.hostHeader,
-            )
-        )
-        else -> null
-    }
+    private val issuanceProviders = MobileWalletIssuanceProviders(walletProviderConfig, attestationConfig, attestationProvider, issuanceHttpClient)
 
     private val issuanceSessionState = WalletIssuanceSessionState(walletId, issuanceSessionStore)
 
@@ -780,8 +745,8 @@ public class MobileWallet internal constructor(
         didStore = didStore,
         credentialStores = listOf(credentialStore),
     ).attachReceiptTrust(receiptTrust).attachIssuanceSessionState(issuanceSessionState).also { created ->
-        if (walletProviderClient != null && walletProviderComposition != WalletProviderConfig.Composition.WalletInstance) {
-            created.attachKeyAttestationProvider(walletProviderClient)
+        if (issuanceProviders.walletProviderClient != null && issuanceProviders.walletProviderComposition != WalletProviderConfig.Composition.WalletInstance) {
+            created.attachKeyAttestationProvider(issuanceProviders.walletProviderClient)
         }
     }
 
@@ -802,7 +767,7 @@ public class MobileWallet internal constructor(
 
     private val issuanceSessions = WalletIssuanceSessionService(
         wallet = wallet,
-        attestationAssembler = attestationAssembler,
+        attestationAssembler = issuanceProviders.attestationAssembler,
         metadataTrustResolver = credentialIssuerMetadataTrustResolver,
         onEvent = ::emitSessionEvent,
         runtimeState = issuanceSessionState,
@@ -839,14 +804,6 @@ public class MobileWallet internal constructor(
             }
             if (storedCredentialIds.isNotEmpty()) registration.afterMutation()
         }
-
-    private fun StoredCredential.toMobileWalletCredential(): MobileWalletCredential {
-        val meta = toMetadata()
-        return MobileWalletCredential(id = meta.id, format = meta.format, issuer = meta.issuer,
-            subject = meta.subject, label = meta.label, addedAt = meta.addedAt?.toString(),
-            credentialDataJson = credential.credentialData.encodeJsonObject(),
-            metadataJson = metadata?.let { Json.encodeToString(JsonObject.serializer(), it) })
-    }
 
     private suspend fun emitSessionEvent(event: WalletSessionEvent) {
         val mobileEvent = event.toMobileWalletEvent()
