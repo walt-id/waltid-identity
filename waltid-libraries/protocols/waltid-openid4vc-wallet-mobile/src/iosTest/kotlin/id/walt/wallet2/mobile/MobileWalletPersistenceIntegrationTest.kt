@@ -112,7 +112,7 @@ class MobileWalletPersistenceIntegrationTest {
         try {
             assertEquals(2, wallet.refreshDigitalCredentialRegistration().registeredEntryCount)
             assertEquals(setOf("mdl-1", "pid-1"), published.map { it.credentialId }.toSet())
-            assertTrue(published.all { it.fields.single().valueJson == "\"Ada\"" && it.displayName.isNotBlank() })
+            assertTrue(published.all { it.fields.single().valueJson == "\"Ada\"" && it.display.name.isNotBlank() })
         } finally {
             wallet.deleteWallet()
         }
@@ -140,6 +140,7 @@ class MobileWalletPersistenceIntegrationTest {
         val wallet = factory.create(config)
         assertEquals(emptyList(), wallet.credentials())
 
+        wallet.close()
         val reopenedWallet = factory.create(config)
         assertEquals(emptyList(), reopenedWallet.credentials())
         assertEquals(listOf("$walletId:$databaseName", "$walletId:$databaseName"), provider.requestedKeys)

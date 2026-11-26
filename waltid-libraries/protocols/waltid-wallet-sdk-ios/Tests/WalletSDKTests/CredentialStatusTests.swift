@@ -18,7 +18,7 @@ final class CredentialStatusTests: XCTestCase {
             addedAt: nil,
             metadataJson: nil
         )
-        let value = WalletBridgeCredentialRead(credential: stored, statusJson: #"{"status":"future-wire-shape"}"#).toSwiftCredential()
+        let value = try WalletBridgeCredentialRead(credential: stored, statusJson: #"{"status":"future-wire-shape"}"#).toSwiftCredential()
         XCTAssertEqual(value.id, "identity")
         XCTAssertEqual(value.label, "Resident card")
         XCTAssertEqual(value.credentialDataJSON, #"{"name":"Example"}"#)
