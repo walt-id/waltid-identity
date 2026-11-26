@@ -652,6 +652,7 @@ object Verifier2VPDirectPostHandler {
         presentedCredentials = null
         presentedRawData = null
         responseCode = null
+        responseCodeExpiresAt = null
     }
 
     /**
