@@ -309,6 +309,11 @@ class W3CVerifier2IntegrationTest {
 
             val sessionId = verificationSessionResponse.sessionId
 
+            test("Default session creation wires holder binding") {
+                val created = http.get("/verification-session/$sessionId/info").body<Verification2Session>()
+                assertTrue(assertNotNull(created.policies.vp_policies).jwtVcJson.any { it.id == "jwt_vc_json/holder-binding" })
+            }
+
             // View created session
             val info1 = testAndReturn("View created session") {
                 http.get("/verification-session/$sessionId/info")
@@ -368,6 +373,10 @@ class W3CVerifier2IntegrationTest {
             test("Check Verification Session after presentation") {
                 assertTrue { info2.attempted }
                 assertTrue { info2.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL }
+                for (queryId in listOf("openbadge", "universitydegree")) {
+                    assertTrue(assertNotNull(info2.presentationValidationResults).getValue(queryId)
+                        .getValue("jwt_vc_json/holder-binding").success)
+                }
                 assertEquals(HttpStatusCode.BadRequest, http.get("/verification-session/$sessionId/request").status)
                 assertEquals(HttpStatusCode.Conflict, http.post("/verification-session/$sessionId/response") {
                     contentType(ContentType.Application.FormUrlEncoded)

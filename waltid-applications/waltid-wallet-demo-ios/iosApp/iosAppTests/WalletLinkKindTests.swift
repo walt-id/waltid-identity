@@ -19,6 +19,23 @@ final class WalletLinkKindTests: XCTestCase {
 }
 
 final class WalletLinkResolverTests: XCTestCase {
+    func testFollowsRedirectsToProfilePresentationSchemes() async throws {
+        for scheme in ["eu-eaap", "haip-vp"] {
+            let target = "\(scheme)://?request_uri=https%3A%2F%2Fverifier.example%2Frequest"
+            let direct = try await WalletLinkResolver.resolve(target) { _ in
+                XCTFail("A presentation URI should be dispatched directly")
+                return WalletLinkDocument(status: 404)
+            }
+            let redirected = try await WalletLinkResolver.resolve("https://verifier.example/start") { _ in
+                WalletLinkDocument(status: 302, location: target)
+            }
+            XCTAssertEqual(direct.kind, .presentation)
+            XCTAssertEqual(redirected.kind, .presentation)
+            XCTAssertEqual(direct.url, target)
+            XCTAssertEqual(redirected.url, target)
+        }
+    }
+
     func testRoutesTheSameDocumentsAsCompose() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

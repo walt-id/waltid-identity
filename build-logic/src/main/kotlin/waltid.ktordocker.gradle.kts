@@ -19,10 +19,13 @@ fun getDockerCredentials(rootDir: File): Pair<String, String> {
     )
 }
 
-// 2. Configure Ktor Docker extension
+// Match the service Dockerfiles and omit the affected Pebble helper (GO-2026-6859).
+val runtimeBaseImage = "amazoncorretto:25-al2023"
+
 ktor {
     docker {
-        jreVersion.set(JavaVersion.VERSION_21)
+        jreVersion.set(JavaVersion.VERSION_25)
+        customBaseImage.set(runtimeBaseImage)
 
         localImageName.set(project.name.replaceFirst("waltid-", "waltid/")) // waltid-verifier-api2 -> waltid/verifier-api2
         imageTag.set("${project.version}")
@@ -46,6 +49,7 @@ configure<JibExtension> {
         workingDirectory = "/${project.name}"
     }
     from {
+        image = runtimeBaseImage
         platforms {
             platform {
                 architecture = "amd64"
