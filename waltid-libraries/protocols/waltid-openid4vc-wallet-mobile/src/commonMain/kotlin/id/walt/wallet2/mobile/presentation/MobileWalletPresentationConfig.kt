@@ -18,13 +18,6 @@ public class MobileWalletPresentationConfig(
     transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     paymentCredentialIssuers: List<PaymentCredentialIssuer> = emptyList(),
 ) {
-    private val anchors = verifierTrust.x509TrustAnchors
-    private val attestationIssuers = buildSet { addAll(verifierTrust.trustedVerifierAttestationIssuers) }
-    // Pre-registered metadata contains nested caller-owned lists and JSON objects.
-    private val registeredMetadata = verifierTrust.preRegisteredClients.mapValues { (_, metadata) ->
-        Json.encodeToString(metadata)
-    }
-
     /** Wallet-owned client metadata and the host's verifier trust anchors. */
     public val verifierTrust: ClientIdTrustConfiguration
         get() = ClientIdTrustConfiguration(
@@ -32,6 +25,13 @@ public class MobileWalletPresentationConfig(
             trustedVerifierAttestationIssuers = attestationIssuers,
             preRegisteredClients = registeredMetadata.mapValues { (_, metadata) -> Json.decodeFromString(metadata) },
         )
+
+    private val anchors = verifierTrust.x509TrustAnchors
+    private val attestationIssuers = buildSet { addAll(verifierTrust.trustedVerifierAttestationIssuers) }
+    // Pre-registered metadata contains nested caller-owned lists and JSON objects.
+    private val registeredMetadata = verifierTrust.preRegisteredClients.mapValues { (_, metadata) ->
+        Json.encodeToString(metadata)
+    }
 
     /** Profiles accepted by this wallet, each with a unique type and field names. */
     public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = buildList {

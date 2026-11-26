@@ -48,12 +48,15 @@ public class ProximitySharingReceipt internal constructor(
 ) {
     /** Local response-completion time; this is not a reader verification timestamp. */
     public val completedAt: Instant = Clock.System.now()
-    private val ownedReview = review.snapshot()
-    private val ownedSubmission = submission.snapshot()
+
     /** Reviewed reader request. Each access returns an independently owned snapshot. */
     public val review: ProximityReview get() = ownedReview.snapshot()
+
     /** Holder-approved credential and field choices. Each access returns an independently owned snapshot. */
     public val submission: ProximitySubmission get() = ownedSubmission.snapshot()
+
+    private val ownedReview = review.snapshot()
+    private val ownedSubmission = submission.snapshot()
 }
 
 /** A wallet-verified request that can be approved before a new connection. This is not permission to share. */
@@ -75,19 +78,21 @@ public class ProximitySharingPlan internal constructor(
     public fun approveStatusReviewed(submission: ProximitySubmission, reviewedStatus: Map<String, String>): ProximityPreparationResult =
         approveInternal(submission, reviewedStatus.toMap())
 
-    private val ownedReview = review.snapshot()
-
     /** Authenticated recipient, requested data, retention and purpose to show before approval. */
     public val review: ProximityReview get() = ownedReview.snapshot()
-
-    /** Display deadline for this recent request. Authoritative expiry uses monotonic time. */
-    public val expiresAt: Instant = now() + PLAN_LIFETIME
 
     /** Exact certificate identity; display names or CA membership alone never identify the recipient. */
     public val readerCertificateSha256: String get() = scope.readerCertificateSha256
 
     /** Whether the request is still recent enough to prepare. It is checked again during approval. */
     public val isExpired: Boolean get() = created.elapsedNow() >= PLAN_LIFETIME
+
+    /** Display deadline for this recent request. Authoritative expiry uses monotonic time. */
+    public val expiresAt: Instant
+
+    private val ownedReview = review.snapshot()
+
+    init { expiresAt = now() + PLAN_LIFETIME }
 
     private fun approveInternal(submission: ProximitySubmission, reviewedStatus: Map<String, String>?): ProximityPreparationResult {
         if (isExpired) return preparationRejected("sharing_plan_expired", "This request has expired. Connect to the reader again.")
@@ -132,6 +137,19 @@ public class ProximityPreparedSharing internal constructor(
 ) {
     /** Revokes future release. Cancellation cannot undo a response already authorized and sent. */
     public suspend fun revoke(): Unit = mutex.withLock { mutableRevoked.value = true }
+
+    /** Original reader request to render together with the exact holder selection. */
+    public val review: ProximityReview get() = plan.review
+
+    /** Exact credential and field choices. Each access returns an independently owned snapshot. */
+    public val submission: ProximitySubmission get() = ownedSubmission.snapshot()
+
+    /** Display deadline; wall-clock changes cannot extend the approval. */
+    public val expiresAt: Instant = approvedAt + APPROVAL_LIFETIME
+
+    /** Remaining time for a matching request to begin its single approved response. */
+    public val remainingSeconds: Int get() = ((remaining.inWholeNanoseconds + 999_999_999) / 1_000_000_000).toInt()
+
     internal suspend fun claim(walletIdentity: Any): ProximityError? = mutex.withLock {
         when {
             plan.walletIdentity !== walletIdentity -> approvalError("prepared_sharing_wrong_wallet", "This approval belongs to another wallet.")
@@ -151,6 +169,10 @@ public class ProximityPreparedSharing internal constructor(
         mutableRevoked.value = true // An accepted decision is also permanently unavailable to every later request.
         ownedSubmission.snapshot()
     }
+
+    internal val remaining: Duration get() = (APPROVAL_LIFETIME - approved.elapsedNow()).coerceAtLeast(Duration.ZERO)
+    internal val revoked: StateFlow<Boolean>
+
     private val ownedSubmission = submission.snapshot()
     private val mutex = Mutex()
 
@@ -158,21 +180,7 @@ public class ProximityPreparedSharing internal constructor(
 
     private val mutableRevoked = MutableStateFlow(false)
 
-    internal val revoked: StateFlow<Boolean> = mutableRevoked.asStateFlow()
-
-    /** Original reader request to render together with the exact holder selection. */
-    public val review: ProximityReview get() = plan.review
-
-    /** Exact credential and field choices. Each access returns an independently owned snapshot. */
-    public val submission: ProximitySubmission get() = ownedSubmission.snapshot()
-
-    /** Display deadline; wall-clock changes cannot extend the approval. */
-    public val expiresAt: Instant = approvedAt + APPROVAL_LIFETIME
-
-    /** Remaining time for a matching request to begin its single approved response. */
-    public val remainingSeconds: Int get() = ((remaining.inWholeNanoseconds + 999_999_999) / 1_000_000_000).toInt()
-
-    internal val remaining: Duration get() = (APPROVAL_LIFETIME - approved.elapsedNow()).coerceAtLeast(Duration.ZERO)
+    init { revoked = mutableRevoked.asStateFlow() }
 }
 
 /** Scope retained without credential contents, keys, request signatures, or session secrets. */

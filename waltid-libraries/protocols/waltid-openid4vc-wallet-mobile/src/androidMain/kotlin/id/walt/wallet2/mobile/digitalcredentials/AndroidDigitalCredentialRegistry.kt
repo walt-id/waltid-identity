@@ -143,6 +143,91 @@ public class AndroidDigitalCredentialRegistry(
             )
         }
     }
+
+    override val capabilities: MobileWalletDigitalCredentialCapabilities
+        get() {
+            val platformAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+            val runtimeAvailable = platformAvailable && registrationAvailable
+            val creationAvailable = platformAvailable && creationRegistrationAvailable
+            val unavailableReason = when {
+                !platformAvailable -> "Credential Manager requires Android 6 (API 23)"
+                !registrationAvailable -> "Credential registration has not completed successfully"
+                else -> null
+            }
+            val creationUnavailableReason = when {
+                !platformAvailable -> "Credential Manager requires Android 6 (API 23)"
+                !creationRegistrationAvailable -> "Credential creation registration has not completed successfully"
+                else -> null
+            }
+            return MobileWalletDigitalCredentialCapabilities(
+                platform = "Android Credential Manager",
+                platformAvailable = platformAvailable,
+                minimumOsVersion = "Android 6 (API 23)",
+                registrationAvailable = runtimeAvailable,
+                capabilities = listOf(
+                    MobileWalletDigitalCredentialCapability(
+                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+                        credentialFormats = listOf(
+                            MobileWalletDigitalCredentialFormat.MDOC,
+                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                        ),
+                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
+                        // response_mode=dc_api and dc_api.jwt respectively.
+                        responseProtection = listOf(
+                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
+                            MobileWalletDigitalCredentialResponseProtection.JWE,
+                        ),
+                        supported = runtimeAvailable,
+                        unsupportedReason = unavailableReason,
+                    ),
+                    MobileWalletDigitalCredentialCapability(
+                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                        credentialFormats = listOf(
+                            MobileWalletDigitalCredentialFormat.MDOC,
+                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                        ),
+                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.SIGNED),
+                        responseProtection = listOf(
+                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
+                            MobileWalletDigitalCredentialResponseProtection.JWE,
+                        ),
+                        supported = runtimeAvailable,
+                        unsupportedReason = unavailableReason,
+                    ),
+                    MobileWalletDigitalCredentialCapability(
+                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
+                        credentialFormats = listOf(
+                            MobileWalletDigitalCredentialFormat.MDOC,
+                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                        ),
+                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.MULTISIGNED),
+                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
+                        supported = false,
+                        unsupportedReason = MULTISIGNED_UNSUPPORTED_REASON,
+                    ),
+                    MobileWalletDigitalCredentialCapability(
+                        protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
+                        credentialFormats = listOf(MobileWalletDigitalCredentialFormat.MDOC),
+                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.READER_AUTHENTICATED),
+                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.HPKE),
+                        supported = runtimeAvailable,
+                        unsupportedReason = unavailableReason,
+                    ),
+                    MobileWalletDigitalCredentialCapability(
+                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+                        credentialFormats = listOf(
+                            MobileWalletDigitalCredentialFormat.MDOC,
+                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                        ),
+                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
+                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
+                        supported = creationAvailable,
+                        unsupportedReason = creationUnavailableReason,
+                    ),
+                ),
+            )
+        }
+
     @OptIn(ExperimentalSerializationApi::class)
     internal fun encodeAnnexCCredentialDatabase(
         records: List<MobileWalletCredentialRegistryRecord>,
@@ -294,90 +379,6 @@ public class AndroidDigitalCredentialRegistry(
     private var registrationAvailable: Boolean = false
 
     private var creationRegistrationAvailable: Boolean = false
-
-    override val capabilities: MobileWalletDigitalCredentialCapabilities
-        get() {
-            val platformAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-            val runtimeAvailable = platformAvailable && registrationAvailable
-            val creationAvailable = platformAvailable && creationRegistrationAvailable
-            val unavailableReason = when {
-                !platformAvailable -> "Credential Manager requires Android 6 (API 23)"
-                !registrationAvailable -> "Credential registration has not completed successfully"
-                else -> null
-            }
-            val creationUnavailableReason = when {
-                !platformAvailable -> "Credential Manager requires Android 6 (API 23)"
-                !creationRegistrationAvailable -> "Credential creation registration has not completed successfully"
-                else -> null
-            }
-            return MobileWalletDigitalCredentialCapabilities(
-                platform = "Android Credential Manager",
-                platformAvailable = platformAvailable,
-                minimumOsVersion = "Android 6 (API 23)",
-                registrationAvailable = runtimeAvailable,
-                capabilities = listOf(
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
-                        credentialFormats = listOf(
-                            MobileWalletDigitalCredentialFormat.MDOC,
-                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
-                        ),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
-                        // response_mode=dc_api and dc_api.jwt respectively.
-                        responseProtection = listOf(
-                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
-                            MobileWalletDigitalCredentialResponseProtection.JWE,
-                        ),
-                        supported = runtimeAvailable,
-                        unsupportedReason = unavailableReason,
-                    ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
-                        credentialFormats = listOf(
-                            MobileWalletDigitalCredentialFormat.MDOC,
-                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
-                        ),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.SIGNED),
-                        responseProtection = listOf(
-                            MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
-                            MobileWalletDigitalCredentialResponseProtection.JWE,
-                        ),
-                        supported = runtimeAvailable,
-                        unsupportedReason = unavailableReason,
-                    ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED,
-                        credentialFormats = listOf(
-                            MobileWalletDigitalCredentialFormat.MDOC,
-                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
-                        ),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.MULTISIGNED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
-                        supported = false,
-                        unsupportedReason = MULTISIGNED_UNSUPPORTED_REASON,
-                    ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
-                        credentialFormats = listOf(MobileWalletDigitalCredentialFormat.MDOC),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.READER_AUTHENTICATED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.HPKE),
-                        supported = runtimeAvailable,
-                        unsupportedReason = unavailableReason,
-                    ),
-                    MobileWalletDigitalCredentialCapability(
-                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
-                        credentialFormats = listOf(
-                            MobileWalletDigitalCredentialFormat.MDOC,
-                            MobileWalletDigitalCredentialFormat.SD_JWT_VC,
-                        ),
-                        requestProtection = listOf(MobileWalletDigitalCredentialRequestProtection.UNSIGNED),
-                        responseProtection = listOf(MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED),
-                        supported = creationAvailable,
-                        unsupportedReason = creationUnavailableReason,
-                    ),
-                ),
-            )
-        }
 
     private suspend fun registerRecords(
         registryId: String,

@@ -161,23 +161,25 @@ public data class ProximityReaderAuthentication(
             is ProximityReaderAuthenticationOutcome.Valid -> ProximityReaderAuthenticationValidity.Valid
         }
 
-    private val decision: ProximityReaderTrustDecision?
-        get() = (outcome as? ProximityReaderAuthenticationOutcome.Valid)?.trust
-
     /** Display trust state; authentication failure has no evaluated trust decision. */
     public val trust: ProximityReaderTrustState
         get() = decision?.state ?: ProximityReaderTrustState.NotEvaluated
+
     /** Independently evaluated certificate-path fact. */
     public val certificatePath: ProximityReaderCertificatePathState
         get() = decision?.certificatePath ?: ProximityReaderCertificatePathState.NotEvaluated
+
     /** Independently evaluated revocation fact. */
     public val revocation: ProximityReaderRevocationState
         get() = decision?.revocation ?: ProximityReaderRevocationState.NotChecked
+
     /** Independently evaluated RICAL fact. */
     public val rical: ProximityRicalState
         get() = decision?.rical ?: ProximityRicalState.NotEvaluated
+
     /** Reader name established by the trust policy. */
     public val displayName: String? get() = decision?.displayName
+
     /** Display-safe authentication or trust explanation. */
     public val reason: String?
         get() = when (outcome) {
@@ -186,6 +188,9 @@ public data class ProximityReaderAuthentication(
             is ProximityReaderAuthenticationOutcome.Invalid -> outcome.reason
             is ProximityReaderAuthenticationOutcome.Valid -> outcome.trust.reason
         }
+
+    private val decision: ProximityReaderTrustDecision?
+        get() = (outcome as? ProximityReaderAuthenticationOutcome.Valid)?.trust
 }
 
 /** Authentication result whose trust payload exists only after successful verification. */
@@ -216,10 +221,6 @@ public sealed interface ProximityReaderAuthenticationOutcome {
         ProximityReaderAuthenticationOutcome
 }
 
-/** Document index derived from the scope, without an independent nullable constructor argument. */
-internal val ProximityReaderAuthenticationScope.documentRequestIndex: Int?
-    get() = (this as? ProximityReaderAuthenticationScope.Document)?.index
-
 /** Default policy: validity is reported, but no reader certificate becomes trusted implicitly. */
 public object UnconfiguredProximityReaderTrustEvaluator :
     ProximityReaderTrustEvaluator {
@@ -231,6 +232,10 @@ public object UnconfiguredProximityReaderTrustEvaluator :
         reason = "No reader trust policy is configured",
     )
 }
+
+/** Document index derived from the scope, without an independent nullable constructor argument. */
+internal val ProximityReaderAuthenticationScope.documentRequestIndex: Int?
+    get() = (this as? ProximityReaderAuthenticationScope.Document)?.index
 
 private fun validateReaderTrustFacts(
     state: ProximityReaderTrustState,

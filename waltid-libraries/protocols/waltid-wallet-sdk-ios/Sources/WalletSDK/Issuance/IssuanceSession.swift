@@ -36,8 +36,6 @@ public enum IssuanceClientIdentification: Sendable {
 public struct AuthorizationCodeOffer: Sendable {
     /// Verified authorization server identifier used to choose the app’s registration.
     public let authorizationServer: String
-    let id: IssuanceSessionID
-    let wallet: Wallet
 
     /// Accepts the offer and prepares a browser request and its durable callback reference.
     /// - Parameters:
@@ -47,6 +45,9 @@ public struct AuthorizationCodeOffer: Sendable {
                                    credentials: [IssuanceCredentialSelection]? = nil) async throws -> PendingIssuanceAuthorization {
         try await wallet.beginAuthorization(id, registration: registration, credentials: credentials)
     }
+
+    let id: IssuanceSessionID
+    let wallet: Wallet
 }
 
 /// A pre-authorized offer and the inputs required by its selected authorization server.
@@ -57,8 +58,6 @@ public struct PreAuthorizedOffer: Sendable {
     public let clientIdentification: IssuanceClientIdentification
     /// Input requested by the credential issuer when the holder needs a separate code.
     public let transactionCode: IssuanceTransactionCode?
-    let id: IssuanceSessionID
-    let wallet: Wallet
 
     /// Accepts the offer after the holder reviews the credentials and supplies any requested inputs.
     /// - Parameters:
@@ -69,6 +68,9 @@ public struct PreAuthorizedOffer: Sendable {
                        clientID: String? = nil) async throws -> IssuanceOutcome {
         try await wallet.accept(id, transactionCode: transactionCode, credentials: credentials, clientID: clientID)
     }
+
+    let id: IssuanceSessionID
+    let wallet: Wallet
 }
 
 /// The grant selected during discovery and the operation available after review.
@@ -101,26 +103,20 @@ public struct IssuanceSession: Sendable {
     }
 }
 
-struct IssuanceOfferReview: Sendable {
-    let id: String
-    let offer: IssuanceOfferPreview
-    let authorizationServer: String
-    let clientIdentification: IssuanceClientIdentification
-}
-
 /// A browser request paired with the callback continuation that created it.
 public struct PendingIssuanceAuthorization: Sendable {
     /// Durable callback reference for a reopened wallet.
     public let id: AuthorizationIssuanceID
     /// Browser URL, PKCE challenge and expected redirect.
     public let request: IssuanceAuthorization
-    let wallet: Wallet
 
     /// Completes this authorization after the browser returns to the app.
     /// - Parameter callback: URI delivered to the host by the browser.
     public func complete(_ callback: URL) async throws -> IssuanceOutcome {
         try await wallet.continueAuthorizationIssuance(sessionID: id, callbackURI: callback)
     }
+
+    let wallet: Wallet
 }
 
 /// Current retained state, refreshed by listing issuance continuations.
@@ -175,4 +171,11 @@ public struct DeferredCredential: Equatable, Sendable {
         self.status = status
         self.displayMetadataJSON = displayMetadataJSON
     }
+}
+
+struct IssuanceOfferReview: Sendable {
+    let id: String
+    let offer: IssuanceOfferPreview
+    let authorizationServer: String
+    let clientIdentification: IssuanceClientIdentification
 }
