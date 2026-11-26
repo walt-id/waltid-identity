@@ -6,6 +6,7 @@ import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.CredentialStatusConfiguration
 import id.walt.openid4vci.CredentialFormat
+import id.walt.credentials.issuance.MdlLoginClaimMapping
 import id.walt.mdoc.issuance.MdlAge
 import id.walt.mdoc.issuance.MsoData
 import io.ktor.server.plugins.NotFoundException
@@ -88,7 +89,11 @@ class CredentialProfileService(
         credentialData: JsonObject,
         claimsMapping: Map<String, String>,
     ): JsonObject =
-        if (isMdl(configurationId)) MdlAgeValidation.claimsDestination(credentialData, claimsMapping) else credentialData
+        if (isMdl(configurationId)) {
+            MdlLoginClaimMapping.forDestinations(claimsMapping.values).prepareDestination(credentialData)
+        } else {
+            credentialData
+        }
 
     private fun isMdl(configurationId: String): Boolean =
         credentialFormat(configurationId) == CredentialFormat.MSO_MDOC &&

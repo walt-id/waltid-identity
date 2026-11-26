@@ -47,6 +47,9 @@ kotlin {
 
             implementation(identityLibs.kotlincrypto.hash.sha2)
         }
+        jvmMain.dependencies {
+            implementation(identityLibs.jaywayjsonpath)
+        }
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))

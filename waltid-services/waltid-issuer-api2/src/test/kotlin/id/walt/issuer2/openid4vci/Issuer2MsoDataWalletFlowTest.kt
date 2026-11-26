@@ -66,6 +66,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -393,12 +394,12 @@ class Issuer2MsoDataWalletFlowTest {
     }
 
     @Test
-    fun authorizedMdlUsesBirthDateFromLoginCallback() = testApplication {
+    fun authorizedMdlUsesLoginToPopulateNullBirthDate() = testApplication {
         issueMdlWithLoginClaims(wholeNamespace = false)
     }
 
     @Test
-    fun authorizedMdlUsesWholeNamespaceFromLoginCallback() = testApplication {
+    fun authorizedMdlUsesLoginToPopulateNullNamespace() = testApplication {
         issueMdlWithLoginClaims(wholeNamespace = true)
     }
 
@@ -454,9 +455,10 @@ class Issuer2MsoDataWalletFlowTest {
                     val profile = config.profiles.getValue(id)
                     val namespace = profile.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject
                     val credentialData = if (wholeNamespace) {
-                        JsonObject(profile.credentialData - ISO_MDL_NAMESPACE)
+                        JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to JsonNull))
                     } else {
-                        JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to JsonObject(namespace - "birth_date")))
+                        val pendingBirthDate = JsonObject(namespace + ("birth_date" to JsonNull))
+                        JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to pendingBirthDate))
                     }
                     config.copy(profiles = config.profiles + (id to profile.copy(
                         credentialData = credentialData,
@@ -476,9 +478,9 @@ class Issuer2MsoDataWalletFlowTest {
             val issuance = client.getSession(offer.offerId).issuanceRequests.single()
             assertEquals(claimsMapping, issuance.idTokenClaimsMapping)
             if (wholeNamespace) {
-                assertNull(issuance.credentialData[ISO_MDL_NAMESPACE])
+                assertEquals(JsonNull, issuance.credentialData[ISO_MDL_NAMESPACE])
             } else {
-                assertNull(issuance.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject["birth_date"])
+                assertEquals(JsonNull, issuance.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject["birth_date"])
             }
             val resolved = wallet.resolve(offer)
             val login = wallet.startAuthorizationCodeFlowWithIssuerState(offer, resolved, scenario)
