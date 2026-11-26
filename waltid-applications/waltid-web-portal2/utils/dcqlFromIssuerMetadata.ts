@@ -93,6 +93,12 @@ export function defaultSelectedClaimIds(
   configurationId?: string,
 ): string[] {
   const claims = claimsFromIssuerMetadata(configuration);
+  if (configuration?.doctype === "org.iso.18013.5.1.mDL") {
+    // The bundled mDL leaves exact age optional. Keep it available for manual selection.
+    return claims
+      .filter((claim) => claim.id !== "org.iso.18013.5.1.age_in_years")
+      .map((claim) => claim.id);
+  }
   if (!isPidConfiguration(configuration, configurationId)) {
     return claims.map((claim) => claim.id);
   }

@@ -7,6 +7,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.KeyType
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
 import id.walt.issuer2.config.Issuer2ProfilesConfig
+import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCredential
 import id.walt.issuer2.models.MultiCredentialOfferCreateRequest
@@ -277,6 +278,11 @@ class Issuer2MsoDataWalletFlowTest {
         val body = rejected.bodyAsText()
         assertEquals(HttpStatusCode.InternalServerError, rejected.status, body)
         assertTrue(body.contains("server_error"), body)
+        redeem(
+            offer(assertNotNull(Issuer2RequestExamples.PRE_AUTHORIZED_MDL_OFFER_WITH_AGE_OVERRIDE.runtimeOverrides)),
+            age = 36,
+            validFrom = birthday,
+        )
         redeem(
             offer(CredentialOfferRuntimeOverrides(
                 mapping = buildJsonObject {

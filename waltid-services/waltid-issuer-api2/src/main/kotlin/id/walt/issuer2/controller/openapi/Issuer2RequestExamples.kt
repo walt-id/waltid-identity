@@ -9,6 +9,7 @@ import id.walt.issuer2.models.MultiCredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.ktornotifications.core.KtorSessionNotifications.WebhookRetryPolicy
+import id.walt.mdoc.issuance.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferRequest
@@ -371,6 +372,19 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
 
+    val PRE_AUTHORIZED_MDL_OFFER_WITH_AGE_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+        profileId = MDOC_MDL_PROFILE_ID,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
+            credentialData = buildJsonObject {
+                putJsonObject("org.iso.18013.5.1") {
+                    put("birth_date", "1990-08-26")
+                    put("age_in_years", 36)
+                }
+            },
+            msoData = MsoData(validFrom = "2027-08-25T00:00:00Z"),
+        ),
+    )
+
     val CREDENTIAL_OFFER_RESPONSE_BY_REFERENCE = CredentialOfferCreateResponse(
         offerId = EXAMPLE_OFFER_ID,
         profileId = W3C_PROFILE_ID,
@@ -603,6 +617,7 @@ object Issuer2RequestExamples {
         "[pre-authorized][single][by-reference][issuerKey override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE,
         "[pre-authorized][single][by-reference][selective disclosure override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE,
         "[pre-authorized][single][by-reference][mDoc credentialData override]" to PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[pre-authorized][single][by-reference][mDL age override]" to PRE_AUTHORIZED_MDL_OFFER_WITH_AGE_OVERRIDE,
         "[pre-authorized][single][by-reference][authorized transaction types override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_AUTHORIZED_TRANSACTION_DATA_TYPES_OVERRIDE,
         "[pre-authorized][multiple][by-reference]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER,
         "[pre-authorized][multiple][by-value]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE,
