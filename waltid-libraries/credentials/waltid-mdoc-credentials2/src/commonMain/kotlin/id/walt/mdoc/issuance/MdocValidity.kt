@@ -24,6 +24,15 @@ fun roundedMdocValidity(
     )
 }
 
+fun requireMdocSignedWithinCertificateValidity(signed: Instant, validity: X509Certificate.Validity) {
+    require(validity.notBefore <= signed) {
+        "MSO signed is before the document signer certificate notBefore"
+    }
+    require(signed <= validity.notAfter) {
+        "MSO signed is after the document signer certificate notAfter"
+    }
+}
+
 fun truncateMdocTDate(instant: Instant): Instant = Instant.fromEpochSeconds(instant.epochSeconds)
 
 private fun Instant.ceilToSecond(): Instant =

@@ -348,26 +348,26 @@ object Issuer2RequestExamples {
                     put("family_name", "Doe")
                     put("given_name", "Jane")
                     put("birth_date", birthDate.toString())
+                    put("age_birth_year", birthDate.year)
                     put("age_in_years", Period.between(birthDate, LocalDate.now(ZoneOffset.UTC)).years)
                     put("issue_date", "2019-10-20")
-                    put("expiry_date", "2024-10-20")
+                    put("expiry_date", "2029-10-20")
                     put("issuing_country", "AT")
                     put("issuing_authority", "AT DMV")
                     put("document_number", "123456789")
-                    put("portrait", "AQIDBAUGBwgJCgsMDQ4P")
                     putJsonArray("driving_privileges") {
                         addJsonObject {
                             put("vehicle_category_code", "A")
                             put("issue_date", "2018-08-09")
-                            put("expiry_date", "2024-10-20")
+                            put("expiry_date", "2029-10-20")
                         }
                         addJsonObject {
                             put("vehicle_category_code", "B")
                             put("issue_date", "2017-02-23")
-                            put("expiry_date", "2024-10-20")
+                            put("expiry_date", "2029-10-20")
                         }
                     }
-                    put("un_distinguishing_sign", "AT")
+                    put("un_distinguishing_sign", "A")
                 }
             },
         ),
@@ -384,6 +384,7 @@ object Issuer2RequestExamples {
                 credentialData = buildJsonObject {
                     putJsonObject("org.iso.18013.5.1") {
                         put("birth_date", birthDate.toString())
+                        put("age_birth_year", birthDate.year)
                         put("age_in_years", Period.between(birthDate, issuanceDate).years)
                     }
                 },

@@ -68,6 +68,10 @@ import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborByteString
+import kotlinx.serialization.cbor.CborInteger
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -81,6 +85,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -98,17 +103,21 @@ class Issuer2MsoDataWalletFlowTest {
 
     @Test
     fun issuedMdocUsesDefaultValidityWhenMsoDataIsOmitted() = testApplication {
-        val validity = issueIsoMdl()
+        val validity = issueIsoMdl(configureProfiles = { config ->
+            val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
+            config.copy(profiles = config.profiles + (id to config.profiles.getValue(id).copy(msoData = null)))
+        })
         assertEquals(validity.signed.epochSeconds, validity.validFrom.epochSeconds)
         assertTrue(validity.validUntil - validity.signed in (364.days..366.days))
         assertTwelveHourUtcBoundary(validity.validUntil)
         assertNull(validity.expectedUpdate)
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun issuedMdocUsesRuntimeMsoDataFunctions() = testApplication {
         val now = Clock.System.now()
-        val validity = issueIsoMdl(
+        val payload = issueIsoMdlCredential(
             CredentialOfferRuntimeOverrides(
                 msoData = MsoData(
                     validFrom = "<timestamp>",
@@ -118,6 +127,14 @@ class Issuer2MsoDataWalletFlowTest {
             )
         )
 
+        val signed = decodeIssuerSigned(payload)
+        val claims = assertNotNull(signed.namespaces?.get(ISO_MDL_NAMESPACE))
+            .entries.associate { it.value.elementIdentifier to it.value.elementValue }
+        val portrait = assertIs<CborByteString>(claims["portrait"]).toByteArray()
+        assertEquals(192, assertNotNull(javax.imageio.ImageIO.read(portrait.inputStream())).width)
+        assertEquals(2, assertIs<CborArray>(claims["driving_privileges"]).size)
+
+        val validity = signed.decodeMobileSecurityObject().validityInfo
         assertTrue(validity.validFrom - now in (-2.days..2.days))
         assertTrue(validity.validUntil - validity.validFrom in (364.days..366.days))
         assertTrue(assertNotNull(validity.expectedUpdate) - validity.validFrom in (179.days..181.days))
@@ -141,6 +158,30 @@ class Issuer2MsoDataWalletFlowTest {
         assertEquals(validFrom.epochSeconds, validity.validFrom.epochSeconds)
         assertEquals(validUntil.epochSeconds, validity.validUntil.epochSeconds)
         assertEquals(expectedUpdate.epochSeconds, validity.expectedUpdate?.epochSeconds)
+    }
+
+    @Test
+    fun issuedMdocAcceptsExpectedUpdateBeforeValidityWindow() =
+        assertExpectedUpdateOutsideValidityWindow("2027-01-05T00:00:00Z")
+
+    @Test
+    fun issuedMdocAcceptsExpectedUpdateAfterValidityWindow() =
+        assertExpectedUpdateOutsideValidityWindow("2027-02-15T00:00:00Z")
+
+    private fun assertExpectedUpdateOutsideValidityWindow(expectedUpdate: String) = testApplication {
+        pinMdlIssuanceClock(Instant.parse("2027-01-01T04:05:06.987Z"))
+        val validity = issueIsoMdl(CredentialOfferRuntimeOverrides(
+            msoData = MsoData(
+                validFrom = "2027-01-10T00:00:00Z",
+                validUntil = "2027-02-10T00:00:00Z",
+                expectedUpdate = expectedUpdate,
+            ),
+        ))
+
+        assertEquals("2027-01-01T00:00:00Z", validity.signed.toString())
+        assertEquals("2027-01-10T00:00:00Z", validity.validFrom.toString())
+        assertEquals("2027-02-10T00:00:00Z", validity.validUntil.toString())
+        assertEquals(expectedUpdate, validity.expectedUpdate.toString())
     }
 
     @Test
@@ -290,6 +331,15 @@ class Issuer2MsoDataWalletFlowTest {
         val documentedOverrides = assertNotNull(documentedOffer.runtimeOverrides)
         assertNull(documentedOverrides.msoData)
         redeem(offer(documentedOverrides), age = 36, validFrom = birthday)
+        val nextBirthday = Instant.parse("2027-08-26T00:00:00Z")
+        redeem(
+            offer(
+                assertNotNull(Issuer2RequestExamples.preAuthorizedMdlOfferWithAgeOverride(LocalDate.parse("2027-08-26")).runtimeOverrides)
+                    .copy(msoData = MsoData(validFrom = nextBirthday.toString())),
+            ),
+            age = 37,
+            validFrom = nextBirthday,
+        )
         redeem(
             offer(CredentialOfferRuntimeOverrides(
                 mapping = buildJsonObject {
@@ -532,10 +582,10 @@ class Issuer2MsoDataWalletFlowTest {
         }
     }
 
-    private fun ApplicationTestBuilder.pinMdlIssuanceClock() {
+    private fun ApplicationTestBuilder.pinMdlIssuanceClock(now: Instant = AGE_VALID_FROM - 1.days) {
         application {
             intercept(ApplicationCallPipeline.Plugins) {
-                withContext(IssuanceClock(InstantClock(AGE_VALID_FROM - 1.days))) { proceed() }
+                withContext(IssuanceClock(InstantClock(now))) { proceed() }
             }
         }
     }
@@ -545,11 +595,13 @@ class Issuer2MsoDataWalletFlowTest {
         return assertNotNull(headers[HttpHeaders.Location])
     }
 
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
     private fun assertSignedBirthDateAndAge(payload: JsonObject, age: Int? = 36) {
         assertEquals(AGE_VALID_FROM, mdocValidityInfo(payload).validFrom)
-        val namespace = mdocNamespaceJson(payload, ISO_MDL_NAMESPACE)
-        assertEquals(JsonPrimitive("1990-08-26"), namespace["birth_date"])
-        assertEquals(age?.let { JsonPrimitive(it) }, namespace["age_in_years"])
+        val claims = assertNotNull(decodeIssuerSigned(payload).namespaces?.get(ISO_MDL_NAMESPACE))
+            .entries.associate { it.value.elementIdentifier to it.value.elementValue }
+        assertEquals(CborString("1990-08-26", 1004uL), claims["birth_date"])
+        assertEquals(age?.let { CborInteger(it.toLong()) }, claims["age_in_years"])
     }
 
     @Test
@@ -601,7 +653,10 @@ class Issuer2MsoDataWalletFlowTest {
             resolvedOffer = walletFlow.resolve(createdOffer),
             scenario = scenario,
         )
-        assertEquals(offerMsoData, client.getSession(createdOffer.offerId).issuanceRequests.single().msoData)
+        assertEquals(
+            PROFILE_MSO_DATA.copy(validUntil = offerMsoData.validUntil),
+            client.getSession(createdOffer.offerId).issuanceRequests.single().msoData,
+        )
     }
 
     @Test

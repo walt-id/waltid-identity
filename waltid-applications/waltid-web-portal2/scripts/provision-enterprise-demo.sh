@@ -22,6 +22,7 @@ else
   API_BASE="https://${ES_ORGANIZATION}.${host}"
 fi
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -101,10 +102,56 @@ request POST "${API_BASE}/v1/${root}.x509/resource-api/services/create" "{\"type
 
 KEY_ID="${root}.kms.issuer-key"
 KMS_ID="${root}.kms"
+IACA_KEY_ID="${KMS_ID}.portal-mdoc-iaca"
+X509_SERVICE_ID="${root}.portal-x509"
+request POST "${API_BASE}/v1/${IACA_KEY_ID}/kms-service-api/keys/generate" '{"backend":"jwk","keyType":"secp256r1","name":"Portal mdoc IACA"}'
+request POST "${API_BASE}/v1/${X509_SERVICE_ID}/resource-api/services/create" "{\"type\":\"x509-service\",\"_id\":\"${X509_SERVICE_ID}\"}"
 
-python3 - "$tmp/issuers.json" "$KEY_ID" "$KMS_ID" <<'PY'
+# Generate an AT document signer for the existing KMS key. Only the leaf goes in x5Chain.
+iaca_body="$(python3 - "$IACA_KEY_ID" <<'PYTHON'
 import json, sys
-path, key_id, kms_id = sys.argv[1:]
+print(json.dumps({
+    "certificateData": {
+        "country": "AT",
+        "commonName": "Portal Demo IACA",
+        "issuerAlternativeNameConf": {"uri": "https://walt.id"},
+        "crlDistributionPointUri": "https://walt.id/crl",
+    },
+    "iacaKeyDesc": {"type": "kms-hosted-key-descriptor", "keyIdPath": sys.argv[1]},
+}))
+PYTHON
+)"
+request POST "${API_BASE}/v1/${X509_SERVICE_ID}/x509-service-api/iso/iacas" "$iaca_body"
+cp "$tmp/body" "$tmp/iaca.json"
+signer_body="$(python3 - "$tmp/iaca.json" "$IACA_KEY_ID" "$KEY_ID" <<'PYTHON'
+import json, sys
+from pathlib import Path
+iaca_path, iaca_key, signer_key = sys.argv[1:]
+print(json.dumps({
+    "iacaSigner": {
+        "type": "iaca-pem-cert-descriptor",
+        "iacaKeyDesc": {"type": "kms-hosted-key-descriptor", "keyIdPath": iaca_key},
+        "iacaPemEncodedCertificate": json.loads(Path(iaca_path).read_text())["certificatePEM"],
+    },
+    "certificateData": {
+        "country": "AT",
+        "commonName": "Portal Demo Document Signer",
+        "issuerAltNameUri": "https://walt.id",
+        "crlDistributionPointUri": "https://walt.id/crl",
+    },
+    "dsKeyDescriptor": {"type": "kms-hosted-key-descriptor", "keyIdPath": signer_key},
+}))
+PYTHON
+)"
+request POST "${API_BASE}/v1/${X509_SERVICE_ID}/x509-service-api/iso/document-signers" "$signer_body"
+
+portrait_file="$repo_root/waltid-applications/waltid-wallet-demo-test-fixtures/resources/files/synthetic-portrait.jpg"
+python3 - "$tmp/issuers.json" "$KEY_ID" "$KMS_ID" "$tmp/body" "$portrait_file" <<'PY'
+import base64, json, sys
+from pathlib import Path
+path, key_id, kms_id, signer_path, portrait_path = sys.argv[1:]
+signer = json.loads(Path(signer_path).read_text())["certificatePEM"]
+portrait = base64.b64encode(Path(portrait_path).read_bytes()).decode("ascii")
 proof = {
     "jwt": {"proof_signing_alg_values_supported": ["ES256"]},
 }
@@ -232,20 +279,38 @@ profiles = {
         "name": "mDL",
         "credentialConfigurationId": "mdl",
         "issuerKeyId": key_id,
+        "x5Chain": [{
+            "type": "pem-encoded-x509-certificate-descriptor",
+            "pemEncodedCertificate": signer,
+        }],
+        "msoData": {
+            "validFrom": "<timestamp>",
+            "validUntil": "<timestamp-in:365d>",
+            "expectedUpdate": "<timestamp-in:180d>",
+        },
         "credentialData": {
             "org.iso.18013.5.1": {
                 "family_name": "Musterfrau",
                 "given_name": "Anna",
                 "birth_date": "1990-01-01",
                 "age_in_years": 36,  # For UTC validFrom dates 2026-01-01 through 2026-12-31.
+                "issue_date": "2025-01-15",
+                "expiry_date": "2035-01-15",
                 "issuing_country": "AT",
+                "issuing_authority": "AT DMV",
+                "document_number": "DL-AT-2025-00018428",
+                "portrait": portrait,
+                "un_distinguishing_sign": "A",
                 "driving_privileges": [{"vehicle_category_code": "B"}],
             }
         },
         "mDocNameSpacesDataMappingConfig": {
             "org.iso.18013.5.1": {
                 "entriesConfigMap": {
-                    "birth_date": {"type": "string", "conversionType": "stringToFullDate"}
+                    "birth_date": {"type": "string", "conversionType": "stringToFullDate"},
+                    "issue_date": {"type": "string", "conversionType": "stringToFullDate"},
+                    "expiry_date": {"type": "string", "conversionType": "stringToFullDate"},
+                    "portrait": {"type": "string", "conversionType": "base64StringToByteString"},
                 }
             }
         },

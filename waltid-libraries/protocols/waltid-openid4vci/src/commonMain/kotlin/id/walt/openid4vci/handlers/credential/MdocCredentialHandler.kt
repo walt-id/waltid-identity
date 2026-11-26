@@ -18,6 +18,7 @@ import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigning
 import id.walt.openid4vci.handlers.endpoints.credential.signEach
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.mdoc.issuance.requireMdocSignedWithinCertificateValidity
 import id.walt.mdoc.issuance.roundedMdocValidity
 import id.walt.mdoc.issuance.truncateMdocTDate
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
@@ -241,10 +242,12 @@ class MdocCredentialHandler(
         val issuerCertificateChain = certificates.map { CoseCertificate(it.encodedDer.toByteArray()) }
 
         val issuedAt = issuanceInstant()
+        val leafValidity = certificates.first().data.validity
         val roundedValidity = if (roundValidityToTwelveHours) {
-            roundedMdocValidity(issuedAt, certificates.first().data.validity, validFrom, validUntil)
+            roundedMdocValidity(issuedAt, leafValidity, validFrom, validUntil)
         } else null
         val signedAt = truncateMdocTDate(roundedValidity?.signed ?: issuedAt)
+        requireMdocSignedWithinCertificateValidity(signedAt, leafValidity)
         val msoValidFrom = (roundedValidity?.validFrom ?: validFrom)?.let(::truncateMdocTDate)
         val msoValidUntil = truncateMdocTDate(roundedValidity?.validUntil ?: validUntil ?: issuedAt.plus(365.days))
         return issuanceBatch.signEach { instance ->

@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
+import kotlin.io.encoding.Base64
 
 object MdocDocs {
     fun getMdocsDocs(): RouteConfig.() -> Unit = {
@@ -29,25 +30,25 @@ object MdocDocs {
             required = true
 
             example(
-                name = "mDL example - Mandatory fields only",
+                name = "mDL example - Base fields",
             ) {
                 value = mdlBaseIssuanceExample
             }
 
             example(
-                name = "mDL example - Mandatory fields & Age attestation (single)",
+                name = "mDL example - Base fields & Age attestation (single)",
             ) {
                 value = mDLSingleAgeAttestation
             }
 
             example(
-                name = "mDL example - Mandatory fields & Age attestations (multiple)",
+                name = "mDL example - Base fields & Age attestations (multiple)",
             ) {
                 value = mDLMultipleAgeAttestations
             }
 
             example(
-                name = "mDL example - All fields & Age attestations (multiple)",
+                name = "mDL example - Optional fields & Age attestations (multiple)",
             ) {
                 value = mDLAllFieldsMultipleAgeAttestations
             }
@@ -56,6 +57,10 @@ object MdocDocs {
 
     private const val MDL_VC_CONFIG_ID = "org.iso.18013.5.1.mDL"
     private const val ISO_IEC_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
+
+    private val mdlPortraitBase64 = Base64.encode(
+        checkNotNull(javaClass.getResourceAsStream("/mdl-demo-portrait.jpg")).use { it.readBytes() },
+    )
 
     val mdlBaseIssuanceExample = Json.decodeFromString<IssuanceRequest>(
         """
@@ -77,27 +82,28 @@ object MdocDocs {
                     "family_name": "Doe",
                     "given_name": "John",
                     "birth_date": "1986-03-22",
+                    "age_in_years": 40,
                     "issue_date": "2019-10-20",
-                    "expiry_date": "2024-10-20",
+                    "expiry_date": "2029-10-20",
                     "issuing_country": "AT",
                     "issuing_authority": "AT DMV",
                     "document_number": "123456789",
-                    "portrait": [141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12],
+                    "portrait": "$mdlPortraitBase64",
                     "driving_privileges": ${
             buildJsonArray {
                 addJsonObject {
                     put("vehicle_category_code", "A".toJsonElement())
                     put("issue_date", "2018-08-09".toJsonElement())
-                    put("expiry_date", "2024-10-20".toJsonElement())
+                    put("expiry_date", "2029-10-20".toJsonElement())
                 }
                 addJsonObject {
                     put("vehicle_category_code", "B".toJsonElement())
                     put("issue_date", "2017-02-23".toJsonElement())
-                    put("expiry_date", "2024-10-20".toJsonElement())
+                    put("expiry_date", "2029-10-20".toJsonElement())
                 }
             }
         },
-                    "un_distinguishing_sign": "AT"
+                    "un_distinguishing_sign": "A"
                 }
             },
             "x5Chain": [
@@ -151,10 +157,8 @@ object MdocDocs {
                     put("birth_place", "Vienna".toJsonElement())
                     put("resident_address", "Some Street 4".toJsonElement())
                     put("portrait_capture_date", "2018-08-09".toJsonElement())
-                    put("age_in_years", 33.toJsonElement())
                     put("age_birth_year", 1986.toJsonElement())
 
-                    put("issuing_jurisdiction", "AT-9".toJsonElement())
                     put("nationality", "AT".toJsonElement())
                     put("resident_city", "Vienna".toJsonElement())
                     put("resident_state", "Vienna".toJsonElement())

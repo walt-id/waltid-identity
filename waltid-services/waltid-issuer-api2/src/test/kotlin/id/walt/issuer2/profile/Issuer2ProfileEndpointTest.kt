@@ -351,7 +351,14 @@ class Issuer2ProfileEndpointTest {
         assertNotNull(profile.x5Chain, "Expected mDL profile to use issuer1 sample certificate")
 
         val mdlData = profile.credentialData[ISO_MDL_NAMESPACE_ID]?.jsonObject
-        assertEquals(CATALOG_PORTRAIT_BASE64, mdlData?.get("portrait")?.jsonPrimitive?.content)
+        val portrait = assertNotNull(mdlData?.get("portrait")?.jsonPrimitive?.content)
+        val image = assertNotNull(javax.imageio.ImageIO.read(java.util.Base64.getDecoder().decode(portrait).inputStream()))
+        assertEquals(192, image.width)
+        assertEquals(240, image.height)
+        assertTrue(portrait.startsWith("/9j/"), "Expected a JPEG portrait")
+        assertEquals("<timestamp>", profile.msoData?.validFrom)
+        assertEquals("<timestamp-in:365d>", profile.msoData?.validUntil)
+        assertEquals("<timestamp-in:180d>", profile.msoData?.expectedUpdate)
         assertEquals(JsonPrimitive(38), mdlData?.get("age_in_years"))
         assertEquals(2, mdlData?.get("driving_privileges")?.jsonArray?.size)
         assertEquals("Mariahilfer Straße 120/8", mdlData?.get("resident_address")?.jsonPrimitive?.content)
@@ -598,8 +605,6 @@ class Issuer2ProfileEndpointTest {
         const val JWT_VC_JSON_FORMAT = "jwt_vc_json"
         const val MSO_MDOC_FORMAT = "mso_mdoc"
         const val SD_JWT_VC_FORMAT = "dc+sd-jwt"
-        const val CATALOG_PORTRAIT_BASE64 =
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0i8AAAAASUVORK5CYII="
         const val DEFAULT_ISSUER_KEY_D = "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ"
         const val DEFAULT_ISSUER_KEY_X = "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM"
         const val DEFAULT_ISSUER_KEY_Y = "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"

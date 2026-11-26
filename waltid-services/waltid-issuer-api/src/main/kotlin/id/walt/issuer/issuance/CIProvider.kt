@@ -12,6 +12,7 @@ import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
@@ -525,10 +526,13 @@ open class CIProvider(
         ).apply {
             issuerSignedItems.forEach { namespace ->
                 namespace.value.forEach { property ->
+                    val portrait = (property.value as? JsonPrimitive)?.takeIf {
+                        namespace.key == "org.iso.18013.5.1" && property.key == "portrait" && it.isString
+                    }?.let { runCatching { ByteStringElement(it.content.decodeFromBase64()) }.getOrNull() }
                     addItemToSign(
                         nameSpace = namespace.key,
                         elementIdentifier = property.key,
-                        elementValue = property.value.toDataElement(),
+                        elementValue = portrait ?: property.value.toDataElement(),
                     )
                 }
             }

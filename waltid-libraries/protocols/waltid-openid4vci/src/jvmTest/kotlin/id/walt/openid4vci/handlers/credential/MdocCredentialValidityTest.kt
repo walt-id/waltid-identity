@@ -86,6 +86,24 @@ class MdocCredentialValidityTest {
     }
 
     @Test
+    fun `accepts signed at the leaf certificate boundaries and rejects signing outside them`() = runTest {
+        val notBefore = "2026-09-08T12:00:00Z"
+        val notAfter = "2026-09-09T00:00:00Z"
+        val fixture = fixture(notBefore, notAfter)
+        assertEquals(Instant.parse(notBefore), fixture.issue(notBefore).signed)
+        assertEquals(Instant.parse(notAfter), fixture.issue(notAfter).signed)
+
+        val tooEarly = assertFailsWith<IllegalArgumentException> {
+            fixture.issueResult(now = "2026-09-08T11:59:59Z", roundValidityToTwelveHours = false)
+        }
+        assertTrue(tooEarly.message.orEmpty().contains("notBefore"))
+        val tooLate = assertFailsWith<IllegalArgumentException> {
+            fixture.issueResult(now = "2026-09-09T12:00:00Z")
+        }
+        assertTrue(tooLate.message.orEmpty().contains("notAfter"))
+    }
+
+    @Test
     fun `default validUntil uses the injected clock when rounding is disabled`() = runTest {
         val frozen = Instant.parse("2026-09-08T19:18:10Z")
         val validity = fixture().issueCredential(
@@ -347,7 +365,10 @@ class MdocCredentialValidityTest {
         )
     }
 
-    private suspend fun fixture(notBefore: String = "2026-01-01T00:00:00Z"): Fixture {
+    private suspend fun fixture(
+        notBefore: String = "2026-01-01T00:00:00Z",
+        notAfter: String = "2028-01-01T00:00:00Z",
+    ): Fixture {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         suspend fun key(id: String) = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
@@ -357,7 +378,7 @@ class MdocCredentialValidityTest {
             issuer, SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
         ) {
             subjectDn = "CN=mdoc validity test"
-            validity = X509Certificate.Validity(Instant.parse(notBefore), Instant.parse("2028-01-01T00:00:00Z"))
+            validity = X509Certificate.Validity(Instant.parse(notBefore), Instant.parse(notAfter))
         }
         return Fixture(issuer, listOf(key("holder-1"), key("holder-2")), certificate)
     }
