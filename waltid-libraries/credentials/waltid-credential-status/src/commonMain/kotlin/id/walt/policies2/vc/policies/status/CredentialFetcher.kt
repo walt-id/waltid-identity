@@ -97,7 +97,7 @@ class CredentialFetcher(
             }
         }
         return response.takeIf { it.status.isSuccess() }
-            ?: throw IllegalStateException("URL $url returned unexpected status: ${response.status}")
+            ?: throw IllegalStateException("Status-list endpoint returned unexpected status: ${response.status.value}")
     }
 
     private suspend fun cached(url: String): StatusListContent? = mutex.withLock {

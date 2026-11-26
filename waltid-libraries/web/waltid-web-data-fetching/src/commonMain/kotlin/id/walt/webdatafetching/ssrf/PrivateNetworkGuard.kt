@@ -1,6 +1,9 @@
 package id.walt.webdatafetching.ssrf
 
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
+import io.ktor.http.Url
 import kotlin.concurrent.Volatile
 
 /** Thrown when a request targets a blocked address. Callers should not echo [message] verbatim to untrusted clients. */
@@ -88,3 +91,7 @@ object PrivateNetworkGuardSettings {
  * Other engines are checked before the engine connects.
  */
 expect fun HttpClientConfig<*>.installPrivateNetworkGuard()
+
+internal expect fun HttpClientConfig<*>.installPrivateNetworkGuard(checkUrl: (Url) -> Unit)
+
+internal expect fun WebDataFetchingConfiguration.credentialHttpClient(configure: HttpClientConfig<*>.() -> Unit): HttpClient

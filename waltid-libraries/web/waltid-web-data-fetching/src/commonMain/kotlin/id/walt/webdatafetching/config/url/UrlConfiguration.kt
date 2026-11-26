@@ -13,8 +13,9 @@ data class UrlConfiguration(
     val urls: AllowList<Url>? = null
 ) {
 
-    fun requireUrlAllowed(url: String) {
-        val parsedUrl = UrlUtils.parseUrl(url)
+    fun requireUrlAllowed(url: String) = requireUrlAllowed(UrlUtils.parseUrl(url))
+
+    internal fun requireUrlAllowed(parsedUrl: Url) {
 
         if (protocols != null) {
             require(protocols.isUrlAllowed(parsedUrl)) { "URL Protocol is not allowed: ${parsedUrl.protocol}" }
@@ -29,7 +30,7 @@ data class UrlConfiguration(
         }
 
         if (urls != null) {
-            require(urls.isAllowed(parsedUrl)) { "URL is not allowed: $parsedUrl" }
+            require(urls.isAllowed(parsedUrl)) { "URL is not allowed for host: ${parsedUrl.host}" }
         }
     }
 

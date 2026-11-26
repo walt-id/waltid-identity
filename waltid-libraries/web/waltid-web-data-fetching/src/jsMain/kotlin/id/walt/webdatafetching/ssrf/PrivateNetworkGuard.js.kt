@@ -1,6 +1,10 @@
 package id.walt.webdatafetching.ssrf
 
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.url.installUrlAllowList
+import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
+import io.ktor.http.Url
 
 /**
  * No-op: the browser/Node network stack already refuses cross-origin/private-network access on the caller's
@@ -9,3 +13,8 @@ import io.ktor.client.HttpClientConfig
  */
 actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
 }
+
+internal actual fun HttpClientConfig<*>.installPrivateNetworkGuard(checkUrl: (Url) -> Unit) = installUrlAllowList(checkUrl)
+
+internal actual fun WebDataFetchingConfiguration.credentialHttpClient(configure: HttpClientConfig<*>.() -> Unit): HttpClient =
+    http.engineCreator().getHttpClient(configure)

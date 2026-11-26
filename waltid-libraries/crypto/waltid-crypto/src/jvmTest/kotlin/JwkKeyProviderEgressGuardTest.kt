@@ -23,6 +23,7 @@ import kotlin.test.assertTrue
 class JwkKeyProviderEgressGuardTest {
     private lateinit var server: HttpServer
     private val hits = AtomicInteger()
+    private val responseStatus = AtomicInteger(200)
     private lateinit var kid: String
     private val jwksUri get() = "http://127.0.0.1:${server.address.port}/jwks"
 
@@ -36,7 +37,7 @@ class JwkKeyProviderEgressGuardTest {
             createContext("/jwks") { exchange ->
                 hits.incrementAndGet()
                 exchange.responseHeaders.add("Content-Type", "application/json")
-                exchange.sendResponseHeaders(200, body.size.toLong())
+                exchange.sendResponseHeaders(responseStatus.get(), body.size.toLong())
                 exchange.responseBody.use { it.write(body) }
             }
             start()
@@ -64,6 +65,19 @@ class JwkKeyProviderEgressGuardTest {
         val key = JwkKeyProvider(jwksUri).getKey(kid).getOrThrow()
         assertEquals(kid, key.getKeyId())
         assertEquals(1, hits.get())
+    }
+
+    @Test
+    fun `only successful HTTP responses populate the key cache`() = runTest {
+        PrivateNetworkGuardSettings.allowLoopback = true
+        val provider = JwkKeyProvider(jwksUri)
+        responseStatus.set(302)
+        val error = runCatching { provider.getKey(kid) }.exceptionOrNull()
+        assertTrue(generateSequence(error) { it.cause }.any { it.message == "JWKS endpoint returned HTTP 302" })
+        responseStatus.set(200)
+        assertEquals(kid, provider.getKey(kid).getOrThrow().getKeyId())
+        assertEquals(kid, provider.getKey(kid).getOrThrow().getKeyId())
+        assertEquals(2, hits.get())
     }
 
     @Test
