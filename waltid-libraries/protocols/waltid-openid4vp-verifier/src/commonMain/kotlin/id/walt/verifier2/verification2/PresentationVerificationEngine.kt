@@ -58,6 +58,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlin.time.Clock
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 object PresentationVerificationEngine {
@@ -786,6 +787,7 @@ object PresentationVerificationEngine {
 
             if (verificationSessionPolicyResults.overallSuccess && session.redirects?.successRedirectUri != null) {
                 session.responseCode = Verifier2VPDirectPostHandler.generateResponseCode()
+                session.responseCodeExpiresAt = Clock.System.now() + 5.minutes
             }
             session.updateSession(SessionEvent.credential_policy_results_available) {
                 this.policyResults = verificationSessionPolicyResults
@@ -794,6 +796,7 @@ object PresentationVerificationEngine {
                     else -> Verification2Session.VerificationSessionStatus.FAILED
                 }
                 this.responseCode = session.responseCode
+                this.responseCodeExpiresAt = session.responseCodeExpiresAt
                 if (!verificationSessionPolicyResults.overallSuccess) {
                     // Invariant: overallSuccess=false implies at least one credential policy failure
                     // in the same lists used to compute the overall result.
