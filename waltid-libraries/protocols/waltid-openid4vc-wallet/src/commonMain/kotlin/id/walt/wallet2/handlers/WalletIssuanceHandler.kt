@@ -49,6 +49,7 @@ import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
+import id.waltid.openid4vci.wallet.metadata.ResolvedAuthorizationServerMetadata
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
@@ -427,13 +428,16 @@ data class WalletOfferResolution(
  */
 internal class ResolvedIssuanceOffer(
     val source: ResolveOfferRequest,
+    val grant: WalletIssuanceGrant,
     val summary: ResolveOfferResult,
     val offer: CredentialOffer,
     val resolvedIssuerMetadata: ResolvedCredentialIssuerMetadata,
     val authorizationServerMetadata: AuthorizationServerMetadata,
     val authorizationServerHeaders: io.ktor.http.Headers,
     val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
-)
+) {
+    val preAuthorizedGrant get() = offer.grants?.preAuthorizedCode?.takeIf { grant == WalletIssuanceGrant.PRE_AUTHORIZED_CODE }
+}
 
 @Serializable
 data class RequestTokenRequest(
@@ -1338,6 +1342,9 @@ object WalletIssuanceHandler {
         )
 
         // 2. Reuse issuer metadata and offered configurations from that resolution.
+        val preAuthGrant = requireNotNull(effectiveResolvedOffer.preAuthorizedGrant) {
+            "This offer requires browser authorization"
+        }
         val offer = effectiveResolvedOffer.offer
         val issuerMetadata = effectiveResolvedOffer.resolvedIssuerMetadata.metadata
         val offeredCredentials = effectiveResolvedOffer.offeredCredentials
@@ -1348,11 +1355,6 @@ object WalletIssuanceHandler {
         val selections = wallet.resolveCredentialSelections(request.credentials, offer.credentialConfigurationIds,
             issuerMetadata, keyMaterial, did)
         log.debug { "Offer contains ${offeredCredentials.size} credential(s)" }
-
-        // 3. Pre-authorized code grant only (auth-code handled by separate flow)
-        val preAuthGrant = offer.grants?.preAuthorizedCode
-            ?: error("Only pre-authorized code grant is currently supported. Offer grants: ${offer.grants}")
-        log.trace { "Using pre-authorized code grant" }
 
         // 4. Request token
         val tokenEndpoint = asMetadata.tokenEndpoint
@@ -1557,7 +1559,7 @@ object WalletIssuanceHandler {
             previewHandle = previewHandle,
             resolvedIssuerMetadata = resolvedOffer.resolvedIssuerMetadata,
             offeredCredentials = resolvedOffer.offeredCredentials,
-            transactionCode = resolvedOffer.offer.grants?.preAuthorizedCode?.txCode,
+            transactionCode = resolvedOffer.preAuthorizedGrant?.txCode,
         )
     }
 
@@ -1580,18 +1582,22 @@ object WalletIssuanceHandler {
         val metadataResolver = IssuerMetadataResolver(httpClient, metadataTrustResolver)
         val resolvedIssuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val issuerMetadata = resolvedIssuerMetadata.metadata
-        val asResolution = metadataResolver.resolveAuthorizationServerMetadataWithFallbackDetailed(issuerMetadata)
+        val (grant, asResolution) = metadataResolver.resolveIssuanceGrant(offer, issuerMetadata, WalletIssuanceGrant.PRE_AUTHORIZED_CODE)
         val asMetadata = asResolution.metadata
+        val preAuthorized = offer.grants?.preAuthorizedCode?.takeIf { grant == WalletIssuanceGrant.PRE_AUTHORIZED_CODE }
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         return ResolvedIssuanceOffer(
             source = request,
+            grant = grant,
             summary = ResolveOfferResult(
                 credentialIssuer = offer.credentialIssuer,
                 credentialConfigurationIds = offer.credentialConfigurationIds,
-                grantType = offer.grants?.preAuthorizedCode?.let { "pre-authorized_code" }
-                    ?: offer.grants?.authorizationCode?.let { "authorization_code" },
-                preAuthorizedCode = offer.grants?.preAuthorizedCode?.preAuthorizedCode,
-                txCodeRequired = offer.grants?.preAuthorizedCode?.txCode != null,
+                grantType = when (grant) {
+                    WalletIssuanceGrant.AUTHORIZATION_CODE -> "authorization_code"
+                    WalletIssuanceGrant.PRE_AUTHORIZED_CODE -> "pre-authorized_code"
+                },
+                preAuthorizedCode = preAuthorized?.preAuthorizedCode,
+                txCodeRequired = preAuthorized?.txCode != null,
                 tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
                 credentialEndpoint = Url(issuerMetadata.credentialEndpoint),
                 offeredCredentials = offeredCredentials.map { it.credentialConfigurationId },
@@ -1661,7 +1667,7 @@ object WalletIssuanceHandler {
             summary = resolved.summary,
             resolvedIssuerMetadata = resolved.resolvedIssuerMetadata,
             offeredCredentials = resolved.offeredCredentials,
-            transactionCode = resolved.offer.grants?.preAuthorizedCode?.txCode,
+            transactionCode = resolved.preAuthorizedGrant?.txCode,
         )
     }
 
@@ -1697,14 +1703,14 @@ object WalletIssuanceHandler {
         val asResolution = credentialIssuer?.let {
             val metadataResolver = IssuerMetadataResolver(httpClient)
             val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(it).metadata
-            metadataResolver.resolveAuthorizationServerMetadataWithFallbackDetailed(issuerMetadata)
+            issuerMetadata to metadataResolver.resolveTokenServer(issuerMetadata, request.tokenEndpoint.toString())
         }
-        val asMetadata = asResolution?.metadata
+        val asMetadata = asResolution?.second?.metadata
         val tokenAttestation = asMetadata?.takeIf { manualAttestation == null }?.let {
             clientAttestationForRequest(
                 wallet = wallet,
                 asMetadata = it,
-                discoveryHeaders = requireNotNull(asResolution).headers,
+                discoveryHeaders = requireNotNull(asResolution).second.headers,
                 clientId = request.clientId,
                 attestationAssembler = attestationAssembler,
                 resolveInstanceKey = {
@@ -1726,6 +1732,7 @@ object WalletIssuanceHandler {
             tokenAttestation = tokenAttestation,
             anonymousPreAuthorizedCode = anonymousPreAuthorizedCode,
             httpClient = httpClient,
+            resolution = asResolution,
         )
     }
 
@@ -1734,6 +1741,7 @@ object WalletIssuanceHandler {
         tokenAttestation: RequestClientAttestation?,
         anonymousPreAuthorizedCode: Boolean,
         httpClient: HttpClient = WalletIssuanceHandler.httpClient,
+        resolution: Pair<CredentialIssuerMetadata, ResolvedAuthorizationServerMetadata>? = null,
     ): RequestTokenDetailedResult {
         parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         val clientConfig = ClientConfiguration(
@@ -1741,15 +1749,11 @@ object WalletIssuanceHandler {
             redirectUris = listOf(request.redirectUri.toString())
         )
         val authorizationParameters = request.credentialConfigurationIds?.let { configurationIds ->
-            val resolver = IssuerMetadataResolver(httpClient)
-            val issuer = resolver.resolveCredentialIssuerMetadata(requireNotNull(request.credentialIssuer)).metadata
-            val authorizationServer = resolver.resolveAuthorizationServerMetadataWithFallback(issuer)
-            require(request.tokenEndpoint.toString() == authorizationServer.tokenEndpoint) {
-                "Token endpoint does not match issuer metadata"
+            val (issuer, server) = resolution ?: IssuerMetadataResolver(httpClient).let { resolver ->
+                val issuer = resolver.resolveCredentialIssuerMetadata(requireNotNull(request.credentialIssuer)).metadata
+                issuer to resolver.resolveTokenServer(issuer, request.tokenEndpoint.toString())
             }
-            CredentialRequestBuilder.preAuthorizedTokenParameters(
-                issuer, configurationIds, authorizationServer,
-            )
+            CredentialRequestBuilder.preAuthorizedTokenParameters(issuer, configurationIds, server.metadata)
         } ?: buildMap {
             request.authorizationDetails?.let { put("authorization_details", lenientJson.encodeToString(it)) }
             request.scope?.let { put("scope", it) }
@@ -2437,10 +2441,10 @@ object WalletIssuanceHandler {
     private suspend fun resolveAuthorizationCodeAuthorizationServerMetadata(
         credentialIssuerBaseUrl: String,
         httpClient: HttpClient,
-    ): id.waltid.openid4vci.wallet.metadata.ResolvedAuthorizationServerMetadata {
+    ): ResolvedAuthorizationServerMetadata {
         val metadataResolver = IssuerMetadataResolver(httpClient)
         val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(credentialIssuerBaseUrl).metadata
-        return metadataResolver.resolveAuthorizationServerMetadataWithFallbackDetailed(issuerMetadata)
+        return metadataResolver.resolveIssuanceGrant(null, issuerMetadata).server
     }
 
     private suspend fun postFollowingRedirects(
@@ -2567,8 +2571,14 @@ object WalletIssuanceHandler {
         wallet: Wallet? = null,
     ): GenerateBatchAuthorizationUrlResult {
         val offer = if (request.credentialIssuer == null) resolveOffer(request, httpClient) else null
-        val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(request.credentialIssuer ?: requireNotNull(offer).credentialIssuer).metadata
-        val asResolution = IssuerMetadataResolver(httpClient).resolveAuthorizationServerMetadataWithFallbackDetailed(issuerMetadata)
+        val resolver = IssuerMetadataResolver(httpClient)
+        val issuerMetadata = resolver.resolveCredentialIssuerMetadata(request.credentialIssuer ?: requireNotNull(offer).credentialIssuer).metadata
+        val asResolution = resolver.resolveIssuanceGrant(offer, issuerMetadata, required = WalletIssuanceGrant.AUTHORIZATION_CODE).server
+        if (offer?.grants?.authorizationCode?.authorizationServer != null) {
+            require(asResolution.metadata.issuer == resolver.resolveIssuanceGrant(null, issuerMetadata).server.metadata.issuer) {
+                "Use a retained issuance session for an offer-specific browser authorization server"
+            }
+        }
         val asMetadata = asResolution.metadata
 
         val authorizationEndpoint = asMetadata.authorizationEndpoint
@@ -2947,9 +2957,12 @@ object WalletIssuanceHandler {
         val material = requireNotNull(wallet.resolveKeyMaterial(requireNotNull(keyId) {
             "dpopKeyId is required for a DPoP access token"
         }, setOf(KeyUsage.SIGN))) { "Sender-constraining key is unavailable" }
-        val metadata = resolveAuthorizationCodeAuthorizationServerMetadata(requireNotNull(credentialIssuer) {
+        val resolver = IssuerMetadataResolver(httpClient)
+        val issuer = resolver.resolveCredentialIssuerMetadata(requireNotNull(credentialIssuer) {
             "credentialIssuerBaseUrl is required for a DPoP access token"
-        }, httpClient)
+        }).metadata
+        val metadata = resolver.resolveDeclaredServer(issuer.authorizationServerIssuers().singleOrNull()
+            ?: error("Use a retained issuance session for a DPoP token with multiple authorization servers"))
         return DpopRequestContext(requireNotNull(dpopAlgorithmsForToken(tokenType,
             usableDpopAlgorithms(metadata.metadata, material))), material)
     }

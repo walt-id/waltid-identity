@@ -38,7 +38,6 @@ import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
-import id.waltid.openid4vci.wallet.metadata.ResolvedAuthorizationServerMetadata
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.LocalizedMetadata
@@ -1542,7 +1541,7 @@ class WalletIssuanceSessionService(
         require(issuerMetadata.metadata.credentialIssuer == (request.credentialIssuer ?: requireNotNull(offer).credentialIssuer)) {
             "Credential issuer metadata identifier does not match the offer"
         }
-        val (grant, asResolution) = resolveGrant(offer, issuerMetadata.metadata, resolver)
+        val (grant, asResolution) = resolver.resolveIssuanceGrant(offer, issuerMetadata.metadata)
         val authorizationServerMetadata = asResolution.metadata
 
         val offered = if (offer != null) OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
@@ -1551,48 +1550,6 @@ class WalletIssuanceSessionService(
             }
         require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
         return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered, grant, asResolution.headers)
-    }
-
-    private suspend fun resolveGrant(
-        offer: CredentialOffer?,
-        issuerMetadata: CredentialIssuerMetadata,
-        resolver: IssuerMetadataResolver,
-    ): Pair<WalletIssuanceGrant, ResolvedAuthorizationServerMetadata> {
-        val offered = offer?.getGrantTypes().orEmpty()
-        // A pre-authorized exchange needs a code from the offer. Discovery alone cannot supply one.
-        val candidates = offered.ifEmpty { listOf(GrantType.AuthorizationCode) }
-        val resolvedServers = mutableMapOf<String, ResolvedAuthorizationServerMetadata>()
-        for (candidate in candidates) {
-            val grant = if (candidate == GrantType.AuthorizationCode) WalletIssuanceGrant.AUTHORIZATION_CODE
-                else WalletIssuanceGrant.PRE_AUTHORIZED_CODE
-            for (server in grantServers(offer, grant, issuerMetadata)) {
-                val resolution = resolvedServers.getOrPut(server) {
-                    resolver.resolveAuthorizationServerMetadataDetailed(server).also {
-                        require(it.metadata.issuer == server) { "Authorization server metadata issuer does not match the selected server" }
-                    }
-                }
-                // Retain explicit single-grant interoperability when servers omit their grant advertisement.
-                if (offered.size == 1 || (resolution.metadata.grantTypesSupported?.contains(candidate.value) != false &&
-                        (grant != WalletIssuanceGrant.AUTHORIZATION_CODE || resolution.metadata.authorizationEndpoint != null))) {
-                    return grant to resolution
-                }
-            }
-        }
-        error("No usable issuance grant is supported by the advertised authorization servers")
-    }
-
-    private fun grantServers(
-        offer: CredentialOffer?, grant: WalletIssuanceGrant, issuerMetadata: CredentialIssuerMetadata,
-    ): List<String> {
-        val declared = issuerMetadata.authorizationServerIssuers()
-        val server = when (grant) {
-            WalletIssuanceGrant.AUTHORIZATION_CODE -> offer?.grants?.authorizationCode?.authorizationServer
-            WalletIssuanceGrant.PRE_AUTHORIZED_CODE -> offer?.grants?.preAuthorizedCode?.authorizationServer
-        } ?: return declared.toList()
-        require(declared.size > 1 && server in declared) {
-            "Offer authorization_server must identify one of multiple declared authorization servers"
-        }
-        return listOf(server)
     }
 
     private fun ResolvedOffer.toPreview(preferredLocales: List<String>): WalletIssuanceOfferPreview {
