@@ -141,7 +141,9 @@ class StatusCredentialTestServer {
     ): String {
         val decoded = CompactJws.decodeUnverified(jwt)
         val payload = Json.parseToJsonElement(decoded.payload.decodeToString()).jsonObject
+        val vc = (payload["vc"] as? JsonObject)?.let { withIssuer(it, did) }
         val updatedPayload = payload + ("iss" to JsonPrimitive(did)) +
+            (vc?.let { mapOf("vc" to it) } ?: if ("issuer" in payload) mapOf("issuer" to JsonPrimitive(did)) else emptyMap()) +
             if ("status_list" in payload) mapOf("sub" to JsonPrimitive(statusListUri)) else emptyMap()
         return key.signJws(
             plaintext = Json.encodeToString(JsonObject(updatedPayload)).encodeToByteArray(),

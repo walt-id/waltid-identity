@@ -32,21 +32,17 @@ private fun ensureSqliteParentDir(jdbcUrl: String) {
  *
  * Example (SQLite — default):
  * ```hocon
- * wallet2-persistence {
- *   jdbcUrl = "jdbc:sqlite:wallet2.db"
- *   driverClassName = "org.sqlite.JDBC"
- * }
+ * jdbcUrl = "jdbc:sqlite:wallet2.db"
+ * driverClassName = "org.sqlite.JDBC"
  * ```
  *
  * Example (PostgreSQL):
  * ```hocon
- * wallet2-persistence {
- *   jdbcUrl = "jdbc:postgresql://localhost:5432/wallet2"
- *   driverClassName = "org.postgresql.Driver"
- *   username = "wallet"
- *   password = "secret"
- *   maximumPoolSize = 10
- * }
+ * jdbcUrl = "jdbc:postgresql://localhost:5432/wallet2"
+ * driverClassName = "org.postgresql.Driver"
+ * username = "wallet"
+ * password = "secret"
+ * maximumPoolSize = 10
  * ```
  */
 @Serializable
@@ -70,7 +66,7 @@ data class Wallet2PersistenceConfig(
 fun initWallet2Database(
     config: Wallet2PersistenceConfig = Wallet2PersistenceConfig()
 ): Database {
-    log.info { "Initialising wallet2 database: ${config.jdbcUrl}" }
+    log.info { "Initialising wallet2 database with ${config.driverClassName}" }
 
     ensureSqliteParentDir(config.jdbcUrl)
 

@@ -36,7 +36,14 @@ class DcqlQueryBindingTest {
     private val nonce = "nonce-binding"
     private val clientId = "redirect_uri:https://verifier.example/response"
 
-    private fun session(dcqlQuery: String) = Json.decodeFromString<Verification2Session>(
+    // These matcher fixtures intentionally omit cryptographic signer resolution.
+    private fun session(query: String) = unboundSession(Json.encodeToString(
+        Json.decodeFromString<DcqlQuery>(query).let { dcql ->
+            dcql.copy(credentials = dcql.credentials.map { it.copy(requireCryptographicHolderBinding = false) })
+        },
+    ))
+
+    private fun unboundSession(dcqlQuery: String) = Json.decodeFromString<Verification2Session>(
         // language=JSON
         """
         {
