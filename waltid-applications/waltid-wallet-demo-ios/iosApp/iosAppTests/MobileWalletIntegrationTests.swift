@@ -240,8 +240,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let first = try await initializeSigningIdentity(wallet1)
         XCTAssertTrue(first.did.starts(with: "did:"), "DID should start with 'did:', got: \(first.did)")
+        try await wallet1.close()
 
         let wallet2 = try await makeWallet()
+        addTeardownBlock { try await wallet2.close() }
         let second = try await initializeSigningIdentity(wallet2)
 
         XCTAssertEqual(second.did, first.did, "Encrypted wallet state should survive wallet facade recreation")
@@ -259,6 +261,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await wallet1.deleteLocalData()
 
         let wallet2 = try await makeWallet()
+        addTeardownBlock { try await wallet2.close() }
         let second = try await initializeSigningIdentity(wallet2)
 
         XCTAssertNotEqual(second.did, first.did, "Deleting local data should remove the persisted DID state")
@@ -328,6 +331,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let bootstrap = try await initializeSigningIdentity(wallet)
         let credentials = try await wallet.credentials()
+        try await wallet.close()
         let reopenedWallet = try await makeWallet(persistence: persistence)
         let reopenedBootstrap = try await initializeSigningIdentity(reopenedWallet)
         let reopenedCredentials = try await reopenedWallet.credentials()
@@ -342,7 +346,25 @@ final class MobileWalletIntegrationTests: XCTestCase {
         // explicit credentials() reads above.
         XCTAssertEqual(listCredentialsCalls, 4)
 
-        try await wallet.deleteLocalData()
+        try await reopenedWallet.deleteLocalData()
+    }
+
+    func testErasingOneWalletRequiresClosingTheOtherOwnerOfItsSwiftStore() async throws {
+        let store = RecordingWalletCredentialStore()
+        let persistence = WalletPersistence(credentialStore: store)
+        let first = try await Wallet(configuration: .init(walletID: testWalletId, persistence: persistence))
+        let other = try await Wallet(configuration: .init(walletID: testWalletId + "-other", persistence: persistence))
+        addTeardownBlock { try await first.close() }
+        addTeardownBlock { try await other.close() }
+        do {
+            try await first.deleteLocalData()
+            XCTFail("A second wallet still owns the shared credential store")
+        } catch {
+            guard case WalletError.storage = error else { throw error }
+        }
+        try await other.close()
+        try await first.deleteLocalData()
+        try await other.deleteLocalData()
     }
 
     func testProvidedDatabaseKeyProviderBootstrapsAcrossRecreationAndDeletesProviderKey() async throws {
@@ -352,6 +374,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let first = try await initializeSigningIdentity(wallet1)
 
+        try await wallet1.close()
         let wallet2 = try await makeWallet(persistence: persistence)
         let second = try await initializeSigningIdentity(wallet2)
         let requestedKeys = await provider.requestedKeys

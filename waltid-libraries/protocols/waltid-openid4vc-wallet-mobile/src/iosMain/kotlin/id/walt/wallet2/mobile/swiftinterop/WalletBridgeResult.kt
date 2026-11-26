@@ -10,6 +10,7 @@ import id.walt.wallet2.handlers.PresentationReviewChangedException
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.presentation.toMobileErrorCode
+import id.walt.wallet2.mobile.WalletStorageInUseException
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.wallet2.status.CredentialStatusReviewChangedException
 import id.waltid.openid4vp.wallet.UnsafePresentationErrorResponseException
@@ -107,7 +108,7 @@ public class WalletBridgeError internal constructor(
                 throwable is CancellationException -> WalletBridgeErrorCategory.cancelled
                 throwable is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
                 throwable is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
-                throwable is WalletPersistenceException -> WalletBridgeErrorCategory.storage
+                throwable is WalletPersistenceException || throwable is WalletStorageInUseException -> WalletBridgeErrorCategory.storage
                 else -> WalletBridgeErrorCategory.internalFailure
             }
 

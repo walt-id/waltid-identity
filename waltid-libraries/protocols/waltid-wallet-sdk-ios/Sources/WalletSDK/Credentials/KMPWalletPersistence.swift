@@ -56,7 +56,9 @@ private final class KMPWalletDatabaseKeyProviderAdapter: WalletBridgeDatabaseEnc
     private let provider: any WalletDatabaseKeyProvider
 }
 
-private final class KMPWalletCredentialStoreAdapter: WalletBridgeCredentialStore, @unchecked Sendable {
+private final class KMPWalletCredentialStoreAdapter: WalletBridgeCredentialStore, WalletBridgeStoreIdentity, @unchecked Sendable {
+    var storageOwner: Any { hostStoreOwner(store) }
+
     init(store: any WalletCredentialStore) {
         self.store = store
     }
@@ -80,7 +82,9 @@ private final class KMPWalletCredentialStoreAdapter: WalletBridgeCredentialStore
     private let store: any WalletCredentialStore
 }
 
-private final class KMPWalletDidStoreAdapter: WalletBridgeDidStore, @unchecked Sendable {
+private final class KMPWalletDidStoreAdapter: WalletBridgeDidStore, WalletBridgeStoreIdentity, @unchecked Sendable {
+    var storageOwner: Any { hostStoreOwner(store) }
+
     init(store: any WalletDidStore) {
         self.store = store
     }
@@ -146,5 +150,14 @@ private extension WalletBridgeStoredDid {
             documentJSON: documentJson
         )
     }
+}
+// Swift value stores can share a backing resource without exposing reference identity.
+private final class ValueStoreOwner: @unchecked Sendable {
+    static let shared = ValueStoreOwner()
+}
+
+private func hostStoreOwner(_ store: Any) -> AnyObject {
+    if type(of: store) is AnyClass { return store as AnyObject }
+    return ValueStoreOwner.shared
 }
 #endif
