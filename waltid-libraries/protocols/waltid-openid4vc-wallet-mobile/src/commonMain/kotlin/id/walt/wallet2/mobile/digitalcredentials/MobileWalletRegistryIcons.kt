@@ -63,12 +63,6 @@ internal object MobileWalletRegistryIcons {
     internal val DefaultCardBlueRgb: Int = 0x1B4FDB
 }
 
-internal data class MobileWalletCardArt(
-    val imageUris: List<String>,
-    val backgroundColor: String?,
-    val fallbackPng: ByteArray?,
-)
-
 internal const val MaxRegistryIconBytes = 2_000_000
 
 /** Largest Base64 character count that can decode to [MaxRegistryIconBytes]. */

@@ -10,6 +10,7 @@ import id.walt.wallet2.mobile.digitalcredentials.AndroidAnnexCCredentialDatabase
 import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialRegistry
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryField
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntryDisplay
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequestProtection
@@ -43,7 +44,7 @@ class AndroidDigitalCredentialRegistryTest {
     fun oneCredentialCanBeIndexedUnderLeafAndAncestorWithoutRewritingItsId() {
         val record = MobileWalletCredentialRegistryRecord(
             registryEntryId = "one-id", credentialId = "stored-id", format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
-            type = "https://issuer.example/leaf", displayName = "Attestation",
+            type = "https://issuer.example/leaf", display = RegistryEntryDisplay("Attestation"),
             fields = listOf(MobileWalletCredentialRegistryField(listOf("given_name"), "\"Ada\"", false)),
         )
         val entries = with(registry) { listOf(record.toAndroidEntry(), record.copy(type = "https://types.example/parent").toAndroidEntry()) }
@@ -127,8 +128,7 @@ class AndroidDigitalCredentialRegistryTest {
                         selectivelyDisclosable = true,
                     )
                 ),
-                displayName = "Driving licence",
-                subtitle = "D-123-456",
+                display = RegistryEntryDisplay("Driving licence", "D-123-456"),
             ).toAndroidEntry()
         } as MdocEntry
 
@@ -156,8 +156,7 @@ class AndroidDigitalCredentialRegistryTest {
                         selectivelyDisclosable = true,
                     )
                 ),
-                displayName = "PID",
-                subtitle = "Personal ID",
+                display = RegistryEntryDisplay("PID", "Personal ID"),
             ).toAndroidEntry()
         } as SdJwtEntry
 
@@ -195,7 +194,7 @@ class AndroidDigitalCredentialRegistryTest {
                 fields = (mediaValues + scalarValues).map { (name, value) ->
                     MobileWalletCredentialRegistryField(listOf("namespace", name), value, true)
                 },
-                displayName = "Example",
+                display = RegistryEntryDisplay("Example"),
             )
         }
         val entries = records.map { record -> with(registry) { record.toAndroidEntry() } }
@@ -236,7 +235,7 @@ class AndroidDigitalCredentialRegistryTest {
                 fields = listOf(MobileWalletCredentialRegistryField(
                     listOf("namespace", "arbitrary_attachment"),
                     "\"data:application/pdf;base64,${"A".repeat(100_000)}\"", true,
-                )), displayName = "Example",
+                )), display = RegistryEntryDisplay("Example"),
             ),
         ))
         val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
@@ -307,8 +306,7 @@ class AndroidDigitalCredentialRegistryTest {
                             selectivelyDisclosable = true,
                         )
                     ),
-                    displayName = "Driving licence",
-                    subtitle = "D-123-456",
+                    display = RegistryEntryDisplay("Driving licence", "D-123-456"),
                 )
             )
         )
@@ -344,8 +342,7 @@ class AndroidDigitalCredentialRegistryTest {
                             selectivelyDisclosable = true,
                         )
                     ),
-                    displayName = "Driving licence",
-                    iconPng = customIcon,
+                    display = RegistryEntryDisplay("Driving licence", iconPng = customIcon),
                 )
             )
         )

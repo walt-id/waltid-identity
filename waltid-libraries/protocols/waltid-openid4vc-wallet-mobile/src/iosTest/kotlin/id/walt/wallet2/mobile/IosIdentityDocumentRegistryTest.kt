@@ -7,6 +7,7 @@ import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistration
 import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistry
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryField
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntryDisplay
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
 import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
 import kotlin.test.Test
@@ -332,7 +333,7 @@ class IosIdentityDocumentRegistryTest {
                                 selectivelyDisclosable = true,
                             ),
                         ),
-                        displayName = "Driving Licence",
+                        display = RegistryEntryDisplay("Driving Licence"),
                     ),
                 ),
             )
@@ -375,7 +376,7 @@ class IosIdentityDocumentRegistryTest {
         format = format,
         type = type,
         fields = emptyList(),
-        displayName = credentialId,
+        display = RegistryEntryDisplay(credentialId),
     )
 
     private companion object {
