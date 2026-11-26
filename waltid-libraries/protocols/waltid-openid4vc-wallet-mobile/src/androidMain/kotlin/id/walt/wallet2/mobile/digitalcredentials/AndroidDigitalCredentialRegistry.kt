@@ -78,7 +78,7 @@ public class AndroidDigitalCredentialRegistry(
         }
         val immediate = records.map { it.withLocalThumbnail() }
         val result = registerRecords(registryId, immediate)
-        if (!result.available || records.none { it.iconPng == null && it.cardArtImageUris.isNotEmpty() }) {
+        if (!result.available || records.none { it.display.iconPng == null && it.display.cardArt.imageUris.isNotEmpty() }) {
             return@withLock result
         }
         val refreshed = withTimeoutOrNull(RegistryIconFetchTimeoutMs) {
@@ -87,7 +87,7 @@ public class AndroidDigitalCredentialRegistry(
             }
         } ?: return@withLock result
         val changed = refreshed.indices.any { index ->
-            !refreshed[index].iconPng.contentEquals(immediate[index].iconPng)
+            !refreshed[index].display.iconPng.contentEquals(immediate[index].display.iconPng)
         }
         if (changed) {
             val refreshResult = registerRecords(registryId, refreshed)
@@ -153,8 +153,8 @@ public class AndroidDigitalCredentialRegistry(
                 .filter { it.format == MobileWalletDigitalCredentialFormat.MDOC }
                 .map { record ->
                     AndroidAnnexCCredential(
-                        title = record.displayName,
-                        subtitle = record.subtitle,
+                        title = record.display.name,
+                        subtitle = record.display.subtitle,
                         bitmap = record.entryIconPng(),
                         mdoc = AndroidAnnexCMdoc(
                             documentId = record.registryEntryId,
@@ -233,8 +233,8 @@ public class AndroidDigitalCredentialRegistry(
     internal fun MobileWalletCredentialRegistryRecord.toAndroidEntry(): DigitalCredentialEntry {
         val display = setOf(
             VerificationEntryDisplayProperties(
-                displayName,
-                subtitle,
+                this.display.name,
+                this.display.subtitle,
                 entryIconBitmap(),
                 null,
                 null,
@@ -441,30 +441,26 @@ public class AndroidDigitalCredentialRegistry(
             .ifBlank { applicationContext.packageName }
 
     private fun MobileWalletCredentialRegistryRecord.withLocalThumbnail(): MobileWalletCredentialRegistryRecord {
-        if (iconPng != null) return this
-        val png = cardArtFallbackPng?.takeIf(::isImageBytes)
-            ?: solidColorPng(parseCssRgb(cardArtBackgroundColor) ?: MobileWalletRegistryIcons.DefaultCardBlueRgb)
-        return copy(iconPng = png)
+        if (display.iconPng != null) return this
+        val png = display.cardArt.fallbackPng?.takeIf(::isImageBytes)
+            ?: solidColorPng(parseCssRgb(display.cardArt.backgroundColor) ?: MobileWalletRegistryIcons.DefaultCardBlueRgb)
+        return copy(display = display.withIcon(png))
     }
 
     private suspend fun MobileWalletCredentialRegistryRecord.withResolvedThumbnail(): MobileWalletCredentialRegistryRecord {
-        if (cardArtImageUris.isEmpty()) return withLocalThumbnail()
+        if (display.cardArt.imageUris.isEmpty()) return withLocalThumbnail()
         val png = MobileWalletRegistryIcons.resolveIconPng(
-            art = MobileWalletCardArt(
-                imageUris = cardArtImageUris,
-                backgroundColor = cardArtBackgroundColor,
-                fallbackPng = cardArtFallbackPng,
-            ),
+            art = display.cardArt,
             fetchHttps = ::fetchRegistryIconBytes,
         )
-        return copy(iconPng = png)
+        return copy(display = display.withIcon(png))
     }
 
     private fun MobileWalletCredentialRegistryRecord.entryIconBitmap(): Bitmap =
-        this.iconPng?.decodeRegistryIcon() ?: applicationIcon
+        this.display.iconPng?.decodeRegistryIcon() ?: applicationIcon
 
     private fun MobileWalletCredentialRegistryRecord.entryIconPng(): ByteArray {
-        val recordIcon = this.iconPng
+        val recordIcon = this.display.iconPng
         return recordIcon?.decodeRegistryIcon()?.toPngBytes()
             ?: recordIcon
             ?: applicationIconPng

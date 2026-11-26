@@ -43,7 +43,7 @@ internal suspend fun Wallet.registryRecords(
                 format = MobileWalletDigitalCredentialFormat.MDOC,
                 type = (credential as MdocsCredential).docType,
                 fields = emptyList(),
-                displayName = "",
+                display = RegistryEntryDisplay(""),
             ))
         }
         val metadata = stored.toMetadata()
@@ -77,11 +77,7 @@ internal suspend fun Wallet.registryRecords(
                                 )
                             }
                         },
-                    displayName = display.title,
-                    subtitle = display.subtitle,
-                    cardArtImageUris = cardArt.imageUris,
-                    cardArtBackgroundColor = cardArt.backgroundColor,
-                    cardArtFallbackPng = cardArt.fallbackPng,
+                    display = RegistryEntryDisplay(display.title, display.subtitle, cardArt = cardArt),
                 )
             }
             else -> if (metadata.format in setOf("vc+sd-jwt", "dc+sd-jwt", "sd-jwt-vc")) {
@@ -117,11 +113,7 @@ internal suspend fun Wallet.registryRecords(
                                 selectivelyDisclosablePaths = selectivelyDisclosablePaths,
                             )
                         },
-                    displayName = display.title,
-                    subtitle = display.subtitle,
-                    cardArtImageUris = cardArt.imageUris,
-                    cardArtBackgroundColor = cardArt.backgroundColor,
-                    cardArtFallbackPng = cardArt.fallbackPng,
+                    display = RegistryEntryDisplay(display.title, display.subtitle, cardArt = cardArt),
                 )
             } else null
         }
