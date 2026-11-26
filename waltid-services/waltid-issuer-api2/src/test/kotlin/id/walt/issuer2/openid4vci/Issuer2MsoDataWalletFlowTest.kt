@@ -1,8 +1,11 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.credentials.issuance.CredentialDataMergeUtils.mdocNamespaceMapping
+import id.walt.credentials.issuance.InstantClock
 import id.walt.credentials.issuance.IssuanceClock
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.KeyType
+import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCredential
@@ -20,6 +23,7 @@ import id.walt.issuer2.testsupport.assertIsoMdlCredentialPayload
 import id.walt.issuer2.testsupport.assertRefreshToken
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
+import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
 import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.getSession
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
@@ -33,13 +37,29 @@ import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.openid4vci.mdoc.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.IssuerStateMode
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
+import io.ktor.http.Url
+import io.ktor.http.URLBuilder
 import io.ktor.http.contentType
 import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.cio.CIO
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.request.receiveParameters
+import io.ktor.server.response.respondRedirect
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.withContext
@@ -310,22 +330,36 @@ class Issuer2MsoDataWalletFlowTest {
 
     @Test
     fun preAuthorizedOfferRejectsBirthDateAvailableOnlyFromLogin() = testApplication {
-        installIssuer2WithConfigFiles(configureProfilesConfig = { config ->
+        pinMdlIssuanceClock()
+        val codeStore = ConfiguredPreAuthorizedCodeRepository()
+        var savedCodes = 0
+        val recordingStore = object : PreAuthorizedCodeRepository by codeStore {
+            override suspend fun save(record: PreAuthorizedCodeRecord) {
+                codeStore.save(record)
+                savedCodes++
+            }
+        }
+        installIssuer2WithConfigFiles(preAuthorizedCodeRepository = recordingStore, configureProfilesConfig = { config ->
             val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
             val profile = config.profiles.getValue(id)
             val namespace = profile.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject
             config.copy(profiles = config.profiles + (id to profile.copy(
                 credentialData = JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to JsonObject(namespace - "birth_date"))),
                 idTokenClaimsMapping = mapOf("$.birthdate" to "$.['$ISO_MDL_NAMESPACE'].birth_date"),
-                msoData = MsoData(validFrom = "2027-08-25T00:00:00Z"),
+                msoData = MsoData(validFrom = AGE_VALID_FROM.toString()),
             )))
         })
         val client = apiClient()
         val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
+        val birthDateOverride = CredentialOfferRuntimeOverrides(
+            credentialData = buildJsonObject {
+                putJsonObject(ISO_MDL_NAMESPACE) { put("birth_date", "1990-08-26") }
+            },
+        )
         val requests = listOf(
             CredentialOfferCreateRequest(profileId = id, authMethod = AuthenticationMethod.PRE_AUTHORIZED),
             MultiCredentialOfferCreateRequest(
-                credentials = listOf(CredentialOfferCredential(id), CredentialOfferCredential(id)),
+                credentials = listOf(CredentialOfferCredential(id, birthDateOverride), CredentialOfferCredential(id)),
                 authMethod = AuthenticationMethod.PRE_AUTHORIZED,
             ),
         )
@@ -342,46 +376,144 @@ class Issuer2MsoDataWalletFlowTest {
             assertTrue(body.contains("credentialData.$ISO_MDL_NAMESPACE.birth_date"), body)
             assertTrue(body.contains("profile or runtime overrides"), body)
             assertTrue(client.listSessions().isEmpty())
+            assertEquals(0, savedCodes)
         }
         val offer = client.createWalletFlowCredentialOffer(
             scenario = Issuer2CredentialScenarios.isoMdl,
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
             txCodeMode = Issuer2TxCodeMode.NONE,
-            runtimeOverrides = CredentialOfferRuntimeOverrides(
-                credentialData = buildJsonObject {
-                    putJsonObject(ISO_MDL_NAMESPACE) { put("birth_date", "1990-08-26") }
-                },
-            ),
+            runtimeOverrides = birthDateOverride,
         )
+        assertEquals(1, savedCodes)
         val wallet = Issuer2WalletFlowDriver(client)
         val resolved = wallet.resolve(offer)
         val token = wallet.exchangePreAuthorizedCode(resolved, txCode = null)
         val payload = wallet.requestCredential(resolved, token.access_token, includeDidInProof = false)
-        val namespace = mdocNamespaceJson(payload, ISO_MDL_NAMESPACE)
-        assertEquals("1990-08-26", namespace.getValue("birth_date").jsonPrimitive.content)
-        assertEquals(JsonPrimitive(36), namespace["age_in_years"])
+        assertSignedBirthDateAndAge(payload)
     }
 
     @Test
-    fun authorizedMdocOfferAllowsBirthDateSuppliedByExternalIdentityClaims() = testApplication {
-        installIssuer2WithConfigFiles(configureProfilesConfig = { config ->
-            val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
-            val profile = config.profiles.getValue(id)
-            val namespace = profile.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject
-            val credentialData = JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to JsonObject(namespace - "birth_date")))
-            config.copy(profiles = config.profiles + (id to profile.copy(
-                credentialData = credentialData,
-                idTokenClaimsMapping = mapOf("$.birthdate" to """$["$ISO_MDL_NAMESPACE"]["birth_date"]"""),
-            )))
-        })
-        val client = apiClient()
-        val offer = client.createWalletFlowCredentialOffer(
-            scenario = Issuer2CredentialScenarios.isoMdl,
-            authenticationMethod = AuthenticationMethod.AUTHORIZED,
-            issuerStateMode = IssuerStateMode.INCLUDE,
-        )
-        val issuance = client.getSession(offer.offerId).issuanceRequests.single()
-        assertNull(issuance.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject["birth_date"])
+    fun authorizedMdlUsesBirthDateFromLoginCallback() = testApplication {
+        issueMdlWithLoginClaims(wholeNamespace = false)
+    }
+
+    @Test
+    fun authorizedMdlUsesWholeNamespaceFromLoginCallback() = testApplication {
+        issueMdlWithLoginClaims(wholeNamespace = true)
+    }
+
+    private suspend fun ApplicationTestBuilder.issueMdlWithLoginClaims(wholeNamespace: Boolean) {
+        pinMdlIssuanceClock()
+        val clientAttestation = createIssuer2ClientAttestationTestMaterial()
+        val claims = buildJsonObject {
+            put("sub", "test-subject")
+            put("birthdate", "1990-08-26")
+            putJsonObject("mdl") {
+                put("given_name", "Jane")
+                put("birth_date", "1990-08-26")
+            }
+        }
+        val idToken = JWKKey.generate(KeyType.secp256r1).signJws(claims.toString().encodeToByteArray())
+        val oauth = embeddedServer(CIO, host = "127.0.0.1", port = 0) {
+            routing {
+                get("/authorize") {
+                    val request = call.request.queryParameters
+                    val callback = URLBuilder(assertNotNull(request["redirect_uri"])).apply {
+                        parameters.append("state", assertNotNull(request["state"]))
+                        parameters.append("code", "local-login")
+                    }
+                    call.respondRedirect(callback.buildString())
+                }
+                post("/token") {
+                    assertEquals("local-login", call.receiveParameters()["code"])
+                    call.respondText(
+                        buildJsonObject {
+                            put("access_token", "local-access-token")
+                            put("token_type", "Bearer")
+                            put("id_token", idToken)
+                        }.toString(),
+                        ContentType.Application.Json,
+                    )
+                }
+            }
+        }.start(wait = false)
+        try {
+            val oauthUrl = "http://127.0.0.1:${oauth.engine.resolvedConnectors().single().port}"
+            val claimsMapping = if (wholeNamespace) {
+                mapOf("$.mdl" to "$.['$ISO_MDL_NAMESPACE']")
+            } else {
+                mapOf("$.birthdate" to """$["$ISO_MDL_NAMESPACE"]["birth_date"]""")
+            }
+            installIssuer2WithConfigFiles(
+                configureServiceConfig = { it.copy(clientAuthenticationConfig = clientAttestation.clientAuthenticationConfig) },
+                configureAuthenticationConfig = {
+                    it.copy(authorizeUrl = "$oauthUrl/authorize", accessTokenUrl = "$oauthUrl/token", clientSecret = "local-test")
+                },
+                configureProfilesConfig = { config ->
+                    val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
+                    val profile = config.profiles.getValue(id)
+                    val namespace = profile.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject
+                    val credentialData = if (wholeNamespace) {
+                        JsonObject(profile.credentialData - ISO_MDL_NAMESPACE)
+                    } else {
+                        JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to JsonObject(namespace - "birth_date")))
+                    }
+                    config.copy(profiles = config.profiles + (id to profile.copy(
+                        credentialData = credentialData,
+                        idTokenClaimsMapping = claimsMapping,
+                        msoData = MsoData(validFrom = AGE_VALID_FROM.toString()),
+                    )))
+                },
+            )
+            val client = apiClient()
+            val scenario = Issuer2CredentialScenarios.isoMdl
+            val wallet = Issuer2WalletFlowDriver(client, attestationAssembler = clientAttestation.attestationAssembler)
+            val offer = client.createWalletFlowCredentialOffer(
+                scenario = scenario,
+                authenticationMethod = AuthenticationMethod.AUTHORIZED,
+                issuerStateMode = IssuerStateMode.INCLUDE,
+            )
+            val issuance = client.getSession(offer.offerId).issuanceRequests.single()
+            assertEquals(claimsMapping, issuance.idTokenClaimsMapping)
+            if (wholeNamespace) {
+                assertNull(issuance.credentialData[ISO_MDL_NAMESPACE])
+            } else {
+                assertNull(issuance.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject["birth_date"])
+            }
+            val resolved = wallet.resolve(offer)
+            val login = wallet.startAuthorizationCodeFlowWithIssuerState(offer, resolved, scenario)
+            val providerUrl = client.get(login).redirectLocation()
+            val callback = HttpClient { followRedirects = false }.use { provider ->
+                provider.get(providerUrl).redirectLocation()
+            }
+            val walletRedirect = client.get(callback).redirectLocation()
+            val code = assertNotNull(Url(walletRedirect).parameters["code"], walletRedirect)
+            val token = wallet.exchangeAuthorizationCode(resolved, code)
+            val credential = wallet.requestCredential(resolved, token.access_token, includeDidInProof = false)
+            assertSignedBirthDateAndAge(credential)
+        } finally {
+            oauth.stop(500, 500)
+        }
+    }
+
+    private fun ApplicationTestBuilder.pinMdlIssuanceClock() {
+        application {
+            intercept(ApplicationCallPipeline.Plugins) {
+                withContext(IssuanceClock(InstantClock(AGE_VALID_FROM - 1.days))) { proceed() }
+            }
+        }
+    }
+
+    private suspend fun HttpResponse.redirectLocation(): String {
+        assertEquals(HttpStatusCode.Found, status, bodyAsText())
+        return assertNotNull(headers[HttpHeaders.Location])
+    }
+
+    private fun assertSignedBirthDateAndAge(payload: JsonObject) {
+        assertEquals(AGE_VALID_FROM, mdocValidityInfo(payload).validFrom)
+        val namespace = mdocNamespaceJson(payload, ISO_MDL_NAMESPACE)
+        assertEquals(JsonPrimitive("1990-08-26"), namespace["birth_date"])
+        assertEquals(JsonPrimitive(36), namespace["age_in_years"])
     }
 
     @Test
@@ -531,6 +663,7 @@ class Issuer2MsoDataWalletFlowTest {
 
     private companion object {
         const val ISO_MDL_NAMESPACE = "org.iso.18013.5.1"
+        val AGE_VALID_FROM = Instant.parse("2027-08-25T00:00:00Z")
         val PROFILE_MSO_DATA = MsoData(
             validFrom = "<timestamp>",
             validUntil = "<timestamp-in:365d>",
