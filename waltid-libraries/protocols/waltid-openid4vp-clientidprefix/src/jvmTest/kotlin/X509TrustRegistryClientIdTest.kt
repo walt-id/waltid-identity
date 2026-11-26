@@ -287,6 +287,30 @@ class X509TrustRegistryClientIdTest {
         }
     }
 
+    /** Through `java.util.Set`, as a Java caller would: Kotlin's read-only `Set` type does not stop it. */
+    @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN", "UNCHECKED_CAST")
+    @Test
+    fun `wallets do not share entity types, and a caller cannot change them after construction`() {
+        val evaluator = TrustDecisionEvaluator { decision() }
+        val first = ClientIdX509TrustRegistry(evaluator)
+        val second = ClientIdX509TrustRegistry(evaluator)
+        val callerTypes = mutableSetOf(TrustedEntityType.RELYING_PARTY_PROVIDER)
+        val fromCaller = ClientIdX509TrustRegistry(evaluator, expectedEntityTypes = callerTypes)
+
+        for (types in listOf(ClientIdX509TrustRegistry.RELYING_PARTY_ENTITY_TYPES, first.expectedEntityTypes, fromCaller.expectedEntityTypes)) {
+            val javaSet = types as java.util.Set<TrustedEntityType>
+            assertFailsWith<UnsupportedOperationException> { javaSet.remove(TrustedEntityType.RELYING_PARTY_PROVIDER) }
+            assertFailsWith<UnsupportedOperationException> { javaSet.add(TrustedEntityType.PID_PROVIDER) }
+            assertFailsWith<UnsupportedOperationException> { javaSet.iterator().apply { next() }.remove() }
+        }
+        callerTypes.clear()
+
+        val relyingParty = setOf(TrustedEntityType.RELYING_PARTY_PROVIDER, TrustedEntityType.ACCESS_CERTIFICATE_PROVIDER)
+        assertEquals(relyingParty, second.expectedEntityTypes)
+        assertEquals(relyingParty, ClientIdX509TrustRegistry(evaluator).expectedEntityTypes)
+        assertEquals(setOf(TrustedEntityType.RELYING_PARTY_PROVIDER), fromCaller.expectedEntityTypes)
+    }
+
     @Test
     fun `with pins and a registry, a registry denial does not fall through to a pin`() = runTest {
         val presented = presented()
