@@ -1,11 +1,13 @@
 package id.walt.wallet2.mobile
 
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletRegistryDisplay
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 
 class MobileWalletRegistryDisplayTest {
 

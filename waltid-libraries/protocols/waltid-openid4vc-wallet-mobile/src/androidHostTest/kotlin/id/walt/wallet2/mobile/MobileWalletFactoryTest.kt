@@ -2,17 +2,27 @@
 
 package id.walt.wallet2.mobile
 
-import id.walt.crypto2.keys.Key as ManagedKeyMaterial
-import id.walt.wallet2.mobile.identity.*
-import id.walt.crypto2.keys.PlatformKeyFacts
-import id.walt.wallet2.persistence.keys.WalletKeyProtection
+import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.sun.net.httpserver.HttpServer
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.examples.SdJwtExamples
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
+import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.crypto2.keys.ManagedKey
+import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.crypto2.keys.ProviderId
 import id.walt.crypto2.keys.SoftwareKey
 import id.walt.crypto2.keys.StoredKey
@@ -20,30 +30,10 @@ import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.CryptographySoftwareKeyProvider
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.signum.SignumKeyPolicyMismatchException
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
 import id.walt.did.dids.registrar.dids.DidCreateOptions
-import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
-import id.walt.crypto2.keys.KeyUseAuthorizationException
-import id.walt.crypto2.keys.KeyUseAuthorizationFailure
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
-import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
-import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
-import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
-import id.walt.wallet2.persistence.keys.WalletKeyRequirements
-import id.walt.crypto2.keys.KeyUseAuthorizationSupport
-import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
-import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
-import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
-import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
-import id.walt.credentials.CredentialParser
-import id.walt.credentials.examples.SdJwtExamples
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
 import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.did.dids.resolver.local.DidWebResolver
@@ -53,25 +43,27 @@ import id.walt.mdoc.proximity.mobile.BleProximityAvailability
 import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequest
+import id.walt.wallet2.mobile.identity.*
+import id.walt.wallet2.mobile.identity.MobileDidSupport
+import id.walt.wallet2.mobile.identity.MobileWalletKeyType
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.MobileWalletRequestAuthentication
+import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
+import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
+import id.walt.wallet2.persistence.keys.WalletKeyProtection
+import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
+import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.ktor.http.URLBuilder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
@@ -80,8 +72,57 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 class MobileWalletFactoryTest {
+    @Test
+    fun closeDisposesEachOwnedDriverOnceAndDeleteReopensOnlyForErasure() = runTest {
+        database().use { db ->
+            var opened = 0
+            var closed = 0
+            val wallet = encryptedWallet(MobileWalletConfig(), db, FakePlatformManagedKeyProvider(),
+                onClose = { closed++ }, onOpen = { opened++ })
+            wallet.close()
+            wallet.close()
+            assertEquals(1, opened)
+            assertEquals(1, closed)
+            wallet.deleteWallet()
+            wallet.deleteWallet()
+            assertEquals(2, opened)
+            assertEquals(opened, closed)
+        }
+    }
+
+    @Test
+    fun cancellationDuringDriverCreationDisposesTheUnpublishedDriver() = runTest {
+        database().use { db ->
+            var closed = 0
+            val opening = async {
+                val openingContext = currentCoroutineContext()
+                encryptedWallet(MobileWalletConfig(), db, FakePlatformManagedKeyProvider(),
+                    onClose = { closed++ }, onOpen = { openingContext.cancel() })
+            }
+            opening.join()
+            assertTrue(opening.isCancelled)
+            assertEquals(1, closed)
+        }
+    }
+
     @Test
     fun `cold factory reopens saved identity and authenticates DID requests without creating keys`() = runTest {
         val verifier = JWKKey.generate(KeyType.secp256r1)
@@ -195,13 +236,33 @@ class MobileWalletFactoryTest {
         }
     }
 
+    @Test
+    fun cancellationAtKeyDeliveryPreventsOpeningTheDatabase() = runTest {
+        val keys = object : DatabaseEncryptionKeyProvider {
+            override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
+                currentCoroutineContext().cancel()
+                return DatabaseEncryptionKey("cancelled", ByteArray(32))
+            }
+            override suspend fun deleteKey(walletId: String, databaseName: String) = Unit
+        }
+        val config = MobileWalletConfig(persistence = MobileWalletPersistence(MobileWalletDatabaseKey.Provided(keys)))
+        database().use { database ->
+            var opens = 0
+            val job = async { encryptedWallet(config, database, FakePlatformManagedKeyProvider()) { opens++ } }
+            job.join()
+            assertTrue(job.isCancelled)
+            assertEquals(0, opens)
+        }
+    }
+
     private suspend fun encryptedWallet(
         config: MobileWalletConfig,
         database: TestDatabase,
         provider: FakePlatformManagedKeyProvider,
+        onClose: (() -> Unit)? = null,
+        onOpen: () -> Unit = {},
     ): MobileWallet = createEncryptedSqlDelightMobileWallet(
         config = config,
-        clientIdTrustConfiguration = ClientIdTrustConfiguration(),
         managedDatabaseKeyProvider = object : DatabaseEncryptionKeyProvider {
             override suspend fun getOrCreateKey(walletId: String, databaseName: String) =
                 DatabaseEncryptionKey("test", ByteArray(32))
@@ -214,7 +275,12 @@ class MobileWalletFactoryTest {
             override fun create(configuration: BleProximityTransportConfiguration): ReaderSelectedTransportProvider =
                 error("No transport needed")
         },
-        openEncryptedDriver = { _, _, _, _ -> database.driver },
+        openEncryptedDriver = { _, _, _, _ ->
+            onOpen()
+            if (onClose == null) database.driver else object : SqlDriver by database.driver {
+                override fun close() = onClose()
+            }
+        },
         deleteDatabase = {},
     )
 
@@ -352,7 +418,6 @@ class MobileWalletFactoryTest {
         didService: Crypto2DidService = Crypto2DidService,
     ): MobileWallet = createSqlDelightMobileWallet(
         config = config,
-        clientIdTrustConfiguration = ClientIdTrustConfiguration(),
         db = database.database,
         keyProvider = provider,
         didService = didService,

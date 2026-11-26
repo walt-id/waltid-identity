@@ -1,29 +1,38 @@
 package id.walt.wallet2.mobile
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocEntry
 import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
 import androidx.credentials.registry.provider.digitalcredentials.VerificationEntryDisplayProperties
 import androidx.credentials.registry.provider.digitalcredentials.VerificationFieldDisplayProperties
 import id.walt.cose.coseCompliantCbor
+import id.walt.wallet2.mobile.digitalcredentials.AndroidAnnexCCredentialDatabase
+import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryField
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequestProtection
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialResponseProtection
+import id.walt.wallet2.mobile.digitalcredentials.OPENID4VCI_CREATE_PROTOCOLS
+import id.walt.wallet2.mobile.digitalcredentials.registrationAvailableAfterRefresh
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.robolectric.RuntimeEnvironment
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.junit.runner.RunWith
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])

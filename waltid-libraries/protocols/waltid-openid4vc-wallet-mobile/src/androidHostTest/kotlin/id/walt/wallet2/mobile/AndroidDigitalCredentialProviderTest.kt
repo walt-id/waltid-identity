@@ -11,15 +11,11 @@ import androidx.credentials.GetDigitalCredentialOption
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialUnknownException
 import androidx.credentials.provider.PendingIntentHandler
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import org.junit.runner.RunWith
-import org.robolectric.shadow.api.Shadow
-import org.robolectric.shadows.ShadowSigningInfo
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
+import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialProvider
+import id.walt.wallet2.mobile.digitalcredentials.MatcherCredentialSelection
+import id.walt.wallet2.mobile.digitalcredentials.MatcherSelectedRequest
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -27,6 +23,15 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.shadow.api.Shadow
+import org.robolectric.shadows.ShadowSigningInfo
 
 private const val EXTRA_CREDENTIAL_SET_ID =
     "androidx.credentials.registry.provider.extra.CREDENTIAL_SET_ID"

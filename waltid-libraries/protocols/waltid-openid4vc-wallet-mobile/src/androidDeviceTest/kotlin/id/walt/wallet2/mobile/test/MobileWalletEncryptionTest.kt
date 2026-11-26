@@ -1,30 +1,27 @@
 package id.walt.wallet2.mobile.test
 
-import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
-import id.walt.wallet2.mobile.identity.SigningIdentity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import androidx.test.platform.app.InstrumentationRegistry
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.MobileWalletDatabaseKey
-import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
+import id.walt.wallet2.mobile.identity.MobileWalletKeyAuthorization
+import id.walt.wallet2.mobile.identity.SigningIdentity
+import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.wallet2.persistence.stores.DriverFactory
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.runBlocking
-import org.junit.Test
 import java.io.File
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -32,6 +29,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.runBlocking
+import org.junit.Test
 
 class MobileWalletEncryptionTest {
 
@@ -194,7 +195,7 @@ class MobileWalletEncryptionTest {
         val wallet = MobileWalletFactory(context).create(
             MobileWalletConfig(
                 walletId = walletId,
-                defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+                keyAuthorization = MobileWalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
             )
         )
         assertTrue(databaseFiles(databaseFileName).any { it.exists() }, "Encrypted wallet DB should exist before deletion")
@@ -228,7 +229,7 @@ class MobileWalletEncryptionTest {
             persistence = MobileWalletPersistence(
                 databaseKey = MobileWalletDatabaseKey.Provided(provider),
             ),
-            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+            keyAuthorization = MobileWalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
         )
         val wallet = factory.create(config)
 
@@ -255,7 +256,7 @@ class MobileWalletEncryptionTest {
             persistence = MobileWalletPersistence(
                 credentialStore = credentialStore,
             ),
-            defaultKeyUseAuthorizationPolicy = KeyUseAuthorizationPolicy.None,
+            keyAuthorization = MobileWalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
         )
         val factory = MobileWalletFactory(context)
         deleteDatabaseFiles(databaseFileName)

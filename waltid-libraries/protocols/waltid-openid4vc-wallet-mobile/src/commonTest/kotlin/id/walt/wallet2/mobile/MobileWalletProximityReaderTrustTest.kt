@@ -2,7 +2,6 @@
 
 package id.walt.wallet2.mobile
 
-import kotlinx.io.bytestring.ByteString
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.extension.AuthorityKeyIdentifierExtension.Companion.extensionAuthorityKeyIdentifier
@@ -23,17 +22,37 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
-import id.walt.mdoc.readertrust.ReaderAuthenticationScope
 import id.walt.mdoc.proximity.Rical
 import id.walt.mdoc.proximity.RicalCertificateInfo
 import id.walt.mdoc.proximity.RicalReaderPathResult
 import id.walt.mdoc.proximity.X509RicalReaderPathValidator
+import id.walt.mdoc.readertrust.ReaderAuthenticationEvidence
+import id.walt.mdoc.readertrust.ReaderAuthenticationScope
+import id.walt.wallet2.mobile.proximity.ProximityCertificateRevocationResult
+import id.walt.wallet2.mobile.proximity.ProximityConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityConfiguredReaderTrustEvaluator
+import id.walt.wallet2.mobile.proximity.ProximityReaderAuthenticationScope
+import id.walt.wallet2.mobile.proximity.ProximityReaderCertificatePathState
+import id.walt.wallet2.mobile.proximity.ProximityReaderEvidence
+import id.walt.wallet2.mobile.proximity.ProximityReaderPolicy
+import id.walt.wallet2.mobile.proximity.ProximityReaderRevocationEvaluator
+import id.walt.wallet2.mobile.proximity.ProximityReaderRevocationPolicy
+import id.walt.wallet2.mobile.proximity.ProximityReaderRevocationState
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustAnchor
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustImportKind
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettings
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustSettingsCodec
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustState
+import id.walt.wallet2.mobile.proximity.ProximityRicalConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityRicalProvider
+import id.walt.wallet2.mobile.proximity.ProximityRicalProviderResult
+import id.walt.wallet2.mobile.proximity.ProximityRicalProviderTrustAnchor
+import id.walt.wallet2.mobile.proximity.ProximityRicalSignerRevocationEvaluator
+import id.walt.wallet2.mobile.proximity.ProximityRicalSignerRevocationPolicy
+import id.walt.wallet2.mobile.proximity.ProximityRicalState
+import id.walt.wallet2.mobile.proximity.ProximityStoredReaderTrustAnchor
 import id.walt.x509.MdocReaderAuthenticationEkuOid
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -45,6 +64,11 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.ByteString
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class ProximityReaderTrustTest {
     @Test

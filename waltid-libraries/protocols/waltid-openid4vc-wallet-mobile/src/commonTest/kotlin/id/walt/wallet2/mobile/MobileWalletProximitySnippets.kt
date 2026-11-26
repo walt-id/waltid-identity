@@ -1,5 +1,13 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.proximity.ProximityApproval
+import id.walt.wallet2.mobile.proximity.ProximityConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityPreparationResult
+import id.walt.wallet2.mobile.proximity.ProximitySession
+import id.walt.wallet2.mobile.proximity.ProximitySharingPlan
+import id.walt.wallet2.mobile.proximity.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximitySubmission
+import id.walt.wallet2.mobile.proximity.ProximityUnsatisfiedRequest
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 

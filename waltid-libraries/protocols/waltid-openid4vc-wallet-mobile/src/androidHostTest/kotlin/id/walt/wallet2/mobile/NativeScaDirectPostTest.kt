@@ -8,16 +8,19 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
 import id.walt.wallet2.persistence.keys.*
 import io.ktor.http.URLBuilder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.*
 import java.net.InetSocketAddress
 import java.net.URLDecoder
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.*
 
 /** Real reviewed wallet submission and HTTP delivery; native authentication is simulated here. */
 class NativeScaDirectPostTest {
@@ -74,8 +77,12 @@ class NativeScaDirectPostTest {
             val selections = preview.credentialOptions.map {
                 MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
             }
-            val consent = assertNotNull(fixture.wallet.preparePaymentConsent(preview.previewHandle, selections))
-            fixture.wallet.submitPresentation(preview.previewHandle, selections, paymentConsentRevision = consent.revision)
+            val review = fixture.wallet.reviewPresentation(
+                preview.previewHandle,
+                MobileWalletPresentationSelection(credentials = selections),
+            )
+            assertNotNull(review.payment)
+            fixture.wallet.submitPresentation(review)
             val vp = Json.parseToJsonElement(assertNotNull(received.get())["vp_token"]!!)
                 .jsonObject.getValue("payment").jsonArray.single().jsonPrimitive.content
             val proof = CompactJws.verify(vp.substringAfterLast('~'), key, JwsAlgorithm.ES256)

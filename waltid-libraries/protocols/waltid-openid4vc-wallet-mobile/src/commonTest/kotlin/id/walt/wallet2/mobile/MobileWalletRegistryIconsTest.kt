@@ -1,16 +1,20 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.digitalcredentials.MaxRegistryIconBase64Chars
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletRegistryIcons
+import id.walt.wallet2.mobile.digitalcredentials.parseCssRgb
+import id.walt.wallet2.mobile.digitalcredentials.solidColorPng
+import kotlin.io.encoding.Base64
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.io.encoding.Base64
-import kotlin.test.Test
-import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class MobileWalletRegistryIconsTest {
 

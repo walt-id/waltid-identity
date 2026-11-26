@@ -1,29 +1,35 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.mobile.identity
 
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
-import id.walt.crypto2.keys.KeyUseAuthorizationSupport
-import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
-import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.BinaryData
+import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.did.dids.Crypto2DidService
-import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.wallet2.mobile.*
+import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.createSqlDelightMobileWallet
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistrationResult
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialsConfig
+import id.walt.wallet2.mobile.digitalcredentials.UnavailableMobileWalletCredentialRegistry
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.*
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.CancellationException
 import kotlin.test.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class SigningIdentityManagerTest {
     @Test fun `unavailable provider reason survives alongside a usable recovery route`() = runTest {
@@ -746,13 +752,18 @@ class SigningIdentityManagerTest {
         private val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         private val db = WalletPersistenceDatabase(driver)
         val queries = db.walletPersistenceQueries
-        private val config = MobileWalletConfig(credentialRegistry = registry, onDigitalCredentialRegistryChanged = onRegistryChanged, signingIdentity = configuration ?: SigningIdentityConfiguration(
-            recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
+        private val config = MobileWalletConfig(
+            signingIdentity = configuration ?: SigningIdentityConfiguration(
+            recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)),
+            digitalCredentials = MobileWalletDigitalCredentialsConfig(
+                registry = registry,
+                onRegistrationChanged = onRegistryChanged,
+            ),
+        )
         init { WalletPersistenceDatabase.Schema.create(driver) }
         val wallet = reopen()
         fun reopen(signingIdentity: SigningIdentityConfiguration = config.signingIdentity) = createSqlDelightMobileWallet(
             config = config.copy(signingIdentity = signingIdentity),
-            clientIdTrustConfiguration = ClientIdTrustConfiguration(),
             db = db,
             keyProvider = native,
             didService = Crypto2DidService,

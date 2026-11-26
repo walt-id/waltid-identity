@@ -1,27 +1,43 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
+import kotlin.test.assertNull
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSessionId
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.wallet2.handlers.*
-import id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.launch
+import id.walt.wallet2.mobile.issuance.IssuanceClientRegistration
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialHolders
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialSelection
+import id.walt.wallet2.mobile.issuance.MobileWalletHolderBinding
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
+import kotlin.test.*
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlin.test.*
 
 class MobileWalletIssuanceOwnershipTest {
+    @Test
+    fun invalidClientRegistrationIsRejectedAtConstruction() {
+        for ((client, redirect) in listOf("" to "wallet://callback", "app" to "", "app" to " wallet://callback")) {
+            assertFailsWith<IllegalArgumentException> { IssuanceClientRegistration(client, redirect) }
+        }
+    }
+
     @Test fun selectionsRejectInvalidHoldersAtConstruction() {
         for (count in listOf(0, -1)) assertFailsWith<IllegalArgumentException> { MobileWalletCredentialHolders.NewKeys(count) }
         assertFailsWith<IllegalArgumentException> { MobileWalletCredentialHolders.Existing(emptyList()) }
@@ -33,9 +49,9 @@ class MobileWalletIssuanceOwnershipTest {
 
     @Test fun invalidSessionAndExcessCopiesDoNotGenerateKeys() = runTest {
         val fixture = fixture()
-        assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance("missing", "123", listOf(selection(2))))
+        assertNull(fixture.wallet.resumeIssuance(MobileWalletIssuanceSessionId("missing")))
         val session = fixture.wallet.startIssuance(request())
-        assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance(session.id, "123", listOf(selection(3))))
+        assertIs<WalletIssuanceOutcome.Failed>((session as MobileWalletIssuanceSession.PreAuthorized).accept("123", listOf(selection(3)), clientId = "eudiw-abca"))
         assertEquals(0, fixture.created)
         assertEquals(0, fixture.tokenCalls)
     }
@@ -47,8 +63,8 @@ class MobileWalletIssuanceOwnershipTest {
             // The missing second binding fails core resolution after the first configuration's key was prepared.
             val selections = listOf(selection(1), MobileWalletCredentialSelection("other",
                 MobileWalletCredentialHolders.Existing(listOf(MobileWalletHolderBinding("missing")))))
-            if (authorization) assertFails { fixture.wallet.beginAuthorizationIssuance(session.id, selections) }
-            else assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance(session.id, "123", selections))
+            if (authorization) assertFails { (session as MobileWalletIssuanceSession.AuthorizationCode).beginAuthorization(IssuanceClientRegistration("eudiw-abca", "openid://"), selections) }
+            else assertIs<WalletIssuanceOutcome.Failed>((session as MobileWalletIssuanceSession.PreAuthorized).accept("123", selections, clientId = "eudiw-abca"))
             assertEquals(1, fixture.created)
             assertEquals(listOf("default"), fixture.keys.listKeys().toList().map { it.keyId })
             assertTrue(fixture.dids.listDids().toList().isEmpty())
@@ -60,7 +76,7 @@ class MobileWalletIssuanceOwnershipTest {
         val fixture = fixture(records = InMemoryIssuanceSessionStore())
         val session = fixture.wallet.startIssuance(request())
         repeat(2) {
-            assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance(session.id, "123", listOf(selection(2))))
+            assertIs<WalletIssuanceOutcome.Failed>((session as MobileWalletIssuanceSession.PreAuthorized).accept("123", listOf(selection(2)), clientId = "eudiw-abca"))
             fixture.wallet = fixture.reopen()
         }
         assertEquals(2, fixture.created)
@@ -68,7 +84,7 @@ class MobileWalletIssuanceOwnershipTest {
         assertEquals(List<KeyUseAuthorizationPolicy>(2) { KeyUseAuthorizationPolicy.BiometricCurrentSet }, fixture.generatedPolicies)
         assertEquals(3, fixture.keys.listKeys().toList().size)
         assertEquals(2, fixture.dids.listDids().toList().size)
-        assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance(session.id, "123", listOf(selection(1))))
+        assertIs<WalletIssuanceOutcome.Failed>((session as MobileWalletIssuanceSession.PreAuthorized).accept("123", listOf(selection(1)), clientId = "eudiw-abca"))
         assertEquals(2, fixture.created)
         assertEquals(2, fixture.tokenCalls)
     }
@@ -76,7 +92,7 @@ class MobileWalletIssuanceOwnershipTest {
     @Test fun cancellationDuringPreparationCleansKeysBeforeIssuerWork() = runTest {
         val fixture = fixture(afterGenerate = { if (it == 2) currentCoroutineContext().cancel() })
         val session = fixture.wallet.startIssuance(request())
-        val operation = launch { fixture.wallet.continuePreAuthorizedIssuance(session.id, "123", listOf(selection(2))) }
+        val operation = launch { (session as MobileWalletIssuanceSession.PreAuthorized).accept("123", listOf(selection(2)), clientId = "eudiw-abca") }
         operation.join()
         assertTrue(operation.isCancelled)
         assertEquals(2, fixture.created)
@@ -102,8 +118,8 @@ class MobileWalletIssuanceOwnershipTest {
             }
             val fixture = fixture(records = records)
             val session = fixture.wallet.startIssuance(request(authorization))
-            if (authorization) assertFails { fixture.wallet.beginAuthorizationIssuance(session.id, listOf(selection(2))) }
-            else assertIs<WalletIssuanceOutcome.Failed>(fixture.wallet.continuePreAuthorizedIssuance(session.id, "123", listOf(selection(2))))
+            if (authorization) assertFails { (session as MobileWalletIssuanceSession.AuthorizationCode).beginAuthorization(IssuanceClientRegistration("eudiw-abca", "openid://"), listOf(selection(2))) }
+            else assertIs<WalletIssuanceOutcome.Failed>((session as MobileWalletIssuanceSession.PreAuthorized).accept("123", listOf(selection(2)), clientId = "eudiw-abca"))
             assertTrue(attemptedCheckpoint)
             assertEquals(2, fixture.created)
             assertEquals(3, fixture.keys.listKeys().toList().size)
@@ -119,7 +135,8 @@ class MobileWalletIssuanceOwnershipTest {
             "credential_issuer":"https://issuer.example",
             "credential_configuration_ids":["identity","other"],
             "grants":${if (authorization) """{"authorization_code":{}}""" else """{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"code","tx_code":{"input_mode":"numeric","length":3}}}"""}
-        }"""), keyId = "default",
+        }"""),
+        keyId = "default",
     )
 
     private class Fixture(val keys: InMemoryMobileWalletKeyStore, val dids: InMemoryDidStore) {

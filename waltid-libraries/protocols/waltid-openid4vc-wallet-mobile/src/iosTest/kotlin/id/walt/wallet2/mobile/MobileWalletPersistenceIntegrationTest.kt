@@ -5,8 +5,20 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.mobile.credentials.MobileWalletDatabaseKey
+import id.walt.wallet2.mobile.credentials.MobileWalletPersistence
+import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistry
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistrationResult
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialsConfig
+import id.walt.wallet2.mobile.digitalcredentials.UnavailableMobileWalletCredentialRegistry
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.test.runTest
@@ -14,10 +26,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import kotlin.uuid.Uuid
 
 class MobileWalletPersistenceIntegrationTest {
 
@@ -30,6 +38,7 @@ class MobileWalletPersistenceIntegrationTest {
                 get() = error("Native iOS registration must not inspect credential payloads")
         })
         for (registry in listOf(
+            null,
             UnavailableMobileWalletCredentialRegistry,
             IosIdentityDocumentRegistry(appGroupIdentifier = null, walletId = "explicit-registry-wallet"),
         )) {
@@ -52,7 +61,8 @@ class MobileWalletPersistenceIntegrationTest {
             )
             val wallet = MobileWalletFactory().create(registryConfig(registry, credentials))
             try {
-                assertEquals("An App Group is required", wallet.refreshDigitalCredentialRegistration().reason)
+                val expected = if (registry === UnavailableMobileWalletCredentialRegistry) "Digital credential registration is unavailable" else "An App Group is required"
+                assertEquals(expected, wallet.refreshDigitalCredentialRegistration().reason)
             } finally {
                 wallet.deleteWallet()
             }
@@ -169,17 +179,17 @@ class MobileWalletPersistenceIntegrationTest {
     }
 
     private fun registryConfig(
-        registry: MobileWalletCredentialRegistry,
+        registry: MobileWalletCredentialRegistry?,
         credentials: List<StoredCredential>,
     ): MobileWalletConfig = MobileWalletConfig(
         walletId = "ios-registry-projection-${Uuid.random()}",
-        credentialRegistry = registry,
         persistence = MobileWalletPersistence(
             databaseKey = MobileWalletDatabaseKey.Provided(
                 RecordingDatabaseKeyProvider(DatabaseEncryptionKey("provided-key", ByteArray(32) { 11 })),
             ),
             credentialStore = RecordingCredentialStore(credentials),
         ),
+        digitalCredentials = MobileWalletDigitalCredentialsConfig(registry = registry),
     )
 
     private class RecordingDatabaseKeyProvider(

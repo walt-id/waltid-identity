@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
 import id.walt.credentials.CredentialParser
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
@@ -7,13 +8,23 @@ import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.*
+import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.metadata.type.TypeMetadataFixture
 import id.walt.sdjwt.metadata.type.TypeMetadataResolver
 import id.walt.sdjwt.metadata.type.validateForIssuance
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistrationResult
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletCredentialRegistryRecord
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialCapabilities
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequest
+import id.walt.wallet2.mobile.issuance.MobileWalletCredentialOffer
+import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import io.ktor.client.HttpClient
@@ -21,13 +32,13 @@ import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.*
 import kotlin.test.*
 import kotlin.time.Clock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.*
 
 class MobileWalletMetadataChainTest {
     @Test
@@ -87,10 +98,10 @@ class MobileWalletMetadataChainTest {
             val store = InMemoryCredentialStore()
             val first = wallet(store)
             val session = first.startIssuance(MobileWalletIssuanceRequest(
-                MobileWalletCredentialOffer.InlineJson("""{"credential_issuer":"https://issuer.example","credential_configuration_ids":["identity"],"grants":{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"synthetic"}}}"""),
+                offer = MobileWalletCredentialOffer.InlineJson("""{"credential_issuer":"https://issuer.example","credential_configuration_ids":["identity"],"grants":{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"synthetic"}}}"""),
                 keyId = "holder",
             ))
-            assertIs<WalletIssuanceOutcome.Stored>(first.continuePreAuthorizedIssuance(session.id))
+            assertIs<WalletIssuanceOutcome.Stored>((session as MobileWalletIssuanceSession.PreAuthorized).accept(clientId = "eudiw-abca"))
             assertEquals(3, metadataRequests, "Metadata requests: $requested")
             // A signed legacy neighbour with a malformed reference must not suppress healthy
             // platform registration or the later presentation preview after reopening the store.
@@ -122,10 +133,16 @@ class MobileWalletMetadataChainTest {
             ))
             val selected = preview.credentialOptions.single()
             val selections = listOf(MobileWalletPresentationCredentialSelection(selected.queryId, selected.credentialId))
-            val review = reopened.reviewDigitalCredentialPresentation(preview.requestId, selections)
+            val review = reopened.reviewDigitalCredentialPresentation(
+                preview.requestId,
+                MobileWalletPresentationSelection(credentials = selections),
+            )
             val reviewed = review.credentials.single()
             assertEquals(selected.credentialId, reviewed.credentialId)
-            val response = reopened.submitDigitalCredentialPresentation(preview.requestId, selections)
+            val response = reopened.submitDigitalCredentialPresentation(
+                preview.requestId,
+                MobileWalletPresentationSelection(credentials = selections),
+            )
             val presentation = Json.parseToJsonElement(response.dataJson).jsonObject.getValue("vp_token")
                 .jsonObject.getValue("account").jsonArray.single().jsonPrimitive.content
             assertEquals(SDJwt.parse(presentation).fullPayload, Json.parseToJsonElement(reviewed.claimsJson))

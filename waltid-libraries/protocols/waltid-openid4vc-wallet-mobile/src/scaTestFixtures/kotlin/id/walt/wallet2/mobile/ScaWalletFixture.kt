@@ -1,7 +1,5 @@
 package id.walt.wallet2.mobile
 
-import id.walt.sdjwt.metadata.type.MetadataIntegrity
-import id.walt.sdjwt.metadata.type.TypeMetadataResolver
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
@@ -10,18 +8,29 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.sdjwt.*
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
+import id.walt.sdjwt.metadata.type.TypeMetadataResolver
 import id.walt.wallet2.consent.PaymentCredentialIssuer
+import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialPreview
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialRequest
+import id.walt.wallet2.mobile.digitalcredentials.MobileWalletDigitalCredentialResponse
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.MobileWalletPresentationSelection
+import id.walt.wallet2.mobile.presentation.MobileWalletTransactionDataProfile
+import id.walt.wallet2.mobile.presentation.NativeScaPresentationAuthorizer
+import id.walt.wallet2.mobile.proximity.snapshot
+import id.walt.wallet2.persistence.keys.*
+import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.headersOf
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
-import id.walt.wallet2.data.WalletKeyStore
-import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.persistence.keys.*
-import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
-import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import kotlinx.serialization.json.*
 
 /** Synthetic issuer and payment data, shared by host and opt-in native tests. */
@@ -36,9 +45,15 @@ internal data class ScaWalletFixture(val wallet: MobileWallet, val request: Json
         val selections = preview.credentialOptions.map {
             MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
         }
-        val consent = requireNotNull(wallet.prepareDigitalCredentialPaymentConsent(preview.requestId, selections))
-        return wallet.submitDigitalCredentialPresentation(preview.requestId, selections,
-            paymentConsentRevision = consent.revision)
+        val consent = requireNotNull(wallet.prepareDigitalCredentialPaymentConsent(
+            preview.requestId,
+            MobileWalletPresentationSelection(credentials = selections),
+        ))
+        return wallet.submitDigitalCredentialPresentation(
+            preview.requestId,
+            MobileWalletPresentationSelection(credentials = selections),
+            paymentConsentRevision = consent.revision,
+        )
     }
 }
 
