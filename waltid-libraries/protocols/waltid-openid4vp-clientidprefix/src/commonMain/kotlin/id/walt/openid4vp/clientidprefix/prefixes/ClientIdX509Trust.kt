@@ -85,7 +85,7 @@ internal object ClientIdX509Trust {
                     ClientValidationResult.Failure(ClientIdError.X509TrustSourceUnavailable)
                 } else {
                     log.info { "Request object signer is not trusted: ${check.reason}" }
-                    ClientValidationResult.Failure(ClientIdError.X509TrustAnchorMismatch)
+                    ClientValidationResult.Failure(ClientIdError.X509TrustRegistryRejected(check.reason))
                 }
             }
 

@@ -35,6 +35,8 @@ kotlin {
              */
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
             api(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
+            // HttpStatusError is a supertype of the public SignedAuthorizationRequestValidationException.
+            api(project(":waltid-libraries:waltid-library-commons"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))

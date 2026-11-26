@@ -43,6 +43,7 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -166,21 +167,24 @@ class X509TrustRegistryClientIdTest {
     }
 
     @Test
-    fun `a registry decision short of RegistryFresh is a denial`() = runTest {
+    fun `a registry decision short of RegistryFresh is a denial that keeps its reason`() = runTest {
         val presented = presented()
+        // Each case maps to the part of the rejection reason that names what was not met.
         val denials = mapOf(
-            "not trusted" to registryTrust(RecordingEvaluator(decision(code = TrustDecisionCode.NOT_TRUSTED))),
-            "stale source" to registryTrust(RecordingEvaluator(decision(freshness = FreshnessState.STALE))),
-            "other entity type" to registryTrust(RecordingEvaluator(decision(entityType = TrustedEntityType.PID_PROVIDER))),
-            "unauthenticated source" to registryTrust(
+            "Trust decision is NOT_TRUSTED" to registryTrust(RecordingEvaluator(decision(code = TrustDecisionCode.NOT_TRUSTED))),
+            "Trust decision is MULTIPLE_MATCHES" to registryTrust(RecordingEvaluator(decision(code = TrustDecisionCode.MULTIPLE_MATCHES))),
+            "freshness is STALE" to registryTrust(RecordingEvaluator(decision(freshness = FreshnessState.STALE))),
+            "Matched entity type PID_PROVIDER" to registryTrust(RecordingEvaluator(decision(entityType = TrustedEntityType.PID_PROVIDER))),
+            "authenticity is UNVERIFIED" to registryTrust(
                 RecordingEvaluator(decision(authenticity = AuthenticityState.UNVERIFIED)),
                 requireAuthenticatedSource = true,
             ),
         )
 
-        for ((case, trust) in denials) {
+        for ((reason, trust) in denials) {
             for (failure in listOf(authenticateSanDns(presented, trust), authenticateHash(presented, trust))) {
-                assertEquals(ClientIdError.X509TrustAnchorMismatch, assertIs<ClientValidationResult.Failure>(failure, case).error, case)
+                val error = assertIs<ClientIdError.X509TrustRegistryRejected>(assertIs<ClientValidationResult.Failure>(failure, reason).error, reason)
+                assertContains(error.reason, reason)
             }
         }
     }
@@ -324,7 +328,7 @@ class X509TrustRegistryClientIdTest {
         // The pins alone would accept this chain.
         assertIs<ClientValidationResult.Success>(authenticateSanDns(presented, ClientIdTrustConfiguration(x509TrustAnchors = pins)))
         for (failure in listOf(authenticateSanDns(presented, trust), authenticateHash(presented, trust))) {
-            assertEquals(ClientIdError.X509TrustAnchorMismatch, assertIs<ClientValidationResult.Failure>(failure).error)
+            assertIs<ClientIdError.X509TrustRegistryRejected>(assertIs<ClientValidationResult.Failure>(failure).error)
         }
         assertEquals(2, evaluator.requests.size)
     }
