@@ -629,7 +629,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         }
 
         let discardedHandles = await client.discardedPresentationPreviewHandles
-        XCTAssertEqual(discardedHandles, [PresentationPreviewHandle(value: "transaction-code-presentation-preview")])
+        XCTAssertEqual(discardedHandles, [try! PresentationPreviewHandle(value: "transaction-code-presentation-preview")])
         XCTAssertNil(viewModel.presentationPreview)
         XCTAssertFalse(viewModel.isLoading)
     }
@@ -1151,7 +1151,7 @@ private actor TransactionCodeWalletClient: WalletClient {
         }
         return .ready(
             PresentationPreview(
-                previewHandle: PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
+                previewHandle: try! PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
                 request: PresentationRequestInfo(
                     clientID: "https://verifier.example",
                     requestAuthentication: .unauthenticated,
@@ -1159,14 +1159,8 @@ private actor TransactionCodeWalletClient: WalletClient {
                     responseEncryption: .notRequired,
                 ),
                 credentialOptions: [
-                    PresentationCredentialOption(
-                        queryID: "pid",
-                        credentialID: Self.credential.id,
-                        format: Self.credential.format,
-                        credentialDataJSON: Self.credential.credentialDataJSON,
-                        issuer: Self.credential.issuer,
-                        subject: Self.credential.subject,
-                        label: Self.credential.label,
+                    try! PresentationCredentialOption(
+                        queryID: "pid", credential: .init(id: Self.credential.id, format: Self.credential.format, credentialDataJSON: Self.credential.credentialDataJSON, issuer: Self.credential.issuer, subject: Self.credential.subject, label: Self.credential.label),
                         disclosures: []
                     )
                 ]

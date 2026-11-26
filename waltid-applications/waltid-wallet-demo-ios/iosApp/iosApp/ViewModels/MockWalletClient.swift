@@ -226,9 +226,9 @@ actor MockWalletClient: WalletClient {
         }
         return .ready(
             PresentationPreview(
-                previewHandle: PresentationPreviewHandle(value: "mock-presentation-preview"),
+                previewHandle: try PresentationPreviewHandle(value: "mock-presentation-preview"),
                 request: previewRequestInfo,
-                credentialOptions: emptyPresentationOptions ? [] : (duplicatePresentationOptions ? duplicateOptions : [defaultOption]),
+                credentialOptions: emptyPresentationOptions ? [] : (duplicatePresentationOptions ? try makeDuplicateOptions() : [try makeDefaultOption()]),
                 credentialRequirements: [
                     PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
                 ]
@@ -426,55 +426,47 @@ actor MockWalletClient: WalletClient {
         """
     )
 
-    private var defaultOption: PresentationCredentialOption {
+    private func makeDefaultOption() throws -> PresentationCredentialOption {
         var disclosures = [
             PresentationDisclosure(
                 path: "$.given_name",
-                name: "given_name",
                 valueJSON: "\"Ada\"",
-                displayValue: "Ada",
-                selectivelyDisclosable: true, required: true, selectable: false
+                disposition: .requiredSelective,
+                name: "given_name",
+                displayValue: "Ada"
             )
         ]
         if let samplePortraitDisclosureValueJSON {
             disclosures.append(PresentationDisclosure(
                 path: "$.portrait",
-                name: nil,
                 valueJSON: samplePortraitDisclosureValueJSON,
-                displayValue: nil,
-                selectivelyDisclosable: true
+                disposition: .selectable
             ))
         }
-        return PresentationCredentialOption(
-            queryID: "pid",
-            credentialID: sampleCredential.id,
-            format: sampleCredential.format,
-            credentialDataJSON: sampleCredential.credentialDataJSON,
-            issuer: sampleCredential.issuer,
-            subject: sampleCredential.subject,
-            label: sampleCredential.label,
+        return try PresentationCredentialOption(
+            queryID: "pid", credential: sampleCredential,
             disclosures: disclosures
         )
     }
 
-    private var duplicateOptions: [PresentationCredentialOption] {
+    private func makeDuplicateOptions() throws -> [PresentationCredentialOption] {
         [
-            defaultOption.with(queryID: "identity", disclosures: [
+            try PresentationCredentialOption(queryID: "identity", credential: sampleCredential, disclosures: [
                 PresentationDisclosure(
                     path: "$.given_name",
-                    name: "Identity disclosure",
                     valueJSON: "\"Ada\"",
-                    displayValue: "Ada",
-                    selectivelyDisclosable: true, required: true, selectable: false
+                    disposition: .requiredSelective,
+                    name: "Identity disclosure",
+                    displayValue: "Ada"
                 )
             ]),
-            defaultOption.with(queryID: "age", disclosures: [
+            try PresentationCredentialOption(queryID: "age", credential: sampleCredential, disclosures: [
                 PresentationDisclosure(
                     path: "$.age_over_18",
-                    name: "Age disclosure",
                     valueJSON: "\"Over 18\"",
-                    displayValue: "Over 18",
-                    selectivelyDisclosable: true, required: true, selectable: false
+                    disposition: .requiredSelective,
+                    name: "Age disclosure",
+                    displayValue: "Over 18"
                 )
             ])
         ]
@@ -531,19 +523,4 @@ actor MockWalletClient: WalletClient {
         label: "Photo ID",
         addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z")
     )
-}
-
-private extension PresentationCredentialOption {
-    func with(queryID: String, disclosures: [PresentationDisclosure]) -> PresentationCredentialOption {
-        PresentationCredentialOption(
-            queryID: queryID,
-            credentialID: credentialID,
-            format: format,
-            credentialDataJSON: credentialDataJSON,
-            issuer: issuer,
-            subject: subject,
-            label: label,
-            disclosures: disclosures
-        )
-    }
 }

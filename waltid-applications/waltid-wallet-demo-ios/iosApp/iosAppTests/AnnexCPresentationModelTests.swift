@@ -513,23 +513,15 @@ final class AnnexCPresentationModelTests: XCTestCase {
     }
 
     private static func option(queryID: String, credentialID: String) -> PresentationCredentialOption {
-        PresentationCredentialOption(
-            queryID: queryID,
-            credentialID: credentialID,
-            format: "mso_mdoc",
-            credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe"}}"#,
-            issuer: "https://issuer.example",
-            subject: "did:example:holder",
-            label: "Mobile Driving Licence",
+        try! PresentationCredentialOption(
+            queryID: queryID, credential: .init(id: credentialID, format: "mso_mdoc", credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe"}}"#, issuer: "https://issuer.example", subject: "did:example:holder", label: "Mobile Driving Licence"),
             disclosures: [
                 PresentationDisclosure(
                     path: "org.iso.18013.5.1.family_name",
-                    name: "family_name",
                     valueJSON: "\"Doe\"",
-                    displayValue: "Doe",
-                    selectivelyDisclosable: true,
-                    required: true,
-                    selectable: false
+                    disposition: .requiredSelective,
+                    name: "family_name",
+                    displayValue: "Doe"
                 ),
             ]
         )

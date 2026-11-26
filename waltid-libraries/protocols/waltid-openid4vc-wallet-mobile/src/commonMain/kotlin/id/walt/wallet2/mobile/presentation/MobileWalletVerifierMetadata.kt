@@ -23,10 +23,10 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 @OptIn(ExperimentalObjCName::class)
 public data class MobileWalletMetadataDisplay(
-    public val name: String?,
-    public val locale: String?,
-    public val logoUri: String?,
-    public val logoAltText: String?,
+    public val name: String? = null,
+    public val locale: String? = null,
+    public val logoUri: String? = null,
+    public val logoAltText: String? = null,
     @ObjCName("descriptionText")
     public val description: String? = null,
     public val backgroundColor: String? = null,

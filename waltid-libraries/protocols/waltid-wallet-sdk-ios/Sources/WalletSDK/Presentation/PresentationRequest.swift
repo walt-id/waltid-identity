@@ -45,7 +45,7 @@ public struct PresentationRequestContext: Equatable, Sendable {
         responseURI: URL? = nil,
         state: String? = nil,
         nonce: String? = nil,
-        responseEncryption: PresentationResponseEncryption = .notRequired
+        responseEncryption: PresentationResponseEncryption
     ) {
         precondition(
             Self.hasValidClientID(clientID),

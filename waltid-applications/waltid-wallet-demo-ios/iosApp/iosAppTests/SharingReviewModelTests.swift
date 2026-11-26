@@ -11,20 +11,18 @@ import XCTest
 final class SharingReviewModelTests: XCTestCase {
     func testEffectiveConsentUsesDetailsLocaleForTreeChoicesAndInclusionReasons() throws {
         let city = #""home_address"."city""#
-        let option = PresentationCredentialOption(
-            queryID: "employee",
-            credentialID: "one",
-            format: "dc+sd-jwt",
-            credentialDataJSON: #"{"home_address":{"city":"Vienna","country":"AT","postal_code":"1010"}}"#,
-            issuer: nil,
-            subject: nil,
-            label: "Identity",
+        let option = try PresentationCredentialOption(
+            queryID: "employee", credential: .init(id: "one", format: "dc+sd-jwt", credentialDataJSON: #"{"home_address":{"city":"Vienna","country":"AT","postal_code":"1010"}}"#, issuer: nil, subject: nil, label: "Identity", metadataJSON: #"{"credentialClaims":[{"path":["home_address"],"display":[{"locale":"en","name":"Address"},{"locale":"de","name":"Anschrift"}]},{"path":["home_address","city"],"display":[{"locale":"en","name":"City"},{"locale":"de","name":"Wohnort"}]},{"path":["home_address","country"],"display":[{"locale":"en","name":"Country"},{"locale":"de","name":"Land"}]},{"path":["home_address","postal_code"],"display":[{"locale":"en","name":"Postal code"},{"locale":"de","name":"Postleitzahl"}]}]}"#),
             disclosures: [
-                .init(path: city, name: "City", valueJSON: #""Vienna""#, displayValue: nil, selectivelyDisclosable: true, required: true),
-                .init(path: #""home_address"."country""#, name: "Country", valueJSON: #""AT""#, displayValue: nil, selectivelyDisclosable: true),
-                .init(path: #""home_address"."postal_code""#, name: "Postal code", valueJSON: #""1010""#, displayValue: nil, selectivelyDisclosable: true),
-            ],
-            metadataJSON: #"{"credentialClaims":[{"path":["home_address"],"display":[{"locale":"en","name":"Address"},{"locale":"de","name":"Anschrift"}]},{"path":["home_address","city"],"display":[{"locale":"en","name":"City"},{"locale":"de","name":"Wohnort"}]},{"path":["home_address","country"],"display":[{"locale":"en","name":"Country"},{"locale":"de","name":"Land"}]},{"path":["home_address","postal_code"],"display":[{"locale":"en","name":"Postal code"},{"locale":"de","name":"Postleitzahl"}]}]}"#
+                .init(path: city, valueJSON: #""Vienna""#, disposition: .requiredSelective, name: "City"),
+                .init(path: #""home_address"."country""#, valueJSON: #""AT""#, disposition: .selectable, name: "Country"),
+                .init(
+                    path: #""home_address"."postal_code""#,
+                    valueJSON: #""1010""#,
+                    disposition: .selectable,
+                    name: "Postal code"
+                ),
+            ]
         )
         let prepared = effectivePrepared(#"{"home_address":{"city":"Vienna","country":"AT"}}"#)
         // English is first in the issuer metadata; a regional German preference must override it.
@@ -129,17 +127,14 @@ final class SharingReviewModelTests: XCTestCase {
 
     func testOptionalArrayControlUsesIssuerMetadataAtItsOriginalIndex() throws {
         let base = effectiveOption()
-        let option = PresentationCredentialOption(
-            queryID: base.queryID,
-            credentialID: base.credentialID,
-            format: base.format,
-            credentialDataJSON: base.credentialDataJSON,
-            issuer: nil,
-            subject: nil,
-            label: base.label,
-            disclosures: [.init(path: #""certifications".1"#, name: "SDK fallback", valueJSON: #"{"name":"Cloud security"}"#,
-                displayValue: nil, selectivelyDisclosable: true)],
-            metadataJSON: base.metadataJSON
+        let option = try PresentationCredentialOption(
+            queryID: base.queryID, credential: .init(id: base.credentialID, format: base.format, credentialDataJSON: base.credentialDataJSON, issuer: nil, subject: nil, label: base.label, metadataJSON: base.metadataJSON),
+            disclosures: [.init(
+                path: #""certifications".1"#,
+                valueJSON: #"{"name":"Cloud security"}"#,
+                disposition: .selectable,
+                name: "SDK fallback"
+            )]
         )
         let nodes = try effectiveReview(effectivePrepared("{}"), option).contributions[0].nodes.sharingSection(always: false)
         let candidate = try XCTUnwrap(nodes.first?.children.first)
@@ -152,17 +147,14 @@ final class SharingReviewModelTests: XCTestCase {
     func testEqualContributionsMergeOnlyWhenOriginalArrayIdentitiesAlsoMatch() throws {
         let base = effectiveOption()
         func option(_ query: String, index: Int) -> PresentationCredentialOption {
-            .init(
-                queryID: query,
-                credentialID: base.credentialID,
-                format: base.format,
-                credentialDataJSON: base.credentialDataJSON,
-                issuer: nil,
-                subject: nil,
-                label: base.label,
-                disclosures: [.init(path: "\"certifications\".\(index)", name: "Certification", valueJSON: #"{"name":"Cloud security"}"#,
-                    displayValue: nil, selectivelyDisclosable: true, required: true)],
-                metadataJSON: base.metadataJSON
+            try! PresentationCredentialOption(
+                queryID: query, credential: .init(id: base.credentialID, format: base.format, credentialDataJSON: base.credentialDataJSON, issuer: nil, subject: nil, label: base.label, metadataJSON: base.metadataJSON),
+                disclosures: [.init(
+                    path: "\"certifications\".\(index)",
+                    valueJSON: #"{"name":"Cloud security"}"#,
+                    disposition: .requiredSelective,
+                    name: "Certification"
+                )]
             )
         }
         let raw = effectivePrepared(#"{"certifications":[{"name":"Cloud security"}]}"#).credentials[0]
@@ -191,21 +183,29 @@ final class SharingReviewModelTests: XCTestCase {
 
     private func effectiveOption() -> PresentationCredentialOption {
         let disclosures: [PresentationDisclosure] = [
-            .init(path: #""employment"."job_title""#, name: "Job title", valueJSON: #""Engineer""#, displayValue: nil, selectivelyDisclosable: true, required: true),
-            .init(path: #""certifications".1"#, name: "Cloud security", valueJSON: #"{"name":"Cloud security"}"#, displayValue: nil, selectivelyDisclosable: true, required: true),
-            .init(path: #""employment"."salary""#, name: "salary", valueJSON: #"{"amount":0,"eligible":false,"until":null}"#, displayValue: nil, selectivelyDisclosable: true),
-            .init(path: #""home_address"."city""#, name: "City", valueJSON: #""Bengaluru""#, displayValue: nil, selectivelyDisclosable: true),
+            .init(
+                path: #""employment"."job_title""#,
+                valueJSON: #""Engineer""#,
+                disposition: .requiredSelective,
+                name: "Job title"
+            ),
+            .init(
+                path: #""certifications".1"#,
+                valueJSON: #"{"name":"Cloud security"}"#,
+                disposition: .requiredSelective,
+                name: "Cloud security"
+            ),
+            .init(
+                path: #""employment"."salary""#,
+                valueJSON: #"{"amount":0,"eligible":false,"until":null}"#,
+                disposition: .selectable,
+                name: "salary"
+            ),
+            .init(path: #""home_address"."city""#, valueJSON: #""Bengaluru""#, disposition: .selectable, name: "City"),
         ]
-        return .init(
-            queryID: "employee",
-            credentialID: "one",
-            format: "dc+sd-jwt",
-            credentialDataJSON: #"{"employment":{"job_title":"Engineer","manager_name":"Withheld"},"certifications":[{}, {"name":"Cloud security"}]}"#,
-            issuer: nil,
-            subject: nil,
-            label: "Employee",
-            disclosures: disclosures,
-            metadataJSON: #"{"credentialClaims":[{"path":["certifications",1],"display":[{"name":"Cloud security"}]}]}"#
+        return try! PresentationCredentialOption(
+            queryID: "employee", credential: .init(id: "one", format: "dc+sd-jwt", credentialDataJSON: #"{"employment":{"job_title":"Engineer","manager_name":"Withheld"},"certifications":[{}, {"name":"Cloud security"}]}"#, issuer: nil, subject: nil, label: "Employee", metadataJSON: #"{"credentialClaims":[{"path":["certifications",1],"display":[{"name":"Cloud security"}]}]}"#),
+            disclosures: disclosures
         )
     }
 
@@ -678,12 +678,10 @@ final class SharingReviewModelTests: XCTestCase {
                 disclosures: [
                     PresentationDisclosure(
                         path: "org.iso.18013.5.1.family_name",
-                        name: "family_name",
                         valueJSON: "\"Doe\"",
-                        displayValue: "Doe",
-                        selectivelyDisclosable: true,
-                        required: true,
-                        selectable: false
+                        disposition: .requiredSelective,
+                        name: "family_name",
+                        displayValue: "Doe"
                     ),
                 ]
             ),
@@ -755,10 +753,20 @@ final class SharingReviewModelTests: XCTestCase {
     func testRepeatedCredentialCombinesQueriesAndRequiredFieldsStayFixed() {
         let required = informationOption(query: "name", name: "Ada")
         let optional = informationOption(query: "optional", name: "Ada", replacing: [
-            .init(path: "birth_date", name: "birth_date", valueJSON: #""1815-12-10""#, displayValue: "1815-12-10",
-                selectivelyDisclosable: true, required: true, selectable: false),
-            .init(path: "$.given_name", name: "given_name", valueJSON: #""Ada""#, displayValue: "Ada",
-                selectivelyDisclosable: true, required: false, selectable: true),
+            .init(
+                path: "birth_date",
+                valueJSON: #""1815-12-10""#,
+                disposition: .requiredSelective,
+                name: "birth_date",
+                displayValue: "1815-12-10"
+            ),
+            .init(
+                path: "$.given_name",
+                valueJSON: #""Ada""#,
+                disposition: .selectable,
+                name: "given_name",
+                displayValue: "Ada"
+            ),
         ])
         let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: [required, optional])
         let groups = review.informationToShare(selection: .init(credentials: [required.selection, optional.selection]),
@@ -772,10 +780,20 @@ final class SharingReviewModelTests: XCTestCase {
     }
 
     func testAdditionalInformationIsVisibleWithoutUnrequestedProtocolMetadata() {
-        let extra = PresentationDisclosure(path: "family_name", name: "family_name", valueJSON: #""Lovelace""#,
-            displayValue: "Lovelace", selectivelyDisclosable: false, required: false, selectable: false, requested: false)
-        let technical = PresentationDisclosure(path: "iss", name: "iss", valueJSON: #""Issuer""#,
-            displayValue: "Issuer", selectivelyDisclosable: false, required: false, selectable: false, requested: false)
+        let extra = PresentationDisclosure(
+            path: "family_name",
+            valueJSON: #""Lovelace""#,
+            disposition: .additionalCleartext,
+            name: "family_name",
+            displayValue: "Lovelace"
+        )
+        let technical = PresentationDisclosure(
+            path: "iss",
+            valueJSON: #""Issuer""#,
+            disposition: .additionalCleartext,
+            name: "iss",
+            displayValue: "Issuer"
+        )
         let option = informationOption(name: "Ada", extra: [extra, technical])
         let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
         let fields = informationFields(option: option, details: details, disclosures: [])
@@ -789,8 +807,13 @@ final class SharingReviewModelTests: XCTestCase {
         let options = [("nested", #"["address","name"]"#, "Vienna"), ("name", "name", "Ada"),
                        ("literal", #"["address.name"]"#, "Literal")].map { query, path, value in
             informationOption(query: query, name: value, replacing: [
-                .init(path: path, name: "name", valueJSON: "\"\(value)\"", displayValue: value,
-                    selectivelyDisclosable: true, required: true, selectable: false)
+                .init(
+                    path: path,
+                    valueJSON: "\"\(value)\"",
+                    disposition: .requiredSelective,
+                    name: "name",
+                    displayValue: value
+                )
             ])
         }
         let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: options)
@@ -816,8 +839,13 @@ final class SharingReviewModelTests: XCTestCase {
     }
 
     func testOptionalClearTextRequestedFieldIsNotPresentedAsAdditional() {
-        let disclosure = PresentationDisclosure(path: "given_name", name: "given_name", valueJSON: #""Ada""#,
-            displayValue: "Ada", selectivelyDisclosable: false, required: false, selectable: false)
+        let disclosure = PresentationDisclosure(
+            path: "given_name",
+            valueJSON: #""Ada""#,
+            disposition: .optionalCleartext,
+            name: "given_name",
+            displayValue: "Ada"
+        )
         let option = informationOption(name: "Ada", replacing: [disclosure])
         let field = informationFields(option: option, details: CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true), disclosures: [])[0]
         XCTAssertTrue(field.included)
@@ -826,16 +854,15 @@ final class SharingReviewModelTests: XCTestCase {
 
     private func informationOption(id: String = "one", query: String = "pid", name: String, required: Bool = true,
         extra: [PresentationDisclosure] = [], replacing: [PresentationDisclosure]? = nil) -> PresentationCredentialOption {
-        .init(
-            queryID: query,
-            credentialID: id,
-            format: "dc+sd-jwt",
-            credentialDataJSON: #"{"given_name":"Ada","family_name":"Lovelace","birth_date":"1815-12-10"}"#,
-            issuer: "Issuer",
-            subject: nil,
-            label: "Identity",
-            disclosures: replacing ?? [.init(path: "given_name", name: "given_name", valueJSON: "\"\(name)\"",
-                displayValue: name, selectivelyDisclosable: true, required: required, selectable: !required)] + extra
+        try! PresentationCredentialOption(
+            queryID: query, credential: .init(id: id, format: "dc+sd-jwt", credentialDataJSON: #"{"given_name":"Ada","family_name":"Lovelace","birth_date":"1815-12-10"}"#, issuer: "Issuer", subject: nil, label: "Identity"),
+            disclosures: replacing ?? [.init(
+                path: "given_name",
+                valueJSON: "\"\(name)\"",
+                disposition: required ? .requiredSelective : .selectable,
+                name: "given_name",
+                displayValue: name
+            )] + extra
         )
     }
 
@@ -852,7 +879,7 @@ final class SharingReviewModelTests: XCTestCase {
         transactionData: [PresentationTransactionData] = []
     ) -> PresentationPreview {
         PresentationPreview(
-            previewHandle: PresentationPreviewHandle(value: "preview"),
+            previewHandle: try! PresentationPreviewHandle(value: "preview"),
             request: PresentationRequestInfo(
                 clientID: "https://verifier.example",
                 requestAuthentication: .unauthenticated,
@@ -896,21 +923,15 @@ final class SharingReviewModelTests: XCTestCase {
         disclosures: [PresentationDisclosure] = [
             PresentationDisclosure(
                 path: "$.given_name",
-                name: "given_name",
                 valueJSON: "\"Ada\"",
-                displayValue: "Ada",
-                selectivelyDisclosable: true
+                disposition: .selectable,
+                name: "given_name",
+                displayValue: "Ada"
             ),
         ]
     ) -> PresentationCredentialOption {
-        PresentationCredentialOption(
-            queryID: queryID,
-            credentialID: credentialID,
-            format: "mso_mdoc",
-            credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe","given_name":"Ada"}}"#,
-            issuer: "https://issuer.example",
-            subject: "did:example:holder",
-            label: "Mobile Driving Licence",
+        try! PresentationCredentialOption(
+            queryID: queryID, credential: .init(id: credentialID, format: "mso_mdoc", credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe","given_name":"Ada"}}"#, issuer: "https://issuer.example", subject: "did:example:holder", label: "Mobile Driving Licence"),
             disclosures: disclosures
         )
     }

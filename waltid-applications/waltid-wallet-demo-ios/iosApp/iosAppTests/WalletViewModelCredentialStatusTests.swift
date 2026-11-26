@@ -195,7 +195,7 @@ final class WalletViewModelCredentialStatusTests: XCTestCase {
             let key = model.presentationNavigationResetKey
             model.checkPresentationCredentialStatus(try XCTUnwrap(preview.credentialOptions.first?.credentialID), handle: preview.previewHandle, navigationKey: key)
             try await waitUntil { await barrier.started }
-            model.releasePresentationStatusRefresh(handle: PresentationPreviewHandle(value: "foreign"), navigationKey: key)
+            model.releasePresentationStatusRefresh(handle: try! PresentationPreviewHandle(value: "foreign"), navigationKey: key)
             XCTAssertNotNil(model.presentationStatusRefresh)
             switch exit {
             case "dispose": model.releasePresentationStatusRefresh(handle: preview.previewHandle, navigationKey: key)

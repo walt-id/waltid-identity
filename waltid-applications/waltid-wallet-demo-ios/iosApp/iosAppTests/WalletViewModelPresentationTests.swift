@@ -145,16 +145,14 @@ final class WalletViewModelPresentationTests: XCTestCase {
     }
 
     private func claimClient(_ preparation: PendingClaimPreparation) -> MockWalletClient {
-        let option = PresentationCredentialOption(
-            queryID: "pid",
-            credentialID: "claim-credential",
-            format: "dc+sd-jwt",
-            credentialDataJSON: #"{"given_name":"Ada"}"#,
-            issuer: nil,
-            subject: nil,
-            label: "Employee",
-            disclosures: [.init(path: "$.given_name", name: "Given name", valueJSON: #""Ada""#,
-                displayValue: nil, selectivelyDisclosable: true)]
+        let option = try! PresentationCredentialOption(
+            queryID: "pid", credential: .init(id: "claim-credential", format: "dc+sd-jwt", credentialDataJSON: #"{"given_name":"Ada"}"#, issuer: nil, subject: nil, label: "Employee"),
+            disclosures: [.init(
+                path: "$.given_name",
+                valueJSON: #""Ada""#,
+                disposition: .selectable,
+                name: "Given name"
+            )]
         )
         let preview = PresentationPreview(previewHandle: .init(value: "claim-preview"),
             request: .init(clientID: "https://verifier.example", requestAuthentication: .unauthenticated,
@@ -183,7 +181,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
     @MainActor
     func testInvalidRequestCanBeDismissedLocallyOrReportedToVerifier() async throws {
         let request = try XCTUnwrap(URL(string: "openid4vp://invalid-request"))
-        let previewHandle = PresentationPreviewHandle(value: "invalid-presentation-preview")
+        let previewHandle = try! PresentationPreviewHandle(value: "invalid-presentation-preview")
         let previewError = PresentationPreviewError(
             previewHandle: previewHandle,
             request: PresentationRequestContext(

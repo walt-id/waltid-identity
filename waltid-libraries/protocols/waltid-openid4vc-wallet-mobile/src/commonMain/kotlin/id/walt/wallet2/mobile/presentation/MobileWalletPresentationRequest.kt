@@ -41,17 +41,20 @@ public data class MobileWalletPresentationRequestContext(
  *
  * @property options Alternative DCQL credential query ID sets that satisfy this requirement.
  */
-public data class MobileWalletPresentationCredentialRequirement(
-    val options: List<List<String>>,
-) {
+public class MobileWalletPresentationCredentialRequirement(options: List<List<String>>) {
+    public val options: List<List<String>> = buildList { options.forEach { option -> add(buildList { addAll(option) }) } }
+
+    public override fun equals(other: Any?): Boolean = other is MobileWalletPresentationCredentialRequirement && options == other.options
+    public override fun hashCode(): Int = options.hashCode()
+
     init {
-        require(options.isNotEmpty()) {
+        require(this.options.isNotEmpty()) {
             "A presentation credential requirement must contain at least one option."
         }
-        require(options.all { it.isNotEmpty() }) {
+        require(this.options.all { it.isNotEmpty() }) {
             "Each presentation credential requirement option must contain at least one query ID."
         }
-        require(options.flatten().all(String::isNotBlank)) {
+        require(this.options.flatten().all(String::isNotBlank)) {
             "Presentation credential requirement query IDs must not be blank."
         }
     }

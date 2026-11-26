@@ -57,20 +57,21 @@ public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
     /// Optional stored display metadata encoded as JSON, including issuer and credential card art.
     public let metadataJSON: String?
 
-    /// Creates a presentation credential option.
-    ///
+    /// Creates the review option for one credential that matches the query.
     /// - Parameters:
-    ///   - queryID: DCQL credential query identifier this option satisfies.
-    ///   - credentialID: Wallet-local credential identifier.
-    ///   - format: Credential format.
-    ///   - credentialDataJSON: Parsed credential data encoded as JSON.
-    ///   - multiple: Whether the request allows multiple credentials for this query.
-    ///   - issuer: Issuer identifier when available.
-    ///   - subject: Subject identifier when available.
-    ///   - label: User-facing credential label when available.
-    ///   - disclosures: Credential values requested from this credential.
-    ///   - metadataJSON: Optional stored display metadata encoded as JSON.
-    public init(
+    ///   - queryID: Non-blank identifier of the matched credential query.
+    ///   - credential: Wallet credential with its display data and stored metadata.
+    ///   - multiple: Whether the query accepts more than one credential.
+    ///   - disclosures: Claims available to review for this match.
+    public init(queryID: String, credential: Credential, multiple: Bool = false,
+                disclosures: [PresentationDisclosure] = []) throws {
+        guard isPresentationIdentifierNonBlank(queryID) else { throw WalletError.invalidInput("A credential query ID is required") }
+        self.init(queryID: queryID, credentialID: credential.id, format: credential.format, credentialDataJSON: credential.credentialDataJSON,
+                  multiple: multiple, issuer: credential.issuer, subject: credential.subject, label: credential.label,
+                  disclosures: disclosures, metadataJSON: credential.metadataJSON)
+    }
+
+    init(
         queryID: String,
         credentialID: String,
         format: String,
@@ -148,6 +149,31 @@ public struct PresentationDisclosureSelection: Equatable, Hashable, Identifiable
     }
 }
 
+/// Inclusion of a claim in this particular presentation.
+public enum DisclosureDisposition: Equatable, Sendable {
+    /// Cleartext shared with the credential outside the requested claims.
+    case additionalCleartext
+    /// A required claim carried in cleartext.
+    case requiredCleartext
+    /// An optional requested claim carried in cleartext.
+    case optionalCleartext
+    /// A selectively disclosable claim included by the accepted request.
+    case requiredSelective
+    /// The format supports selective disclosure, but this optional claim has no independent toggle.
+    case fixedSelective
+    /// An optional claim the holder may independently toggle.
+    case selectable
+
+    /// Whether the credential format supports selective disclosure of this claim.
+    public var selectivelyDisclosable: Bool { self == .requiredSelective || self == .fixedSelective || self == .selectable }
+    /// Whether the accepted request requires the claim.
+    public var required: Bool { self == .requiredCleartext || self == .requiredSelective }
+    /// Whether the holder may toggle this claim for the current request.
+    public var selectable: Bool { self == .selectable }
+    /// Whether the verifier requested the claim.
+    public var requested: Bool { self != .additionalCleartext }
+}
+
 /// Credential value that may be shared.
 public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
     /// Stable display identifier.
@@ -165,68 +191,33 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
     /// Human-readable value when trivially available.
     public let displayValue: String?
 
-    /// Whether this value comes from a selectively disclosable claim.
-    public let selectivelyDisclosable: Bool
+    /// The inclusion state for this claim in the current presentation.
+    public let disposition: DisclosureDisposition
+    /// Whether the credential format supports selective disclosure of this claim.
+    public var selectivelyDisclosable: Bool { disposition.selectivelyDisclosable }
+    /// Whether the accepted request requires the claim.
+    public var required: Bool { disposition.required }
+    /// Whether the holder may toggle this claim for the current request.
+    public var selectable: Bool { disposition.selectable }
+    /// Whether the verifier requested the claim.
+    public var requested: Bool { disposition.requested }
 
-    /// Whether the presentation request requires this claim for the matched query.
-    public let required: Bool
-
-    /// Whether apps may let the user toggle this claim for submission.
-    public let selectable: Bool
-
-    /// False for additional clear-text data the credential must transmit even when not requested.
-    public let requested: Bool
-
-    /// Creates a presentation disclosure.
-    ///
+    /// Creates the display value and inclusion rules for a reviewed claim.
     /// - Parameters:
-    ///   - path: Opaque claim path token supplied by the presentation engine.
-    ///   - name: Claim name when known.
-    ///   - valueJSON: Raw claim value encoded as JSON.
-    ///   - displayValue: Human-readable value when trivially available.
-    ///   - selectivelyDisclosable: Whether the credential format can selectively
-    ///     disclose this claim.
-    ///   - required: Whether the request requires this claim.
-    ///   - selectable: Whether apps may let the user toggle this claim.
-    ///   - requested: Whether the presentation request asks for this claim, rather than additional clear-text data.
+    ///   - path: Opaque claim path supplied by the wallet.
+    ///   - valueJSON: Claim value encoded as JSON.
+    ///   - disposition: Inclusion state for this matched request.
+    ///   - name: Optional name suitable for display.
+    ///   - displayValue: Optional human-readable representation.
     public init(
-        path: String,
-        name: String?,
-        valueJSON: String,
-        displayValue: String?,
-        selectivelyDisclosable: Bool,
-        required: Bool? = nil,
-        selectable: Bool? = nil,
-        requested: Bool = true
+        path: String, valueJSON: String, disposition: DisclosureDisposition,
+        name: String? = nil, displayValue: String? = nil
     ) {
         self.path = path
         self.name = name
         self.valueJSON = valueJSON
         self.displayValue = displayValue
-        self.selectivelyDisclosable = selectivelyDisclosable
-        let resolvedRequired = required ?? !selectivelyDisclosable
-        let resolvedSelectable = selectable ?? (selectivelyDisclosable && !resolvedRequired)
-        precondition(requested || (!selectivelyDisclosable && !resolvedRequired && !resolvedSelectable),
-            "Additional shared data must be immutable and independent of request requirements.")
-        self.requested = requested
-        precondition(
-            Self.hasValidSelectionState(
-                selectivelyDisclosable: selectivelyDisclosable,
-                required: resolvedRequired,
-                selectable: resolvedSelectable
-            ),
-            "A selectable disclosure must be selectively disclosable and optional."
-        )
-        self.required = resolvedRequired
-        self.selectable = resolvedSelectable
-    }
-
-    static func hasValidSelectionState(
-        selectivelyDisclosable: Bool,
-        required: Bool,
-        selectable: Bool
-    ) -> Bool {
-        !selectable || (selectivelyDisclosable && !required)
+        self.disposition = disposition
     }
 }
 

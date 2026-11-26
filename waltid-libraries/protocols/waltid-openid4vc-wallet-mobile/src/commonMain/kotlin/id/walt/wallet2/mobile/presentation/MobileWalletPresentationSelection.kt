@@ -2,6 +2,7 @@ package id.walt.wallet2.mobile.presentation
 
 import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
+import id.walt.wallet2.mobile.credentials.MobileWalletCredential
 
 /**
  * The exact credential and claim choices used for review, payment consent and submission.
@@ -41,7 +42,8 @@ public class MobileWalletPresentationSelection(
  * @property metadataJson Optional stored display metadata encoded as JSON, including issuer and
  *   credential card art.
  */
-public data class MobileWalletPresentationCredentialOption(
+@ConsistentCopyVisibility
+public data class MobileWalletPresentationCredentialOption internal constructor(
     val queryId: String,
     val credentialId: String,
     val format: String,
@@ -53,6 +55,15 @@ public data class MobileWalletPresentationCredentialOption(
     val disclosures: List<MobileWalletPresentationDisclosure> = emptyList(),
     val metadataJson: String? = null,
 ) {
+    /** Creates an option from a wallet credential and the review facts for this query. */
+    public constructor(
+        queryId: String,
+        credential: MobileWalletCredential,
+        multiple: Boolean = false,
+        disclosures: List<MobileWalletPresentationDisclosure> = emptyList(),
+    ) : this(queryId, credential.id, credential.format, credential.credentialDataJson, multiple,
+        credential.issuer, credential.subject, credential.label, buildList { addAll(disclosures) }, credential.metadataJson)
+
     /** Identifies this exact credential in its query when the holder selects it. */
     public val selection: MobileWalletPresentationCredentialSelection
         get() = MobileWalletPresentationCredentialSelection(queryId, credentialId)
@@ -92,34 +103,54 @@ public data class MobileWalletPresentationDisclosureSelection(
     val path: String,
 )
 
-/**
- * Claim or selective-disclosure value that may be shared for a matched credential.
- *
- * @property path Opaque claim path token supplied by the presentation engine.
- * @property name Optional human-readable claim name supplied by the presentation engine.
- * @property valueJson Claim value encoded as JSON.
- * @property displayValue Optional presentation-engine display value for the claim.
- * @property selectivelyDisclosable `true` when the credential format can selectively disclose this claim.
- * @property required `true` when the presentation request requires this claim for the matched query.
- * @property selectable `true` when apps may let the user toggle this claim for submission.
- * @property requested `false` for additional clear-text data the credential must transmit.
- */
+/** How the matched request and credential determine inclusion of this claim. */
+public enum class DisclosureDisposition {
+    /** Unrequested cleartext included whenever the credential is presented. */
+    AdditionalCleartext,
+    /** A required requested claim carried in cleartext. */
+    RequiredCleartext,
+    /** An optional requested claim carried in cleartext. */
+    OptionalCleartext,
+    /** A required claim in a selectively disclosable format. */
+    RequiredSelective,
+    /** An optional selectively disclosable claim without an independent holder choice. */
+    FixedSelective,
+    /** An optional claim the holder can independently include or omit. */
+    Selectable;
+
+    /** The credential supports selective disclosure for this claim, even if the request fixes it. */
+    public val selectivelyDisclosable: Boolean get() = this == RequiredSelective || this == FixedSelective || this == Selectable
+    /** Presenting the matched request includes this claim as required. */
+    public val required: Boolean get() = this == RequiredCleartext || this == RequiredSelective
+    /** The holder can independently toggle the claim for this request. */
+    public val selectable: Boolean get() = this == Selectable
+    /** The verifier requested this claim. Additional cleartext travels with the credential. */
+    public val requested: Boolean get() = this != AdditionalCleartext
+}
+
+/** A claim shown to the holder, with the inclusion rules for this particular request. */
 public data class MobileWalletPresentationDisclosure(
     val path: String,
-    val name: String?,
     val valueJson: String,
-    val displayValue: String?,
-    val selectivelyDisclosable: Boolean,
-    val required: Boolean = !selectivelyDisclosable,
-    val selectable: Boolean = selectivelyDisclosable && !required,
-    val requested: Boolean = true,
+    val disposition: DisclosureDisposition,
+    val name: String? = null,
+    val displayValue: String? = null,
 ) {
-    init {
-        require(requested || (!selectivelyDisclosable && !required && !selectable)) {
-            "Additional shared data must be immutable and independent of request requirements."
-        }
-        require(!selectable || (selectivelyDisclosable && !required)) {
-            "A selectable disclosure must be selectively disclosable and optional."
-        }
+    public val selectivelyDisclosable: Boolean get() = disposition.selectivelyDisclosable
+    public val required: Boolean get() = disposition.required
+    public val selectable: Boolean get() = disposition.selectable
+    public val requested: Boolean get() = disposition.requested
+}
+
+internal fun disclosureDisposition(selective: Boolean, required: Boolean, selectable: Boolean, requested: Boolean): DisclosureDisposition {
+    require(requested || (!selective && !required && !selectable))
+    require(!selectable || (selective && !required))
+    return when {
+        !requested -> DisclosureDisposition.AdditionalCleartext
+        selectable -> DisclosureDisposition.Selectable
+        selective && required -> DisclosureDisposition.RequiredSelective
+        selective -> DisclosureDisposition.FixedSelective
+        required -> DisclosureDisposition.RequiredCleartext
+        else -> DisclosureDisposition.OptionalCleartext
     }
 }

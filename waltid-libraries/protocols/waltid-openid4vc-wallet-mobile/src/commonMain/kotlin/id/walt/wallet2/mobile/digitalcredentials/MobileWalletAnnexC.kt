@@ -5,16 +5,13 @@ package id.walt.wallet2.mobile.digitalcredentials
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
-import id.walt.cose.CoseKey
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toEncodedJwk
 import id.walt.cose.verifyDetached
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.hpke.Hpke
-import id.walt.crypto2.keys.HpkeCiphertext
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
@@ -35,6 +32,7 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.resolveHolderKey
 import id.walt.wallet2.handlers.PreviewSessionStore
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationCredentialOption
+import id.walt.wallet2.mobile.presentation.DisclosureDisposition
 import id.walt.wallet2.mobile.presentation.MobileWalletPresentationDisclosure
 import id.waltid.openid4vp.wallet.DcApiWallet
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
@@ -44,14 +42,10 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.toList
 import kotlinx.io.bytestring.ByteString as IoByteString
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborObjectAsArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -63,16 +57,6 @@ import kotlinx.serialization.json.jsonPrimitive
  * only suite [Hpke] implements, and `aad` is empty because the session transcript is already bound
  * through `info`.
  */
-internal suspend fun encryptAnnexCHpke(
-    recipientPublicKey: CoseKey,
-    plaintext: ByteArray,
-    info: ByteArray,
-): HpkeCiphertext = Hpke.sealBase(
-    recipientPublicKey = recipientPublicKey.toEncodedJwk(),
-    plaintext = plaintext,
-    info = info,
-)
-
 /**
  * The whole ISO 18013-7 Annex C presentation flow.
  *
@@ -137,7 +121,7 @@ internal class MobileWalletAnnexCEngine(
             currentCoroutineContext()[PresentationReviewGuard]?.check()
             val documents = buildSelectedDocuments(submission, retained, confirmed.transcript)
             currentCoroutineContext()[PresentationReviewGuard]?.check()
-            encryptDeviceResponse(documents, confirmed)
+            encryptAnnexCDeviceResponse(documents, confirmed.encryptionInfo, confirmed.transcript)
         }
 
     /** A request that passed validation, with everything later steps need already decoded. */
@@ -347,40 +331,7 @@ internal class MobileWalletAnnexCEngine(
         }
     }
 
-    /** HPKE-seals the `DeviceResponse` to the reader's recipient key and wraps it for the platform. */
-    private suspend fun encryptDeviceResponse(
-        documents: List<Document>,
-        confirmed: ConfirmedRequest,
-    ): MobileWalletDigitalCredentialResponse {
-        val plaintext = coseCompliantCbor.encodeToByteArray(
-            DeviceResponse.serializer(),
-            DeviceResponse(version = "1.0", documents = documents.toTypedArray(), status = 0u),
-        )
-        val ciphertext = encryptAnnexCHpke(
-            recipientPublicKey = confirmed.encryptionInfo.encryptionParameters.recipientPublicKey,
-            plaintext = plaintext,
-            info = AnnexCDcapiHandoverInfo.hpkeInfo(confirmed.transcript),
-        )
-        val responseBase64Url = coseCompliantCbor.encodeToByteArray(
-            AnnexCEncryptedResponse.serializer(),
-            AnnexCEncryptedResponse(
-                type = "dcapi",
-                response = AnnexCEncryptedResponseData(
-                    enc = ciphertext.encapsulatedKey.toByteArray(),
-                    cipherText = ciphertext.ciphertext.toByteArray(),
-                ),
-            ),
-        ).encodeToBase64Url()
-        return MobileWalletDigitalCredentialResponse(
-            protocol = MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C,
-            dataJson = buildJsonObject {
-                put(
-                    "response",
-                    JsonPrimitive(responseBase64Url)
-                )
-            }.toString(),
-        )
-    }
+
 
     private fun decodeAndValidateDeviceRequest(base64Url: String): DeviceRequest =
         DeviceRequest.decodeFromBase64Url(base64Url).also { request ->
@@ -592,9 +543,7 @@ internal class MobileWalletAnnexCEngine(
                     name = elementName,
                     valueJson = Json.encodeToString(JsonElement.serializer(), value),
                     displayValue = value.displayValue(),
-                    selectivelyDisclosable = true,
-                    required = true,
-                    selectable = false,
+                    disposition = DisclosureDisposition.RequiredSelective,
                 )
             }
         }
@@ -634,16 +583,3 @@ internal class MobileWalletAnnexCEngine(
         private fun annexCQueryId(index: Int, docType: String): String = "$index:$docType"
     }
 }
-
-@Serializable
-@CborObjectAsArray
-private data class AnnexCEncryptedResponse(
-    val type: String,
-    val response: AnnexCEncryptedResponseData,
-)
-
-@Serializable
-private data class AnnexCEncryptedResponseData(
-    @ByteString val enc: ByteArray,
-    @ByteString val cipherText: ByteArray,
-)
