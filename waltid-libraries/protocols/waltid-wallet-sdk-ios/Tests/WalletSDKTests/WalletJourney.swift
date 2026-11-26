@@ -51,9 +51,9 @@ import WalletSDK
             case .preAuthorized(let grant):
                 var code: String?
                 if let requirement = session.offer.transactionCode { code = await ui.code(requirement) }
-                outcome = try await wallet.accept(grant, transactionCode: code, clientID: client.clientID)
+                outcome = try await grant.accept(transactionCode: code, clientID: grant.clientIdentification == .clientIDRequired ? client.clientID : nil)
             case .authorizationCode(let grant):
-                let authorization = try await wallet.beginAuthorization(grant, registration: client)
+                let authorization = try await grant.beginAuthorization(using: client)
                 if let redirected = try await ui.browser(authorization.request.url) {
                     outcome = try await authorization.complete(redirected)
                 } else {

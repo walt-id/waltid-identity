@@ -736,9 +736,17 @@ final class WalletAPITests: XCTestCase {
         let selections = [try IssuanceCredentialSelection(configurationID: "identity", holders: .existing(bindings))]
 
         let session = try await wallet.startIssuance(request)
-        let authorization = try await wallet.beginAuthorization(.init(rawValue: session.id.rawValue), registration: .init(clientID: "ios-client", redirectURI: URL(string: "wallet.example:/callback")!), credentials: selections)
-        let preAuthorizedOutcome = try await wallet.accept(.init(rawValue: session.id.rawValue), transactionCode: "1234",
-            credentials: selections, clientID: "ios-client")
+        guard case .preAuthorized(let preAuthorized) = session.grant else { return XCTFail("Expected pre-authorized offer") }
+        XCTAssertEqual(preAuthorized.authorizationServer, "https://authorization.example")
+        XCTAssertEqual(preAuthorized.clientIdentification, .clientIDRequired)
+        let preAuthorizedOutcome = try await preAuthorized.accept(transactionCode: "1234", credentials: selections, clientID: "ios-client")
+        bridge.issuanceSessionResult = .init(id: session.id.rawValue,
+            offer: .init(grant: .authorizationCode, issuer: session.offer.issuer, credentials: [], transactionCode: nil),
+            authorizationServer: "https://browser.example", clientIdentification: .clientIDRequired)
+        let browserSession = try await wallet.startIssuance(request)
+        guard case .authorizationCode(let browser) = browserSession.grant else { return XCTFail("Expected browser offer") }
+        XCTAssertEqual(browser.authorizationServer, "https://browser.example")
+        let authorization = try await browser.beginAuthorization(using: .init(clientID: "ios-client", redirectURI: URL(string: "wallet.example:/callback")!), credentials: selections)
         let callbackURL = URL(string: "wallet.example:/callback?code=authorization-code")!
         let authorizationOutcome = try await wallet.continueAuthorizationIssuance(
             sessionID: authorization.id,
@@ -747,13 +755,13 @@ final class WalletAPITests: XCTestCase {
         let cancellationOutcome = try await wallet.cancelIssuance(sessionID: session.id)
         let deferredOutcome = try await wallet.resumeDeferredIssuance(.init(id: "deferred-1", credentialConfigurationID: nil, intervalSeconds: nil))
 
-        XCTAssertEqual(session, bridge.issuanceSessionResult)
+        XCTAssertEqual(authorization.id.rawValue, browserSession.id.rawValue)
         XCTAssertEqual(authorization.request.url.absoluteString, "https://issuer.example/authorize")
         XCTAssertEqual(preAuthorizedOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(authorizationOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(cancellationOutcome, bridge.issuanceOutcomeResult)
         XCTAssertEqual(deferredOutcome, bridge.issuanceOutcomeResult)
-        XCTAssertEqual(bridge.issuanceRequests, [request])
+        XCTAssertEqual(bridge.issuanceRequests, [request, request])
         XCTAssertEqual(bridge.authorizationStartSessionIDs, [session.id.rawValue])
         XCTAssertEqual(bridge.createdHolderKeyCounts, [2])
         XCTAssertEqual(bridge.authorizationSelections, [selections])
@@ -779,7 +787,9 @@ final class WalletAPITests: XCTestCase {
             storedCredentialIDs: ["stored"], deferredCredentials: [pending])
         bridge.deferredCredentialsResult = [pending]
         let wallet = Wallet(bridge: bridge)
-        let result = try await wallet.accept(.init(rawValue: "session"), clientID: "ios-client")
+        let session = try await wallet.startIssuance(.init(offer: URL(string: "https://issuer.example/offer")!))
+        guard case .preAuthorized(let offer) = session.grant else { return XCTFail("Expected pre-authorized offer") }
+        let result = try await offer.accept(clientID: "ios-client")
         XCTAssertEqual(result, bridge.issuanceOutcomeResult)
         let recovered = try await wallet.listDeferredIssuance()
         XCTAssertEqual(recovered, [pending])
@@ -1303,7 +1313,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var keyUseAuthorizationPreflightResult: WalletKeyUseAuthorizationPreflight?
-    var issuanceSessionResult = IssuanceSession(
+    var issuanceSessionResult = IssuanceOfferReview(
         id: "issuance-session-1",
         offer: IssuanceOfferPreview(
             grant: .preAuthorizedCode,
@@ -1313,7 +1323,8 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             ),
             credentials: [],
             transactionCode: nil
-        )
+        ),
+        authorizationServer: "https://authorization.example", clientIdentification: .clientIDRequired
     )
     var issuanceOutcomeResult = IssuanceOutcome.stored(sessionID: "issuance-session-1", credentialIDs: [])
     var credentialsResult: [Credential] = []
@@ -1413,7 +1424,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return deferredCredentialsResult
     }
 
-    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
+    func startIssuance(request: IssuanceRequest) async throws -> IssuanceOfferReview {
         if let error {
             throw error
         }

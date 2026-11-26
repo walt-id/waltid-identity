@@ -1080,13 +1080,13 @@ private actor TransactionCodeWalletClient: WalletClient {
         (failWithProgress || deferWithProgress) && credentialIssued ? [.init(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)] : []
     }
 
-    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
+    func startIssuance(_ request: IssuanceRequest) async throws -> ReviewedIssuanceOffer {
         issuanceStartCalls += 1
         if issuanceStartDelayNanoseconds > 0 {
             try? await Task.sleep(nanoseconds: issuanceStartDelayNanoseconds)
         }
-        return IssuanceSession(
-            id: "transaction-code-session",
+        return ReviewedIssuanceOffer(
+            id: .init(rawValue: "transaction-code-session"),
             offer: IssuanceOfferPreview(
                 grant: issuanceGrant,
                 issuer: IssuanceIssuerPreview(
@@ -1105,18 +1105,18 @@ private actor TransactionCodeWalletClient: WalletClient {
         )
     }
 
-    func beginAuthorizationIssuance(sessionID: AuthorizationIssuanceID, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest {
         receivedIssuanceSelections.append(credentials)
-        return IssuanceAuthorization(
+        return .init(id: .init(rawValue: sessionID.rawValue), request: IssuanceAuthorization(
             url: URL(string: "https://issuer.example/authorize")!,
             state: "test-state",
             redirectURI: URL(string: "openid://")!,
             pkce: .init(codeChallenge: "test-challenge", codeChallengeMethod: "S256"),
             pushedAuthorizationRequestUsed: false
-        )
+        ))
     }
 
-    func continuePreAuthorizedIssuance(sessionID: PreAuthorizedIssuanceID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+    func continuePreAuthorizedIssuance(sessionID: IssuanceSessionID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
         try await finishIssuance(sessionID.rawValue, transactionCode: transactionCode, credentials: credentials)
     }
 

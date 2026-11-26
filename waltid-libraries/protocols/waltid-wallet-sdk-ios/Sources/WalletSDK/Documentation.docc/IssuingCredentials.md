@@ -44,10 +44,11 @@ let outcome: IssuanceOutcome
 switch session.grant {
 case .preAuthorized(let grant):
     var code: String?
-    if let requirement = session.offer.transactionCode { code = await ui.code(requirement) }
-    outcome = try await wallet.accept(grant, transactionCode: code)
+    if let requirement = grant.transactionCode { code = await ui.code(requirement) }
+    let clientID = grant.clientIdentification == .clientIDRequired ? registration.clientID : nil
+    outcome = try await grant.accept(transactionCode: code, clientID: clientID)
 case .authorizationCode(let grant):
-    let authorization = try await wallet.beginAuthorization(grant, registration: registration)
+    let authorization = try await grant.beginAuthorization(using: registration)
     if let callback = try await ui.browser(authorization.request.url) {
         outcome = try await authorization.complete(callback)
     } else {
@@ -56,6 +57,8 @@ case .authorizationCode(let grant):
 }
 ui.received(outcome)
 ```
+
+Select the app registration using the offer’s `authorizationServer`. A pre-authorized offer exposes the effective client identification and transaction-code prompt.
 
 Save the session ID during offer review. After reopening the same wallet, call `resumeIssuance(_:)` to redisplay the offer while it is still available.
 

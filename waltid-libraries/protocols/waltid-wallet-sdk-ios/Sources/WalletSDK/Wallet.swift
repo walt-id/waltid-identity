@@ -162,51 +162,13 @@ public actor Wallet {
         guard !request.offer.absoluteString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw WalletError.invalidInput("Credential offer URI must not be blank")
         }
-        return try await bridge.startIssuance(request: request)
+        return try await IssuanceSession(bridge.startIssuance(request: request), wallet: self)
     }
 
     /// Reopens an offer in the same wallet, returning nil when the offer is no longer available.
     /// - Parameter id: Session reference saved while reviewing the offer.
     public func resumeIssuance(_ id: IssuanceSessionID) async throws -> IssuanceSession? {
-        try await bridge.resumeIssuance(id: id)
-    }
-
-    /// Accepts a browser grant and builds its request using the app's registered client and exact redirect.
-    /// - Parameters:
-    ///   - session: Browser grant returned by the wallet.
-    ///   - registration: Client identifier and exact registered callback URI.
-    ///   - credentials: Selected configurations and copy counts. Omit to use the offered defaults.
-    public func beginAuthorization(
-        _ session: AuthorizationIssuanceID,
-        registration: IssuanceClientRegistration,
-        credentials: [IssuanceCredentialSelection]? = nil
-    ) async throws -> PendingIssuanceAuthorization {
-        let redirect = registration.redirectURI.absoluteString
-        guard !registration.clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !redirect.isEmpty, redirect == redirect.trimmingCharacters(in: .whitespacesAndNewlines) else {
-            throw WalletError.invalidInput("A registered client ID and callback URI are required")
-        }
-        let request = try await bridge.beginAuthorizationIssuance(
-            sessionID: session.rawValue, registration: registration, credentials: credentials
-        )
-        return PendingIssuanceAuthorization(id: session, request: request, wallet: self)
-    }
-
-    /// Accepts the pre-authorized grant. Supply a client identity when the authorization server requires one.
-    /// - Parameters:
-    ///   - session: Pre-authorized grant returned by the wallet.
-    ///   - transactionCode: Code entered by the holder when the offer requires one.
-    ///   - credentials: Selected configurations and copy counts.
-    ///   - clientID: Client identifier when required by the authorization server.
-    public func accept(
-        _ session: PreAuthorizedIssuanceID,
-        transactionCode: String? = nil,
-        credentials: [IssuanceCredentialSelection]? = nil,
-        clientID: String? = nil
-    ) async throws -> IssuanceOutcome {
-        try await bridge.continuePreAuthorizedIssuance(
-            sessionID: session.rawValue, transactionCode: transactionCode, credentials: credentials, clientID: clientID
-        )
+        try await bridge.resumeIssuance(id: id).map { IssuanceSession($0, wallet: self) }
     }
 
     /// Delivers a callback with its saved browser reference after reopening the wallet.
@@ -404,4 +366,44 @@ public actor Wallet {
 
     private let bridge: any WalletCoreBridge
 
+}
+
+extension Wallet {
+    /// Accepts a browser grant and builds its request using the app's registered client and exact redirect.
+    /// - Parameters:
+    ///   - session: Browser grant returned by the wallet.
+    ///   - registration: Client identifier and exact registered callback URI.
+    ///   - credentials: Selected configurations and copy counts. Omit to use the offered defaults.
+    func beginAuthorization(
+        _ session: IssuanceSessionID,
+        registration: IssuanceClientRegistration,
+        credentials: [IssuanceCredentialSelection]? = nil
+    ) async throws -> PendingIssuanceAuthorization {
+        let redirect = registration.redirectURI.absoluteString
+        guard !registration.clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !redirect.isEmpty, redirect == redirect.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            throw WalletError.invalidInput("A registered client ID and callback URI are required")
+        }
+        let request = try await bridge.beginAuthorizationIssuance(
+            sessionID: session.rawValue, registration: registration, credentials: credentials
+        )
+        return PendingIssuanceAuthorization(id: .init(rawValue: session.rawValue), request: request, wallet: self)
+    }
+
+    /// Accepts the pre-authorized grant. Supply a client identity when the authorization server requires one.
+    /// - Parameters:
+    ///   - session: Pre-authorized grant returned by the wallet.
+    ///   - transactionCode: Code entered by the holder when the offer requires one.
+    ///   - credentials: Selected configurations and copy counts.
+    ///   - clientID: Client identifier when required by the authorization server.
+    func accept(
+        _ session: IssuanceSessionID,
+        transactionCode: String? = nil,
+        credentials: [IssuanceCredentialSelection]? = nil,
+        clientID: String? = nil
+    ) async throws -> IssuanceOutcome {
+        try await bridge.continuePreAuthorizedIssuance(
+            sessionID: session.rawValue, transactionCode: transactionCode, credentials: credentials, clientID: clientID
+        )
+    }
 }

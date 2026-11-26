@@ -94,7 +94,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             of: Waltid_openid4vc_walletWalletIssuanceContinuation.self).map { $0.toSwiftDeferredCredential() }
     }
 
-    func startIssuance(request: IssuanceRequest) async throws -> IssuanceSession {
+    func startIssuance(request: IssuanceRequest) async throws -> IssuanceOfferReview {
         let result = try await bridge.startIssuance(
             request: MobileWalletIssuanceRequest(
                 offer: MobileWalletCredentialOfferUri(value: request.offer.absoluteString),
@@ -105,16 +105,16 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         let value = try Self.successValue(
             result,
-            as: Waltid_openid4vc_walletWalletIssuanceBatchSession.self,
+            as: Waltid_openid4vc_walletWalletIssuanceOfferReview.self,
             operation: "start issuance"
         )
-        return try value.toSwiftIssuanceSession()
+        return try value.toSwiftOfferReview()
     }
 
-    func resumeIssuance(id: IssuanceSessionID) async throws -> IssuanceSession? {
+    func resumeIssuance(id: IssuanceSessionID) async throws -> IssuanceOfferReview? {
         let result = try await bridge.resumeIssuance(sessionId: id.rawValue)
         let lookup = try Self.successValue(result, as: WalletBridgeIssuanceLookup.self, operation: "resume issuance")
-        return try lookup.session?.toSwiftIssuanceSession()
+        return try lookup.session?.toSwiftOfferReview()
     }
 
     func beginAuthorizationIssuance(sessionID: String, registration: IssuanceClientRegistration, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {

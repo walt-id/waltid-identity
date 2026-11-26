@@ -260,7 +260,10 @@ class WalletViewModel: ObservableObject {
     private var statusDismissedKey: String?
     private var statusHideTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
-    private var issuanceSession: IssuanceSession?
+    private var pendingAuthorizationID: AuthorizationIssuanceID?
+    private var issuanceSession: ReviewedIssuanceOffer? {
+        didSet { pendingAuthorizationID = nil }
+    }
     private var pendingPresentationSuccessMessage: String?
     private var presentationTask: Task<Void, Never>?
     private var paymentConsentTask: Task<Void, Never>?
@@ -1272,7 +1275,7 @@ class WalletViewModel: ObservableObject {
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
         setLoading(WalletStatusText.resolvingCredentialOffer, tab: .receive)
         receiveTask = Task {
-            var newSession: IssuanceSession?
+            var newSession: ReviewedIssuanceOffer?
             do {
                 let session = try await walletClient.startIssuance(
                     IssuanceRequest(
@@ -1348,22 +1351,23 @@ class WalletViewModel: ObservableObject {
                 let selections = try issuanceSelections(session.offer)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
-                switch session.grant {
-                case .preAuthorized(let grantID):
+                switch session.offer.grant {
+                case .preAuthorizedCode:
                     try await completeIssuanceOutcome(
                         try await walletClient.continuePreAuthorizedIssuance(
-                            sessionID: grantID,
+                            sessionID: session.id,
                             transactionCode: trimmedTxCode,
                             credentials: selections
                         ),
                         previousCredentials: previousCredentials,
                         request: request
                     )
-                case .authorizationCode(let grantID):
-                    let authorization = try await walletClient.beginAuthorizationIssuance(sessionID: grantID, credentials: selections)
+                case .authorizationCode:
+                    let authorization = try await walletClient.beginAuthorizationIssuance(sessionID: session.id, credentials: selections)
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
-                    authorizationRequestURL = authorization.url
+                    pendingAuthorizationID = authorization.id
+                    authorizationRequestURL = authorization.request.url
                     setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
                 }
             } catch is CancellationError {
@@ -1407,9 +1411,7 @@ class WalletViewModel: ObservableObject {
             }
             return
         }
-        guard let session = issuanceSession,
-              offerPreview != nil,
-              case .authorizationCode(let grantID) = session.grant else { return }
+        guard offerPreview != nil, let grantID = pendingAuthorizationID else { return }
         let request = ReceiveRequest(
             offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines),
             navigationResetKey: receiveNavigationResetKey

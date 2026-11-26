@@ -165,10 +165,10 @@ actor MockWalletClient: WalletClient {
 
     func listDeferredIssuance() async throws -> [DeferredCredential] { [] }
 
-    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
+    func startIssuance(_ request: IssuanceRequest) async throws -> ReviewedIssuanceOffer {
         try await delayOperation()
-        return IssuanceSession(
-            id: "mock-session",
+        return ReviewedIssuanceOffer(
+            id: .init(rawValue: "mock-session"),
             offer: .init(
                 grant: issuanceGrant,
                 issuer: .init(
@@ -188,20 +188,20 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func beginAuthorizationIssuance(sessionID: AuthorizationIssuanceID, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest {
         guard issuanceGrant == .authorizationCode else {
             throw WalletError.internalFailure("Mock issuance session is not authorization-code based")
         }
-        return IssuanceAuthorization(
+        return .init(id: .init(rawValue: sessionID.rawValue), request: IssuanceAuthorization(
             url: URL(string: "https://issuer.example/authorize")!,
             state: "mock-state",
             redirectURI: URL(string: "openid://")!,
             pkce: .init(codeChallenge: "mock-challenge", codeChallengeMethod: "S256"),
             pushedAuthorizationRequestUsed: false
-        )
+        ))
     }
 
-    func continuePreAuthorizedIssuance(sessionID: PreAuthorizedIssuanceID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+    func continuePreAuthorizedIssuance(sessionID: IssuanceSessionID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
         try await finishIssuance(sessionID.rawValue)
     }
 

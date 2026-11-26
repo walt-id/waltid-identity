@@ -271,12 +271,12 @@ public class MobileWallet internal constructor(
      * Accept the returned grant after showing its credential and issuer preview.
      */
     public suspend fun startIssuance(request: MobileWalletIssuanceRequest): MobileWalletIssuanceSession = lifecycle.use {
-        MobileWalletIssuanceSession.from(issuanceSessions.startBatch(issuanceKeys.offerRequest(request), preferredLocales), this)
+        MobileWalletIssuanceSession.from(issuanceSessions.startOffer(issuanceKeys.offerRequest(request), preferredLocales), this)
     }
 
     /** Reopens an offer that is still awaiting acceptance, including after wallet recreation. */
     public suspend fun resumeIssuance(id: MobileWalletIssuanceSessionId): MobileWalletIssuanceSession? = lifecycle.use {
-        issuanceSessions.reviewBatch(id.value)?.let { MobileWalletIssuanceSession.from(it, this) }
+        issuanceSessions.reviewOffer(id.value)?.let { MobileWalletIssuanceSession.from(it, this) }
     }
 
     /**

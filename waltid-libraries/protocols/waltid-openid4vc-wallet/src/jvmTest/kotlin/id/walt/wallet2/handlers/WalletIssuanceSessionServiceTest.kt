@@ -231,6 +231,27 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
+    fun reviewedPreAuthorizedIdentificationMatchesAcceptanceAndReopen() = runTest {
+        for (anonymous in listOf(false, true)) {
+            val sessions = service { request -> when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false, anonymousPreAuthorized = anonymous))
+                else -> error("Review and missing input checks require discovery only")
+            } }
+            val review = sessions.startOffer(WalletIssuanceOfferRequest(offerJson = preAuthorizedRequest().offerJson))
+            val expected = if (anonymous) IssuanceClientIdentification.ANONYMOUS_ALLOWED else IssuanceClientIdentification.CLIENT_ID_REQUIRED
+            assertEquals(ISSUER, review.authorizationServer)
+            assertEquals(expected, review.clientIdentification)
+            if (!anonymous) {
+                val failure = assertIs<WalletIssuanceOutcome.Failed>(sessions.continuePreAuthorized(review.session.id))
+                assertEquals(WalletIssuanceErrorCode.INVALID_INPUT, failure.error.code)
+                assertTrue(failure.error.canRetryOffer)
+            }
+            assertEquals(expected, sessions.reviewOffer(review.session.id)?.clientIdentification)
+        }
+    }
+
+    @Test
     fun malformedManualAttestationIsRejectedBeforeDiscoveryOrSessionPersistence() = runTest {
         val records = RecordingSessionStore()
         val provider = StaticAttestationProvider()
@@ -347,7 +368,7 @@ class WalletIssuanceSessionServiceTest {
             requestedUrls += request.url.toString()
             when (request.url.toString()) {
                 ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
-                AS_METADATA -> jsonResponse(authorizationServerMetadata())
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }

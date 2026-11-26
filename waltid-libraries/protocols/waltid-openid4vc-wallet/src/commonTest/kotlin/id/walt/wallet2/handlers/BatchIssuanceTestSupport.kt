@@ -93,6 +93,9 @@ internal fun batchTestOffer(): JsonObject = Json.parseToJsonElement(
     """{"credential_issuer":"$BATCH_TEST_ISSUER","credential_configuration_ids":["identity"],
         "grants":{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"pre-code"}}}""").jsonObject
 
+internal fun batchTestBrowserOffer(): JsonObject = JsonObject(batchTestOffer() + ("grants" to
+    Json.parseToJsonElement("""{"authorization_code":{}}""")))
+
 internal fun batchTestMetadata(batchSize: Int = 5) = """{"credential_issuer":"$BATCH_TEST_ISSUER","credential_endpoint":"$BATCH_TEST_ISSUER/credential",
     "deferred_credential_endpoint":"$BATCH_TEST_ISSUER/deferred","nonce_endpoint":"$BATCH_TEST_ISSUER/nonce","batch_credential_issuance":{"batch_size":$batchSize},
     "credential_configurations_supported":{"identity":{"format":"dc+sd-jwt","vct":"identity","scope":"identity",

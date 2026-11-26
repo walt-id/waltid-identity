@@ -506,10 +506,32 @@ class WalletIssuanceSessionService(
         preferredLocales: List<String> = emptyList(),
     ): WalletIssuanceBatchSession = startSession(request, preferredLocales, null, null).toBatchSession()
 
+    /** Resolves the selected authorization server and effective client identification before acceptance. */
+    suspend fun startOffer(
+        request: WalletIssuanceOfferRequest,
+        preferredLocales: List<String> = emptyList(),
+    ): WalletIssuanceOfferReview = startSession(request, preferredLocales, null, null).toOfferReview()
+
     /** Returns the retained offer while it still awaits the holder's acceptance. */
-    suspend fun reviewBatch(sessionId: String): WalletIssuanceBatchSession? {
+    suspend fun reviewBatch(sessionId: String): WalletIssuanceBatchSession? = reviewOffer(sessionId)?.session
+
+    /** Reopens the offer and evaluates client identification using this wallet's configured authentication. */
+    suspend fun reviewOffer(sessionId: String): WalletIssuanceOfferReview? {
         val active = loadActive(sessionId) ?: return null
-        return mutex.withLock { active.takeIf { sessions[sessionId] === it && it.state == SessionState.AWAITING_ACCEPTANCE }?.toBatchSession() }
+        return mutex.withLock { active.takeIf { sessions[sessionId] === it && it.state == SessionState.AWAITING_ACCEPTANCE }?.toOfferReview() }
+    }
+
+    private fun ActiveSession.toOfferReview() = WalletIssuanceOfferReview(
+        toBatchSession(), resolved.authorizationServerMetadata.issuer, clientIdentification(),
+    )
+
+    private fun ActiveSession.clientIdentification(): IssuanceClientIdentification {
+        val metadata = resolved.authorizationServerMetadata
+        val identified = resolved.grant == WalletIssuanceGrant.AUTHORIZATION_CODE ||
+            metadata.preAuthorizedGrantAnonymousAccessSupported != true || request.tokenRequestHeaders.isNotEmpty() ||
+            (attestationAssembler != null && metadata.tokenEndpointAuthMethodsSupported
+                ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true)
+        return if (identified) IssuanceClientIdentification.CLIENT_ID_REQUIRED else IssuanceClientIdentification.ANONYMOUS_ALLOWED
     }
 
     private fun ActiveSession.toBatchSession(): WalletIssuanceBatchSession = WalletIssuanceBatchSession(
@@ -700,12 +722,7 @@ class WalletIssuanceSessionService(
             return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.INVALID_INPUT)
         }
         val effectiveClientId = clientId ?: active.clientId
-        val metadata = active.resolved.authorizationServerMetadata
-        val requiresClient = metadata.preAuthorizedGrantAnonymousAccessSupported != true ||
-            active.request.tokenRequestHeaders.isNotEmpty() ||
-            (attestationAssembler != null && metadata.tokenEndpointAuthMethodsSupported
-                ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true)
-        if (requiresClient && effectiveClientId == null) {
+        if (active.clientIdentification() == IssuanceClientIdentification.CLIENT_ID_REQUIRED && effectiveClientId == null) {
             return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.INVALID_INPUT)
         }
         active.clientId = effectiveClientId

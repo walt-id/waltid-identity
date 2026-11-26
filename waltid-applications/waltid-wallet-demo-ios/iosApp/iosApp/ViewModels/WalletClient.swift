@@ -1,6 +1,17 @@
 import Foundation
 import WalletSDK
 
+struct ReviewedIssuanceOffer: Sendable {
+    let id: IssuanceSessionID
+    let offer: IssuanceOfferPreview
+}
+
+struct BrowserIssuanceRequest: Sendable {
+    let id: AuthorizationIssuanceID
+    let request: IssuanceAuthorization
+}
+
+
 protocol WalletClient {
     func submit(_ review: PresentationReview) async throws -> PresentationResult
     func retainedPresentation(_ handle: PresentationPreviewHandle, selection: PresentationSelection, did: String?) async throws -> PresentationReview?
@@ -31,9 +42,9 @@ protocol WalletClient {
     ) async throws -> WalletDemoSigningProtectionAvailability
     func credentials() async throws -> [Credential]
     func listDeferredIssuance() async throws -> [DeferredCredential]
-    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
-    func beginAuthorizationIssuance(sessionID: AuthorizationIssuanceID, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization
-    func continuePreAuthorizedIssuance(sessionID: PreAuthorizedIssuanceID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
+    func startIssuance(_ request: IssuanceRequest) async throws -> ReviewedIssuanceOffer
+    func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest
+    func continuePreAuthorizedIssuance(sessionID: IssuanceSessionID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome
     func resumeDeferredIssuance(_ continuation: DeferredCredential) async throws -> IssuanceOutcome
@@ -163,14 +174,25 @@ final class SDKWalletClient: WalletClient {
     }
 
     func listDeferredIssuance() async throws -> [DeferredCredential] { try await wallet().listDeferredIssuance() }
-    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession { try await wallet().startIssuance(request) }
-    func beginAuthorizationIssuance(sessionID: AuthorizationIssuanceID, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+    func startIssuance(_ request: IssuanceRequest) async throws -> ReviewedIssuanceOffer {
+        let session = try await wallet().startIssuance(request)
+        return .init(id: session.id, offer: session.offer)
+    }
+    func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest {
         let registration = IssuanceClientRegistration(clientID: "eudiw-abca", redirectURI: URL(string: "openid://")!)
-        return try await wallet().beginAuthorization(sessionID, registration: registration, credentials: credentials).request
+        guard case .authorizationCode(let offer) = try await wallet().resumeIssuance(sessionID)?.grant else {
+            throw WalletError.invalidInput("Browser offer is no longer available")
+        }
+        let pending = try await offer.beginAuthorization(using: registration, credentials: credentials)
+        return .init(id: pending.id, request: pending.request)
     }
 
-    func continuePreAuthorizedIssuance(sessionID: PreAuthorizedIssuanceID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
-        try await wallet().accept(sessionID, transactionCode: transactionCode, credentials: credentials, clientID: "eudiw-abca")
+    func continuePreAuthorizedIssuance(sessionID: IssuanceSessionID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+        guard case .preAuthorized(let offer) = try await wallet().resumeIssuance(sessionID)?.grant else {
+            throw WalletError.invalidInput("Pre-authorized offer is no longer available")
+        }
+        return try await offer.accept(transactionCode: transactionCode, credentials: credentials,
+                                      clientID: offer.clientIdentification == .clientIDRequired ? "eudiw-abca" : nil)
     }
 
     func continueAuthorizationIssuance(sessionID: AuthorizationIssuanceID, callbackURI: URL) async throws -> IssuanceOutcome {

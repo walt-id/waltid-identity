@@ -12,7 +12,7 @@ import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.handlers.WalletIssuanceAuthorization
-import id.walt.wallet2.handlers.WalletIssuanceBatchSession
+import id.walt.wallet2.handlers.WalletIssuanceOfferReview
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletEvent
@@ -710,7 +710,7 @@ class WalletSdkBridgeTest {
             count: Int, keyType: MobileWalletKeyType?, didMethod: String, policy: KeyUseAuthorizationPolicy?,
         ): List<MobileWalletHolderBinding> = List(count) { MobileWalletHolderBinding("holder-$it", "did:key:holder-$it") }
 
-        override suspend fun resumeIssuance(sessionId: String): WalletIssuanceBatchSession? = null
+        override suspend fun resumeIssuance(sessionId: String): WalletIssuanceOfferReview? = null
 
         override suspend fun startIssuance(request: MobileWalletIssuanceRequest) =
             error("Not used by this test fake")

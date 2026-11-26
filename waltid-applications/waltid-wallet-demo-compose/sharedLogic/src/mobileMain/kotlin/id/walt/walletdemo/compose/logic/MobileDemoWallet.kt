@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
+import id.walt.wallet2.handlers.IssuanceClientIdentification
 import id.walt.wallet2.handlers.PresentationReviewChangedException
 import id.walt.wallet2.handlers.WalletIssuanceContinuation
 import id.walt.wallet2.mobile.issuance.MobileWalletIssuanceSession
@@ -292,7 +293,10 @@ internal class MobileDemoWallet(
         credentials: List<WalletDemoCredentialSelection>,
     ): WalletDemoIssuanceOutcome =
         (requireNotNull(mobileWallet.resumeIssuance(MobileWalletIssuanceSessionId(sessionId))) as MobileWalletIssuanceSession.PreAuthorized)
-            .accept(transactionCode, credentials.toMobileSelections(), clientId = "eudiw-abca").toDemoIssuanceOutcome()
+            .let { offer ->
+                offer.accept(transactionCode, credentials.toMobileSelections(),
+                    clientId = "eudiw-abca".takeIf { offer.clientIdentification == IssuanceClientIdentification.CLIENT_ID_REQUIRED })
+            }.toDemoIssuanceOutcome()
 
     override suspend fun continueAuthorizationIssuance(
         sessionId: String,
