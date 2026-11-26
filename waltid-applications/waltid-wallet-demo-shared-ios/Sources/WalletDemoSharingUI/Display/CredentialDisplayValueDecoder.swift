@@ -189,6 +189,9 @@ private struct Base64Payload {
     }
 
     func decode() -> Data? {
+        if let data = Data(base64Encoded: value) {
+            return data
+        }
         let normalized = value
             .replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")

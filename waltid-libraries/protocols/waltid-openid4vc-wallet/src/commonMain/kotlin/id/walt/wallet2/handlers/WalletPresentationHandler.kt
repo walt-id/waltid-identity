@@ -2211,25 +2211,26 @@ object WalletPresentationHandler {
             }
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED
         } else unsignedRequestObjectPolicy
-        val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         val resolved = AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
             unsignedRequestObjectPolicy = requestPolicy,
             trustConfiguration = clientIdTrustConfiguration,
             expectedRequestObjectAudience = expectedRequestObjectAudience,
             fetchRequestUri = { requestUri, requestUriMethod ->
-                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                    webResolveAuthReq = fetcher,
-                    requestUri = requestUri,
-                    unsignedRequestObjectPolicy = requestPolicy,
-                    requestUriMethod = requestUriMethod,
-                    expectedRequestObjectAudience = expectedRequestObjectAudience,
-                    requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
-                        WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
-                        clientIdTrustConfiguration,
-                        requestPolicy,
-                    ),
-                )
+                WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST).use { fetcher ->
+                    AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        webResolveAuthReq = fetcher,
+                        requestUri = requestUri,
+                        unsignedRequestObjectPolicy = requestPolicy,
+                        requestUriMethod = requestUriMethod,
+                        expectedRequestObjectAudience = expectedRequestObjectAudience,
+                        requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                            WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
+                            clientIdTrustConfiguration,
+                            requestPolicy,
+                        ),
+                    )
+                }
             },
         )
         if (haipRedirect) {
