@@ -741,7 +741,7 @@ class WalletSdkBridgeTest {
             error("Not used by this test fake")
 
         override suspend fun credentialReads(): List<MobileWalletCredentialRead> = credentials().map {
-            MobileWalletCredentialRead(it, CredentialStatus.references(), Clock.System.now().toString())
+            MobileWalletCredentialRead(it, CredentialStatus.references(), Clock.System.now())
         }
         var statusFlow: Flow<WalletCredentialStatusSnapshot> = emptyFlow()
         override val credentialStatuses: Flow<WalletCredentialStatusSnapshot>

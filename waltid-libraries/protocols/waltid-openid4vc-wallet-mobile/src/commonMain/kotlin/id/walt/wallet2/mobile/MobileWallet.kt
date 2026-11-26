@@ -317,7 +317,7 @@ public class MobileWallet internal constructor(
     /** Reads credentials with typed, local status metadata without rebuilding them for status updates. */
     public suspend fun credentialReads(): List<MobileWalletCredentialRead> = lifecycle.use {
         wallet.readCredentialsWithStatus().map { read ->
-            MobileWalletCredentialRead(read.credential.toMobileWalletCredential(), read.status, read.evaluatedAt.toString())
+            MobileWalletCredentialRead(read.credential.toMobileWalletCredential(), read.status, read.evaluatedAt)
         }
     }
 

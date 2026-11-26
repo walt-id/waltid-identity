@@ -58,29 +58,8 @@ public data class MobileWalletVerifierMetadata(
  * establish verifier trust and does not expose cryptographic key material.
  */
 public sealed interface MobileWalletResponseEncryption {
-    /** Whether response encryption is required for the reviewed request. */
-    public val isRequired: Boolean
-
-    /** JWE `alg` value when encryption is required. */
-    public val keyManagementAlgorithm: String?
-
-    /** JWE `enc` value when encryption is required. */
-    public val contentEncryptionAlgorithm: String?
-
-    /** Verifier-provided identifier of the selected encryption key. */
-    public val verifierKeyId: String?
-
-    /** RFC 7638 thumbprint of the selected verifier encryption key. */
-    public val verifierKeyThumbprint: String?
-
     /** The reviewed request does not require an encrypted authorization response. */
-    public data object NotRequired : MobileWalletResponseEncryption {
-        override val isRequired: Boolean = false
-        override val keyManagementAlgorithm: String? = null
-        override val contentEncryptionAlgorithm: String? = null
-        override val verifierKeyId: String? = null
-        override val verifierKeyThumbprint: String? = null
-    }
+    public data object NotRequired : MobileWalletResponseEncryption
 
     /**
      * The reviewed request requires an encrypted authorization response.
@@ -91,13 +70,11 @@ public sealed interface MobileWalletResponseEncryption {
      * @property verifierKeyThumbprint RFC 7638 thumbprint of the selected verifier encryption key.
      */
     public data class Required(
-        override val keyManagementAlgorithm: String,
-        override val contentEncryptionAlgorithm: String,
-        override val verifierKeyId: String?,
-        override val verifierKeyThumbprint: String,
-    ) : MobileWalletResponseEncryption {
-        override val isRequired: Boolean = true
-    }
+        val keyManagementAlgorithm: String,
+        val contentEncryptionAlgorithm: String,
+        val verifierKeyId: String?,
+        val verifierKeyThumbprint: String,
+    ) : MobileWalletResponseEncryption
 }
 
 @OptIn(ExperimentalSerializationApi::class)

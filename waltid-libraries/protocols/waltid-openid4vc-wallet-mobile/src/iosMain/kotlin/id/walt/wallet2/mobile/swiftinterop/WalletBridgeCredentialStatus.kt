@@ -1,10 +1,13 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.credentials.status.CredentialStatus
+import id.walt.credentials.status.CredentialStatusPresentationData
 import id.walt.wallet2.mobile.credentials.MobileWalletCredential
 import id.walt.wallet2.mobile.credentials.MobileWalletCredentialRead
-import id.walt.wallet2.mobile.credentials.MobileWalletCredentialStatusValue
 import id.walt.wallet2.status.WalletCredentialStatusSnapshot
 import id.walt.wallet2.status.toResponse
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -35,12 +38,17 @@ public sealed interface WalletBridgeCredentialStatusUpdate {
 internal val credentialStatusJson: Json = Json { encodeDefaults = true }
 
 internal fun MobileWalletCredentialRead.toStatusBridgeRead(): WalletBridgeCredentialRead = WalletBridgeCredentialRead(
-    credential, credentialStatusJson.encodeToString(MobileWalletCredentialStatusValue.serializer(),
-        MobileWalletCredentialStatusValue(status, presentation.toData(), evaluatedAt)),
+    credential, credentialStatusJson.encodeToString(CredentialStatusPayload.serializer(),
+        CredentialStatusPayload(status, presentation.toData(), evaluatedAt.toString())),
 )
 
-internal fun WalletCredentialStatusSnapshot.toStatusBridgeSnapshot(): String {
-    val status = credentialStatusJson.encodeToJsonElement(toResponse()).jsonObject
-    val notices = credentialStatusJson.encodeToJsonElement(pendingNotices)
-    return JsonObject(status + ("pendingNotices" to notices)).toString()
-}
+internal fun WalletCredentialStatusSnapshot.toStatusBridgeSnapshot(): String =
+    credentialStatusJson.encodeToString(WalletCredentialStatusSnapshotResponse.serializer(), toResponse())
+
+@Serializable
+@SerialName("id.walt.wallet2.mobile.credentials.MobileWalletCredentialStatusValue")
+private data class CredentialStatusPayload(
+    val status: CredentialStatus,
+    val presentation: CredentialStatusPresentationData,
+    val evaluatedAt: String,
+)
