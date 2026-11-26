@@ -95,7 +95,7 @@ class MobileWalletFactoryTest {
         database().use { db ->
             var opened = 0
             var closed = 0
-            val wallet = encryptedWallet(MobileWalletConfig(), db, FakePlatformManagedKeyProvider(),
+            val wallet = encryptedWallet(MobileWalletConfig(walletId = "driver-disposal"), db, FakePlatformManagedKeyProvider(),
                 onClose = { closed++ }, onOpen = { opened++ })
             wallet.close()
             wallet.close()
@@ -122,6 +122,22 @@ class MobileWalletFactoryTest {
             first.deleteWallet()
             first.deleteWallet()
         }
+    }
+
+    @Test
+    fun aSharedHostStoreExcludesOpensDuringErasureAcrossWalletIds() = runTest {
+        val store = Any()
+        val first = MobileWalletStorageLease("first.db", "first", listOf(store))
+        val second = MobileWalletStorageLease("second.db", "second", listOf(store))
+        first.open()
+        second.open()
+        assertFailsWith<IllegalStateException> { first.beginErase() }
+        second.close()
+        first.beginErase()
+        assertFailsWith<IllegalStateException> { second.open() }
+        first.finishErase()
+        second.open()
+        second.close()
     }
 
     @Test
@@ -205,32 +221,36 @@ class MobileWalletFactoryTest {
                 assertTrue(DidService.resolverMethods.isEmpty())
                 assertTrue(Crypto2DidService.resolveToKeys(verifierDid).isFailure)
                 val reopened = encryptedWallet(config, database, provider)
-                // Authenticate before initialize(): resolver setup must not depend on identity work.
-                val online = assertIs<MobileWalletPresentationPreviewResult.Ready>(reopened.previewPresentation(
-                    requestUrl(clientId, signedDidRequest(verifier, verifierDid, "direct_post", kid)),
-                )).preview
-                assertEquals(clientId, online.request.clientId)
-                assertEquals("saved-pid", online.credentialOptions.single().credentialId)
-                assertIs<MobileWalletRequestAuthentication.Authenticated>(online.request.requestAuthentication)
-                val dc = reopened.previewDigitalCredentialPresentation(MobileWalletDigitalCredentialRequest(
-                    protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
-                    dataJson = buildJsonObject { put("request", signedDidRequest(verifier, verifierDid, "dc_api", kid)) }.toString(),
-                    verifiedOrigin = "https://verifier.example",
-                ))
-                assertEquals(clientId, dc.request.clientId)
-                assertEquals("saved-pid", dc.credentialOptions.single().credentialId)
-                assertEquals(identity, assertIs<SigningIdentityOperationResult.Active>(reopened.signingIdentity.initialize()).identity)
-                assertEquals(savedCredentials, reopened.credentials())
-                assertEquals(1, provider.generateCount)
-                assertEquals(0, provider.deleteCount)
+                try {
+                    // Authenticate before initialize(): resolver setup must not depend on identity work.
+                    val online = assertIs<MobileWalletPresentationPreviewResult.Ready>(reopened.previewPresentation(
+                        requestUrl(clientId, signedDidRequest(verifier, verifierDid, "direct_post", kid)),
+                    )).preview
+                    assertEquals(clientId, online.request.clientId)
+                    assertEquals("saved-pid", online.credentialOptions.single().credentialId)
+                    assertIs<MobileWalletRequestAuthentication.Authenticated>(online.request.requestAuthentication)
+                    val dc = reopened.previewDigitalCredentialPresentation(MobileWalletDigitalCredentialRequest(
+                        protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED,
+                        dataJson = buildJsonObject { put("request", signedDidRequest(verifier, verifierDid, "dc_api", kid)) }.toString(),
+                        verifiedOrigin = "https://verifier.example",
+                    ))
+                    assertEquals(clientId, dc.request.clientId)
+                    assertEquals("saved-pid", dc.credentialOptions.single().credentialId)
+                    assertEquals(identity, assertIs<SigningIdentityOperationResult.Active>(reopened.signingIdentity.initialize()).identity)
+                    assertEquals(savedCredentials, reopened.credentials())
+                    assertEquals(1, provider.generateCount)
+                    assertEquals(0, provider.deleteCount)
 
-                val badSignature = signedDidRequest(JWKKey.generate(KeyType.secp256r1), verifierDid, "direct_post", kid)
-                assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
-                    reopened.previewPresentation(requestUrl(clientId, badSignature))
-                }
-                val badKid = signedDidRequest(verifier, verifierDid, "direct_post", "$verifierDid#missing")
-                assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
-                    reopened.previewPresentation(requestUrl(clientId, badKid))
+                    val badSignature = signedDidRequest(JWKKey.generate(KeyType.secp256r1), verifierDid, "direct_post", kid)
+                    assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+                        reopened.previewPresentation(requestUrl(clientId, badSignature))
+                    }
+                    val badKid = signedDidRequest(verifier, verifierDid, "direct_post", "$verifierDid#missing")
+                    assertFailsWith<AuthorizationRequestResolver.SignedAuthorizationRequestValidationException> {
+                        reopened.previewPresentation(requestUrl(clientId, badKid))
+                    }
+                } finally {
+                    reopened.close()
                 }
             }
         }
@@ -242,7 +262,7 @@ class MobileWalletFactoryTest {
             (1..8).map {
                 async(Dispatchers.Default) {
                     database().use { database ->
-                        encryptedWallet(MobileWalletConfig(), database, FakePlatformManagedKeyProvider())
+                        encryptedWallet(MobileWalletConfig(), database, FakePlatformManagedKeyProvider()).close()
                     }
                 }
             }.awaitAll()
@@ -293,8 +313,8 @@ class MobileWalletFactoryTest {
         },
         openEncryptedDriver = { _, _, _, _ ->
             onOpen()
-            if (onClose == null) database.driver else object : SqlDriver by database.driver {
-                override fun close() = onClose()
+            object : SqlDriver by database.driver {
+                override fun close() { onClose?.invoke() }
             }
         },
         deleteDatabase = {},

@@ -101,7 +101,8 @@ class WalletStatusReviewedPresentationTest {
         try {
             service.refresh(mode = CredentialStatusRefreshMode.FORCE)
             val initial = service.snapshot().credentials.single().presentation
-            assertEquals(CredentialStatusKind.CHECKED, initial.kind)
+            assertEquals(CredentialStatusKind.CHECKED, initial.kind,
+                "Initial status issue: ${initial.issue}, discovery: ${initial.discoveryProblem}, failure: ${initial.failure}")
             val reviewed = mutableMapOf("resident" to initial.advisoryRevision)
             val request = AuthorizationRequest(
                 clientId = "redirect_uri:https://verifier.example/callback",

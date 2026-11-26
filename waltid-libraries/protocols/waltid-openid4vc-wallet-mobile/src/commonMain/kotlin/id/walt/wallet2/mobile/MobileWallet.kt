@@ -716,7 +716,7 @@ public class MobileWallet internal constructor(
         wallet.closeCredentialStatusService()
         issuanceSessions.closeSessions()
         proximityCoordinator.shutdown()
-        WalletPresentationHandler.clearPreviews(wallet)
+        WalletPresentationHandler.closeInstancePreviews(wallet)
         keyStore.listKeys().toList().forEach { key -> keyStore.removeKey(key.keyId) }
         credentialStore.listCredentials().toList().forEach { credential -> credentialStore.removeCredential(credential.id) }
         didStore.listDids().toList().forEach { did -> didStore.removeDid(did.did) }
