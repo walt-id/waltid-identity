@@ -264,7 +264,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNotNil(persistence.didStore)
     }
 
-    func testWalletDatabaseKeyDescriptionRedactsMaterial() {
+    func testDatabaseEncryptionKeyDescriptionRedactsMaterial() {
         let key = DatabaseEncryptionKey(
             keyID: "consumer-wallet:wallet_consumer-wallet",
             material: Data([1, 2, 3, 4])
