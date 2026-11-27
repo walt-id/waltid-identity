@@ -32,7 +32,19 @@ class SqlDelightCredentialStoreBindingTest {
             val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
             val original = MdocsExamples.mdocsExampleBase64Url
             queries.insertCredential("one", original, "mso_mdoc", "Original", 0, null, null)
-            WalletPersistenceDatabase.Schema.migrate(driver, 1, WalletPersistenceDatabase.Schema.version)
+            WalletPersistenceDatabase.Schema.migrate(driver, 1, 4)
+            queries.saveCredentialStatusIfCurrent("status-before-upgrade", "notice-before-upgrade",
+                "one", original, null)
+            queries.setCredentialStatusMaintenance("wallet", "existing-grant")
+            queries.advanceCredentialStatusMaintenance("one", "wallet", "existing-grant", null)
+
+            WalletPersistenceDatabase.Schema.migrate(driver, 4, WalletPersistenceDatabase.Schema.version)
+            assertEquals("status-before-upgrade", queries.selectCredentialStatus("one").executeAsOne())
+            assertEquals("notice-before-upgrade", queries.selectCredentialStatusNotice("one").executeAsOne().notice)
+            val maintenance = queries.selectCredentialStatusMaintenance("wallet").executeAsOne()
+            assertEquals("existing-grant", maintenance.grant_id)
+            assertEquals("one", maintenance.cursor_id)
+
             val store = SqlDelightCredentialStore(queries)
             assertNull(queries.selectCredentialSummaries().executeAsOne().type_metadata)
             val row = store.credentialSummaries().single()
