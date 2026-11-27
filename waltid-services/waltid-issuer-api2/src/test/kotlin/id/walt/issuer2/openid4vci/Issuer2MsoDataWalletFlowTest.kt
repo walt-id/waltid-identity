@@ -773,7 +773,7 @@ class Issuer2MsoDataWalletFlowTest {
     fun authorizationCodeOfferWithIssuerStateKeepsOfferMsoData() = testApplication {
         val scenario = Issuer2CredentialScenarios.isoMdl
         val offerMsoData = MsoData(validUntil = "<timestamp-in:730d>")
-        installIssuer2WithConfigFiles()
+        installIssuer2WithConfigFiles(configureProfilesConfig = withIsoMdlMsoData())
         val client = apiClient()
         val walletFlow = Issuer2WalletFlowDriver(client)
         val createdOffer = client.createWalletFlowCredentialOffer(
