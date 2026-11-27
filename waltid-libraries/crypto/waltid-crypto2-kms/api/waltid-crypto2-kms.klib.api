@@ -337,6 +337,9 @@ final class id.walt.crypto2.kms.vault/VaultTransitOptions { // id.walt.crypto2.k
 
 final class id.walt.crypto2.kms/KmsProviderException : kotlin/Exception { // id.walt.crypto2.kms/KmsProviderException|null[0]
     constructor <init>(kotlin/String, kotlin/Throwable? = ...) // id.walt.crypto2.kms/KmsProviderException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
+
+    final val httpStatus // id.walt.crypto2.kms/KmsProviderException.httpStatus|{}httpStatus[0]
+        final fun <get-httpStatus>(): kotlin/Int? // id.walt.crypto2.kms/KmsProviderException.httpStatus.<get-httpStatus>|<get-httpStatus>(){}[0]
 }
 
 final value class id.walt.crypto2.kms/CredentialReference { // id.walt.crypto2.kms/CredentialReference|null[0]
