@@ -1315,6 +1315,13 @@ public struct IssuanceFailure: Equatable, Sendable {
     }
 
     /// Creates a failure with the wallet's decision about resuming the accepted proof.
+    ///
+    /// - Parameters:
+    ///   - code: Stable category of the failed issuance transition.
+    ///   - message: Public description that excludes protocol secrets.
+    ///   - targetFailure: The failed credential target and any unattempted targets, when available.
+    ///   - canRetryOffer: Whether the caller may resubmit the reviewed offer.
+    ///   - signingApprovalRequired: Whether the holder can retry signing on the original session ID.
     public init(code: IssuanceErrorCode, message: String, targetFailure: IssuanceTargetFailure?, canRetryOffer: Bool, signingApprovalRequired: Bool) {
         self.code = code
         self.message = message

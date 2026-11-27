@@ -228,6 +228,10 @@ public actor Wallet {
     }
 
     /// Declines the remaining proofs and preserves earlier deliveries.
+    ///
+    /// - Parameter sessionID: Identifier of the original issuance session awaiting signing approval.
+    /// - Returns: A cancelled outcome or a typed failure if the wallet could not confirm the decline.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
     public func declineIssuanceSigning(sessionID: String) async throws -> IssuanceOutcome {
         try await bridge.declineIssuanceSigning(sessionID: sessionID)
     }

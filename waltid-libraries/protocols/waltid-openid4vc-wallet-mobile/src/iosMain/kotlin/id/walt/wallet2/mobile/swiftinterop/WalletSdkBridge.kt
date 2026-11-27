@@ -247,6 +247,8 @@ public class WalletSdkBridge private constructor(
     /** Continues the accepted issuance after a fresh holder decision. */
     public suspend fun retryIssuanceSigning(sessionId: String): WalletBridgeResult<WalletIssuanceOutcome> =
         walletBridgeCall { operations.retryIssuanceSigning(sessionId) }
+
+    /** Declines signing for the original issuance session and preserves earlier deliveries. */
     public suspend fun declineIssuanceSigning(sessionId: String): WalletBridgeResult<WalletIssuanceOutcome> =
         walletBridgeCall { operations.declineIssuanceSigning(sessionId) }
 
