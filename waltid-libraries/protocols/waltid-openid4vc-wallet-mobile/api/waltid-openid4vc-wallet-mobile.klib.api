@@ -646,29 +646,6 @@ final enum class id.walt.wallet2.mobile.proximity/ProximityTransport : kotlin/En
     final fun values(): kotlin/Array<id.walt.wallet2.mobile.proximity/ProximityTransport> // id.walt.wallet2.mobile.proximity/ProximityTransport.values|values#static(){}[0]
 }
 
-final enum class id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory : kotlin/Enum<id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory> { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory|null[0]
-    enum entry authorization // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.authorization|null[0]
-    enum entry cancelled // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.cancelled|null[0]
-    enum entry credentialStatusReviewChanged // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.credentialStatusReviewChanged|null[0]
-    enum entry internalFailure // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.internalFailure|null[0]
-    enum entry invalidInput // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.invalidInput|null[0]
-    enum entry paymentConsent // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.paymentConsent|null[0]
-    enum entry presentationReviewChanged // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.presentationReviewChanged|null[0]
-    enum entry presentationValidation // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.presentationValidation|null[0]
-    enum entry storage // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.storage|null[0]
-
-    final val entries // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.values|values#static(){}[0]
-
-    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.Companion|null[0]
-        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.Companion.serializer|serializer(){}[0]
-        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
-    }
-}
-
 final enum class id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataSignerTrustType : kotlin/Enum<id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataSignerTrustType> { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataSignerTrustType|null[0]
     enum entry TrustedDelegate // id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataSignerTrustType.TrustedDelegate|null[0]
     enum entry TrustedIssuer // id.walt.wallet2.mobile.swiftinterop/WalletBridgeIssuerMetadataSignerTrustType.TrustedIssuer|null[0]
@@ -784,6 +761,38 @@ final enum class id.walt.wallet2.mobile/WalletEventStatus : kotlin/Enum<id.walt.
 
     final fun valueOf(kotlin/String): id.walt.wallet2.mobile/WalletEventStatus // id.walt.wallet2.mobile/WalletEventStatus.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<id.walt.wallet2.mobile/WalletEventStatus> // id.walt.wallet2.mobile/WalletEventStatus.values|values#static(){}[0]
+}
+
+final enum class id.walt.wallet2.mobile/WalletFailure : kotlin/Enum<id.walt.wallet2.mobile/WalletFailure> { // id.walt.wallet2.mobile/WalletFailure|null[0]
+    enum entry authorization // id.walt.wallet2.mobile/WalletFailure.authorization|null[0]
+    enum entry cancelled // id.walt.wallet2.mobile/WalletFailure.cancelled|null[0]
+    enum entry credentialStatusReviewChanged // id.walt.wallet2.mobile/WalletFailure.credentialStatusReviewChanged|null[0]
+    enum entry crypto // id.walt.wallet2.mobile/WalletFailure.crypto|null[0]
+    enum entry deliveryUncertain // id.walt.wallet2.mobile/WalletFailure.deliveryUncertain|null[0]
+    enum entry internalFailure // id.walt.wallet2.mobile/WalletFailure.internalFailure|null[0]
+    enum entry invalidInput // id.walt.wallet2.mobile/WalletFailure.invalidInput|null[0]
+    enum entry issuanceOutcomeUncertain // id.walt.wallet2.mobile/WalletFailure.issuanceOutcomeUncertain|null[0]
+    enum entry network // id.walt.wallet2.mobile/WalletFailure.network|null[0]
+    enum entry paymentConsent // id.walt.wallet2.mobile/WalletFailure.paymentConsent|null[0]
+    enum entry presentationReviewChanged // id.walt.wallet2.mobile/WalletFailure.presentationReviewChanged|null[0]
+    enum entry presentationValidation // id.walt.wallet2.mobile/WalletFailure.presentationValidation|null[0]
+    enum entry remoteResponse // id.walt.wallet2.mobile/WalletFailure.remoteResponse|null[0]
+    enum entry storage // id.walt.wallet2.mobile/WalletFailure.storage|null[0]
+    enum entry timeout // id.walt.wallet2.mobile/WalletFailure.timeout|null[0]
+
+    final val entries // id.walt.wallet2.mobile/WalletFailure.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<id.walt.wallet2.mobile/WalletFailure> // id.walt.wallet2.mobile/WalletFailure.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val userMessage // id.walt.wallet2.mobile/WalletFailure.userMessage|{}userMessage[0]
+        final fun <get-userMessage>(): kotlin/String // id.walt.wallet2.mobile/WalletFailure.userMessage.<get-userMessage>|<get-userMessage>(){}[0]
+
+    final fun valueOf(kotlin/String): id.walt.wallet2.mobile/WalletFailure // id.walt.wallet2.mobile/WalletFailure.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<id.walt.wallet2.mobile/WalletFailure> // id.walt.wallet2.mobile/WalletFailure.values|values#static(){}[0]
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // id.walt.wallet2.mobile/WalletFailure.Companion|null[0]
+        final fun classify(kotlin/Throwable): id.walt.wallet2.mobile/WalletFailure // id.walt.wallet2.mobile/WalletFailure.Companion.classify|classify(kotlin.Throwable){}[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<id.walt.wallet2.mobile/WalletFailure> // id.walt.wallet2.mobile/WalletFailure.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // id.walt.wallet2.mobile/WalletFailure.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
 }
 
 abstract fun interface id.walt.wallet2.mobile.proximity.trust/ProximityCrlFetcher { // id.walt.wallet2.mobile.proximity.trust/ProximityCrlFetcher|null[0]
@@ -4940,7 +4949,7 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeError { // id.walt.w
     final val authorizationFailure // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.authorizationFailure|{}authorizationFailure[0]
         final fun <get-authorizationFailure>(): id.walt.crypto2.keys/KeyUseAuthorizationFailure? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.authorizationFailure.<get-authorizationFailure>|<get-authorizationFailure>(){}[0]
     final val category // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.category|{}category[0]
-        final fun <get-category>(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeErrorCategory // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.category.<get-category>|<get-category>(){}[0]
+        final fun <get-category>(): id.walt.wallet2.mobile/WalletFailure // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.category.<get-category>|<get-category>(){}[0]
     final val causeClass // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.causeClass|{}causeClass[0]
         final fun <get-causeClass>(): kotlin/String? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.causeClass.<get-causeClass>|<get-causeClass>(){}[0]
     final val message // id.walt.wallet2.mobile.swiftinterop/WalletBridgeError.message|{}message[0]

@@ -415,6 +415,38 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(viewModel.txCode, "")
     }
 
+    func testOfferLookupKeepsReviewForStorageFailureAndClosesItWhenUnavailable() async throws {
+        let cases: [(IssuanceGrant, any Error)] = [
+            (.preAuthorizedCode, ReviewedOfferUnavailable()),
+            (.authorizationCode, WalletError.issuanceOutcomeUncertain),
+        ]
+        for (grant, terminal) in cases {
+            let client = TransactionCodeWalletClient(transactionCode: nil, issuanceGrant: grant)
+            let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+            model.unlockForTests()
+            try await waitUntil { model.isReady }
+            model.offerUrl = "openid-credential-offer://issuer.example"
+            model.previewOffer()
+            try await waitUntil { model.offerPreview != nil && !model.isLoading }
+
+            await client.failOfferLookup(with: WalletError.storage("private store diagnostic"))
+            model.acceptOffer()
+            try await waitUntil { !model.isLoading }
+            XCTAssertTrue(model.acceptOfferEnabled)
+            XCTAssertFalse(model.statusMessage.contains("private store diagnostic"))
+
+            await client.failOfferLookup(with: terminal)
+            model.acceptOffer()
+            try await waitUntil { !model.isLoading }
+            XCTAssertNil(model.offerPreview)
+            XCTAssertNil(model.authorizationRequestURL)
+            XCTAssertFalse(model.acceptOfferEnabled)
+            model.acceptOffer()
+            let attempts = await client.receivedIssuanceSelections.count
+            XCTAssertEqual(attempts, 2)
+        }
+    }
+
     func testLostTokenResponseClosesOfferAndPreventsAnotherAccept() async throws {
         let failure = IssuanceFailure(code: .network, message: "The issuer could not be reached.")
         let client = TransactionCodeWalletClient(firstAcceptanceFailure: failure)
@@ -1105,8 +1137,13 @@ private actor TransactionCodeWalletClient: WalletClient {
         )
     }
 
+    private var offerLookupError: (any Error)?
+
+    func failOfferLookup(with error: any Error) { offerLookupError = error }
+
     func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest {
         receivedIssuanceSelections.append(credentials)
+        if let offerLookupError { throw offerLookupError }
         guard let authorizationID = IssuanceAuthorizationID(rawValue: sessionID.rawValue) else {
             throw WalletError.invalidInput("Invalid issuance authorization ID")
         }
@@ -1120,7 +1157,11 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func continuePreAuthorizedIssuance(sessionID: IssuanceSessionID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
-        try await finishIssuance(sessionID.rawValue, transactionCode: transactionCode, credentials: credentials)
+        if let offerLookupError {
+            receivedIssuanceSelections.append(credentials)
+            throw offerLookupError
+        }
+        return try await finishIssuance(sessionID.rawValue, transactionCode: transactionCode, credentials: credentials)
     }
 
     func completeAuthorization(_ authorizationID: IssuanceAuthorizationID, callback: URL) async throws -> IssuanceOutcome {

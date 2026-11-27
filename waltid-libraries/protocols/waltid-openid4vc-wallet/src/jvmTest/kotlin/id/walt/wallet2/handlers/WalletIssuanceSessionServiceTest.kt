@@ -1715,7 +1715,7 @@ class WalletIssuanceSessionServiceTest {
 
         assertFailsWith<CancellationException> { continuation.await() }
         assertEquals(
-            WalletIssuanceErrorCode.INVALID_SESSION,
+            WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN,
             assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id)).error.code,
         )
     }
@@ -2598,7 +2598,7 @@ class WalletIssuanceSessionServiceTest {
 
     @Test
     fun lostTokenResponseAndRejectedSingleUseGrantEndOfferAcceptance() = runTest {
-        for (expectedCode in listOf(WalletIssuanceErrorCode.NETWORK, WalletIssuanceErrorCode.ISSUER_RESPONSE)) {
+        for (expectedCode in listOf(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN, WalletIssuanceErrorCode.ISSUER_RESPONSE)) {
             var tokenCalls = 0
             val service = service { request ->
                 when (request.url.toString()) {
@@ -2606,7 +2606,7 @@ class WalletIssuanceSessionServiceTest {
                     AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
                     TOKEN_ENDPOINT -> {
                         tokenCalls++
-                        if (expectedCode == WalletIssuanceErrorCode.NETWORK) throw IOException("Token response lost")
+                        if (expectedCode == WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN) throw IOException("Token response lost")
                         jsonResponse("""{"error":"invalid_grant"}""", HttpStatusCode.BadRequest)
                     }
                     else -> error("Unexpected request to ${request.url}")
@@ -2618,14 +2618,15 @@ class WalletIssuanceSessionServiceTest {
             assertFalse(first.error.canRetryOffer)
 
             val second = assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id))
-            assertEquals(WalletIssuanceErrorCode.INVALID_SESSION, second.error.code)
+            val expectedNext = if (expectedCode == WalletIssuanceErrorCode.ISSUER_RESPONSE) WalletIssuanceErrorCode.INVALID_SESSION else expectedCode
+            assertEquals(expectedNext, second.error.code)
             assertFalse(second.error.canRetryOffer)
             assertEquals(1, tokenCalls)
         }
     }
 
     @Test
-    fun lostTokenResponseStillClosesTheOfferIfTheProcessingRecordCannotBeDeleted() = runTest {
+    fun lostTokenResponseRemainsUncertainOnTheFirstAndNextCall() = runTest {
         val records = RecordingSessionStore()
         val store = object : AtomicWalletIssuanceSessionStore by records {
             override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
@@ -2649,7 +2650,7 @@ class WalletIssuanceSessionServiceTest {
         }
         val session = service.start(preAuthorizedRequest())
         val lost = assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id))
-        assertEquals(WalletIssuanceErrorCode.NETWORK, lost.error.code)
+        assertEquals(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN, lost.error.code)
         assertFalse(lost.error.canRetryOffer)
 
         val pending = assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id))
@@ -2659,7 +2660,7 @@ class WalletIssuanceSessionServiceTest {
     }
 
     @Test
-    fun storageFailurePermitsAnotherAcceptOnlyBeforeTheOfferIsClaimed() = runTest {
+    fun unreadableOrUnrestorableOffersDoNotAdvertiseRetry() = runTest {
         val records = RecordingSessionStore()
         var failRead = false
         val store = object : AtomicWalletIssuanceSessionStore by records {
@@ -2686,7 +2687,7 @@ class WalletIssuanceSessionServiceTest {
         failRead = true
         val unread = assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(session.id))
         assertEquals(WalletIssuanceErrorCode.STORAGE, unread.error.code)
-        assertTrue(unread.error.canRetryOffer)
+        assertFalse(unread.error.canRetryOffer)
 
         failRead = false
         val unrestored = assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(
@@ -2994,6 +2995,98 @@ class WalletIssuanceSessionServiceTest {
             }
         }
         assertFailsWith<IllegalArgumentException> { mismatched.start(preAuthorizedRequest()) }
+    }
+
+    @Test
+    fun unconfirmedCredentialDeliveryKeepsTheClaimAcrossReopen() = runTest {
+        for (lostReply in listOf(true, false)) {
+            val records = RecordingSessionStore()
+            var exchanges = 0
+            var requests = 0
+            suspend fun open() = service(sessionStore = records) { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                    AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                    TOKEN_ENDPOINT -> { exchanges++; jsonResponse("""{"access_token":"received","token_type":"Bearer"}""") }
+                    CREDENTIAL_ENDPOINT -> {
+                        requests++
+                        if (lostReply) throw IOException("response lost")
+                        jsonResponse("truncated")
+                    }
+                    else -> error("Unexpected request")
+                }
+            }
+            val wallet = open()
+            val session = wallet.start(preAuthorizedRequest())
+            val first = assertIs<WalletIssuanceOutcome.Failed>(wallet.continuePreAuthorized(session.id))
+            assertEquals(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN, first.error.code)
+            assertFalse(first.error.canRetryOffer)
+            assertTrue(first.storedCredentialIds.isEmpty() && first.deferredCredentials.isEmpty())
+            val reopened = open()
+            assertFailsWith<IssuanceOutcomeUncertainException> { reopened.reviewOffer(session.id) }
+            assertEquals(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN,
+                assertIs<WalletIssuanceOutcome.Failed>(reopened.continuePreAuthorized(session.id)).error.code)
+            assertEquals(listOf(1, 1), listOf(exchanges, requests))
+        }
+    }
+
+    @Test
+    fun cancellationAfterCredentialRequestPreservesOwnershipAndNeverRedelivers() = runTest {
+        val records = RecordingSessionStore()
+        var exchanges = 0
+        var requests = 0
+        val reached = CompletableDeferred<Unit>()
+        suspend fun open() = service(sessionStore = records) { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> { exchanges++; jsonResponse("""{"access_token":"received","token_type":"Bearer"}""") }
+                CREDENTIAL_ENDPOINT -> {
+                    requests++
+                    reached.complete(Unit)
+                    kotlinx.coroutines.awaitCancellation()
+                }
+                else -> error("Unexpected request")
+            }
+        }
+        val wallet = open()
+        val session = wallet.start(preAuthorizedRequest())
+        val job = async { wallet.continuePreAuthorized(session.id) }
+        reached.await()
+        job.cancel()
+        assertFailsWith<CancellationException> { job.await() }
+        assertFailsWith<IssuanceOutcomeUncertainException> { open().reviewOffer(session.id) }
+        val again = assertIs<WalletIssuanceOutcome.Failed>(wallet.continuePreAuthorized(session.id))
+        assertEquals(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN, again.error.code)
+        assertEquals(listOf(1, 1), listOf(exchanges, requests))
+    }
+
+    @Test
+    fun failedCleanupPreservesParentCancellationAndTheDurableClaim() = runTest {
+        val records = RecordingSessionStore()
+        val store = object : AtomicWalletIssuanceSessionStore by records {
+            override suspend fun compareAndSet(expected: WalletIssuanceSessionRecord, replacement: WalletIssuanceSessionRecord?): Boolean {
+                if (replacement == null) throw IOException("Cleanup failed")
+                return records.compareAndSet(expected, replacement)
+            }
+        }
+        val cancellation = CancellationException("Parent stopped issuance")
+        var exchanges = 0
+        val service = service(sessionStore = store, onEvent = {
+            if (it == WalletSessionEvent.issuance_token_obtained) throw cancellation
+        }) { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                TOKEN_ENDPOINT -> { exchanges++; jsonResponse("""{"access_token":"received","token_type":"Bearer"}""") }
+                else -> error("Unexpected request")
+            }
+        }
+        val session = service.start(preAuthorizedRequest())
+        assertEquals(cancellation.message, assertFailsWith<CancellationException> { service.continuePreAuthorized(session.id) }.message)
+        assertFailsWith<IssuanceOutcomeUncertainException> { service.reviewOffer(session.id) }
+        assertEquals(1, records.records.size)
+        assertEquals(1, exchanges)
     }
 
     private suspend fun service(

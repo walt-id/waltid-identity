@@ -86,7 +86,13 @@ internal object WalletDisplayText {
     fun failure(prefix: String, reason: String): String = "$prefix: $reason"
 
     fun failure(prefix: String, error: Throwable): String =
-        failure(prefix, error.message ?: error::class.simpleName ?: UnexpectedError)
+        failure(prefix, safeFailureMessage(error))
+
+    fun safeFailureMessage(error: Throwable): String = when (error) {
+        is WalletDemoKeyOperationException -> error.message ?: UnexpectedError
+        is WalletDemoStatusReviewChanged -> "Review the updated information before sharing."
+        else -> platformWalletFailureMessage(error) ?: UnexpectedError
+    }
 
     fun biometricSigningUnavailable(
         availability: WalletDemoSigningProtectionAvailability,
@@ -127,3 +133,5 @@ private fun issuanceProgressSummary(saved: Int, pending: Int, failed: Int = 0, n
 
 internal fun WalletDemoIssuanceOutcome.Failed.messageWithProgress(): String =
     partialProgressSummary()?.let { "$message\n$it" } ?: message
+
+internal expect fun platformWalletFailureMessage(error: Throwable): String?

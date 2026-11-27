@@ -84,6 +84,12 @@ sealed interface WalletDemoIssuanceOutcome {
     ) : WalletDemoIssuanceOutcome
 }
 
+internal class ReviewedOfferUnavailable(
+    val outcome: WalletDemoIssuanceOutcome.Failed = WalletDemoIssuanceOutcome.Failed(
+        "The offer is no longer available.", offerConsumed = true,
+    ),
+) : Exception(outcome.message)
+
 fun WalletDemoIssuanceOutcome.Failed.problem() =
     WalletDemoIssuanceProblem(message, kind, failedTargetCount, notAttemptedTargetCount)
 

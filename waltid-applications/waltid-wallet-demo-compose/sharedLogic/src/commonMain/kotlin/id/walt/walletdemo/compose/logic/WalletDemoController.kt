@@ -688,8 +688,8 @@ class WalletDemoController(
                 replacementStarted = true
                 deleteWalletAndReconcileBackground()
                 val result = wallet.bootstrap(target)
-                check(result.signingProtection == target) {
-                    "Reprovisioned wallet did not apply the selected signing protection"
+                if (result.signingProtection != target) {
+                    throw WalletDemoKeyOperationException("Reprovisioned wallet did not apply the selected signing protection")
                 }
                 val credentials = wallet.listCredentials()
                 result to credentials
@@ -1188,6 +1188,8 @@ class WalletDemoController(
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
+            } catch (error: ReviewedOfferUnavailable) {
+                completeIssuanceOutcome(ready, request, error.outcome)
             } catch (error: Throwable) {
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.withFailedOperation(
@@ -1775,7 +1777,7 @@ class WalletDemoController(
                     WalletDemoClaimReview.Ready(prepared, groups)
                 }
             } catch (cause: CancellationException) { throw cause
-            } catch (cause: Exception) { WalletDemoClaimReview.Failed(cause.message ?: "Couldn't update the information to share.") }
+            } catch (cause: Exception) { WalletDemoClaimReview.Failed(WalletDisplayText.safeFailureMessage(cause)) }
             val review = try {
                 val retained = (information as? WalletDemoClaimReview.Ready)?.review?.retained
                 if (retained != null) retained.payment?.let { WalletDemoPaymentReview.Ready(it) } ?: WalletDemoPaymentReview.NotRequired
@@ -1785,7 +1787,7 @@ class WalletDemoController(
                         ?.let { WalletDemoPaymentReview.Ready(it) } ?: WalletDemoPaymentReview.NotRequired
                 else WalletDemoPaymentReview.NotRequired
             } catch (cause: CancellationException) { throw cause
-            } catch (cause: Exception) { WalletDemoPaymentReview.Blocked(cause.message ?: "Payment instructions are unavailable.") }
+            } catch (cause: Exception) { WalletDemoPaymentReview.Blocked(WalletDisplayText.safeFailureMessage(cause)) }
             currentCoroutineContext().ensureActive()
             _state.update { latest ->
                 if (latest.presentationPreview?.previewHandle == preview.previewHandle &&

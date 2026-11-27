@@ -11,6 +11,7 @@ import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.retry
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -29,8 +30,14 @@ internal class DeferredCredentialResponse(
 ) {
     val status: HttpStatusCode get() = response.status
 
-    suspend fun readCredential(legacyPending: Boolean = false): CredentialResponse =
+    suspend fun readCredential(legacyPending: Boolean = false): CredentialResponse = try {
         response.readCredentialResponse(decryptionKey.takeIf { status.isSuccess() && !legacyPending })
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        if (status == HttpStatusCode.OK) throw CredentialDeliveryUncertainException(error)
+        throw error
+    }
 }
 
 internal suspend fun HttpClient.pollDeferredCredential(
@@ -56,6 +63,7 @@ internal suspend fun HttpClient.pollDeferredCredential(
         }
         val response = try {
             post(request.endpoint) {
+                retry { noRetry() }
                 header(HttpHeaders.Authorization, "${authorizationScheme(request.tokenType)} ${request.accessToken}")
                 proof?.let { header(DPOP_HEADER, it) }
                 if (prepared.contentType.isApplicationJwt()) acceptCredentialResponse()

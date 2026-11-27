@@ -1378,7 +1378,7 @@ class WalletTest {
         assertEquals(listOf("pid-1"), credentialStore.removedCredentialIds)
         val reported = assertNotNull(wallet.digitalCredentialRegistration.value)
         assertFalse(reported.available)
-        assertEquals("Credential Manager rejected the registry", reported.reason)
+        assertEquals("The platform could not register the stored credentials.", reported.reason)
 
         // Retrying re-publishes current wallet state rather than requiring another wallet operation.
         val retried = wallet.refreshDigitalCredentialRegistration()
@@ -1430,7 +1430,7 @@ class WalletTest {
         assertEquals(1, registry.replaceCalls)
         val reported = assertNotNull(wallet.digitalCredentialRegistration.value)
         assertFalse(reported.available)
-        assertEquals("Credential Manager rejected the registry", reported.reason)
+        assertEquals("The platform could not register the stored credentials.", reported.reason)
     }
 
     @Test

@@ -28,6 +28,8 @@ private struct WalletStatusBannerModel {
     var key: String { "\(kind):\(message):\(occurrenceId)" }
 }
 
+private struct SigningProtectionMismatch: Error {}
+
 private enum WalletStatusText {
     static let startingWallet = "Starting wallet..."
     static let walletReady = "Wallet ready"
@@ -83,8 +85,16 @@ private enum WalletStatusText {
         "\(prefix): \(reason)"
     }
 
+    static func safeFailureMessage(_ error: Error) -> String {
+        if error is ReviewedOfferUnavailable { return "The offer is no longer available." }
+        if error is SigningProtectionMismatch {
+            return "The reopened wallet did not apply the selected signing protection."
+        }
+        return (error as? WalletError)?.localizedDescription ?? "The wallet operation could not be completed."
+    }
+
     static func failure(_ prefix: String, _ error: Error) -> String {
-        failure(prefix, error.localizedDescription)
+        failure(prefix, safeFailureMessage(error))
     }
 }
 
@@ -1376,9 +1386,14 @@ class WalletViewModel: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
-                if isCurrent(request) {
-                    setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
+                guard isCurrent(request) else { return }
+                if error is ReviewedOfferUnavailable || error as? WalletError == .issuanceOutcomeUncertain {
+                    issuanceSession = nil
+                    offerPreview = nil
+                    authorizationRequestURL = nil
+                    txCode = ""
                 }
+                setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error), tab: .receive)
             }
         }
     }
@@ -1818,7 +1833,7 @@ class WalletViewModel: ObservableObject {
                 guard !Task.isCancelled, presentationPreview?.previewHandle == preview.previewHandle,
                       selectedPresentationCredentialOptions == credentials,
                       selectedPresentationDisclosureOptions == disclosures else { return }
-                claimReview = .failed(error.localizedDescription)
+                claimReview = .failed(WalletStatusText.safeFailureMessage(error))
                 paymentReview = .notRequired
                 return
             }
@@ -1838,7 +1853,7 @@ class WalletViewModel: ObservableObject {
                       selectedPresentationCredentialOptions == credentials,
                       selectedPresentationDisclosureOptions == disclosures else { return }
                 claimReview = information
-                paymentReview = .blocked(error.localizedDescription)
+                paymentReview = .blocked(WalletStatusText.safeFailureMessage(error))
             }
         }
     }
@@ -2051,7 +2066,7 @@ class WalletViewModel: ObservableObject {
                 do {
                     try await identityDocumentRegistrationUpdate()
                 } catch {
-                    logE2E("Identity document registration failed: \(error.localizedDescription)")
+                    logE2E("Identity document registration failed")
                 }
             }
         }
@@ -2085,7 +2100,7 @@ class WalletViewModel: ObservableObject {
                 else { isLoading = false; statusMessage = "Set up your wallet" }
                 logE2E(isReady ? "Bootstrap: wallet ready" : "Bootstrap: awaiting key setup")
             } catch {
-                logE2E("Bootstrap: FAILED with error: \(error.localizedDescription)")
+                logE2E("Bootstrap failed")
                 setError(WalletStatusText.failure(WalletStatusText.bootstrapFailed, error))
             }
         }
@@ -2106,15 +2121,13 @@ class WalletViewModel: ObservableObject {
         }
         logE2E("Opening selected wallet identity")
         let result = try await walletClient.bootstrap(signingProtection: signingProtection)
-        logE2E("Bootstrap: success, DID: \(result.did)")
+        logE2E("Bootstrap succeeded")
 
         let appliedProtection = try WalletDemoSigningProtection(
             appliedPolicy: result.keyUseAuthorizationPolicy
         )
         guard requiredAppliedSigningProtection == nil || appliedProtection == requiredAppliedSigningProtection else {
-            throw WalletError.internalFailure(
-                "Reprovisioned wallet did not apply the selected signing protection"
-            )
+            throw SigningProtectionMismatch()
         }
 
         logE2E("Bootstrap: calling wallet.credentials()")
@@ -2280,7 +2293,6 @@ class WalletViewModel: ObservableObject {
         statusMessage = message
         statusExpanded = false
         statusHideTask?.cancel()
-        logE2E("STATUS \(message)")
     }
 
     private func setSuccess(_ message: String, tab: WalletTab? = nil) {
@@ -2291,7 +2303,6 @@ class WalletViewModel: ObservableObject {
         statusMessage = message
         statusExpanded = false
         statusOccurrenceId += 1
-        logE2E("STATUS \(message)")
         scheduleSuccessAutoHide()
     }
 
@@ -2320,7 +2331,6 @@ class WalletViewModel: ObservableObject {
         statusExpanded = false
         statusOccurrenceId += 1
         statusHideTask?.cancel()
-        logE2E("STATUS \(message)")
     }
 
     private func resetFlowStatusForIncomingURL() {
@@ -2329,7 +2339,6 @@ class WalletViewModel: ObservableObject {
         statusTab = nil
         statusMessage = isReady ? WalletStatusText.walletReady : WalletStatusText.startingWallet
         statusExpanded = false
-        logE2E("STATUS \(statusMessage)")
         if isReady && !isLoading {
             scheduleSuccessAutoHide()
         }

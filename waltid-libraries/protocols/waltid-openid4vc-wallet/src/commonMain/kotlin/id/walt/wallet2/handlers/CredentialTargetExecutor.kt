@@ -43,6 +43,7 @@ internal suspend fun executeCredentialTargets(
     requestMetadata: JsonObject? = null,
     ensureOwned: suspend () -> Unit = {},
     onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    onRemoteOutcomePending: (Boolean) -> Unit = {},
     beforeCredentialsStored: suspend (Int) -> Unit = {},
     onCredentialStored: suspend (StoredCredential) -> Unit,
     onDeferredCredential: suspend (DeferredCredentialTransaction) -> Unit,
@@ -66,7 +67,10 @@ internal suspend fun executeCredentialTargets(
                 onProofGenerated = { if (algorithms != null) onEvent.emitSafely(WalletSessionEvent.issuance_proof_signed) },
                 dpop = access.dpop,
                 issuerMetadata = issuerMetadata,
-                onStage = { stage = it },
+                onStage = {
+                    stage = it
+                    if (it == CredentialIssuanceStage.REQUEST) onRemoteOutcomePending(true)
+                },
             )
             val response = exchange.response
             ensureOwned()
@@ -133,7 +137,10 @@ internal suspend fun executeCredentialTargets(
                 val outcome = sessions.storeReceivedCredentials(
                     prepared, target.credentialConfigurationId, target.credentialIdentifier,
                     persistable = access.persistable, sessionId = sessionId,
-                    beforeCredentialsStored = beforeCredentialsStored,
+                    beforeCredentialsStored = { count ->
+                        onRemoteOutcomePending(false)
+                        beforeCredentialsStored(count)
+                    },
                     onCredentialStored = { entry ->
                         stage = CredentialIssuanceStage.OBSERVER
                         onCredentialStored(entry)
@@ -148,6 +155,7 @@ internal suspend fun executeCredentialTargets(
                 )
                 if (outcome is WalletIssuanceOutcome.Failed) throw CredentialStorageException(outcome)
             }
+            onRemoteOutcomePending(false)
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {

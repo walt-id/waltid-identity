@@ -11,6 +11,7 @@ struct BrowserIssuanceRequest: Sendable {
     let request: IssuanceAuthorization
 }
 
+struct ReviewedOfferUnavailable: Error {}
 
 protocol WalletClient {
     func submit(_ review: PresentationReview) async throws -> PresentationResult
@@ -189,7 +190,7 @@ final class SDKWalletClient: WalletClient {
     func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest {
         let registration = IssuanceClientRegistration(clientID: "eudiw-abca", redirectURI: URL(string: "openid://")!)
         guard case .authorizationCode(let offer) = try await wallet().resumeIssuance(sessionID)?.grant else {
-            throw WalletError.invalidInput("Browser offer is no longer available")
+            throw ReviewedOfferUnavailable()
         }
         let pending = try await offer.beginAuthorization(using: registration, credentials: credentials)
         return .init(id: pending.id, request: pending.request)
@@ -197,7 +198,7 @@ final class SDKWalletClient: WalletClient {
 
     func continuePreAuthorizedIssuance(sessionID: IssuanceSessionID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
         guard case .preAuthorized(let offer) = try await wallet().resumeIssuance(sessionID)?.grant else {
-            throw WalletError.invalidInput("Pre-authorized offer is no longer available")
+            throw ReviewedOfferUnavailable()
         }
         return try await offer.accept(transactionCode: transactionCode, credentials: credentials,
                                       clientID: offer.clientIdentification == .clientIDRequired ? "eudiw-abca" : nil)

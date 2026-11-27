@@ -9,6 +9,7 @@ import id.walt.wallet2.mobile.issuance.IssuanceSession
 import id.walt.wallet2.mobile.issuance.IssuanceAuthorizationId
 import id.walt.wallet2.mobile.issuance.IssuanceSessionId
 import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.WalletFailure
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.SHA256
 import id.walt.wallet2.mobile.identity.*
@@ -274,8 +275,21 @@ internal class SdkDemoWallet(
         )
     ).toDemoIssuanceSession()
 
+    private suspend inline fun <reified T : IssuanceSession> reviewedOffer(sessionId: String): T {
+        val session = try {
+            wallet.resumeIssuance(IssuanceSessionId(sessionId))
+        } catch (error: Exception) {
+            val failure = WalletFailure.classify(error)
+            if (failure != WalletFailure.issuanceOutcomeUncertain) throw error
+            throw ReviewedOfferUnavailable(WalletDemoIssuanceOutcome.Failed(
+                failure.userMessage, offerConsumed = true, kind = WalletDemoIssuanceFailureKind.RemoteOutcomeUncertain,
+            ))
+        }
+        return session as? T ?: throw ReviewedOfferUnavailable()
+    }
+
     override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
-        (requireNotNull(wallet.resumeIssuance(IssuanceSessionId(sessionId))) as IssuanceSession.AuthorizationCode)
+        reviewedOffer<IssuanceSession.AuthorizationCode>(sessionId)
             .beginAuthorization(IssuanceClientRegistration("eudiw-abca", redirectUri), credentials.toIssuanceSelections())
             .let { pending -> WalletDemoIssuanceAuthorization(pending.id.value, pending.request.url) }
 
@@ -288,7 +302,7 @@ internal class SdkDemoWallet(
         transactionCode: String?,
         credentials: List<WalletDemoCredentialSelection>,
     ): WalletDemoIssuanceOutcome =
-        (requireNotNull(wallet.resumeIssuance(IssuanceSessionId(sessionId))) as IssuanceSession.PreAuthorized)
+        reviewedOffer<IssuanceSession.PreAuthorized>(sessionId)
             .let { offer ->
                 offer.accept(transactionCode, credentials.toIssuanceSelections(),
                     clientId = "eudiw-abca".takeIf { offer.clientIdentification == IssuanceClientIdentification.CLIENT_ID_REQUIRED })

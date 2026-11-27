@@ -7,9 +7,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.credentials.ExperimentalDigitalCredentialApi
-import id.walt.wallet2.mobile.issuance.IssuanceAuthorizationId
+import id.walt.wallet2.mobile.WalletFailure
 import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialCreateProvider
 import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialCreateResponse
+import id.walt.wallet2.mobile.issuance.IssuanceAuthorizationId
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.WalletDemoOfferCreateUiState
 import id.walt.walletdemo.compose.ui.WalletDemoOfferDraft
@@ -140,7 +141,7 @@ internal class DigitalCredentialCreateModel(
         perform {
             try { action() }
             catch (cause: CancellationException) { throw cause }
-            catch (cause: Exception) { state = previous.copy(refreshError = cause.message ?: "Could not refresh this result.") }
+            catch (cause: Exception) { state = previous.copy(refreshError = WalletFailure.classify(cause).userMessage) }
         }
     }
 
@@ -211,9 +212,10 @@ internal class DigitalCredentialCreateModel(
     }
 
     override fun showFailure(cause: Exception) {
-        Log.e("WaltDigitalCredentials", "Digital credential issuance failed (${cause::class.simpleName})", cause)
+        val failure = WalletFailure.classify(cause)
+        Log.e("WaltDigitalCredentials", "Digital credential issuance failed (${failure.name})")
         clearAuthorization()
-        state = WalletDemoOfferCreateUiState.Failure(cause.message ?: "The request could not be completed.")
+        state = WalletDemoOfferCreateUiState.Failure(failure.userMessage)
     }
 
     override suspend fun releaseRequest() {

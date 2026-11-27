@@ -30,26 +30,27 @@ Use ``WalletEventPhase`` and ``WalletEventStatus`` for high-level UI state, and
 
 ### Handle Failures
 
-The public API throws ``WalletError`` so Swift consumers can handle SDK failures
-without depending on generated Kotlin exception types.
+The public facade throws ``WalletError`` for SDK failures. A cancelled Swift task can throw `CancellationError`.
 
 ```swift
 do {
     let session = try await wallet.startIssuance(.init(offer: credentialOfferURL))
     await showOffer(session.offer)
 
+} catch is CancellationError {
+    throw CancellationError()
 } catch let error as WalletError {
-    showWalletError(error.localizedDescription)
-} catch {
     showWalletError(error.localizedDescription)
 }
 ```
 
 When an invalid OpenID4VP request has an unsafe response channel, the SDK throws
 `WalletError.presentationValidation(code:message:responseSafetyFailure:)`. The
-protocol code and validation message describe the request failure;
-`responseSafetyFailure` explains why no error response was sent to the verifier.
-`localizedDescription` includes both reasons for demo and application diagnostics.
+protocol code and validation message describe the request failure.
+`responseSafetyFailure` explains why the wallet kept the error local. Use
+`localizedDescription` for display and keep the detailed fields out of UI and logs.
 The response-destination safety checks still apply before any remote reporting.
 
 Inspect ``IssuanceOutcome`` after accepting an offer. Its failed and deferred cases carry any credentials already stored and the remaining continuations. A thrown storage, validation, or key-authorization error describes the operation that threw it. A retained presentation or credential-status review that changed must be shown to the holder again. Host callbacks can throw their own Swift errors, and a cancelled task can throw `CancellationError`.
+
+A direct-post rejection returns `PresentationResult.transmitted(.failed(...))`. If the SDK throws `WalletError.deliveryUncertain`, check the original verifier transaction before sharing again. The presentation may already have been disclosed.

@@ -5,14 +5,14 @@ import WalletSDKKeychainRecovery
 #endif
 
 final class PresentationValidationErrorTests: XCTestCase {
-    func testLocalizedDescriptionIncludesProtocolAndResponseSafetyFailures() {
+    func testLocalizedDescriptionExcludesProtocolDiagnostics() {
         let error = WalletError.presentationValidation(
             code: .invalidRequest,
             message: "Authorization Request nonce is required",
             responseSafetyFailure: "Unbound response destination"
         )
         XCTAssertEqual(error.localizedDescription,
-            "invalid_request: Authorization Request nonce is required. Error response was not sent: Unbound response destination")
+            "The request is invalid and the wallet cannot safely report it to the verifier.")
     }
 
 #if canImport(WalletCore) && os(iOS)
@@ -109,8 +109,8 @@ final class PresentationValidationErrorTests: XCTestCase {
             XCTAssertEqual(message, "Authorization Request nonce is required")
             XCTAssertEqual(responseSafetyFailure,
                 "Authorization Request redirect_uri is required; an error response cannot be sent safely")
-            XCTAssertTrue(error.localizedDescription.contains(message))
-            XCTAssertTrue(error.localizedDescription.contains(responseSafetyFailure))
+            XCTAssertFalse(error.localizedDescription.contains(message))
+            XCTAssertFalse(error.localizedDescription.contains(responseSafetyFailure))
         }
         try await wallet.deleteLocalData()
     }

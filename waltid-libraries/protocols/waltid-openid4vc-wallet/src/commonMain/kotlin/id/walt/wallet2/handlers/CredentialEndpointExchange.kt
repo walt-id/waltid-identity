@@ -26,6 +26,8 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.retry
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
@@ -33,6 +35,7 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
+import kotlinx.io.IOException
 
 internal data class CredentialEndpointExchange(
     val response: CredentialResponse,
@@ -98,6 +101,9 @@ internal suspend fun requestCredential(
     return CredentialEndpointExchange(response, prepared.responseDecryptionKey)
 }
 
+internal class CredentialDeliveryUncertainException(cause: Throwable) :
+    Exception("The credential response could not be confirmed.", cause)
+
 internal suspend fun HttpClient.requestCredentialResponse(
     endpoint: String,
     accessToken: String,
@@ -121,17 +127,30 @@ internal suspend fun HttpClient.requestCredentialResponse(
             )
         }
         onStage(CredentialIssuanceStage.REQUEST)
-        val response = postFollowingRedirects(endpoint) {
-            header(HttpHeaders.Authorization, "$scheme ${accessToken}")
-            proof?.let { header(DPOP_HEADER, it) }
-            contentType(prepared.contentType)
-            if (prepared.contentType.isApplicationJwt()) acceptCredentialResponse()
-            setBody(prepared.body)
+        val response = try {
+            postFollowingRedirects(endpoint) {
+                retry { noRetry() }
+                header(HttpHeaders.Authorization, "$scheme ${accessToken}")
+                proof?.let { header(DPOP_HEADER, it) }
+                contentType(prepared.contentType)
+                if (prepared.contentType.isApplicationJwt()) acceptCredentialResponse()
+                setBody(prepared.body)
+            }
+        } catch (error: HttpRequestTimeoutException) {
+            throw CredentialDeliveryUncertainException(error)
+        } catch (error: IOException) {
+            throw CredentialDeliveryUncertainException(error)
         }
         dpop?.nonce = response.headers[DPOP_NONCE_HEADER] ?: dpopNonce
         if (response.status.isSuccess()) {
             onStage(CredentialIssuanceStage.RESPONSE)
-            val credentialResponse = response.readCredentialResponse(prepared.responseDecryptionKey)
+            val credentialResponse = try {
+                response.readCredentialResponse(prepared.responseDecryptionKey)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                throw CredentialDeliveryUncertainException(error)
+            }
             return credentialResponse.validateCredentialResponse(response.status.value, expectedTransactionId)
         }
 
@@ -206,7 +225,7 @@ private suspend fun HttpClient.postFollowingRedirects(
     if (response.status.value in REDIRECT_STATUS_CODES) {
         val location = response.headers[HttpHeaders.Location]
         if (location != null) {
-            log.debug { "Following redirect to: $location" }
+            log.debug { "Following credential endpoint redirect" }
             check(isSameOrigin(url, location)) {
                 "Cross-origin redirect from $url to $location is not supported for wallet POST requests"
             }

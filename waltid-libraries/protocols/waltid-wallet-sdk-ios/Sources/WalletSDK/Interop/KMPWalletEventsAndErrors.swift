@@ -57,6 +57,12 @@ extension WalletBridgeError {
             return .keyUseAuthorization(authorizationFailure.toSwiftAuthorizationFailure())
         case .cancelled:
             return .cancelled
+        case .timeout: return .timeout
+        case .network: return .network
+        case .remoteResponse: return .remoteResponse
+        case .crypto: return .crypto
+        case .issuanceOutcomeUncertain: return .issuanceOutcomeUncertain
+        case .deliveryUncertain: return .deliveryUncertain
         case .internalFailure:
             return .internalFailure(message)
         }

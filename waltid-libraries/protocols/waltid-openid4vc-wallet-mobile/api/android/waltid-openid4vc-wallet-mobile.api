@@ -138,6 +138,34 @@ public final class id/walt/wallet2/mobile/WalletFactory {
 	public static synthetic fun open$default (Lid/walt/wallet2/mobile/WalletFactory;Lid/walt/wallet2/mobile/WalletConfiguration;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
+public final class id/walt/wallet2/mobile/WalletFailure : java/lang/Enum {
+	public static final field Companion Lid/walt/wallet2/mobile/WalletFailure$Companion;
+	public static final field authorization Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field cancelled Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field credentialStatusReviewChanged Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field crypto Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field deliveryUncertain Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field internalFailure Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field invalidInput Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field issuanceOutcomeUncertain Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field network Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field paymentConsent Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field presentationReviewChanged Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field presentationValidation Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field remoteResponse Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field storage Lid/walt/wallet2/mobile/WalletFailure;
+	public static final field timeout Lid/walt/wallet2/mobile/WalletFailure;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getUserMessage ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lid/walt/wallet2/mobile/WalletFailure;
+	public static fun values ()[Lid/walt/wallet2/mobile/WalletFailure;
+}
+
+public final class id/walt/wallet2/mobile/WalletFailure$Companion {
+	public final fun classify (Ljava/lang/Throwable;)Lid/walt/wallet2/mobile/WalletFailure;
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class id/walt/wallet2/mobile/credentials/AndroidCredentialStatusMaintenanceKt {
 	public static final fun refreshDueStatusesForExistingWallet-zkXUZaI (Landroid/content/Context;Ljava/lang/String;IJLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun refreshDueStatusesForExistingWallet-zkXUZaI$default (Landroid/content/Context;Ljava/lang/String;IJLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
