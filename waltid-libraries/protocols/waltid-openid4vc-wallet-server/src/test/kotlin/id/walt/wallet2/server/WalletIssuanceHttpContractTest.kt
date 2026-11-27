@@ -1,6 +1,7 @@
 package id.walt.wallet2.server
 
 import id.walt.openid4vci.proofs.Proofs
+import id.waltid.openid4vci.wallet.credential.CredentialIssuanceTarget
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.models.OfferIssuerMetadata
 import id.walt.wallet2.server.models.OfferClaimMetadata
@@ -150,6 +151,32 @@ class WalletIssuanceHttpContractTest {
         val incompatible = client.get("/unrepresentable")
         assertEquals(HttpStatusCode.Conflict, incompatible.status)
         assertEquals(multiple, Json.decodeFromString<ReceiveCredentialsResult>(incompatible.bodyAsText()))
+    }
+
+    @Test
+    fun refusedIssuerIsUnprocessableWhileAFailingTrustSourceStaysAnUpstreamFailure() = testApplication {
+        val target = CredentialIssuanceTarget("identity")
+        fun failed(reason: CredentialIssuanceFailureReason?) =
+            ReceiveCredentialsResult(emptyList(), failure = CredentialIssuanceFailure(target, CredentialIssuanceStage.RESPONSE, reason = reason))
+        application {
+            install(ContentNegotiation) { json(Json { encodeDefaults = true }) }
+            routing {
+                get("/refused") { call.respondIssuanceResult(failed(CredentialIssuanceFailureReason.ISSUER_NOT_TRUSTED)) }
+                get("/refused-legacy") { call.respondIssuanceResult(failed(CredentialIssuanceFailureReason.ISSUER_NOT_TRUSTED), legacy = true) }
+                get("/unavailable") { call.respondIssuanceResult(failed(CredentialIssuanceFailureReason.ISSUER_TRUST_UNAVAILABLE)) }
+                get("/response") { call.respondIssuanceResult(failed(null)) }
+            }
+        }
+        val refused = client.get("/refused")
+        assertEquals(HttpStatusCode.UnprocessableEntity, refused.status)
+        val body = Json.parseToJsonElement(refused.bodyAsText()).jsonObject.getValue("failure").jsonObject
+        assertEquals("ISSUER_NOT_TRUSTED", body["reason"]?.jsonPrimitive?.content)
+        assertEquals(HttpStatusCode.UnprocessableEntity, client.get("/refused-legacy").status)
+        assertEquals(HttpStatusCode.BadGateway, client.get("/unavailable").status)
+        val response = client.get("/response")
+        assertEquals(HttpStatusCode.BadGateway, response.status)
+        // Other failures keep their released body, even when defaults are encoded.
+        assertFalse("reason" in Json.parseToJsonElement(response.bodyAsText()).jsonObject.getValue("failure").jsonObject)
     }
 
     @Test

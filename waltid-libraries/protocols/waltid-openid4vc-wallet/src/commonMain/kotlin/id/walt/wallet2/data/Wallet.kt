@@ -15,6 +15,9 @@ import id.walt.wallet2.handlers.KeyAttestationProvider
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.walt.wallet2.handlers.WalletIssuanceSessionService
 import id.walt.wallet2.handlers.WalletIssuanceSessionState
+import id.walt.wallet2.trust.IssuerNotTrustedException
+import id.walt.wallet2.trust.WalletIssuanceTrust
+import kotlin.coroutines.cancellation.CancellationException
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -178,6 +181,34 @@ data class Wallet(
     }
 
     internal fun hasKeyAttestationProvider(): Boolean = keyAttestationSource != null
+
+    private var issuanceTrustResolver: (suspend () -> WalletIssuanceTrust?)? = null
+
+    /**
+     * Checks the issuer of every credential received through OpenID4VCI before any of it is stored, see
+     * [WalletIssuanceTrust]. [resolver] runs once per credential response, so its configuration can change
+     * at runtime; it returns null to store without the check. A resolver that throws rejects the response.
+     * Runtime only, like the other attachments: reattach after recreation.
+     */
+    fun attachIssuanceTrust(resolver: suspend () -> WalletIssuanceTrust?): Wallet = apply {
+        issuanceTrustResolver = resolver
+    }
+
+    /** Checks every received credential against the fixed [trust]. */
+    fun attachIssuanceTrust(trust: WalletIssuanceTrust): Wallet = attachIssuanceTrust { trust }
+
+    internal suspend fun issuanceTrust(): WalletIssuanceTrust? {
+        val resolver = issuanceTrustResolver ?: return null
+        return try {
+            resolver()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw IssuerNotTrustedException(
+                "Issuer trust configuration could not be resolved: ${e.message}", cause = e, trustSourceUnavailable = true,
+            )
+        }
+    }
 
     internal suspend fun keyAttestationProviderFor(credentialIssuer: String): KeyAttestationProvider? =
         when (val source = keyAttestationSource) {

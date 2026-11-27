@@ -20,6 +20,7 @@ import id.walt.openid4vci.proofs.ProofType
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
+import id.walt.wallet2.trust.IssuerNotTrustedException
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
@@ -339,6 +340,9 @@ enum class WalletIssuanceErrorCode {
     CRYPTO,
     STORAGE,
     PROTOCOL,
+
+    /** A received credential's issuer is not trusted, or its trust could not be established. Nothing was stored. */
+    ISSUER_NOT_TRUSTED,
 }
 
 @Serializable
@@ -1001,11 +1005,19 @@ class WalletIssuanceSessionService(
                 // Preserve that contract, but still reject any explicit binding to a different public key.
                 val bindings = if (request.validation is DeferredResponseValidation.ReleasedSingleKey)
                     List(credentials.size) { request.bindings.single() } else request.bindings
-                val prepared = wallet.prepareIssuedCredentials(credentials.map {
-                    val value = it.credential
-                    if (value is JsonPrimitive) value.content else value.toString()
-                }, bindings, request.label, request.metadata, configured?.proofRequired ?: false,
-                    expectedConfiguration = configured?.configuration, typeMetadataHttpClient = httpClient)
+                val prepared = try {
+                    wallet.prepareIssuedCredentials(credentials.map {
+                        val value = it.credential
+                        if (value is JsonPrimitive) value.content else value.toString()
+                    }, bindings, request.label, request.metadata, configured?.proofRequired ?: false,
+                        expectedConfiguration = configured?.configuration, typeMetadataHttpClient = httpClient)
+                } catch (error: IssuerNotTrustedException) {
+                    // The issuer has answered its transaction and the wallet refused it, so nothing is left to poll.
+                    deliverCredentialNotification(httpClient, record.copy(notificationId = issued.notificationId).notificationTarget(),
+                        NotificationEvent.CREDENTIAL_FAILURE)
+                    removeDeferred(record)
+                    return failed(record.sessionId, WalletIssuanceErrorCode.ISSUER_NOT_TRUSTED)
+                }
                 record = record.copy(
                     content = DeferredContent.Received(prepared),
                     claimed = false,
@@ -1199,6 +1211,7 @@ class WalletIssuanceSessionService(
                     NonceRequestError.ISSUER_RESPONSE -> WalletIssuanceErrorCode.ISSUER_RESPONSE
                     NonceRequestError.INVALID_RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
                 }
+                cause is IssuerNotTrustedException -> WalletIssuanceErrorCode.ISSUER_NOT_TRUSTED
                 error.failure.stage == CredentialIssuanceStage.PROOF -> WalletIssuanceErrorCode.CRYPTO
                 cause is CredentialEndpointException -> WalletIssuanceErrorCode.ISSUER_RESPONSE
                 cause is IllegalArgumentException || error.failure.stage == CredentialIssuanceStage.RESPONSE -> WalletIssuanceErrorCode.PROTOCOL
@@ -2397,6 +2410,7 @@ class WalletIssuanceSessionService(
         WalletIssuanceErrorCode.CRYPTO -> "The selected holder key could not create the required proof."
         WalletIssuanceErrorCode.STORAGE -> "The issued credential could not be stored."
         WalletIssuanceErrorCode.PROTOCOL -> "The issuance response did not satisfy OpenID4VCI 1.0 requirements."
+        WalletIssuanceErrorCode.ISSUER_NOT_TRUSTED -> "The credential issuer is not trusted, or its trust could not be established. Nothing was stored."
     }
 
     private fun nextDeferredPoll(intervalSeconds: Long, current: Long = nowEpochMilliseconds()): Long {

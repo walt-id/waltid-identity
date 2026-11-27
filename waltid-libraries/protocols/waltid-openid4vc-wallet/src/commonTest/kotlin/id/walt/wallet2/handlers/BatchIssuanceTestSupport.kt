@@ -93,7 +93,8 @@ internal fun batchTestOffer(): JsonObject = Json.parseToJsonElement(
     """{"credential_issuer":"$BATCH_TEST_ISSUER","credential_configuration_ids":["identity"],
         "grants":{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"pre-code"}}}""").jsonObject
 
-internal fun batchTestMetadata(batchSize: Int = 5) = """{"credential_issuer":"$BATCH_TEST_ISSUER","credential_endpoint":"$BATCH_TEST_ISSUER/credential",
+internal fun batchTestMetadata(batchSize: Int = 5, notificationEndpoint: Boolean = false) = """{"credential_issuer":"$BATCH_TEST_ISSUER","credential_endpoint":"$BATCH_TEST_ISSUER/credential",
+    ${if (notificationEndpoint) "\"notification_endpoint\":\"$BATCH_TEST_ISSUER/notification\"," else ""}
     "deferred_credential_endpoint":"$BATCH_TEST_ISSUER/deferred","nonce_endpoint":"$BATCH_TEST_ISSUER/nonce","batch_credential_issuance":{"batch_size":$batchSize},
     "credential_configurations_supported":{"identity":{"format":"dc+sd-jwt","vct":"identity","scope":"identity",
     "cryptographic_binding_methods_supported":["jwk"],"proof_types_supported":{"jwt":{"proof_signing_alg_values_supported":["ES256"]}}}}}"""
@@ -107,6 +108,7 @@ internal fun batchTestClient(
     credential: suspend (JsonObject) -> String,
     deferredStatus: () -> HttpStatusCode = { HttpStatusCode.OK },
     deferred: suspend (JsonObject) -> String = { error("Unexpected deferred request") },
+    notification: suspend (JsonObject) -> Unit = { error("Unexpected notification request") },
 ) = HttpClient(MockEngine) {
     engine {
         addHandler { request ->
@@ -133,6 +135,11 @@ internal fun batchTestClient(
                 "$BATCH_TEST_ISSUER/deferred" -> {
                     status = deferredStatus()
                     deferred(Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject)
+                }
+                "$BATCH_TEST_ISSUER/notification" -> {
+                    status = HttpStatusCode.NoContent
+                    notification(Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject)
+                    ""
                 }
                 else -> error("Unexpected endpoint ${request.url}")
             }
