@@ -51,9 +51,10 @@ reviewed sharing, persistence and lifecycle examples.
 The existing dynamic adapter products are `WalletSDKKeychainRecovery` and `WalletSDKEnterpriseCustody`.
 Choose one linkage per adapter. Both linkages use the same unsuffixed module name and registration calls.
 
-Xcode can place the implementation in `WalletSDK.framework` when another package product depends on
-it. From the Swift package directory, check that both executables can find one copy in the
-containing app’s `Frameworks` directory.
+From the Swift package directory, run the checker on the built app and its embedded extension.
+It verifies that both load the same framework from the app’s `Frameworks` directory and that
+only one image it inspects defines the Swift package’s `WalletCore`. Xcode can name that framework
+`WalletSDK.framework` when another package product depends on it.
 
 ```sh
 python3 scripts/check-shared-runtime.py App.app App.app/Extensions/Provider.appex
@@ -521,10 +522,10 @@ The native iOS consumer proof lives in the existing demo app:
 waltid-applications/waltid-wallet-demo-ios
 ```
 
-That app imports `WalletSDK` directly from SwiftUI and exercises the same
-Swift package boundary a native iOS integrator would use. The separate Compose
-Multiplatform demo remains the KMP/Compose consumer proof and uses its generated
-Kotlin `sharedUI` framework instead of routing through this Swift facade.
+The native demo imports `WalletSDK` directly from SwiftUI. The Compose Multiplatform demo
+renders its main UI through the generated Kotlin `sharedUI` framework. Its iOS credential-provider
+integration uses the Swift facade, with `WalletSDKShared` linked by both the app and its
+Identity Document Provider extension.
 
 ## Interop Boundary
 
@@ -544,12 +545,6 @@ public SDK module small for DocC, symbol graph checks, and host-side SwiftPM
 tests. SKIE Swift code bundling remains a viable future packaging option if the
 release shape should become a single binary framework that includes both the
 KMP core and the Swift facade.
-
-The Compose Multiplatform demo intentionally does not apply this Swift facade.
-Its iOS app hosts Kotlin Compose UI through the generated `sharedUI` framework,
-which is the right proof path for KMP/Compose integrators. SKIE would become
-useful there only if the demo adds a native SwiftUI path that directly consumes
-shared Kotlin state, flows, sealed UI state, or suspend APIs.
 
 ## Publishing Follow-up
 
