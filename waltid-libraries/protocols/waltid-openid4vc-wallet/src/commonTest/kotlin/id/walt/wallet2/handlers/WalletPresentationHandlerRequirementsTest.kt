@@ -85,11 +85,11 @@ class WalletPresentationHandlerRequirementsTest {
             )
         )
 
-        val requirements = WalletPresentationHandler.run { query.requiredCredentialRequirements() }
+        val requirements = query.requiredCredentialRequirements()
 
         assertEquals(listOf(PresentationCredentialRequirement(options = listOf(listOf("pid", "age")))), requirements)
-        assertTrue(WalletPresentationHandler.run { requirements.satisfiedBy(setOf("pid", "age")) })
-        assertFalse(WalletPresentationHandler.run { requirements.satisfiedBy(setOf("pid")) })
+        assertTrue(requirements.satisfiedBy(setOf("pid", "age")))
+        assertFalse(requirements.satisfiedBy(setOf("pid")))
     }
 
     @Test
@@ -114,7 +114,7 @@ class WalletPresentationHandlerRequirementsTest {
             )
         )
 
-        val requirements = WalletPresentationHandler.run { query.requiredCredentialRequirements() }
+        val requirements = query.requiredCredentialRequirements()
 
         assertEquals(
             listOf(
@@ -127,8 +127,8 @@ class WalletPresentationHandlerRequirementsTest {
             ),
             requirements,
         )
-        assertTrue(WalletPresentationHandler.run { requirements.satisfiedBy(setOf("photo-id")) })
-        assertFalse(WalletPresentationHandler.run { requirements.satisfiedBy(setOf("address")) })
+        assertTrue(requirements.satisfiedBy(setOf("photo-id")))
+        assertFalse(requirements.satisfiedBy(setOf("address")))
     }
 
     @Test
@@ -149,18 +149,16 @@ class WalletPresentationHandlerRequirementsTest {
             )
         )
 
-        val requirements = WalletPresentationHandler.run { query.requiredCredentialRequirements() }
+        val requirements = query.requiredCredentialRequirements()
 
         assertEquals(emptyList(), requirements)
-        assertTrue(WalletPresentationHandler.run { requirements.satisfiedBy(emptySet()) })
+        assertTrue(requirements.satisfiedBy(emptySet()))
     }
 
     @Test
     fun presentationSelectionRequiresAtLeastOneCredentialOption() {
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                emptyList<PresentationCredentialSelection>().requireValidPresentationCredentialSelection()
-            }
+            emptyList<PresentationCredentialSelection>().requireValidPresentationCredentialSelection()
         }
     }
 
@@ -732,9 +730,7 @@ class WalletPresentationHandlerRequirementsTest {
             query = { queryId -> credentialQuery(queryId, multiple = true) },
         )
 
-        val selected = WalletPresentationHandler.run {
-            matched.selectCredentialOptions(selections)
-        }
+        val selected = matched.selectCredentialOptions(selections)
 
         assertEquals(listOf("cred-1", "cred-2"), selected.getValue("pid").map { it.credential.id })
     }
@@ -747,14 +743,12 @@ class WalletPresentationHandlerRequirementsTest {
         )
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                matched.selectCredentialOptions(
-                    listOf(
-                        PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1"),
-                        PresentationCredentialSelection(queryId = "pid", credentialId = "cred-2"),
-                    )
+            matched.selectCredentialOptions(
+                listOf(
+                    PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1"),
+                    PresentationCredentialSelection(queryId = "pid", credentialId = "cred-2"),
                 )
-            }
+            )
         }
     }
 
@@ -765,9 +759,7 @@ class WalletPresentationHandlerRequirementsTest {
         )
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                selections.requireValidPresentationCredentialSelection()
-            }
+            selections.requireValidPresentationCredentialSelection()
         }
     }
 
@@ -778,9 +770,7 @@ class WalletPresentationHandlerRequirementsTest {
             PresentationCredentialSelection(queryId = "age", credentialId = "cred-1"),
         )
 
-        WalletPresentationHandler.run {
-            selections.requireValidPresentationCredentialSelection()
-        }
+        selections.requireValidPresentationCredentialSelection()
     }
 
     @Test
@@ -788,48 +778,40 @@ class WalletPresentationHandlerRequirementsTest {
         val matched = matchResult("pid" to "cred-1")
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                matched.selectCredentialOptions(
-                    listOf(PresentationCredentialSelection(queryId = "unknown", credentialId = "cred-1"))
-                )
-            }
+            matched.selectCredentialOptions(
+                listOf(PresentationCredentialSelection(queryId = "unknown", credentialId = "cred-1"))
+            )
         }
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                matched.selectCredentialOptions(
-                    selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                    selectedDisclosureOptions = listOf(
-                        PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = "$.unknown"),
-                    ),
-                )
-            }
+            matched.selectCredentialOptions(
+                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+                selectedDisclosureOptions = listOf(
+                    PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = "$.unknown"),
+                ),
+            )
         }
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                matchResult(
-                    "pid" to "cred-1",
-                    "pid" to "cred-2",
-                    selectedDisclosures = mapOf("$.given_name" to DcqlDisclosure("given_name", JsonPrimitive("Ada"))),
-                ).selectCredentialOptions(
-                    selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                    selectedDisclosureOptions = listOf(
-                        PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-2", path = "$.given_name"),
-                    ),
-                )
-            }
+            matchResult(
+                "pid" to "cred-1",
+                "pid" to "cred-2",
+                selectedDisclosures = mapOf("$.given_name" to DcqlDisclosure("given_name", JsonPrimitive("Ada"))),
+            ).selectCredentialOptions(
+                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+                selectedDisclosureOptions = listOf(
+                    PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-2", path = "$.given_name"),
+                ),
+            )
         }
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                matchResult("pid" to "cred-1").selectCredentialOptions(
-                    selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                    selectedDisclosureOptions = listOf(
-                        PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = "$.given_name"),
-                    ),
-                )
-            }
+            matchResult("pid" to "cred-1").selectCredentialOptions(
+                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+                selectedDisclosureOptions = listOf(
+                    PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = "$.given_name"),
+                ),
+            )
         }
     }
 
@@ -838,11 +820,9 @@ class WalletPresentationHandlerRequirementsTest {
         val matched = matchResult("pid" to "cred-1")
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                matched.selectCredentialOptions(
-                    listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "missing-cred"))
-                )
-            }
+            matched.selectCredentialOptions(
+                listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "missing-cred"))
+            )
         }
     }
 
@@ -853,11 +833,9 @@ class WalletPresentationHandlerRequirementsTest {
             "photo-id" to "cred-photo",
         )
 
-        val selected = WalletPresentationHandler.run {
-            matched.selectCredentialOptions(
-                listOf(PresentationCredentialSelection(queryId = "photo-id", credentialId = "cred-photo"))
-            )
-        }
+        val selected = matched.selectCredentialOptions(
+            listOf(PresentationCredentialSelection(queryId = "photo-id", credentialId = "cred-photo"))
+        )
 
         assertEquals(setOf("photo-id"), selected.keys)
         assertEquals(listOf("cred-photo"), selected.getValue("photo-id").map { it.credential.id })
@@ -884,14 +862,12 @@ class WalletPresentationHandlerRequirementsTest {
             },
         )
 
-        val selected = WalletPresentationHandler.run {
-            matched.selectCredentialOptions(
-                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                selectedDisclosureOptions = listOf(
-                    PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = givenName),
-                ),
-            )
-        }
+        val selected = matched.selectCredentialOptions(
+            selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+            selectedDisclosureOptions = listOf(
+                PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = givenName),
+            ),
+        )
 
         assertEquals(
             setOf(givenName, ageOver18),
@@ -927,14 +903,12 @@ class WalletPresentationHandlerRequirementsTest {
             },
         )
 
-        val selected = WalletPresentationHandler.run {
-            matched.selectCredentialOptions(
-                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                selectedDisclosureOptions = listOf(
-                    PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = givenName),
-                ),
-            )
-        }
+        val selected = matched.selectCredentialOptions(
+            selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+            selectedDisclosureOptions = listOf(
+                PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = givenName),
+            ),
+        )
 
         val disclosures = selected.getValue("pid").single().selectedDisclosures.orEmpty()
         assertEquals(setOf(givenName, vct), disclosures.keys)
@@ -959,9 +933,7 @@ class WalletPresentationHandlerRequirementsTest {
             query = ::optionalBirthDateCredentialQuery,
         )
 
-        val disclosures = WalletPresentationHandler.run {
-            matched.getValue("pid").single().toPresentationDisclosures()
-        }
+        val disclosures = matched.getValue("pid").single().toPresentationDisclosures()
 
         assertEquals(listOf(givenName, familyName, birthDate), disclosures.map { it.path })
         assertEquals(listOf(true, true, false), disclosures.map { it.required })
@@ -987,14 +959,12 @@ class WalletPresentationHandlerRequirementsTest {
             query = ::optionalBirthDateCredentialQuery,
         )
 
-        val selected = WalletPresentationHandler.run {
-            matched.selectCredentialOptions(
-                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                selectedDisclosureOptions = listOf(
-                    PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = birthDate),
-                ),
-            )
-        }
+        val selected = matched.selectCredentialOptions(
+            selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+            selectedDisclosureOptions = listOf(
+                PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = birthDate),
+            ),
+        )
 
         assertEquals(
             setOf(givenName, familyName, birthDate),
@@ -1014,12 +984,10 @@ class WalletPresentationHandlerRequirementsTest {
             ),
         )
 
-        val selected = WalletPresentationHandler.run {
-            matched.selectCredentialOptions(
-                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                selectedDisclosureOptions = emptyList(),
-            )
-        }
+        val selected = matched.selectCredentialOptions(
+            selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+            selectedDisclosureOptions = emptyList(),
+        )
 
         val disclosures = selected.getValue("pid").single().selectedDisclosures.orEmpty()
         assertEquals(setOf(vct), disclosures.keys)
@@ -1054,14 +1022,12 @@ class WalletPresentationHandlerRequirementsTest {
         )
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                matched.selectCredentialOptions(
-                    selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                    selectedDisclosureOptions = listOf(
-                        PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = givenName),
-                    ),
-                )
-            }
+            matched.selectCredentialOptions(
+                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+                selectedDisclosureOptions = listOf(
+                    PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = givenName),
+                ),
+            )
         }
     }
 
@@ -1076,14 +1042,12 @@ class WalletPresentationHandlerRequirementsTest {
         )
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                matched.selectCredentialOptions(
-                    selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-                    selectedDisclosureOptions = listOf(
-                        PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = "$.vct"),
-                    ),
-                )
-            }
+            matched.selectCredentialOptions(
+                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+                selectedDisclosureOptions = listOf(
+                    PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = "$.vct"),
+                ),
+            )
         }
     }
 
@@ -1097,11 +1061,9 @@ class WalletPresentationHandlerRequirementsTest {
             ),
         )
 
-        val selected = WalletPresentationHandler.run {
-            matched.selectCredentialOptions(
-                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
-            )
-        }
+        val selected = matched.selectCredentialOptions(
+            selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+        )
 
         assertEquals(
             setOf("$.given_name", "$.age_over_18"),
@@ -1114,20 +1076,16 @@ class WalletPresentationHandlerRequirementsTest {
         val transactionData = transactionDataForCredentialIds("identity", "payment")
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                validateSelectedTransactionDataCredentials(
-                    transactionData = listOf(transactionData),
-                    selectedQueryIds = setOf("identity", "payment"),
-                )
-            }
-        }
-
-        WalletPresentationHandler.run {
             validateSelectedTransactionDataCredentials(
                 transactionData = listOf(transactionData),
-                selectedQueryIds = setOf("identity"),
+                selectedQueryIds = setOf("identity", "payment"),
             )
         }
+
+        validateSelectedTransactionDataCredentials(
+            transactionData = listOf(transactionData),
+            selectedQueryIds = setOf("identity"),
+        )
     }
 
     @Test
@@ -1135,12 +1093,10 @@ class WalletPresentationHandlerRequirementsTest {
         val transactionData = transactionDataForCredentialIds("identity", "payment")
 
         assertFailsWith<IllegalArgumentException> {
-            WalletPresentationHandler.run {
-                validateSelectedTransactionDataCredentials(
-                    transactionData = listOf(transactionData),
-                    selectedQueryIds = setOf("profile"),
-                )
-            }
+            validateSelectedTransactionDataCredentials(
+                transactionData = listOf(transactionData),
+                selectedQueryIds = setOf("profile"),
+            )
         }
     }
 

@@ -48,6 +48,7 @@ import id.walt.wallet2.handlers.WalletCredentialHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.walt.wallet2.handlers.BuildVpTokenRequest
 import id.walt.wallet2.handlers.requireCrypto2SigningKey
+import id.walt.wallet2.handlers.selectPresentableFromStores
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
@@ -276,7 +277,7 @@ class HolderKeyBindingTest {
         ).also { credentialStore.addCredential(it) }
         val query = DcqlQuery(credentials = listOf(mdocQuery("mdl", MDOC_DOCTYPE)))
 
-        val selected = WalletPresentationHandler.selectPresentableFromStores(
+        val selected = selectPresentableFromStores(
             wallet = wallet,
             query = query,
         )
