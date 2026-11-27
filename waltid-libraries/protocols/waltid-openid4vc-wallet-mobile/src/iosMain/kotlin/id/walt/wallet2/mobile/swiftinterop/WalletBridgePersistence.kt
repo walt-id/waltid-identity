@@ -26,26 +26,15 @@ import kotlinx.serialization.json.jsonObject
 /**
  * Persistence configuration exposed to the Swift wallet bridge.
  *
- * @property databaseKey Owner of the encrypted local database key.
+ * @property databaseKeyProvider Supplies the encrypted database key. The platform manages it when absent.
  * @property credentialStore Optional credential-store override exposed by the Swift facade.
  * @property didStore Optional DID-store override exposed by the Swift facade.
  */
 public data class WalletBridgePersistence(
-    public val databaseKey: WalletBridgeDatabaseKeyConfiguration = WalletBridgeDatabaseKeyConfiguration.Managed,
+    public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val credentialStore: WalletBridgeCredentialStore? = null,
     public val didStore: WalletBridgeDidStore? = null,
 )
-
-/**
- * Database-key ownership modes exposed to the Swift wallet bridge.
- */
-public enum class WalletBridgeDatabaseKeyConfiguration {
-    /** Platform-managed encrypted database key. */
-    Managed,
-
-    /** Encrypted database key supplied by Swift app code. */
-    Provided,
-}
 
 /**
  * Database key material returned by a Swift-owned database key provider.
@@ -163,28 +152,12 @@ public interface WalletBridgeDidStore {
     public suspend fun removeDid(did: String): Boolean
 }
 
-internal fun WalletBridgePersistence.toWalletPersistence(
-    databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
-): WalletPersistence = WalletPersistence(
-    databaseKey = databaseKey.toWalletDatabaseKey(databaseKeyProvider),
+internal fun WalletBridgePersistence.toWalletPersistence(): WalletPersistence = WalletPersistence(
+    databaseKey = databaseKeyProvider?.let { WalletDatabaseKey.Provided(BridgeDatabaseEncryptionKeyProvider(it)) }
+        ?: WalletDatabaseKey.Managed,
     credentialStore = credentialStore?.let(::BridgeCredentialStore),
     didStore = didStore?.let(::BridgeDidStore),
 )
-
-private fun WalletBridgeDatabaseKeyConfiguration.toWalletDatabaseKey(
-    databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
-): WalletDatabaseKey = when (this) {
-    WalletBridgeDatabaseKeyConfiguration.Managed ->
-        WalletDatabaseKey.Managed
-
-    WalletBridgeDatabaseKeyConfiguration.Provided ->
-        WalletDatabaseKey.Provided(
-            provider = BridgeDatabaseEncryptionKeyProvider(
-                databaseKeyProvider
-                    ?: throw IllegalArgumentException("Provided database-key persistence requires a database key provider"),
-            )
-        )
-}
 
 private class BridgeDatabaseEncryptionKeyProvider(
     private val bridgeProvider: WalletBridgeDatabaseEncryptionKeyProvider,

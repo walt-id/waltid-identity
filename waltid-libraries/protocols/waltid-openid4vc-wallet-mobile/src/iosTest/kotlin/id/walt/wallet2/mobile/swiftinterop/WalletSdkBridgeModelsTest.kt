@@ -9,6 +9,7 @@ import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.handlers.PreviewSessionFailureReason
+import id.walt.wallet2.mobile.digitalcredentials.WalletAppGroupAccess
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -193,17 +194,11 @@ class WalletSdkBridgeModelsTest {
     }
 
     @Test
-    fun bridgeRequiresCompleteCrossProcessConfiguration() {
-        assertFailsWith<IllegalArgumentException> {
-            WalletBridgeConfiguration(appGroupIdentifier = "group.example").toWalletConfiguration()
-        }
+    fun bridgeMapsOptionalCrossProcessAccess() {
+        val access = WalletAppGroupAccess("group.example", "TEAM.example")
+        val config = WalletBridgeConfiguration(crossProcessAccess = access).toWalletConfiguration()
 
-        val config = WalletBridgeConfiguration(
-            appGroupIdentifier = "group.example",
-            keychainAccessGroup = "TEAM.example",
-        ).toWalletConfiguration()
-
-        assertEquals("group.example", config.digitalCredentials.crossProcessAccess?.appGroupIdentifier)
-        assertEquals("TEAM.example", config.digitalCredentials.crossProcessAccess?.keychainAccessGroup)
+        assertEquals(access, config.digitalCredentials.crossProcessAccess)
+        assertEquals(null, WalletBridgeConfiguration().toWalletConfiguration().digitalCredentials.crossProcessAccess)
     }
 }

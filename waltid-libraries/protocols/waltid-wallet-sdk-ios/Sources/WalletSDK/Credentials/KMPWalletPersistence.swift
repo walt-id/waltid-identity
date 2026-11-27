@@ -5,27 +5,14 @@ import Foundation
 extension WalletPersistence {
     func toKMPPersistence() -> WalletBridgePersistence {
         WalletBridgePersistence(
-            databaseKey: databaseKey.toKMPDatabaseKeyConfiguration(),
+            databaseKeyProvider: databaseKey.toKMPDatabaseKeyProvider(),
             credentialStore: credentialStore.map { KMPWalletCredentialStoreAdapter(store: $0) },
             didStore: didStore.map { KMPWalletDidStoreAdapter(store: $0) }
         )
     }
-
-    func toKMPDatabaseKeyProvider() -> WalletBridgeDatabaseEncryptionKeyProvider? {
-        databaseKey.toKMPDatabaseKeyProvider()
-    }
 }
 
-extension WalletDatabaseKeyConfiguration {
-    func toKMPDatabaseKeyConfiguration() -> WalletBridgeDatabaseKeyConfiguration {
-        switch self {
-        case .managed:
-            return .managed
-        case .provided:
-            return .provided
-        }
-    }
-
+private extension WalletDatabaseKeyConfiguration {
     func toKMPDatabaseKeyProvider() -> WalletBridgeDatabaseEncryptionKeyProvider? {
         switch self {
         case .managed:
