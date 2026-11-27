@@ -126,7 +126,12 @@ appex_xcent="$intermediates/IdentityDocumentProvider.build/IdentityDocumentProvi
 
 # The extension must ship inside the app. An unembedded .appex builds cleanly and is simply never
 # offered by iOS.
-[[ -d "$appex" ]] || fail "IdentityDocumentProvider.appex is not embedded at $appex"
+if [[ -d "$appex" ]]; then
+  python3 "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/check-shared-runtime.py" "$app" "$appex" ||
+    fail "App and provider must load one shared WalletCore"
+else
+  fail "IdentityDocumentProvider.appex is not embedded at $appex"
+fi
 
 # codesign -d --entitlements reports an empty dict for simulator builds, so read the entitlements the
 # build actually applied instead.

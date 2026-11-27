@@ -44,7 +44,7 @@ let package = Package(
             name: "WalletDemoSharingUI",
             dependencies: [
                 "WalletDemoQRCodeCore",
-                .product(name: "WalletSDK", package: "waltid-wallet-sdk-ios"),
+                .product(name: "WalletSDKShared", package: "waltid-wallet-sdk-ios"),
             ],
             resources: [
                 .process("Resources"),
@@ -54,7 +54,7 @@ let package = Package(
             name: "WalletDemoIdentityDocumentSupport",
             dependencies: [
                 "WalletDemoSharingUI",
-                .product(name: "WalletSDK", package: "waltid-wallet-sdk-ios"),
+                .product(name: "WalletSDKShared", package: "waltid-wallet-sdk-ios"),
             ]
         ),
         // Private adapter for the one ZXing-C++ writer mode not exposed by its Swift wrapper:

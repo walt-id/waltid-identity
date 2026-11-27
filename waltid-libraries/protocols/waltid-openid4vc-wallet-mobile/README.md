@@ -35,6 +35,35 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - Present mdocs in person through a stateful ISO/IEC 18013-5 proximity session.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
+## Measuring release size
+
+Build the same release host without the SDK, with the SDK linked but unused, and with source
+code that calls issuance and presentation. Build each optional integration separately on top
+of the receive-and-present host. Keep other dependencies, signing, device and build settings
+fixed. Subtract the SDK-free host to measure what each build ships. Calling an API from host
+code can keep more code in the release binary. Using the feature after installation changes
+only runtime state, such as the wallet database. A host already using Kotlin or Compose can
+share dependencies with the SDK.
+
+On Android, enable R8 optimization and resource shrinking in the app's release build.
+The X.509 AAR supplies the Bouncy Castle keystore rules used by Android TLS.
+Kotlin serialization and SQLCipher supply their own consumer rules. The built-in wallet
+stores use SQLDelight queries and Kotlin serializers and need no app-specific keep rules.
+Build APKs from each release bundle for the same bundletool device spec and compare
+`bundletool get-size total --apks=<file> --device-spec=<spec>`. For installed size,
+compare the app's `StorageStats.appBytes` on the same device at first launch. Record
+wallet data and cache separately.
+
+To check an upgrade, receive a test credential with the previous minified release.
+Install the new release over it with the same application ID and signing key, reopen the
+wallet and present the stored credential. Clearing app data would skip the migration.
+
+On iOS, archive each Release host and export it with app thinning for the same device.
+Compare the compressed and uncompressed entries for that device in Xcode's App Thinning
+Size Report. Include the containing app and its extensions. Choose the
+[Swift package products](../waltid-wallet-sdk-ios/README.md#choosing-swift-package-products)
+for that layout. The developer XCFramework download also includes the simulator slice.
+
 ## Signing identity and recovery
 
 Use `wallet.signingIdentity.initialize()` for the default P-256 / `did:jwk` identity,

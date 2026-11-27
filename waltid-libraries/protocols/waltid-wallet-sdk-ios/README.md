@@ -41,6 +41,30 @@ foreground/manual triggers and preferences. Cancel stream tasks with their UI ow
 [credential-status guide](Sources/WalletSDK/Documentation.docc/CheckingCredentialStatus.md) for semantics,
 reviewed sharing, persistence and lifecycle examples.
 
+## Choosing Swift package products
+
+| App configuration | Products and Xcode settings |
+| --- | --- |
+| One executable | Link `WalletSDK`. For optional signing-key recovery, add `WalletSDKKeychainRecoveryStatic`. For Enterprise KMS import, add `WalletSDKEnterpriseCustodyStatic`. |
+| App and credential-provider extension | Link `WalletSDKShared` in both targets and select it in their supporting packages. Choose **Embed & Sign** in the containing app and **Do Not Embed** in the extension. Add `@executable_path/../../Frameworks` to the extension’s **Runpath Search Paths**. Both targets can use `import WalletSDK`. |
+
+The existing dynamic adapter products are `WalletSDKKeychainRecovery` and `WalletSDKEnterpriseCustody`.
+Choose one linkage per adapter. Both linkages use the same unsuffixed module name and registration calls.
+
+From the Swift package directory, run the checker on the built app and its embedded extension.
+It verifies that both load the same framework from the app’s `Frameworks` directory and that
+only one image it inspects defines the Swift package’s `WalletCore`. Xcode can name that framework
+`WalletSDK.framework` when another package product depends on it.
+
+```sh
+python3 scripts/check-shared-runtime.py App.app App.app/Extensions/Provider.appex
+```
+
+For an app-hosted XCTest target that imports `WalletCore` directly, add
+`-Xfrontend -disable-autolink-framework -Xfrontend WalletCore` to **Other Swift Flags**.
+This makes the test use the host’s Kotlin runtime. The checker also inspects hosted test bundles in
+a build for testing.
+
 ## Local Build
 
 Generate the KMP core XCFramework before building an iOS consumer:
@@ -498,10 +522,10 @@ The native iOS consumer proof lives in the existing demo app:
 waltid-applications/waltid-wallet-demo-ios
 ```
 
-That app imports `WalletSDK` directly from SwiftUI and exercises the same
-Swift package boundary a native iOS integrator would use. The separate Compose
-Multiplatform demo remains the KMP/Compose consumer proof and uses its generated
-Kotlin `sharedUI` framework instead of routing through this Swift facade.
+The native demo imports `WalletSDK` directly from SwiftUI. The Compose Multiplatform demo
+renders its main UI through the generated Kotlin `sharedUI` framework. Its iOS credential-provider
+integration uses the Swift facade, with `WalletSDKShared` linked by both the app and its
+Identity Document Provider extension.
 
 ## Interop Boundary
 
@@ -521,12 +545,6 @@ public SDK module small for DocC, symbol graph checks, and host-side SwiftPM
 tests. SKIE Swift code bundling remains a viable future packaging option if the
 release shape should become a single binary framework that includes both the
 KMP core and the Swift facade.
-
-The Compose Multiplatform demo intentionally does not apply this Swift facade.
-Its iOS app hosts Kotlin Compose UI through the generated `sharedUI` framework,
-which is the right proof path for KMP/Compose integrators. SKIE would become
-useful there only if the demo adds a native SwiftUI path that directly consumes
-shared Kotlin state, flows, sealed UI state, or suspend APIs.
 
 ## Publishing Follow-up
 
@@ -554,8 +572,9 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 Use `initialize()` for the default identity without recovery, or request complete SDK-issued
 options for explicit protection and recovery choices. The unreleased `bootstrap` API is removed. This version requires a fresh database; no compatibility migration is provided.
 
-The base `WalletSDK` product has no backup provider. Add `WalletSDKKeychainRecovery` and
-register `KeychainIdentityRecovery(namespace:)` to opt in, or implement the replaceable
+The base `WalletSDK` product has no backup provider. Choose the
+[recovery product for your app](#choosing-swift-package-products) and register
+`KeychainIdentityRecovery(namespace:)` to opt in, or implement the replaceable
 `IdentityRecoveryProvider` contract. Same-key Secure Enclave recovery is unavailable;
 iOS recovery uses ordinary Keychain or encrypted database signing.
 

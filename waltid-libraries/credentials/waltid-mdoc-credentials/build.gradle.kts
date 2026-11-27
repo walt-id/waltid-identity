@@ -20,7 +20,10 @@ kotlin {
             implementation(kotlin("test"))
         }
         jvmMain.dependencies {
-            implementation(identityLibs.java.cose)
+            implementation(identityLibs.java.cose.get().copy()) {
+                // COSE uses Lombok during its own compilation.
+                exclude(group = "org.projectlombok", module = "lombok")
+            }
         }
         jvmTest.dependencies {
             implementation(identityLibs.bouncycastle.prov)

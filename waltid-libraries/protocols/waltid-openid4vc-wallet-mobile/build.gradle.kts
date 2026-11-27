@@ -57,6 +57,9 @@ kotlin {
                 baseName = "WalletCore"
                 isStatic = true
                 binaryOption("bundleId", "id.walt.wallet.core")
+                if (buildType == NativeBuildType.RELEASE) {
+                    binaryOption("smallBinary", "true")
+                }
                 walletCoreXcFramework.add(this)
             }
 

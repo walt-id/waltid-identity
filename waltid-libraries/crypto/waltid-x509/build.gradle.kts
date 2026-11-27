@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
+
 plugins {
     id("waltid.full.library")
     id("waltid.publish.maven")
@@ -7,6 +9,10 @@ plugins {
 group = "id.walt.crypto"
 
 kotlin {
+    targets.withType<KotlinMultiplatformAndroidLibraryTarget>().configureEach {
+        optimization.consumerKeepRules.file("consumer-rules.pro")
+        optimization.consumerKeepRules.publish = true
+    }
 
     js {
         outputModuleName = "x509"

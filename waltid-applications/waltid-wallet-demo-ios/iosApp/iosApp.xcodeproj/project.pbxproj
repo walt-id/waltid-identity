@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		D1359347622C4BE98C5735D6 /* SettingsDestinationRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBF1E56076E648E8A2D132E0 /* SettingsDestinationRow.swift */; };
+		A18660000000000000000001 /* WalletSDKShared in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDKShared */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A13330000000000000000030 /* WalletSDKKeychainRecovery in Embed Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A13330000000000000000021 /* WalletIssuanceUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13330000000000000000022 /* WalletIssuanceUI.swift */; };
 		A13330000000000000000020 /* WalletSDKKeychainRecovery in Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; };
@@ -28,9 +29,9 @@
         A74900000000000000000001 /* WalletSDKKeychainRecovery in Frameworks */ = {isa = PBXBuildFile; productRef = A74900000000000000000002 /* WalletSDKKeychainRecovery */; };
         14400001AAAA000100000001 /* BiometricRecoverySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14400001AAAA000000000001 /* BiometricRecoverySection.swift */; };
         A74900000000000000000003 /* WalletIdentityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74900000000000000000004 /* WalletIdentityView.swift */; };
-		0221E8E7784E493B08CF5888 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDK */; };
-		2185E0068DD9855D00602730 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
-		71E100012FDAE00000000001 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
+		0221E8E7784E493B08CF5888 /* WalletSDKShared in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDKShared */; };
+		2185E0068DD9855D00602730 /* WalletSDKShared in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDKShared */; };
+		71E100012FDAE00000000001 /* WalletSDKShared in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDKShared */; };
 		71E100022FDAE00000000002 /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
 		A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001AAAA000000000001 /* WalletViewModel.swift */; };
 		A1000002AAAA000100000002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002AAAA000000000002 /* HomeView.swift */; };
@@ -57,7 +58,7 @@
 		A1000462AAAA000100000062 /* DemoReaderTrustSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000462AAAA000000000062 /* DemoReaderTrustSettings.swift */; };
 		A1000463AAAA000100000063 /* DemoClientIdTrust.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000463AAAA000000000063 /* DemoClientIdTrust.swift */; };
 		A1000500AAAA000100000050 /* WalletDemoQRScanner in Frameworks */ = {isa = PBXBuildFile; productRef = A1000501AAAA000000000051 /* WalletDemoQRScanner */; };
-		A7520000000000000000000A /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDK */; };
+		A7520000000000000000000A /* WalletSDKShared in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WalletSDKShared */; };
 		A7520000000000000000000C /* IdentityDocumentProvider.appex in Embed ExtensionKit Extensions */ = {isa = PBXBuildFile; fileRef = A75200000000000000000002 /* IdentityDocumentProvider.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A75200000000000000000011 /* IdentityDocumentRegistrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */; };
 		A75200000000000000000012 /* IdentityDocumentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000013 /* IdentityDocumentProvider.swift */; };
@@ -140,7 +141,10 @@
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
-			files = (A13330000000000000000030 /* WalletSDKKeychainRecovery in Embed Frameworks */,);
+			files = (
+				A18660000000000000000001 /* WalletSDKShared in Embed Frameworks */,
+				A13330000000000000000030 /* WalletSDKKeychainRecovery in Embed Frameworks */,
+			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,7 +281,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				71E100012FDAE00000000001 /* WalletSDK in Frameworks */,
+				71E100012FDAE00000000001 /* WalletSDKShared in Frameworks */,
 				71E100022FDAE00000000002 /* TestHelpers.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -286,7 +290,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A7520000000000000000000A /* WalletSDK in Frameworks */,
+				A7520000000000000000000A /* WalletSDKShared in Frameworks */,
 				A75200000000000000000025 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 				A75200000000000000000044 /* WalletDemoSharingUI in Frameworks */,
 			);
@@ -296,7 +300,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0221E8E7784E493B08CF5888 /* WalletSDK in Frameworks */,
+				0221E8E7784E493B08CF5888 /* WalletSDKShared in Frameworks */,
                 A74900000000000000000001 /* WalletSDKKeychainRecovery in Frameworks */,
 				A75200000000000000000024 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 				B17530000000000000000001 /* WalletDemoBackgroundStatus in Frameworks */,
@@ -326,7 +330,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A13330000000000000000001 /* SnapshotTesting in Frameworks */,
-				2185E0068DD9855D00602730 /* WalletSDK in Frameworks */,
+				2185E0068DD9855D00602730 /* WalletSDKShared in Frameworks */,
 				A13330000000000000000020 /* WalletSDKKeychainRecovery in Frameworks */,
 				A75200000000000000000026 /* WalletDemoIdentityDocumentSupport in Frameworks */,
 				A75200000000000000000045 /* WalletDemoSharingUI in Frameworks */,
@@ -537,7 +541,7 @@
 			);
 			name = iosAppEnterpriseTests;
 			packageProductDependencies = (
-				519D794773D1421EEC9493DE /* WalletSDK */,
+				519D794773D1421EEC9493DE /* WalletSDKShared */,
 			);
 			productName = iosAppEnterpriseTests;
 			productReference = 71E100052FDAE00000000005 /* iosAppEnterpriseTests.xctest */;
@@ -557,7 +561,7 @@
 			);
 			name = IdentityDocumentProvider;
 			packageProductDependencies = (
-				256D4E3F703216DC04F0C650 /* WalletSDK */,
+				256D4E3F703216DC04F0C650 /* WalletSDKShared */,
 				A75200000000000000000022 /* WalletDemoIdentityDocumentSupport */,
 				A75200000000000000000041 /* WalletDemoSharingUI */,
 			);
@@ -582,7 +586,7 @@
 			);
 			name = iosApp;
 			packageProductDependencies = (
-				256D4E3F703216DC04F0C650 /* WalletSDK */,
+				256D4E3F703216DC04F0C650 /* WalletSDKShared */,
                 A74900000000000000000002 /* WalletSDKKeychainRecovery */,
 				A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */,
 				B17530000000000000000002 /* WalletDemoBackgroundStatus */,
@@ -636,7 +640,7 @@
 			packageProductDependencies = (
 				A74900000000000000000002 /* WalletSDKKeychainRecovery */,
 				A13330000000000000000002 /* SnapshotTesting */,
-				519D794773D1421EEC9493DE /* WalletSDK */,
+				519D794773D1421EEC9493DE /* WalletSDKShared */,
 				A75200000000000000000023 /* WalletDemoIdentityDocumentSupport */,
 				A75200000000000000000042 /* WalletDemoSharingUI */,
 				A53800000000000000000003 /* WalletDemoKeyAttestation */,
@@ -1269,7 +1273,8 @@
 		D6B7A3502FD94CC3009C69E7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS";
+				/* Resolve Kotlin types from the wallet framework already loaded by the test host. */
+				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS -Xfrontend -disable-autolink-framework -Xfrontend WalletCore";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1295,7 +1300,8 @@
 		D6B7A3512FD94CC3009C69E7 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS";
+				/* Resolve Kotlin types from the wallet framework already loaded by the test host. */
+				OTHER_SWIFT_FLAGS = "$(inherited) -D WALLET_SDK_APP_HOST_TESTS -Xfrontend -disable-autolink-framework -Xfrontend WalletCore";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1458,15 +1464,15 @@
 			productName = SnapshotTesting;
 		};
         A74900000000000000000002 /* WalletSDKKeychainRecovery */ = {isa = XCSwiftPackageProductDependency; package = 8A81DD79791BBF3F1CFF90A1; productName = WalletSDKKeychainRecovery; };
-		256D4E3F703216DC04F0C650 /* WalletSDK */ = {
+		256D4E3F703216DC04F0C650 /* WalletSDKShared */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
-			productName = WalletSDK;
+			productName = WalletSDKShared;
 		};
-		519D794773D1421EEC9493DE /* WalletSDK */ = {
+		519D794773D1421EEC9493DE /* WalletSDKShared */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
-			productName = WalletSDK;
+			productName = WalletSDKShared;
 		};
 		A1000501AAAA000000000051 /* WalletDemoQRScanner */ = {
 			isa = XCSwiftPackageProductDependency;
