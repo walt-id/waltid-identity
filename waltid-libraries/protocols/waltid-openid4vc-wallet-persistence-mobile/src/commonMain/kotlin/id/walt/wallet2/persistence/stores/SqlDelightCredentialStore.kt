@@ -41,9 +41,14 @@ public class SqlDelightCredentialStore private constructor(
     /** Opens the foreground credential store in the already-open database. */
     public constructor(queries: WalletPersistenceQueries) : this(queries, SqlDelightStatusInventory(queries))
 
+    /** Reads the current unparsed status row for wallet-local [id], or returns null if the credential is absent. */
     @HiddenFromObjC
     override suspend fun readStatusRow(id: String): StoredCredentialStatusRow? = status.readStatusRow(id)
 
+    /**
+     * Reads up to [limit] unparsed status rows in wallet-local ID order, strictly after [afterId].
+     * A null [afterId] starts at the first row. The supported [limit] is 1 through 1,001.
+     */
     @HiddenFromObjC
     override suspend fun statusRows(afterId: String?, limit: Int): List<StoredCredentialStatusRow> =
         status.statusRows(afterId, limit)
