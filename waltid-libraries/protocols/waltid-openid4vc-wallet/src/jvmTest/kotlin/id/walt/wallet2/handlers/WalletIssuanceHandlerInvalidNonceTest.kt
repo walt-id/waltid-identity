@@ -60,7 +60,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
             }
         }
 
-        val response = WalletIssuanceHandler.requestCredentialWithNonceRetry(
+        val response = exchangeCredentialWithNonceRetry(
             request = fetchRequest(),
             nonceEndpoint = NONCE_ENDPOINT,
             httpClient = client,
@@ -68,7 +68,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
                 proofNonces += nonce
                 id.walt.openid4vci.proofs.Proofs(jwt = listOf("proof-for-$nonce"))
             },
-        )
+        ).response
 
         assertEquals(listOf<String?>("stale-nonce", "fresh-nonce"), proofNonces)
         assertEquals(2, nonceRequests)
@@ -100,7 +100,7 @@ class WalletIssuanceHandlerInvalidNonceTest {
         }
 
         val failure = try {
-            WalletIssuanceHandler.requestCredentialWithNonceRetry(
+            exchangeCredentialWithNonceRetry(
                 request = fetchRequest(),
                 nonceEndpoint = NONCE_ENDPOINT,
                 httpClient = client,

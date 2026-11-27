@@ -1990,7 +1990,7 @@ class WalletBatchIssuanceTest {
         val config = Json.decodeFromString<id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata>(batchTestMetadata())
         val selected = fixture.wallet.resolveCredentialSelections(listOf(fixture.selection(5)), listOf("identity"),
             config, fixture.keys.first(), null).single()
-        WalletIssuanceHandler.requestCredentialWithNonceRetry(
+        exchangeCredentialWithNonceRetry(
             FetchCredentialRequest(Url("$BATCH_TEST_ISSUER/credential"), "access", "identity"), "$BATCH_TEST_ISSUER/nonce", http,
             buildProof = { WalletIssuanceHandler.buildProofCollection(fixture.wallet, selected.bindings, config.credentialConfigurationsSupported.getValue("identity"), BATCH_TEST_ISSUER, it, null) })
         assertEquals(listOf(5, 5), collections.map { it.size })
