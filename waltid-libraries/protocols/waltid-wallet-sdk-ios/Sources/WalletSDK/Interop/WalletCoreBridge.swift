@@ -23,7 +23,7 @@ protocol WalletCoreBridge: Sendable {
     func startIssuance(request: IssuanceRequest) async throws -> IssuanceOfferReview
     func resumeIssuance(id: IssuanceSessionID) async throws -> IssuanceOfferReview?
     func beginAuthorizationIssuance(sessionID: String, registration: IssuanceClientRegistration, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?, clientID: String?) async throws -> IssuanceOutcome
+    func continuePreAuthorizedIssuance(sessionID: String, clientID: String?, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
     func completeAuthorization(_ authorizationID: String, callback: URL) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome
@@ -98,8 +98,9 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
 
     func continuePreAuthorizedIssuance(
         sessionID: String,
+        clientID: String?,
         transactionCode: String?,
-        credentials: [IssuanceCredentialSelection]?, clientID: String?
+        credentials: [IssuanceCredentialSelection]?
     ) async throws -> IssuanceOutcome {
         throw unavailableError()
     }

@@ -794,8 +794,9 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.authorizationSelections, [selections])
         XCTAssertEqual(bridge.preAuthorizedSelections, [selections])
         XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.count, 1)
-        XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.0, session.id.rawValue)
-        XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.1, "1234")
+        XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.sessionID, session.id.rawValue)
+        XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.clientID, "ios-client")
+        XCTAssertEqual(bridge.preAuthorizedIssuanceCalls.first?.transactionCode, "1234")
         XCTAssertEqual(bridge.authorizationIssuanceCalls.count, 1)
         XCTAssertEqual(bridge.authorizationIssuanceCalls.first?.0, session.id.rawValue)
         XCTAssertEqual(bridge.authorizationIssuanceCalls.first?.1, callbackURL)
@@ -1383,7 +1384,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var proximitySessionStarts = 0
     private(set) var issuanceRequests: [IssuanceRequest] = []
     private(set) var authorizationStartSessionIDs: [String] = []
-    private(set) var preAuthorizedIssuanceCalls: [(String, String?)] = []
+    private(set) var preAuthorizedIssuanceCalls: [(sessionID: String, clientID: String?, transactionCode: String?)] = []
     private(set) var authorizationIssuanceCalls: [(String, URL)] = []
     private(set) var cancelledIssuanceSessionIDs: [String] = []
     private(set) var resumedDeferredCredentialIDs: [String] = []
@@ -1463,9 +1464,9 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         )
     }
 
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?, clientID: String?) async throws -> IssuanceOutcome {
+    func continuePreAuthorizedIssuance(sessionID: String, clientID: String?, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
         if let error { throw error }
-        preAuthorizedIssuanceCalls.append((sessionID, transactionCode))
+        preAuthorizedIssuanceCalls.append((sessionID, clientID, transactionCode))
         preAuthorizedSelections.append(credentials)
         return issuanceOutcomeResult
     }

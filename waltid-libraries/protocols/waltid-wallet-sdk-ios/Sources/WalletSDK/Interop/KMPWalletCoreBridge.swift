@@ -131,14 +131,15 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
 
     func continuePreAuthorizedIssuance(
         sessionID: String,
+        clientID: String?,
         transactionCode: String?,
-        credentials: [IssuanceCredentialSelection]?, clientID: String?
+        credentials: [IssuanceCredentialSelection]?
     ) async throws -> IssuanceOutcome {
         let result = try await bridge.continuePreAuthorizedIssuance(
             sessionId: sessionID,
+            clientId: clientID,
             transactionCode: transactionCode,
-            credentials: try credentials?.map { try $0.toKMPSelection() },
-            clientId: clientID
+            credentials: try credentials?.map { try $0.toKMPSelection() }
         )
         return try Self.issuanceOutcome(result, operation: "continue pre-authorized issuance")
     }

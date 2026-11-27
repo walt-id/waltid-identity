@@ -403,7 +403,7 @@ extension Wallet {
         clientID: String? = nil
     ) async throws -> IssuanceOutcome {
         try await bridge.continuePreAuthorizedIssuance(
-            sessionID: session.rawValue, transactionCode: transactionCode, credentials: credentials, clientID: clientID
+            sessionID: session.rawValue, clientID: clientID, transactionCode: transactionCode, credentials: credentials
         )
     }
 }

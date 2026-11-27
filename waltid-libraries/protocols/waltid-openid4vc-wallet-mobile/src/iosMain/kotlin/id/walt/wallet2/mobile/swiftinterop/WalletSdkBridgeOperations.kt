@@ -79,9 +79,9 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
+        clientId: String?,
         transactionCode: String?,
         credentials: List<IssuanceCredentialSelection>?,
-        clientId: String?,
     ): WalletIssuanceOutcome
 
     suspend fun completeAuthorization(
