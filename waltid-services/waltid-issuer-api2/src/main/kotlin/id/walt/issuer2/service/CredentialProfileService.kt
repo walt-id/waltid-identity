@@ -79,6 +79,7 @@ class CredentialProfileService(
         idTokenClaimsMapping: Map<String, String>?,
         msoData: MsoData?,
         canUseLoginClaims: Boolean = true,
+        explicitBirthYear: JsonElement? = null,
     ) {
         if (isMdl(configurationId)) {
             MdlAgeValidation.validateConfiguration(
@@ -86,6 +87,7 @@ class CredentialProfileService(
                 mapping = mapping,
                 loginClaimDestinations = if (canUseLoginClaims) idTokenClaimsMapping.orEmpty().values else emptyList(),
                 validFrom = msoData?.validFrom,
+                explicitBirthYear = explicitBirthYear,
             )
         }
     }
@@ -101,7 +103,7 @@ class CredentialProfileService(
             credentialData
         }
 
-    private fun isMdl(configurationId: String): Boolean =
+    internal fun isMdl(configurationId: String): Boolean =
         credentialFormat(configurationId) == CredentialFormat.MSO_MDOC &&
             metadataConfig.credentialConfigurations[configurationId]
                 ?.jsonObject?.get("doctype")?.jsonPrimitive?.content == MdlAge.DOC_TYPE

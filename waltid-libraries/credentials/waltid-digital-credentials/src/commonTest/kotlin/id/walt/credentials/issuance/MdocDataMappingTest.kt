@@ -65,6 +65,27 @@ class MdocDataMappingTest {
     }
 
     @Test
+    fun rejectsInheritedBirthYearWhenResolvedMappingChangesTheBirthDate() = runTest {
+        val credentialData = buildJsonObject {
+            putJsonObject(MdlAge.NAMESPACE) {
+                put(MdlAge.BIRTH_DATE, "1988-08-25")
+                put(MdlAge.AGE_BIRTH_YEAR, 1988)
+            }
+        }
+        val birthDateMapping = buildJsonObject {
+            putJsonObject(MdlAge.NAMESPACE) {
+                put(MdlAge.BIRTH_DATE, "<date-before:365d>")
+            }
+        }
+        val error = assertFailsWith<IllegalArgumentException> {
+            MdocDataMapping.resolve(
+                credentialData, birthDateMapping, MdlAge.DOC_TYPE, validFrom, InstantClock(issuedAt),
+            ) { emptyMap() }
+        }
+        assertContains(error.message.orEmpty(), "credentialData.${MdlAge.NAMESPACE}.age_birth_year must be 2026")
+    }
+
+    @Test
     fun rejectsInvalidAgeWithoutMappingAndLeavesOtherDocTypesAlone() = runTest {
         for (age in listOf(JsonPrimitive(37), JsonPrimitive("39"), JsonNull)) {
             val supplied = buildJsonObject {

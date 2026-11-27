@@ -37,6 +37,7 @@ import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.mdoc.issuance.MsoData
+import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
@@ -463,6 +464,33 @@ class Issuer2MsoDataWalletFlowTest {
             assertTrue(client.listSessions().isEmpty())
             assertEquals(0, savedCodes)
         }
+        val mappedBirthYear = buildJsonObject {
+            putJsonObject(ISO_MDL_NAMESPACE) { put("age_birth_year", 1990) }
+        }
+        for (mapping in listOf(null, mappedBirthYear)) {
+            val conflictingYear = client.post("/issuer2/credential-offers") {
+                contentType(ContentType.Application.Json)
+                setBody(CredentialOfferCreateRequest(
+                    profileId = id,
+                    authMethod = AuthenticationMethod.PRE_AUTHORIZED,
+                    runtimeOverrides = CredentialOfferRuntimeOverrides(
+                        credentialData = buildJsonObject {
+                            putJsonObject(ISO_MDL_NAMESPACE) {
+                                put("birth_date", "1990-08-26")
+                                put("age_birth_year", 1988)
+                            }
+                        },
+                        mapping = mapping,
+                    ),
+                ))
+            }
+            val error = conflictingYear.bodyAsText()
+            assertEquals(HttpStatusCode.BadRequest, conflictingYear.status, error)
+            assertTrue(error.contains("credentialData.$ISO_MDL_NAMESPACE.age_birth_year must be 1990"), error)
+            assertTrue(client.listSessions().isEmpty())
+            assertEquals(0, savedCodes)
+        }
+
         val offer = client.createWalletFlowCredentialOffer(
             scenario = Issuer2CredentialScenarios.isoMdl,
             authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
@@ -487,18 +515,19 @@ class Issuer2MsoDataWalletFlowTest {
         issueMdlWithLoginClaims(wholeNamespace = true)
     }
 
-    private suspend fun ApplicationTestBuilder.issueMdlWithLoginClaims(wholeNamespace: Boolean) {
+    @Test
+    fun authorizedMdlRejectsConflictingBirthYearFromLogin() = testApplication {
+        issueMdlWithLoginClaims(wholeNamespace = false, conflictingBirthYear = 1988)
+    }
+
+    private suspend fun ApplicationTestBuilder.issueMdlWithLoginClaims(
+        wholeNamespace: Boolean,
+        conflictingBirthYear: Int? = null,
+    ) {
         pinMdlIssuanceClock()
         val clientAttestation = createIssuer2ClientAttestationTestMaterial()
-        val claims = buildJsonObject {
-            put("sub", "test-subject")
-            put("birthdate", "1990-08-26")
-            putJsonObject("mdl") {
-                put("given_name", "Jane")
-                put("birth_date", "1990-08-26")
-            }
-        }
-        val idToken = JWKKey.generate(KeyType.secp256r1).signJws(claims.toString().encodeToByteArray())
+        lateinit var loginNamespace: JsonObject
+        val idTokenKey = JWKKey.generate(KeyType.secp256r1)
         val oauth = embeddedServer(CIO, host = "127.0.0.1", port = 0) {
             routing {
                 get("/authorize") {
@@ -511,6 +540,13 @@ class Issuer2MsoDataWalletFlowTest {
                 }
                 post("/token") {
                     assertEquals("local-login", call.receiveParameters()["code"])
+                    val claims = buildJsonObject {
+                        put("sub", "test-subject")
+                        put("birthdate", "1990-08-26")
+                        conflictingBirthYear?.let { put("birthyear", it) }
+                        put("mdl", loginNamespace)
+                    }
+                    val idToken = idTokenKey.signJws(claims.toString().encodeToByteArray())
                     call.respondText(
                         buildJsonObject {
                             put("access_token", "local-access-token")
@@ -527,7 +563,12 @@ class Issuer2MsoDataWalletFlowTest {
             val claimsMapping = if (wholeNamespace) {
                 mapOf("$.mdl" to "$.['$ISO_MDL_NAMESPACE']")
             } else {
-                mapOf("$.birthdate" to """$["$ISO_MDL_NAMESPACE"]["birth_date"]""")
+                buildMap {
+                    put("$.birthdate", """$["$ISO_MDL_NAMESPACE"]["birth_date"]""")
+                    if (conflictingBirthYear != null) {
+                        put("$.birthyear", """$["$ISO_MDL_NAMESPACE"]["age_birth_year"]""")
+                    }
+                }
             }
             installIssuer2WithConfigFiles(
                 configureServiceConfig = { it.copy(clientAuthenticationConfig = clientAttestation.clientAuthenticationConfig) },
@@ -538,11 +579,25 @@ class Issuer2MsoDataWalletFlowTest {
                     val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
                     val profile = config.profiles.getValue(id)
                     val namespace = profile.credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject
+                    loginNamespace = JsonObject(
+                        namespace.filterKeys { !it.startsWith("age_") } + mapOf(
+                            "given_name" to JsonPrimitive("Jane"),
+                            "birth_date" to JsonPrimitive("1990-08-26"),
+                        ),
+                    )
                     val credentialData = if (wholeNamespace) {
                         JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to JsonNull))
                     } else {
-                        val pendingBirthDate = JsonObject(namespace + mapOf("birth_date" to JsonNull, "age_in_years" to JsonPrimitive(36)))
-                        JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to pendingBirthDate))
+                        val pendingBirthDate = if (conflictingBirthYear == null) {
+                            namespace + mapOf(
+                                "birth_date" to JsonNull,
+                                "age_in_years" to JsonPrimitive(36),
+                                "age_birth_year" to JsonPrimitive(1990),
+                            )
+                        } else {
+                            namespace.filterKeys { !it.startsWith("age_") } + ("birth_date" to JsonNull)
+                        }
+                        JsonObject(profile.credentialData + (ISO_MDL_NAMESPACE to JsonObject(pendingBirthDate)))
                     }
                     config.copy(profiles = config.profiles + (id to profile.copy(
                         credentialData = credentialData,
@@ -553,7 +608,11 @@ class Issuer2MsoDataWalletFlowTest {
             )
             val client = apiClient()
             val scenario = Issuer2CredentialScenarios.isoMdl
-            val wallet = Issuer2WalletFlowDriver(client, attestationAssembler = clientAttestation.attestationAssembler)
+            val walletConfig = ClientConfiguration(
+                clientId = "issuer2-wallet-test",
+                redirectUris = listOf("https://wallet.example/callback"),
+            )
+            val wallet = Issuer2WalletFlowDriver(client, walletConfig, clientAttestation.attestationAssembler)
             val offer = client.createWalletFlowCredentialOffer(
                 scenario = scenario,
                 authenticationMethod = AuthenticationMethod.AUTHORIZED,
@@ -575,8 +634,28 @@ class Issuer2MsoDataWalletFlowTest {
             val walletRedirect = client.get(callback).redirectLocation()
             val code = assertNotNull(Url(walletRedirect).parameters["code"], walletRedirect)
             val token = wallet.exchangeAuthorizationCode(resolved, code)
-            val credential = wallet.requestCredential(resolved, token.access_token, includeDidInProof = false)
-            assertSignedBirthDateAndAge(credential, age = if (wholeNamespace) null else 36)
+            if (conflictingBirthYear == null) {
+                val credential = wallet.requestCredential(resolved, token.access_token, includeDidInProof = false)
+                assertSignedBirthDateAndAge(credential, age = if (wholeNamespace) null else 36)
+            } else {
+                val mapped = client.getSession(offer.offerId).issuanceRequests.single()
+                    .credentialData.getValue(ISO_MDL_NAMESPACE).jsonObject
+                assertEquals(JsonPrimitive("1990-08-26"), mapped["birth_date"])
+                assertEquals(JsonPrimitive(conflictingBirthYear), mapped["age_birth_year"])
+                assertTrue("age_in_years" !in mapped)
+                val configurationId = scenario.credentialConfigurationId
+                val proofs = wallet.buildJwtProofs(
+                    resolved.issuerMetadata, configurationId, includeDidInProof = false, clientId = walletConfig.clientId,
+                )
+                val response = client.post(resolved.issuerMetadata.credentialEndpoint) {
+                    bearerAuth(token.access_token)
+                    contentType(ContentType.Application.Json)
+                    setBody(credentialRequest(configurationId, proofs))
+                }
+                val error = response.bodyAsText()
+                assertEquals(HttpStatusCode.InternalServerError, response.status, error)
+                assertTrue(error.contains("server_error"), error)
+            }
         } finally {
             oauth.stop(500, 500)
         }
@@ -600,8 +679,19 @@ class Issuer2MsoDataWalletFlowTest {
         assertEquals(AGE_VALID_FROM, mdocValidityInfo(payload).validFrom)
         val claims = assertNotNull(decodeIssuerSigned(payload).namespaces?.get(ISO_MDL_NAMESPACE))
             .entries.associate { it.value.elementIdentifier to it.value.elementValue }
+        val missing = setOf(
+            "family_name", "given_name", "birth_date", "issue_date", "expiry_date", "issuing_country",
+            "issuing_authority", "document_number", "portrait", "driving_privileges", "un_distinguishing_sign",
+        ) - claims.keys
+        assertTrue(missing.isEmpty(), "Missing mandatory mDL elements: $missing")
         assertEquals(CborString("1990-08-26", 1004uL), claims["birth_date"])
         assertEquals(age?.let { CborInteger(it.toLong()) }, claims["age_in_years"])
+        if (age == null) {
+            assertEquals(CborString("Jane"), claims["given_name"])
+            assertTrue(claims.keys.none { it.startsWith("age_") })
+        } else {
+            assertEquals(CborInteger(1990), claims["age_birth_year"])
+        }
     }
 
     @Test

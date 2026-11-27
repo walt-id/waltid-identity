@@ -1,6 +1,7 @@
 package id.walt.issuer2.service
 
 import id.walt.credentials.issuance.CredentialDataMergeUtils.validateMdocNamespaceMappingShape
+import id.walt.credentials.issuance.MdlAgeValidation
 import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.sdjwt.metadata.type.validateIssuanceInput
 
@@ -17,6 +18,7 @@ import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.openid4vci.CredentialFormat
 import id.walt.mdoc.issuance.MsoData
+import id.walt.mdoc.issuance.MdlAge
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -69,15 +71,24 @@ class CredentialOfferService(
             val issuerKey = overrides?.issuerKey ?: profile.issuerKey
             require(issuerKey.isNotEmpty()) { "issuerKey must not be empty" }
             require(issuerKey["type"] != null) { "issuerKey must contain a key type" }
-            val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
+            val mergedData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
             val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
             val mapping = overrides?.mapping ?: profile.mapping
             val msoData = (profile.msoData ?: MsoData()).merge(overrides?.msoData).takeUnless { it.isEmpty() }
-            try {
+            val credentialData = try {
+                val resolvedData = if (profileService.isMdl(profile.credentialConfigurationId)) {
+                    MdlAgeValidation.reconcileInheritedBirthYear(mergedData, overrides?.credentialData, mapping, overrides?.mapping)
+                } else {
+                    mergedData
+                }
+                val explicitBirthYear = (overrides?.credentialData?.get(MdlAge.NAMESPACE) as? JsonObject)
+                    ?.get(MdlAge.AGE_BIRTH_YEAR)
                 profileService.validateMdlAge(
-                    profile.credentialConfigurationId, credentialData, mapping, idTokenClaimsMapping, msoData,
+                    profile.credentialConfigurationId, resolvedData, mapping, idTokenClaimsMapping, msoData,
                     canUseLoginClaims = request.authMethod == AuthenticationMethod.AUTHORIZED,
+                    explicitBirthYear = explicitBirthYear,
                 )
+                resolvedData
             } catch (e: IllegalArgumentException) {
                 throw BadRequestException(e.message ?: "Invalid mDL age configuration", e)
             }

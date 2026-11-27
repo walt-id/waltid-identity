@@ -227,6 +227,17 @@ class CredentialProfileServiceTest {
     }
 
     @Test
+    fun `validates birth year without age or a fixed validity start`() {
+        mdlProfileService(age = null, birthYear = JsonPrimitive(1988)).getProfile("isoMdl")
+        for (value in listOf(JsonPrimitive(1990), JsonPrimitive("1988"), JsonPrimitive(1988.5), JsonNull)) {
+            val error = assertFailsWith<IllegalArgumentException> {
+                mdlProfileService(age = null, birthYear = value).getProfile("isoMdl")
+            }
+            assertTrue(error.message.orEmpty().contains("credentialData.${MdlAge.NAMESPACE}.age_birth_year"))
+        }
+    }
+
+    @Test
     fun `checks literal mDL age against the UTC date of a fixed validity start`() {
         val validFrom = MsoData(validFrom = "2027-08-25T01:00:00+02:00")
         val valid = mdlProfileService(age = JsonPrimitive(38), msoData = validFrom)
@@ -267,7 +278,8 @@ class CredentialProfileServiceTest {
 
     private fun mdlProfileService(
         birthDate: JsonElement? = JsonPrimitive("1988-08-25"),
-        age: JsonElement = JsonPrimitive(38),
+        age: JsonElement? = JsonPrimitive(38),
+        birthYear: JsonElement? = null,
         msoData: MsoData? = null,
         idTokenClaimsMapping: Map<String, String>? = null,
     ) = serviceWithProfiles(
@@ -276,7 +288,8 @@ class CredentialProfileServiceTest {
             credentialData = buildJsonObject {
                 putJsonObject(MdlAge.NAMESPACE) {
                     birthDate?.let { put("birth_date", it) }
-                    put("age_in_years", age)
+                    age?.let { put("age_in_years", it) }
+                    birthYear?.let { put("age_birth_year", it) }
                 }
             },
             msoData = msoData,

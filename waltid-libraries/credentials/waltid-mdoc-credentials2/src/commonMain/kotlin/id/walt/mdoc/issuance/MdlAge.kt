@@ -14,27 +14,42 @@ object MdlAge {
     const val NAMESPACE = "org.iso.18013.5.1"
     const val BIRTH_DATE = "birth_date"
     const val AGE_IN_YEARS = "age_in_years"
+    const val AGE_BIRTH_YEAR = "age_birth_year"
 
     private val fullDate = Regex("""[0-9]{4}-[0-9]{2}-[0-9]{2}""")
 
-    /** Check the optional age claim on the final mDL namespace before signing. */
+    /** Check the optional age and birth-year claims on the final mDL namespace before signing. */
     fun validate(namespace: JsonObject, validFrom: Instant, namespacePath: String) {
-        val age = namespace[AGE_IN_YEARS] ?: return
-        val agePath = "$namespacePath.$AGE_IN_YEARS"
+        val age = namespace[AGE_IN_YEARS]
+        val birthYear = namespace[AGE_BIRTH_YEAR]
+        if (age == null && birthYear == null) return
+
         val birthDatePath = "$namespacePath.$BIRTH_DATE"
-        requireMatchesBirthDate(
-            age = parseAge(age, agePath),
-            birthDate = parseBirthDate(namespace[BIRTH_DATE], birthDatePath),
-            validFrom = validFrom,
-            agePath = agePath,
-            birthDatePath = birthDatePath,
-        )
+        val birthDate = parseBirthDate(namespace[BIRTH_DATE], birthDatePath)
+        birthYear?.let {
+            val path = "$namespacePath.$AGE_BIRTH_YEAR"
+            requireMatchesBirthYear(parseBirthYear(it, path), birthDate, path)
+        }
+        age?.let {
+            val path = "$namespacePath.$AGE_IN_YEARS"
+            requireMatchesBirthDate(parseAge(it, path), birthDate, validFrom, path, birthDatePath)
+        }
     }
 
-    fun parseAge(value: JsonElement, path: String): UInt {
-        val age = (value as? JsonPrimitive)?.takeUnless { it.isString }?.content?.toUIntOrNull()
-        require(age != null) { "$path must be a nonnegative integer" }
-        return age
+    fun parseAge(value: JsonElement, path: String): UInt = parseUnsignedClaim(value, path)
+
+    fun parseBirthYear(value: JsonElement, path: String): UInt = parseUnsignedClaim(value, path)
+
+    private fun parseUnsignedClaim(value: JsonElement, path: String): UInt {
+        val number = (value as? JsonPrimitive)?.takeUnless { it.isString }?.content?.toUIntOrNull()
+        require(number != null) { "$path must be a nonnegative integer" }
+        return number
+    }
+
+    fun requireMatchesBirthYear(birthYear: UInt, birthDate: LocalDate, path: String) {
+        require(birthYear == birthDate.year.toUInt()) {
+            "$path must be ${birthDate.year} for the birth_date"
+        }
     }
 
     fun parseBirthDate(value: JsonElement?, path: String): LocalDate {

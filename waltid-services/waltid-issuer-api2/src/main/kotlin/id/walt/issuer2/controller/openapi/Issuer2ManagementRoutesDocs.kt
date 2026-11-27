@@ -114,6 +114,10 @@ object Issuer2ManagementRoutesDocs {
               runtime overrides. The issuer checks it against the final `birth_date` and the UTC date of MSO
               `validFrom` before signing. Offers with fixed values are also checked at creation.
               Leave `msoData.validFrom` unset in the profile and offer to start validity at the MSO signing timestamp.
+            - If an offer changes the mDL birth date and inherits `age_birth_year`, a literal birth date updates
+              the inherited year. A conflicting explicit year returns HTTP 400 when the birth date is known.
+              Before signing, Issuer2 checks any supplied year against the final birth date, even when
+              `age_in_years` is omitted.
             - Non-empty `runtimeOverrides.msoData` is accepted only for `mso_mdoc`. Blank validity values are rejected.
               Null `expectedUpdate` clears the profile value; null `validFrom` or `validUntil` inherits it.
             - Validity must satisfy `signed <= validFrom < validUntil`. `expectedUpdate` is optional;
