@@ -1,7 +1,7 @@
-export const PID_CONFIGURATION_IDS = [
-  "eu.europa.ec.eudi.pid.1",
-  "urn:eudi:pid:1",
-] as const;
+const PID_DOCTYPE = "eu.europa.ec.eudi.pid.1";
+const PID_VCT = "urn:eudi:pid:1";
+const LEGACY_DEMO_PID_VCT = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1";
+export const PID_CONFIGURATION_IDS = [PID_DOCTYPE, PID_VCT] as const;
 
 interface IssuerCredentialClaim {
   path?: string[];
@@ -59,20 +59,10 @@ export function isPidConfiguration(
   configuration?: IssuerMetadataForDcql,
   configurationId?: string,
 ): boolean {
-  if (
-    configurationId &&
-    (PID_CONFIGURATION_IDS as readonly string[]).includes(configurationId)
-  ) {
-    return true;
+  if (configuration?.format === "dc+sd-jwt" || configuration?.vct !== undefined) {
+    return configuration.vct === PID_VCT || configuration.vct === LEGACY_DEMO_PID_VCT;
   }
-  const doctype = configuration?.doctype;
-  const vct = configuration?.vct;
-  return (
-    doctype === "eu.europa.ec.eudi.pid.1" ||
-    configurationId === "eu.europa.ec.eudi.pid.1" ||
-    (typeof vct === "string" && vct.includes("urn:eudi:pid:1")) ||
-    configurationId === "urn:eudi:pid:1"
-  );
+  return configuration?.doctype === PID_DOCTYPE || PID_CONFIGURATION_IDS.some((id) => id === configurationId);
 }
 
 export function isMdocConfiguration(
