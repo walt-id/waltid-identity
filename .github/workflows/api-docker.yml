@@ -121,33 +121,27 @@ jobs:
             --arg identity "$(git -C waltid-identity rev-parse HEAD)" \
             --arg enterprise "$(git -C waltid-identity-enterprise rev-parse HEAD)" \
             --arg license "$(git -C waltid-identity-enterprise-license rev-parse HEAD)" \
-            --arg invocation "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
-            'def source($repo; $sha):
-               if ($sha | test("^[0-9a-f]{40}$")) then
-                 {uri: ("git+https://github.com/walt-id/" + $repo + ".git"), digest: {gitCommit: $sha}}
-               else error("Missing checkout commit for " + $repo) end;
-             {
-               buildDefinition: {
-                 buildType: "https://github.com/walt-id/waltid-identity/blob/main/.github/workflows/api-docker.yml",
-                 externalParameters: {version: $version, gradleTask: $task},
-                 resolvedDependencies: [
-                   source("waltid-unified-build"; $unified), source("waltid-identity"; $identity),
-                   source("waltid-identity-enterprise"; $enterprise), source("waltid-identity-enterprise-license"; $license)
-                 ]
-               },
-               runDetails: {
-                 builder: {id: "https://github.com/actions/runner/github-hosted"},
-                 metadata: {invocationId: $invocation}
-               }
-             }' > "$RUNNER_TEMP/jib-provenance.json"
+            '{version: $version, gradleTask: $task, checkoutRefs: {
+                unified: $unified, identity: $identity, enterprise: $enterprise, enterprise_license: $license
+             }} | if all(.checkoutRefs[]; test("^[0-9a-f]{40}$")) then .
+                  else error("Missing checkout commit for the Jib build") end' > "$RUNNER_TEMP/jib-build-inputs.json"
       - name: Attest the published image digest
         if: ${{ inputs.attest-provenance }}
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-name: docker.io/waltid/${{ matrix.image }}
           subject-digest: ${{ steps.provenance.outputs.digest }}
-          predicate-type: https://slsa.dev/provenance/v1
-          predicate-path: ${{ runner.temp }}/jib-provenance.json
+          push-to-registry: true
+          create-storage-record: false
+
+      - name: Attest the Jib build inputs for the same digest
+        if: ${{ inputs.attest-provenance }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: docker.io/waltid/${{ matrix.image }}
+          subject-digest: ${{ steps.provenance.outputs.digest }}
+          predicate-type: https://github.com/walt-id/waltid-identity/blob/main/.github/workflows/api-docker.yml#jib-build-inputs-v1
+          predicate-path: ${{ runner.temp }}/jib-build-inputs.json
           push-to-registry: true
           create-storage-record: false
 
