@@ -11,9 +11,7 @@ fun roundedMdocValidity(
     validFrom: Instant?,
     validUntil: Instant?,
 ): ValidityInfo {
-    // Round down to 12-hour UTC windows to reduce linkability.
-    val windowSeconds = 43_200L
-    val base = Instant.fromEpochSeconds(now.epochSeconds.floorDiv(windowSeconds) * windowSeconds)
+    val base = roundMdocTimestampDownToTwelveHours(now)
     // A newly valid certificate must not appear to have signed before its validity began.
     val signed = truncateMdocTDate(maxOf(base, certificateValidity.notBefore.ceilToSecond()))
     return ValidityInfo(
@@ -22,6 +20,12 @@ fun roundedMdocValidity(
         validFrom = truncateMdocTDate(validFrom ?: signed),
         validUntil = truncateMdocTDate(validUntil ?: (base + 365.days)),
     )
+}
+
+/** Round down to a 12-hour UTC boundary to reduce linkability. */
+fun roundMdocTimestampDownToTwelveHours(instant: Instant): Instant {
+    val windowSeconds = 43_200L
+    return Instant.fromEpochSeconds(instant.epochSeconds.floorDiv(windowSeconds) * windowSeconds)
 }
 
 fun requireMdocSignedWithinCertificateValidity(signed: Instant, validity: X509Certificate.Validity) {

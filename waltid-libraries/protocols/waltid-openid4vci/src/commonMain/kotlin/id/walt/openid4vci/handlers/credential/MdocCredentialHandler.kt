@@ -269,6 +269,7 @@ class MdocCredentialHandler(
                 fallbackValidUntil = validUntil ?: defaultValidUntil,
                 clock = InstantClock(issuedAt),
                 requireExpectedUpdateWithinWindow = requireExpectedUpdateWithinWindow,
+                roundTimestampFunctions = roundValidityToTwelveHours,
             )
         } else {
             MsoValidityResolver.resolve(

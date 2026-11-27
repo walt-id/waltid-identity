@@ -116,7 +116,7 @@ class Issuer2MsoDataWalletFlowTest {
 
     @OptIn(ExperimentalSerializationApi::class)
     @Test
-    fun issuedMdocUsesRuntimeMsoDataFunctions() = testApplication {
+    fun issuedMdocRoundsRuntimeMsoDataFunctions() = testApplication {
         val now = Clock.System.now()
         val payload = issueIsoMdlCredential(
             CredentialOfferRuntimeOverrides(
@@ -137,8 +137,12 @@ class Issuer2MsoDataWalletFlowTest {
 
         val validity = signed.decodeMobileSecurityObject().validityInfo
         assertTrue(validity.validFrom - now in (-2.days..2.days))
+        assertEquals(validity.signed, validity.validFrom)
+        assertTwelveHourUtcBoundary(validity.validUntil)
         assertTrue(validity.validUntil - validity.validFrom in (364.days..366.days))
-        assertTrue(assertNotNull(validity.expectedUpdate) - validity.validFrom in (179.days..181.days))
+        val expectedUpdate = assertNotNull(validity.expectedUpdate)
+        assertTwelveHourUtcBoundary(expectedUpdate)
+        assertTrue(expectedUpdate - validity.validFrom in (179.days..181.days))
     }
 
     @Test
@@ -699,11 +703,11 @@ class Issuer2MsoDataWalletFlowTest {
     }
 
     @Test
-    fun validityUsesRecordedSigningTimeAndTemplatesUseWalletClaimTime() = testApplication {
+    fun msoTimestampsRoundIndependentlyOfCredentialDataFunctions() = testApplication {
         val claimTime = Instant.parse("2026-11-27T14:00:00Z")
         val recordedSigned = Instant.parse("2026-11-27T12:00:00Z")
         val explicitStart = Instant.parse("2026-11-27T13:00:00Z")
-        val expectedUpdate = Instant.parse("2026-11-28T14:00:00Z")
+        val expectedUpdate = recordedSigned + 1.days
         pinMdlIssuanceClock(claimTime)
         installIssuer2WithConfigFiles(configureProfilesConfig = { config ->
             val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
@@ -723,7 +727,7 @@ class Issuer2MsoDataWalletFlowTest {
         }
         val variants = listOf(
             Triple(MsoData(), recordedSigned, expectedUpdate),
-            Triple(MsoData(validFrom = "<timestamp>"), claimTime, expectedUpdate),
+            Triple(MsoData(validFrom = "<timestamp>"), recordedSigned, expectedUpdate),
             Triple(MsoData(validFrom = explicitStart.toString(), expectedUpdateCleared = true), explicitStart, null),
         )
         for ((override, expectedStart, expectedHint) in variants) {
@@ -732,19 +736,23 @@ class Issuer2MsoDataWalletFlowTest {
             )
             val validity = mdocValidityInfo(payload)
             assertEquals(recordedSigned, validity.signed)
-            assertEquals(claimTime + 365.days, validity.validUntil)
+            assertEquals(recordedSigned + 365.days, validity.validUntil)
             assertEquals(expectedHint, validity.expectedUpdate)
             assertSignedBirthDateAndAge(payload, expectedValidFrom = expectedStart)
         }
     }
 
     @Test
-    fun issuedMdocUsesProfileMsoDataWhenOfferOmitsOverrides() = testApplication {
+    fun issuedMdocRoundsConfiguredProfileMsoData() = testApplication {
         val now = Clock.System.now()
-        val validity = issueIsoMdl(configureProfiles = withIsoMdlMsoData())
+        val validity = issueIsoMdl()
         assertTrue(validity.validFrom - now in (-2.days..2.days))
+        assertEquals(validity.signed, validity.validFrom)
+        assertTwelveHourUtcBoundary(validity.validUntil)
         assertTrue(validity.validUntil - validity.validFrom in (364.days..366.days))
-        assertTrue(assertNotNull(validity.expectedUpdate) - validity.validFrom in (179.days..181.days))
+        val expectedUpdate = assertNotNull(validity.expectedUpdate)
+        assertTwelveHourUtcBoundary(expectedUpdate)
+        assertTrue(expectedUpdate - validity.validFrom in (179.days..181.days))
     }
 
     @Test

@@ -122,8 +122,9 @@ object Issuer2ManagementRoutesDocs {
             - Data functions use the wallet's claim time. Validity must satisfy `signed <= validFrom < validUntil`
               using the timestamps recorded in the MSO. `expectedUpdate` is optional;
               this issuer does not require it to fall within that window.
-            - Without a configured `validUntil`, the default is 365 days, rounded to a 12-hour UTC bucket
-              when rounding is enabled. Explicit `validUntil` timestamps and resolved data functions are not rounded.
+            - Issuer2 rounds generated `msoData` timestamps and the default 365-day expiry down to 12-hour UTC
+              boundaries. A generated `validFrom` in the signing window starts at the recorded signing time
+              if the signer certificate became valid partway through that window. Literal dates retain second precision.
 
             See [MSO validity configuration](https://docs.walt.id/community-stack/issuer2/configurations/config-files/issuer-profiles#mso-validity-msodata).
 

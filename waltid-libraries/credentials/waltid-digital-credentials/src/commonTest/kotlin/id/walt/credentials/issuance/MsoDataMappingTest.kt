@@ -34,6 +34,7 @@ class MsoDataMappingTest {
         val resolved = MsoDataMapping.resolve(
             MsoData(validFrom = validFrom, validUntil = validUntil, expectedUpdate = expectedUpdate),
             signed,
+            roundTimestampFunctions = true,
         )
 
         assertEquals(signed.epochSeconds, resolved.validFrom?.epochSeconds)
@@ -44,7 +45,7 @@ class MsoDataMappingTest {
 
     @Test
     fun `resolves timestamp data functions for all three fields`() = runTest {
-        val signed = Instant.parse("2026-09-03T12:00:00Z")
+        val signed = Instant.parse("2026-09-03T19:18:10Z")
         val resolved = MsoDataMapping.resolve(
             MsoData(
                 validFrom = "<timestamp>",
@@ -59,6 +60,27 @@ class MsoDataMappingTest {
         assertEquals(signed.epochSeconds, validFrom.epochSeconds)
         assertEquals(signed.plus(365.days).epochSeconds, resolved.validUntil?.epochSeconds)
         assertEquals(signed.plus(180.days).epochSeconds, resolved.expectedUpdate?.epochSeconds)
+    }
+
+    @Test
+    fun `rounds timestamp functions without moving validFrom before signed`() = runTest {
+        val windowStart = Instant.parse("2026-09-03T12:00:00Z")
+        val signed = Instant.parse("2026-09-03T14:10:05Z")
+        val claimTime = Instant.parse("2026-09-03T19:18:10Z")
+        val resolved = MsoDataMapping.resolve(
+            MsoData(
+                validFrom = "<timestamp-seconds>",
+                validUntil = "<timestamp-in:365d>",
+                expectedUpdate = "<timestamp-in-seconds:180d>",
+            ),
+            signed,
+            clock = InstantClock(claimTime),
+            roundTimestampFunctions = true,
+        )
+
+        assertEquals(signed, resolved.validFrom)
+        assertEquals(windowStart + 365.days, resolved.validUntil)
+        assertEquals(windowStart + 180.days, resolved.expectedUpdate)
     }
 
     @Test
