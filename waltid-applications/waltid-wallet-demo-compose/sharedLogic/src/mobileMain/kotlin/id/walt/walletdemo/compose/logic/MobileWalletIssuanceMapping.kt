@@ -80,6 +80,9 @@ fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOutcome =
             failedTargetCount = if (failure == null) 0 else 1,
             notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
             offerConsumed = !error.canRetryOffer,
+            remainingSigningTargets = failure?.takeIf { signingApprovalRequired }?.let { stopped ->
+                (listOf(stopped.target) + stopped.notAttempted).map { it.credentialConfigurationId }
+            }.orEmpty(),
             kind = when (error.code) {
                 WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN -> WalletDemoIssuanceFailureKind.RemoteOutcomeUncertain
                 WalletIssuanceErrorCode.STORAGE_OUTCOME_UNCERTAIN -> WalletDemoIssuanceFailureKind.StorageOutcomeUncertain

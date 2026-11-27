@@ -71,7 +71,8 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>) =
         wallet().beginAuthorizationIssuance(sessionId, credentials)
 
-
+    override suspend fun approveSigning(sessionId: String) = wallet().approveSigning(sessionId)
+    override suspend fun declineSigning(sessionId: String) = wallet().declineSigning(sessionId)
     override suspend fun listDeferredIssuance() = wallet().listDeferredIssuance()
 
     override suspend fun continuePreAuthorizedIssuance(sessionId: String, transactionCode: String?, credentials: List<WalletDemoCredentialSelection>) =

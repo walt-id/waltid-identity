@@ -125,5 +125,5 @@ private fun issuanceProgressSummary(saved: Int, pending: Int, failed: Int = 0, n
     "Saved credentials: $saved. Pending targets: $pending." +
         if (failed > 0) " Failed targets: $failed. Not attempted: $notAttempted." else ""
 
-internal fun WalletDemoIssuanceOutcome.Failed.messageWithProgress(): String =
+fun WalletDemoIssuanceOutcome.Failed.messageWithProgress(): String =
     partialProgressSummary()?.let { "$message\n$it" } ?: message

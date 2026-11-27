@@ -45,6 +45,7 @@ val WalletDemoUiState.offerReviewEnabled: Boolean
 val WalletDemoUiState.acceptOfferEnabled: Boolean
     get() {
         val preview = offerPreview ?: return false
+        if (preview.awaitingSigning) return offerReviewEnabled
         return offerReviewEnabled && (preview.transactionCode?.accepts(requestDrafts.txCode) ?: true) &&
             preview.offeredCredentials.any { (issuanceCopyCounts[it.configurationId] ?: 1) > 0 } &&
             issuanceSelectionFitsHolderBudget(preview, issuanceCopyCounts)

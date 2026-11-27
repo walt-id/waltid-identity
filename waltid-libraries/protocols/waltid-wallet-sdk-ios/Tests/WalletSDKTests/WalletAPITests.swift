@@ -1483,6 +1483,9 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         return issuanceOutcomeResult
     }
 
+    func retryIssuanceSigning(sessionID: String) async throws -> IssuanceOutcome { throw WalletError.invalidInput("Unexpected signing retry") }
+    func declineIssuanceSigning(sessionID: String) async throws -> IssuanceOutcome { throw WalletError.invalidInput("Unexpected signing decline") }
+
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
         if let error { throw error }
         cancelledIssuanceSessionIDs.append(sessionID)

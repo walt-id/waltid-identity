@@ -82,6 +82,7 @@ kotlin {
         }
         commonTest {
             kotlin.srcDir("src/scaTestFixtures/kotlin")
+            kotlin.srcDir("src/issuanceTestFixtures/kotlin")
             kotlin.srcDir("../../sdjwt/waltid-sdjwt/src/typeMetadataTestFixtures/kotlin")
             kotlin.srcDir("../../credentials/waltid-mdoc-proximity/src/commonTestFixtures/kotlin")
             kotlin.srcDir("../../crypto/waltid-x509/src/commonTestFixtures/kotlin")
@@ -208,6 +209,8 @@ kotlin {
                 defaultSourceSet {
                     dependsOn(iosProductionSources)
                     kotlin.srcDir("src/iosBridgeFixtures/kotlin")
+                    kotlin.srcDir("src/issuanceTestFixtures/kotlin")
+                    dependencies { implementation(identityLibs.ktor.client.mock) }
                 }
             }
             binaries.framework("bridgeFixtures", listOf(NativeBuildType.RELEASE)) {

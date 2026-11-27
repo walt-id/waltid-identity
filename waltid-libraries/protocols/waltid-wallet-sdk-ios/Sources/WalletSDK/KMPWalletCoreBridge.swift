@@ -18,6 +18,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     var signingIdentityCore: any SigningIdentityCore { KMPSigningIdentityCore(bridge: bridge) }
     private let nfcHost = IOSNfcHostPlatformAdapter()
 
+    init(bridge: WalletSdkBridge) { self.bridge = bridge }
+
     init(configuration: WalletConfiguration) async throws {
         WalletCoreRuntime.initializeIfNeeded()
         let result = try await WalletSdkBridgeFactory(
@@ -158,6 +160,15 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             callbackUri: callbackURI.absoluteString
         )
         return try Self.issuanceOutcome(result, operation: "continue authorization issuance")
+    }
+
+    func retryIssuanceSigning(sessionID: String) async throws -> IssuanceOutcome {
+        let result = try await bridge.retryIssuanceSigning(sessionId: sessionID)
+        return try Self.issuanceOutcome(result, operation: "retry issuance signing")
+    }
+    func declineIssuanceSigning(sessionID: String) async throws -> IssuanceOutcome {
+        let result = try await bridge.declineIssuanceSigning(sessionId: sessionID)
+        return try Self.issuanceOutcome(result, operation: "decline issuance signing")
     }
 
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
@@ -1390,7 +1401,8 @@ extension Waltid_openid4vc_walletWalletIssuanceOutcome {
                     code: value.error.code.toSwiftIssuanceErrorCode(),
                     message: value.error.message,
                     targetFailure: value.failure?.toSwiftTargetFailure(),
-                    canRetryOffer: value.error.canRetryOffer
+                    canRetryOffer: value.error.canRetryOffer,
+                    signingApprovalRequired: value.signingApprovalRequired
                 ),
                 storedCredentialIDs: swiftArray(value.storedCredentialIds, of: String.self),
                 deferredCredentials: swiftArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletIssuanceContinuation.self)

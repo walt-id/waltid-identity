@@ -2090,6 +2090,28 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun dismissedSigningOffersOnlyAnExplicitApproval() = runTest {
+        val wallet = FakeDemoWallet(preAuthorizedOutcome = WalletDemoIssuanceOutcome.Failed(
+            "Signing was dismissed", storedCredentialIds = listOf("saved"), remainingSigningTargets = listOf("remaining")))
+        val controller = unlockedControllerWith(wallet, this)
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.previewOffer()
+        runCurrent()
+        controller.acceptOffer()
+        runCurrent()
+        assertEquals(listOf("remaining"), controller.state.value.offerPreview?.signingReview?.remainingSigningTargets)
+        assertEquals(listOf("saved"), controller.state.value.lastReceivedCredentialIds)
+        assertTrue(controller.state.value.acceptOfferEnabled)
+        assertEquals(0, wallet.signingApprovals)
+        wallet.credentials = listOf(sampleCredential)
+        controller.acceptOffer()
+        runCurrent()
+        assertEquals(1, wallet.receiveCalls)
+        assertEquals(1, wallet.signingApprovals)
+        assertNull(controller.state.value.offerPreview)
+    }
+
+    @Test
     fun rejectedTransactionCodeRetainsReviewAndCorrectedCodeIsSubmittedOnce() = runTest {
         val wallet = FakeDemoWallet(
             offerResolution = offerPreview(transactionCode = textTransactionCode()),
@@ -4437,6 +4459,11 @@ private class FakeDemoWallet(
     var resolvedOfferUrl: String? = null
     val receivedTxCodes = mutableListOf<String?>()
     val receivedTxCode: String? get() = receivedTxCodes.lastOrNull()
+    var signingApprovals = 0
+    override suspend fun approveSigning(sessionId: String): WalletDemoIssuanceOutcome {
+        signingApprovals++
+        return WalletDemoIssuanceOutcome.Stored(listOf("cred-1"))
+    }
     var receiveCalls = 0
     val receivedIssuanceSelections = mutableListOf<List<WalletDemoCredentialSelection>>()
     var previewedRequestUrl: String? = null

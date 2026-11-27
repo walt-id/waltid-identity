@@ -89,6 +89,9 @@ class DigitalCredentialCreateModelTest {
 
     @Test fun browserReturnUsesTheSameBatchAndIgnoresUnrelatedOrDuplicateCallbacks() = runTest(dispatcher) {
         val client = Client(WalletDemoIssuanceGrant.AuthorizationCode)
+        client.outcome = WalletDemoIssuanceOutcome.Failed(
+            "Signing was dismissed", storedCredentialIds = listOf("first"), remainingSigningTargets = listOf("mdl"),
+        )
         val model = model(client)
         val host = Robolectric.buildActivity(FragmentActivity::class.java).setup()
         model.attach(host.get())
@@ -108,7 +111,16 @@ class DigitalCredentialCreateModelTest {
         runCurrent()
         assertEquals(1, client.callbacks)
         assertEquals(0, client.accepts)
-        assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state)
+        val review = assertIs<WalletDemoOfferCreateUiState.Review>(model.state)
+        assertEquals(listOf("mdl"), review.preview.signingReview?.remainingSigningTargets)
+        assertEquals(listOf("first"), review.preview.signingReview?.storedCredentialIds)
+        assertTrue(review.errorMessage.orEmpty().contains("Saved credentials: 1"))
+        assertEquals(0, client.signingApprovals)
+        client.outcome = WalletDemoIssuanceOutcome.Stored(listOf("first", "second"))
+        model.accept(null, emptyMap()); runCurrent()
+        assertEquals(1, client.callbacks)
+        assertEquals(1, client.signingApprovals)
+        assertEquals(listOf("first", "second"), assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state).receivedIds.toList())
         val resume = assertNotNull(shadowOf(host.get()).nextStartedActivity)
         assertEquals(DigitalCredentialCreateActivity::class.java.name, resume.component?.className)
         assertEquals(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP, resume.flags)
@@ -116,6 +128,22 @@ class DigitalCredentialCreateModelTest {
         model.done(); assertNotNull(model.takeResult())
         store.clear(); runCurrent()
         host.pause().stop().destroy()
+    }
+
+    @Test fun decliningSigningKeepsPreviouslyReturnedDeliveryHandles() = runTest(dispatcher) {
+        val client = Client()
+        val pending = WalletDemoDeferredCredential("earlier", "pid", 5)
+        client.outcome = WalletDemoIssuanceOutcome.Failed("Signing dismissed", deferredCredentials = listOf(pending),
+            remainingSigningTargets = listOf("mdl"))
+        val model = model(client)
+        model.start(Intent(), false); runCurrent()
+        model.accept("1234", mapOf("pid" to 1, "mdl" to 1)); runCurrent()
+        val review = assertIs<WalletDemoOfferCreateUiState.Review>(model.state)
+        assertEquals(listOf(pending.id), review.preview.signingReview?.deferredCredentials?.map { it.id })
+        model.cancel()
+        store.clear(); runCurrent()
+        assertEquals(1, client.signingDeclines)
+        assertEquals(0, client.cancels)
     }
 
     @Test fun refreshDoesNotRepeatIssuanceAndUncertainWorkCannotBeResumed() = runTest(dispatcher) {
@@ -242,6 +270,13 @@ class DigitalCredentialCreateModelTest {
             return WalletIssuanceAuthorization("https://issuer.example/authorize", "expected", "openid://", WalletIssuancePkceState("challenge", "S256"), false)
         }
         override suspend fun continueAuthorization(id: String, callback: String): WalletDemoIssuanceOutcome { callbacks++; return outcome }
+        var signingApprovals = 0
+        override suspend fun approveSigning(id: String): WalletDemoIssuanceOutcome {
+            signingApprovals++
+            return outcome
+        }
+        override suspend fun declineSigning(id: String): WalletDemoIssuanceOutcome { signingDeclines++; return WalletDemoIssuanceOutcome.Cancelled }
+        var signingDeclines = 0
         override suspend fun cancel(id: String) { cancels++ }
         override suspend fun resume(id: String): WalletDemoIssuanceOutcome { resumes++; return outcome }
         override suspend fun credentials(): List<WalletDemoCredential> { check(!credentialsFail); return saved }

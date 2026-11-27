@@ -48,22 +48,27 @@ internal fun ReceiveTab(
                     reviewEnabled = state.offerReviewEnabled,
                     onAccept = onAcceptOffer,
                     onDecline = onDeclineOffer,
+                    awaitingSigning = preview.awaitingSigning,
                 )
             },
         ) {
             feedback?.invoke()
-            OfferReviewSection(
-                preview = preview,
-                acceptEnabled = state.acceptOfferEnabled,
-                reviewEnabled = state.offerReviewEnabled,
-                txCode = requestDrafts.txCode,
-                onTxCodeChange = onTxCodeChange,
-                copies = state.issuanceCopyCounts,
-                onCopiesChange = onCopiesChange,
-                onAccept = onAcceptOffer,
-                onDecline = onDeclineOffer,
-                showActions = false,
-            )
+            if (preview.awaitingSigning) {
+                SigningReviewContent(preview, state.issuanceCopyCounts)
+            } else {
+                OfferReviewSection(
+                    preview = preview,
+                    acceptEnabled = state.acceptOfferEnabled,
+                    reviewEnabled = state.offerReviewEnabled,
+                    txCode = requestDrafts.txCode,
+                    onTxCodeChange = onTxCodeChange,
+                    copies = state.issuanceCopyCounts,
+                    onCopiesChange = onCopiesChange,
+                    onAccept = onAcceptOffer,
+                    onDecline = onDeclineOffer,
+                    showActions = false,
+                )
+            }
         }
         return
     }

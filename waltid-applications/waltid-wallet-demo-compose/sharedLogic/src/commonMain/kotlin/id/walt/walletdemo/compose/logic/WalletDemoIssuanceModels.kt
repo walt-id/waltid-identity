@@ -77,6 +77,7 @@ sealed interface WalletDemoIssuanceOutcome {
         val storedCredentialIds: List<String> = emptyList(),
         val deferredCredentials: List<WalletDemoDeferredCredential> = emptyList(),
         val offerConsumed: Boolean = false,
+        val remainingSigningTargets: List<String> = emptyList(),
         val failedTargetCount: Int = 0,
         val notAttemptedTargetCount: Int = 0,
         val kind: WalletDemoIssuanceFailureKind = WalletDemoIssuanceFailureKind.General,

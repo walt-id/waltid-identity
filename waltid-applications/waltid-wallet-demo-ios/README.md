@@ -40,7 +40,7 @@ Receiving uses full artwork for a single credential and compact rows for multipl
 
 Offer review lets users select credential configurations and explicitly request copies up to the issuer's advertised limit. Every configuration defaults to one copy. Additional holder keys are created only after acceptance, and the same choices are passed to pre-authorized and browser authorization flows. The Wallet SDK retains each credential's holder-key association for presentation.
 
-Saved credentials remain visible when other targets are deferred or fail. Deferred handles are restored when reopening the wallet and can be polled individually from Receive. A failure after target processing consumes the reviewed offer; it does not offer a retry of the already spent grant.
+Saved credentials remain visible when other targets are deferred or fail. Deferred handles are restored when reopening the wallet and can be polled individually from Receive. After a dismissed signing prompt, **Approve signing** resumes the remaining selection on the same session.
 
 The receive status summarizes saved credentials and pending targets. When a target fails,
 it also shows the failed and not-attempted target counts. A target can yield multiple

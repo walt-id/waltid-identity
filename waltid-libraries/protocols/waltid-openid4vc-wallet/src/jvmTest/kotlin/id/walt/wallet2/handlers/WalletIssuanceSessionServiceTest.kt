@@ -18,6 +18,12 @@ import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key as Crypto2Key
+import id.walt.did.dids.Crypto2DidService
+import id.walt.did.dids.DidService
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.Signer
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
@@ -2793,6 +2799,163 @@ class WalletIssuanceSessionServiceTest {
         headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
     )
 
+    @Test fun approvingSigningResumesOnlyTheRemainingAcceptedTarget() = runTest {
+        val attempt = dismissSigning(targets = listOf("first", "second"))
+        val original = attempt.failure.storedCredentialIds.single()
+        assertIs<WalletIssuanceOutcome.Failed>(attempt.open().continuePreAuthorized(attempt.id))
+        val receipt = assertIs<WalletIssuanceOutcome.Stored>(attempt.open().retrySigning(attempt.id))
+        assertEquals(original, receipt.credentialIds.first())
+        assertEquals(2, receipt.credentialIds.distinct().size)
+        assertEquals(receipt.credentialIds, attempt.credentials.credentials.map { it.id })
+        assertIs<WalletIssuanceOutcome.Failed>(attempt.open().retrySigning(attempt.id))
+        assertEquals(2, attempt.requests)
+    }
+
+    @Test fun onlyOneWalletCanApproveSigningAfterBrowserAuthorization() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val attempt = dismissSigning(browser = true) { started.complete(Unit); release.await() }
+        val owner = async { attempt.open().retrySigning(attempt.id) }
+        started.await()
+        try {
+            assertTrue(attempt.records.records.values.none { "retained" in it.payload })
+            val competing = assertIs<WalletIssuanceOutcome.Failed>(attempt.open().retrySigning(attempt.id))
+            assertEquals(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN, competing.error.code)
+        } finally {
+            release.complete(Unit)
+        }
+        assertIs<WalletIssuanceOutcome.Stored>(owner.await())
+        assertEquals(1, attempt.requests)
+    }
+
+    @Test fun decliningTwiceOrAfterTheReviewDeadlinePreservesEarlierDeferredDelivery() = runTest {
+        for (late in listOf(false, true)) {
+            val attempt = dismissSigning(listOf("first", "second"), first = FirstResponse.Defer)
+            val handle = attempt.failure.deferredCredentials.single().id
+            if (late) attempt.advance(601)
+            repeat(2) { assertIs<WalletIssuanceOutcome.Cancelled>(attempt.open().declineSigning(attempt.id)) }
+            assertIs<WalletIssuanceOutcome.Failed>(attempt.open().retrySigning(attempt.id))
+            assertEquals(listOf(handle), attempt.open().listDeferredCredentials().map { it.id })
+            assertEquals(1, attempt.requests)
+        }
+    }
+
+    @Test fun issuerTokenExpiryEndsSigningEvenWhileTheReviewWouldStillBeValid() = runTest {
+        val attempt = dismissSigning(tokenSeconds = 30)
+        attempt.advance(31)
+        val failure = assertIs<WalletIssuanceOutcome.Failed>(attempt.open().retrySigning(attempt.id))
+        assertEquals(WalletIssuanceErrorCode.INVALID_SESSION, failure.error.code)
+        assertEquals(0, attempt.requests)
+    }
+
+    @Test fun aDeliveryCollectedWhileAwaitingApprovalIsAbsentFromTheRetryReceipt() = runTest {
+        val attempt = dismissSigning(listOf("first", "second"), first = FirstResponse.Defer)
+        attempt.advance(11)
+        val delivered = assertIs<WalletIssuanceOutcome.Stored>(
+            attempt.open().resumeDeferred(attempt.failure.deferredCredentials.single().id))
+        val approved = assertIs<WalletIssuanceOutcome.Stored>(attempt.open().retrySigning(attempt.id))
+        assertEquals(attempt.credentials.credentials.map { it.id }, delivered.credentialIds + approved.credentialIds)
+        assertEquals(2, attempt.requests)
+        assertEquals(1, attempt.polls)
+    }
+
+    @Test fun aDismissedFreshProofAfterAnExplicitNonceRejectionCanBeApproved() = runTest {
+        val attempt = dismissSigning(first = FirstResponse.RejectNonce)
+        assertEquals(2, attempt.nonces)
+        assertEquals(1, attempt.requests)
+        assertIs<WalletIssuanceOutcome.Stored>(attempt.open().retrySigning(attempt.id))
+        assertEquals(2, attempt.requests)
+    }
+
+    @Test fun aMissingHolderKeyOnlyAffectsItsOwnSigningSession() = runTest {
+        val keys = InMemoryKeyStore()
+        val records = RecordingSessionStore()
+        val removed = dismissSigning(keys = keys, records = records, keyId = "removed")
+        val valid = dismissSigning(keys = keys, records = records, keyId = "valid")
+        assertTrue(keys.removeKey("removed"))
+        val unavailable = assertIs<WalletIssuanceOutcome.Failed>(valid.open().retrySigning(removed.id))
+        assertEquals(WalletIssuanceErrorCode.CRYPTO, unavailable.error.code)
+        assertFalse(unavailable.signingApprovalRequired)
+        assertIs<WalletIssuanceOutcome.Cancelled>(valid.open().declineSigning(removed.id))
+        assertIs<WalletIssuanceOutcome.Stored>(valid.open().retrySigning(valid.id))
+        assertEquals(1, valid.requests)
+    }
+
+    private enum class FirstResponse { Store, Defer, RejectNonce }
+
+    private class SigningAttempt(val records: RecordingSessionStore) {
+        val credentials = RecordingCredentialStore()
+        var now = Clock.System.now()
+        var requests = 0
+        var polls = 0
+        var nonces = 0
+        lateinit var open: () -> WalletIssuanceSessionService
+        lateinit var failure: WalletIssuanceOutcome.Failed
+        val id get() = failure.sessionId
+        fun advance(seconds: Long) { now += seconds.seconds }
+    }
+
+    private suspend fun dismissSigning(
+        targets: List<String> = listOf("test-credential"),
+        first: FirstResponse = FirstResponse.Store,
+        browser: Boolean = false,
+        tokenSeconds: Int = 1200,
+        keys: InMemoryKeyStore = InMemoryKeyStore(),
+        records: RecordingSessionStore = RecordingSessionStore(),
+        keyId: String = "holder",
+        beforeResponse: suspend () -> Unit = {},
+    ): SigningAttempt {
+        val attempt = SigningAttempt(records)
+        val holder = crypto2SigningKey(keyId)
+        val dismissAt = if (first == FirstResponse.RejectNonce) 2 else targets.size
+        var prompts = 0
+        keys.addCrypto2Key(object : Crypto2Key by holder {
+            override val capabilities = holder.capabilities.copy(signer = Signer { data, algorithm ->
+                if (++prompts == dismissAt)
+                    throw KeyUseAuthorizationException(KeyUseAuthorizationFailure.AuthorizationNotCompleted, "Signing dismissed")
+                requireNotNull(holder.capabilities.signer).sign(data, algorithm)
+            })
+        })
+        DidService.minimalInit()
+        val did = Crypto2DidService.registerByKey("key", holder).did
+        val issued = issuedCredentialBody(signedTestCredential(JWKKey.generate(KeyType.secp256r1), did))
+        var tokens = 0
+        val http = client { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = true, nonceEndpoint = first == FirstResponse.RejectNonce, configurationIds = targets))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = browser))
+                TOKEN_ENDPOINT -> {
+                    check(++tokens == 1) { "Single-use grant was redeemed twice" }
+                    jsonResponse("""{"access_token":"retained","token_type":"Bearer","expires_in":$tokenSeconds,"refresh_token":"unused-refresh"}""")
+                }
+                NONCE_ENDPOINT -> jsonResponse("""{"c_nonce":"nonce-${++attempt.nonces}"}""")
+                CREDENTIAL_ENDPOINT -> {
+                    beforeResponse()
+                    when (if (++attempt.requests == 1) first else FirstResponse.Store) {
+                        FirstResponse.Store -> jsonResponse(issued)
+                        FirstResponse.Defer -> jsonResponse("""{"transaction_id":"first-pending","interval":10}""", HttpStatusCode.Accepted)
+                        FirstResponse.RejectNonce -> jsonResponse("""{"error":"invalid_nonce"}""", HttpStatusCode.BadRequest)
+                    }
+                }
+                DEFERRED_ENDPOINT -> { attempt.polls++; jsonResponse(issued) }
+                else -> error("Unexpected issuance request")
+            }
+        }
+        attempt.open = { WalletIssuanceSessionService(Wallet("signing-recovery", keyStores = listOf(keys),
+            credentialStores = listOf(attempt.credentials)), sessionStore = records, httpClient = http, now = { attempt.now }) }
+        val wallet = attempt.open()
+        val session = wallet.start((if (browser) authRequest() else preAuthorizedRequest(targets)).copy(keyId = keyId, did = did))
+        val outcome = if (browser) {
+            val authorization = wallet.beginAuthorization(session.id)
+            wallet.continueAuthorization(WalletIssuanceAuthorizationCallback(session.id, callback(authorization, "once")))
+        } else wallet.continuePreAuthorized(session.id)
+        attempt.failure = assertIs<WalletIssuanceOutcome.Failed>(outcome)
+        assertTrue(attempt.failure.signingApprovalRequired)
+        assertEquals(1, tokens)
+        assertTrue(records.records.values.none { "unused-refresh" in it.payload })
+        return attempt
+    }
+
     private fun authRequest() = WalletIssuanceSessionRequest(
         offerJson = buildJsonObject {
             put("credential_issuer", ISSUER)
@@ -2832,8 +2995,8 @@ class WalletIssuanceSessionServiceTest {
     private fun callback(authorization: WalletIssuanceAuthorization, code: String) =
         "$REDIRECT_URI?code=$code&state=${authorization.state}"
 
-    private suspend fun signedTestCredential(key: JWKKey): String = key.signJws(
-        """{"iss":"https://issuer.example","sub":"did:key:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"did:key:holder","given_name":"Ada"}}}"""
+    private suspend fun signedTestCredential(key: JWKKey, subject: String = "did:key:holder"): String = key.signJws(
+        """{"iss":"https://issuer.example","sub":"$subject","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","TestCredential"],"credentialSubject":{"id":"$subject","given_name":"Ada"}}}"""
             .encodeToByteArray()
     )
 

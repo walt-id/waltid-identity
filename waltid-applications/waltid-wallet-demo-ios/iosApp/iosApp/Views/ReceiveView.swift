@@ -47,18 +47,29 @@ struct ReceiveView: View {
     private func reviewContent(preview: IssuanceOfferPreview) -> some View {
         WalletReviewScaffold {
             WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
-            OfferReviewView(
-                preview: preview,
-                isAcceptEnabled: viewModel.acceptOfferEnabled,
-                isReviewEnabled: viewModel.offerReviewEnabled,
-                copies: viewModel.issuanceCopyCounts,
-                onCopiesChange: viewModel.updateIssuanceCopies,
-                txCode: viewModel.txCode,
-                onTxCodeChange: viewModel.updateTxCode,
-                onAccept: viewModel.acceptOffer,
-                onDecline: viewModel.declineOffer,
-                showActions: false
-            )
+            if viewModel.awaitingSigning {
+                IssuanceIssuerSection(issuer: preview.issuer)
+                WalletSection("Credentials to sign") {
+                    ForEach(Array(viewModel.signingTargets.enumerated()), id: \.offset) { _, target in
+                        let name = preview.credentials.first { $0.configurationID == target.configurationID }?.name ?? target.configurationID
+                        let count = viewModel.issuanceCopyCounts[target.configurationID] ?? 1
+                        Text("\(name) × \(count)")
+                    }
+                }
+            } else {
+                OfferReviewView(
+                    preview: preview,
+                    isAcceptEnabled: viewModel.acceptOfferEnabled,
+                    isReviewEnabled: viewModel.offerReviewEnabled,
+                    copies: viewModel.issuanceCopyCounts,
+                    onCopiesChange: viewModel.updateIssuanceCopies,
+                    txCode: viewModel.txCode,
+                    onTxCodeChange: viewModel.updateTxCode,
+                    onAccept: viewModel.acceptOffer,
+                    onDecline: viewModel.declineOffer,
+                    showActions: false
+                )
+            }
 
             if let warning = viewModel.transactionDataProfilesWarning {
                 WarningBannerView(message: warning)
@@ -70,7 +81,8 @@ struct ReceiveView: View {
                 isAcceptEnabled: viewModel.acceptOfferEnabled,
                 isReviewEnabled: viewModel.offerReviewEnabled,
                 onAccept: viewModel.acceptOffer,
-                onDecline: viewModel.declineOffer
+                onDecline: viewModel.declineOffer,
+                awaitingSigning: viewModel.awaitingSigning
             )
         }
     }

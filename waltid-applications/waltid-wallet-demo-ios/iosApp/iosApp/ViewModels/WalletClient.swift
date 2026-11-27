@@ -33,6 +33,8 @@ protocol WalletClient {
     func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome
+    func approveSigning(sessionID: String) async throws -> IssuanceOutcome
+    func declineSigning(sessionID: String) async throws -> IssuanceOutcome
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome
     func rejectIssuedCredential(
         notificationID: String,
@@ -63,6 +65,8 @@ protocol WalletClient {
 }
 
 extension WalletClient {
+    func approveSigning(sessionID: String) async throws -> IssuanceOutcome { throw WalletError.invalidInput("Signing approval unavailable") }
+    func declineSigning(sessionID: String) async throws -> IssuanceOutcome { throw WalletError.invalidInput("Signing decline unavailable") }
     func reconcileBackgroundStatus(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
     func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
     func invalidateCredentialStatusSnapshot() async throws {}
@@ -181,6 +185,8 @@ final class SDKWalletClient: WalletClient {
     func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization { try await wallet().beginAuthorizationIssuance(sessionID: sessionID, credentials: credentials) }
     func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome { try await wallet().continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: transactionCode, credentials: credentials) }
     func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome { try await wallet().continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI) }
+    func approveSigning(sessionID: String) async throws -> IssuanceOutcome { try await wallet().retryIssuanceSigning(sessionID: sessionID) }
+    func declineSigning(sessionID: String) async throws -> IssuanceOutcome { try await wallet().declineIssuanceSigning(sessionID: sessionID) }
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { try await wallet().cancelIssuance(sessionID: sessionID) }
     func rejectIssuedCredential(
         notificationID: String,

@@ -169,6 +169,7 @@ public final class id/walt/wallet2/mobile/MobileWallet {
 	public final fun credentialStatusMaintenanceEnrollment (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun credentialStatusSnapshot (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun credentials (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun declineIssuanceSigning (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun deleteCredential (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun deleteWallet (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun digitalCredentialCapabilities ()Lid/walt/wallet2/mobile/MobileWalletDigitalCredentialCapabilities;
@@ -205,6 +206,7 @@ public final class id/walt/wallet2/mobile/MobileWallet {
 	public final fun rejectPresentation (Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Lid/walt/wallet2/mobile/MobileWalletPresentationErrorCode;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun rejectPresentation$default (Lid/walt/wallet2/mobile/MobileWallet;Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Lid/walt/wallet2/mobile/MobileWalletPresentationErrorCode;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun resumeDeferredIssuance (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun retryIssuanceSigning (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun reviewDigitalCredentialPresentation (Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun reviewDigitalCredentialPresentation$default (Lid/walt/wallet2/mobile/MobileWallet;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun reviewPresentation (Lid/walt/wallet2/mobile/MobileWalletPresentationPreviewHandle;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;

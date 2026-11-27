@@ -54,6 +54,8 @@ interface DemoWallet {
         signingProtection: WalletDemoSigningProtection,
     ): WalletDemoSigningProtectionAvailability
     suspend fun listCredentials(): List<WalletDemoCredential>
+    suspend fun approveSigning(sessionId: String): WalletDemoIssuanceOutcome = error("Signing approval unavailable")
+    suspend fun declineSigning(sessionId: String): WalletDemoIssuanceOutcome = error("Signing decline unavailable")
     suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential>
     suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?): WalletDemoIssuanceSession
     suspend fun beginAuthorizationIssuance(

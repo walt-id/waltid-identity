@@ -134,5 +134,13 @@ class WalletDemoOfferReviewTestScenarios {
         onNodeWithTag(WalletUiTestTags.OfferReview).assertIsDisplayed()
         assertEquals(0, dismissed)
         assertEquals(1, accepted.size)
+
+        val failure = WalletDemoIssuanceOutcome.Failed("Signing dismissed", remainingSigningTargets = listOf("pid"))
+        runOnIdle { state.value = WalletDemoOfferCreateUiState.Review(preview.copy(signingReview = failure)) }
+        onNodeWithText("pid × 3").assertIsDisplayed()
+        onNodeWithTag("issuance-select-mdl").assertDoesNotExist()
+        onNodeWithTag(WalletUiTestTags.TxCodeInput).assertDoesNotExist()
+        onNodeWithText("Approve signing").assertIsEnabled()
+        assertEquals(1, accepted.size)
     }
 }

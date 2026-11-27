@@ -438,6 +438,32 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(calls, 1)
     }
 
+    func testDismissedSigningOffersOnlyAnExplicitApproval() async throws {
+        let target = IssuanceCredentialTarget(configurationID: "ExampleCredential")
+        let failure = IssuanceFailure(code: .crypto, message: "Signing was dismissed",
+                                     targetFailure: .init(target: target, stage: .proof, notAttempted: []), canRetryOffer: true, signingApprovalRequired: true)
+        let client = TransactionCodeWalletClient(transactionCode: nil, firstAcceptanceFailure: failure)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady }
+        model.offerUrl = "openid-credential-offer://issuer.example"
+        model.previewOffer()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        model.acceptOffer()
+        try await waitUntil { model.awaitingSigning && !model.isLoading }
+        XCTAssertEqual(model.signingTargets, [target])
+        model.updateIssuanceCopies(target.configurationID, 0)
+        XCTAssertEqual(model.issuanceCopyCounts[target.configurationID], 1)
+        XCTAssertTrue(model.acceptOfferEnabled)
+        model.acceptOffer()
+        try await waitUntil { model.receiveCompleted && !model.isLoading }
+        let approvals = await client.signingApprovals
+        let grantCalls = await client.issuanceContinuationCalls
+        XCTAssertEqual(approvals, 1)
+        XCTAssertEqual(grantCalls, 1)
+        XCTAssertNil(model.offerPreview)
+    }
+
     func testRejectedTransactionCodeCanBeCorrectedOnTheSameOffer() async throws {
         let failure = IssuanceFailure(code: .issuerResponse, message: "Transaction code rejected", canRetryOffer: true)
         let client = TransactionCodeWalletClient(firstAcceptanceFailure: failure)
@@ -958,6 +984,14 @@ private actor PendingRegistrationUpdate {
 }
 
 private actor TransactionCodeWalletClient: WalletClient {
+    private(set) var signingApprovals = 0
+
+    func approveSigning(sessionID: String) async throws -> IssuanceOutcome {
+        signingApprovals += 1
+        credentialIssued = true
+        return .stored(sessionID: sessionID, credentialIDs: [Self.credential.id])
+    }
+
     private(set) var issuanceContinuationCalls = 0
     private(set) var issuanceStartCalls = 0
     private(set) var presentationPreviewCalls = 0

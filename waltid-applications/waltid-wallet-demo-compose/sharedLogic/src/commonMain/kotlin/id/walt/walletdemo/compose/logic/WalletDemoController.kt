@@ -942,6 +942,7 @@ class WalletDemoController(
     }
 
     fun updateTxCode(value: String) {
+        if (_state.value.offerPreview?.awaitingSigning == true) return
         _state.update {
             val normalized = it.offerPreview?.transactionCode?.normalizeInput(value) ?: value
             it.copy(requestDrafts = it.requestDrafts.copy(txCode = normalized))
@@ -1149,7 +1150,7 @@ class WalletDemoController(
     fun updateIssuanceCopies(configurationId: String, copies: Int) {
         val current = _state.value
         val preview = current.offerPreview ?: return
-        if (!current.offerReviewEnabled || preview.offeredCredentials.none { it.configurationId == configurationId }) return
+        if (!current.offerReviewEnabled || preview.awaitingSigning || preview.offeredCredentials.none { it.configurationId == configurationId }) return
         val count = copies.coerceIn(0, issuanceCopyLimit(preview, current.issuanceCopyCounts, configurationId))
         _state.compareAndSet(current, current.copy(issuanceCopyCounts = current.issuanceCopyCounts + (configurationId to count)))
     }
@@ -1170,6 +1171,10 @@ class WalletDemoController(
 
         receiveJob = scope.launch(dispatcher) {
             try {
+                if (preview.awaitingSigning) {
+                    completeIssuanceOutcome(ready, request, wallet.approveSigning(session.id))
+                    return@launch
+                }
                 val selections = preview.credentialSelections(current.issuanceCopyCounts, WalletDemoHolderBinding(ready.keyId, ready.did))
                 when (session.grant) {
                     WalletDemoIssuanceGrant.PreAuthorizedCode -> completeIssuanceOutcome(
@@ -1197,6 +1202,7 @@ class WalletDemoController(
 
     fun declineOffer() {
         val sessionId = issuanceSession?.id ?: return
+        val signing = _state.value.offerPreview?.awaitingSigning == true
         issuanceSession = null
         val declineTab = WalletDemoTab.Credentials
         val declined = WalletOperationState.Succeeded(WalletDisplayText.CredentialOfferDeclined, declineTab)
@@ -1213,7 +1219,8 @@ class WalletDemoController(
         }
         scope.launch(dispatcher) {
             try {
-                wallet.cancelIssuance(sessionId)
+                val result = if (signing) wallet.declineSigning(sessionId) else wallet.cancelIssuance(sessionId)
+                if (result is WalletDemoIssuanceOutcome.Failed) error(result.message)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
@@ -1289,7 +1296,8 @@ class WalletDemoController(
                 if (outcome.offerConsumed) issuanceSession = null
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.copy(
-                        offerPreview = if (outcome.offerConsumed) null else it.offerPreview,
+                        offerPreview = if (outcome.offerConsumed) null
+                            else it.offerPreview?.copy(signingReview = outcome.takeIf { it.remainingSigningTargets.isNotEmpty() }),
                         authorizationRequestUrl = null,
                         requestDrafts = if (outcome.offerConsumed) it.requestDrafts.copy(txCode = "") else it.requestDrafts,
                         deferredCredentials = (it.deferredCredentials + outcome.deferredCredentials)
@@ -2014,9 +2022,10 @@ class WalletDemoController(
 
     private fun cancelIssuance() {
         val sessionId = issuanceSession?.id ?: return
+        val signing = _state.value.offerPreview?.awaitingSigning == true
         issuanceSession = null
         scope.launch(dispatcher) {
-            runCatching { wallet.cancelIssuance(sessionId) }
+            runCatching { if (signing) wallet.declineSigning(sessionId) else wallet.cancelIssuance(sessionId) }
         }
     }
 
