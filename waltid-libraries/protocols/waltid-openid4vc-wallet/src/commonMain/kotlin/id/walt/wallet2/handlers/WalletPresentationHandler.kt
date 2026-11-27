@@ -752,12 +752,7 @@ object WalletPresentationHandler {
             if (format != WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC) {
                 defaultCapabilities
             } else {
-                val stored = storedById[option.credentialId] ?: return@compatibleWithVerifierFormats null
-                runCatching {
-                    WalletPresentationFormatRegistry.capabilitiesFromKeys(
-                        listOf(resolveMdocHolderKey(option.credentialId, stored.credential)),
-                    )
-                }.getOrNull()
+                storedById[option.credentialId]?.mdocCapabilities(resolveMdocHolderKey)
             }
         }
         val credentialRequirements = query.requiredCredentialRequirements()

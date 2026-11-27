@@ -4,7 +4,9 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletKeyStoreEntry
+import id.waltid.openid4vp.wallet.PresentationRequestValidator
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -48,11 +50,7 @@ internal suspend fun WalletPresentationFormatRegistry.RuntimeCapabilities.withBo
         ) {
             return@flatMap emptyList()
         }
-        runCatching {
-            WalletPresentationFormatRegistry.capabilitiesFromKeys(
-                listOf(resolveMdocHolderKey(storedCredential.id, storedCredential.credential)),
-            ).supportedMdocCoseAlgorithms
-        }.getOrDefault(emptyList())
+        storedCredential.mdocCapabilities(resolveMdocHolderKey)?.supportedMdocCoseAlgorithms.orEmpty()
     }
     val mdocAlgorithms = (supportedMdocCoseAlgorithms + boundMdocAlgorithms).distinct().sorted()
     return copy(
@@ -76,4 +74,14 @@ internal suspend fun List<PresentationCredentialOption>.compatibleWithVerifierFo
             add(option)
         }
     }
+}
+
+internal suspend fun StoredCredential.mdocCapabilities(
+    resolveHolderKey: suspend (String, DigitalCredential) -> Crypto2Key,
+): WalletPresentationFormatRegistry.RuntimeCapabilities? = try {
+    WalletPresentationFormatRegistry.capabilitiesFromKeys(listOf(resolveHolderKey(id, credential)))
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (_: Exception) {
+    null
 }
