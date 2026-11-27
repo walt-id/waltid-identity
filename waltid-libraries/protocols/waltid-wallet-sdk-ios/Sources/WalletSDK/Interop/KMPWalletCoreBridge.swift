@@ -225,8 +225,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     ) async throws -> CredentialStatusMaintenanceResult {
         WalletCoreRuntime.initializeIfNeeded()
         let result = try await WalletStatusMaintenanceBridge.shared.refresh(
-            binding: binding, appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
-            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup, maxItems: maxItems,
+            binding: binding, crossProcessAccess: crossProcessAccess?.toKMP(), maxItems: maxItems,
             timeoutMilliseconds: timeoutMilliseconds
         )
         let value = try successValue(result, as: WalletBridgeStatusMaintenanceResult.self, operation: "background credential status check")

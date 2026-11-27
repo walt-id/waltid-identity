@@ -41,14 +41,11 @@ public object WalletStatusMaintenanceBridge {
     @Throws(CancellationException::class)
     public suspend fun refresh(
         binding: String,
-        appGroupIdentifier: String?,
-        keychainAccessGroup: String?,
+        crossProcessAccess: WalletAppGroupAccess?,
         maxItems: Int,
         timeoutMilliseconds: Long,
     ): WalletBridgeResult<WalletBridgeStatusMaintenanceResult> = walletBridgeCall {
-        val access = if (appGroupIdentifier == null && keychainAccessGroup == null) null else
-            WalletAppGroupAccess(requireNotNull(appGroupIdentifier), requireNotNull(keychainAccessGroup))
-        when (val result = refreshDueStatusesForExistingWallet(binding, access, maxItems, timeoutMilliseconds.milliseconds)) {
+        when (val result = refreshDueStatusesForExistingWallet(binding, crossProcessAccess, maxItems, timeoutMilliseconds.milliseconds)) {
             is CredentialStatusMaintenanceResult.Finished ->
                 WalletBridgeStatusMaintenanceResult("FINISHED", result.checked, result.unchanged, result.remaining, result.hasNewNotice)
             CredentialStatusMaintenanceResult.Deferred -> WalletBridgeStatusMaintenanceResult("DEFERRED")

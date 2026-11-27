@@ -218,19 +218,21 @@ class WalletSdkBridgeTest {
             WalletBridgeIssuerMetadataSignerTrustType.TrustedDelegate to MetadataSignerTrustType.TRUSTED_DELEGATE,
         ).forEach { (bridgeTrustType, expectedTrustType) ->
             val configured = WalletBridgeConfiguration(
-                issuerMetadataTrustResolver = object : WalletBridgeIssuerMetadataTrustResolver {
-                    override suspend fun verify(
-                        compactJwt: String,
-                        expectedCredentialIssuer: String,
-                    ) = WalletBridgeIssuerMetadataSigner(
-                        keyId = "issuer-key",
-                        algorithm = "ES256",
-                        trustType = bridgeTrustType,
-                    ).also {
-                        assertEquals("signed-metadata-jwt", compactJwt)
-                        assertEquals("https://issuer.example", expectedCredentialIssuer)
-                    }
-                },
+                issuance = WalletBridgeIssuanceConfiguration(
+                    issuerMetadataTrustResolver = object : WalletBridgeIssuerMetadataTrustResolver {
+                        override suspend fun verify(
+                            compactJwt: String,
+                            expectedCredentialIssuer: String,
+                        ) = WalletBridgeIssuerMetadataSigner(
+                            keyId = "issuer-key",
+                            algorithm = "ES256",
+                            trustType = bridgeTrustType,
+                        ).also {
+                            assertEquals("signed-metadata-jwt", compactJwt)
+                            assertEquals("https://issuer.example", expectedCredentialIssuer)
+                        }
+                    },
+                ),
             ).toWalletConfiguration()
 
             val signer = requireNotNull(configured.issuance.metadataTrustResolver).verify(
@@ -346,29 +348,30 @@ class WalletSdkBridgeTest {
         val result = factory.create(
             WalletBridgeConfiguration(
                 walletId = "consumer-wallet",
-                persistence = WalletBridgePersistence(
-                    databaseKey = WalletBridgeDatabaseKeyConfiguration.Managed,
+                issuance = WalletBridgeIssuanceConfiguration(
+                    attestation = WalletAttestationConfig(
+                        baseUrl = "https://attestation.example",
+                        attesterPath = "/wallet-attestation",
+                        bearerToken = "token",
+                        hostHeader = "attestation.example",
+                    ),
                 ),
-                attestation = WalletAttestationConfig(
-                    baseUrl = "https://attestation.example",
-                    attesterPath = "/wallet-attestation",
-                    bearerToken = "token",
-                    hostHeader = "attestation.example",
-                ),
-                clientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(
-                    x509TrustAnchorsPem = listOf(validTrustAnchorPem),
-                    preRegisteredClientMetadataJson = mapOf(
-                        "demo-verifier" to """{"jwks":{"keys":[{"kty":"EC","crv":"P-256","x":"x","y":"y"}]}}""",
+                presentation = WalletBridgePresentationConfiguration(
+                    clientIdTrustConfiguration = WalletBridgeClientIdTrustConfiguration(
+                        x509TrustAnchorsPem = listOf(validTrustAnchorPem),
+                        preRegisteredClientMetadataJson = mapOf(
+                            "demo-verifier" to """{"jwks":{"keys":[{"kty":"EC","crv":"P-256","x":"x","y":"y"}]}}""",
+                        ),
+                    ),
+                    transactionDataProfiles = listOf(
+                        TransactionDataProfile(
+                            type = "example.transaction",
+                            displayName = "Example Transaction",
+                            fields = listOf("amount"),
+                        )
                     ),
                 ),
                 preferredLocales = listOf("de-AT", "en"),
-                transactionDataProfiles = listOf(
-                    TransactionDataProfile(
-                        type = "example.transaction",
-                        displayName = "Example Transaction",
-                        fields = listOf("amount"),
-                    )
-                ),
             )
         )
 
@@ -424,9 +427,8 @@ class WalletSdkBridgeTest {
             WalletBridgeConfiguration(
                 walletId = "swift-managed-wallet",
                 persistence = WalletBridgePersistence(
-                    databaseKey = WalletBridgeDatabaseKeyConfiguration.Provided,
+                    databaseKeyProvider = bridgeKeyProvider,
                 ),
-                databaseKeyProvider = bridgeKeyProvider,
             )
         )
 
@@ -567,10 +569,9 @@ class WalletSdkBridgeTest {
             WalletBridgeConfiguration(
                 walletId = "swift-combined-wallet",
                 persistence = WalletBridgePersistence(
-                    databaseKey = WalletBridgeDatabaseKeyConfiguration.Provided,
+                    databaseKeyProvider = bridgeKeyProvider,
                     credentialStore = bridgeCredentialStore,
                 ),
-                databaseKeyProvider = bridgeKeyProvider,
             )
         )
 
@@ -604,7 +605,9 @@ class WalletSdkBridgeTest {
             throw CancellationException("opening cancelled")
         }
         val profile = TransactionDataProfile("example.transaction")
-        val invalid = factory.create(WalletBridgeConfiguration(transactionDataProfiles = listOf(profile, profile)))
+        val invalid = factory.create(WalletBridgeConfiguration(
+            presentation = WalletBridgePresentationConfiguration(transactionDataProfiles = listOf(profile, profile)),
+        ))
         assertEquals(WalletBridgeErrorCategory.invalidInput, assertIs<WalletBridgeResult.Failure>(invalid).error.category)
         assertEquals(0, opens)
         assertFailsWith<CancellationException> { factory.create() }
@@ -720,9 +723,9 @@ class WalletSdkBridgeTest {
 
         override suspend fun continuePreAuthorizedIssuance(
             sessionId: String,
+            clientId: String?,
             transactionCode: String?,
             credentials: List<IssuanceCredentialSelection>?,
-            clientId: String?,
         ) = error("Not used by this test fake")
 
         override suspend fun completeAuthorization(

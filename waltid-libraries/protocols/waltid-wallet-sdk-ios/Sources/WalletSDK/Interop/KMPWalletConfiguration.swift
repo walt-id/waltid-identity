@@ -11,27 +11,37 @@ extension WalletConfiguration {
         return try WalletBridgeConfiguration(
             walletId: walletID,
             persistence: persistence.toKMPPersistence(),
-            databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
-            attestation: issuance.attestation?.toKMPAttestationConfiguration(),
-            walletProvider: issuance.walletProvider?.toKMPWalletProvider(),
-            issuerMetadataTrustResolver: issuance.metadataTrustResolver.map {
-                KMPIssuerMetadataTrustResolverAdapter(resolver: $0)
-            },
-            receiptAuthoritiesJson: try issuance.receiptAuthorities.map { String(decoding: try JSONEncoder().encode($0.map(\.fields)), as: UTF8.self) },
-            preferredLocales: preferredLocales,
-            transactionDataProfiles: presentation.transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
-            paymentCredentialIssuers: presentation.paymentCredentialIssuers.map { WalletBridgePaymentCredentialIssuer(issuer: $0.issuer, publicJwkJson: $0.publicJWKJSON, algorithm: $0.algorithm) },
-            clientIdTrustConfiguration: presentation.verifierTrust.toKMPClientIDTrustConfiguration(),
-            registersDigitalCredentials: registersDigitalCredentials,
-            appGroupIdentifier: crossProcessAccess?.appGroupIdentifier,
-            keychainAccessGroup: crossProcessAccess?.keychainAccessGroup,
             defaultKeyUseAuthorizationPolicy: keyAuthorization.policy.toKMPAuthorizationPolicy(),
             keyUseAuthorizationPrompt: Waltid_openid4vc_wallet_persistence_mobileKeyUseAuthorizationPrompt(
                 reason: keyAuthorization.prompt.message,
                 cancelText: keyAuthorization.prompt.cancelText
             ),
-            signingIdentity: signingIdentity.toKMPSigningIdentityConfiguration()
+            signingIdentity: signingIdentity.toKMPSigningIdentityConfiguration(),
+            issuance: WalletBridgeIssuanceConfiguration(
+                attestation: issuance.attestation?.toKMPAttestationConfiguration(),
+                walletProvider: issuance.walletProvider?.toKMPWalletProvider(),
+                issuerMetadataTrustResolver: issuance.metadataTrustResolver.map { KMPIssuerMetadataTrustResolverAdapter(resolver: $0) },
+                receiptAuthoritiesJson: try issuance.receiptAuthorities.map {
+                    String(decoding: try JSONEncoder().encode($0.map(\.fields)), as: UTF8.self)
+                }
+            ),
+            presentation: WalletBridgePresentationConfiguration(
+                clientIdTrustConfiguration: presentation.verifierTrust.toKMPClientIDTrustConfiguration(),
+                transactionDataProfiles: presentation.transactionDataProfiles.map { $0.toKMPTransactionDataProfile() },
+                paymentCredentialIssuers: presentation.paymentCredentialIssuers.map {
+                    WalletBridgePaymentCredentialIssuer(issuer: $0.issuer, publicJwkJson: $0.publicJWKJSON, algorithm: $0.algorithm)
+                }
+            ),
+            registersDigitalCredentials: registersDigitalCredentials,
+            crossProcessAccess: crossProcessAccess?.toKMP(),
+            preferredLocales: preferredLocales
         )
+    }
+}
+
+extension WalletCrossProcessAccess {
+    func toKMP() -> WalletAppGroupAccess {
+        WalletAppGroupAccess(appGroupIdentifier: appGroupIdentifier, keychainAccessGroup: keychainAccessGroup)
     }
 }
 
