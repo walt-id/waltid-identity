@@ -1,7 +1,7 @@
-export const PID_CONFIGURATION_IDS = [
-  "eu.europa.ec.eudi.pid.1",
-  "urn:eudi:pid:1",
-] as const;
+const PID_DOCTYPE = "eu.europa.ec.eudi.pid.1";
+const PID_VCT = "urn:eudi:pid:1";
+const LEGACY_DEMO_PID_VCT = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1";
+export const PID_CONFIGURATION_IDS = [PID_DOCTYPE, PID_VCT] as const;
 
 interface IssuerCredentialClaim {
   path?: string[];
@@ -59,20 +59,10 @@ export function isPidConfiguration(
   configuration?: IssuerMetadataForDcql,
   configurationId?: string,
 ): boolean {
-  if (
-    configurationId &&
-    (PID_CONFIGURATION_IDS as readonly string[]).includes(configurationId)
-  ) {
-    return true;
+  if (configuration?.format === "dc+sd-jwt" || configuration?.vct !== undefined) {
+    return configuration.vct === PID_VCT || configuration.vct === LEGACY_DEMO_PID_VCT;
   }
-  const doctype = configuration?.doctype;
-  const vct = configuration?.vct;
-  return (
-    doctype === "eu.europa.ec.eudi.pid.1" ||
-    configurationId === "eu.europa.ec.eudi.pid.1" ||
-    (typeof vct === "string" && vct.includes("urn:eudi:pid:1")) ||
-    configurationId === "urn:eudi:pid:1"
-  );
+  return configuration?.doctype === PID_DOCTYPE || PID_CONFIGURATION_IDS.some((id) => id === configurationId);
 }
 
 export function isMdocConfiguration(
@@ -81,12 +71,57 @@ export function isMdocConfiguration(
   return configuration?.format === "mso_mdoc";
 }
 
-/** PID claims that wallets typically accept; extra metadata claims stay optional. */
+/** mdoc PID claims. SD-JWT PID uses the rulebook names below. */
 export const DEFAULT_PID_CLAIM_NAMES = new Set([
   "family_name",
   "given_name",
   "birth_date",
 ]);
+
+/** PID rulebook section 4.1 claim names for `urn:eudi:pid:1`. */
+export const SD_JWT_PID_DEFAULT_CLAIM_NAMES = new Set([
+  "family_name",
+  "given_name",
+  "birthdate",
+]);
+
+const SD_JWT_PID_CLAIM_PATHS: Record<string, string[]> = {
+  birth_date: ["birthdate"],
+  birthdate: ["birthdate"],
+  nationality: ["nationalities"],
+  nationalities: ["nationalities"],
+  resident_address: ["address", "formatted"],
+  resident_country: ["address", "country"],
+  resident_state: ["address", "region"],
+  resident_city: ["address", "locality"],
+  resident_postal_code: ["address", "postal_code"],
+  resident_street: ["address", "street_address"],
+  resident_house_number: ["address", "house_number"],
+  family_name_birth: ["birth_family_name"],
+  given_name_birth: ["birth_given_name"],
+  birth_family_name: ["birth_family_name"],
+  birth_given_name: ["birth_given_name"],
+  email_address: ["email"],
+  email: ["email"],
+  mobile_phone_number: ["phone_number"],
+  phone_number: ["phone_number"],
+  portrait: ["picture"],
+  picture: ["picture"],
+  expiry_date: ["date_of_expiry"],
+  date_of_expiry: ["date_of_expiry"],
+  issuance_date: ["date_of_issuance"],
+  date_of_issuance: ["date_of_issuance"],
+};
+
+/** Map a PID claim path onto the SD-JWT rulebook name. mdoc paths stay unchanged. */
+export function sdJwtPidClaimPath(path: string[]): string[] {
+  if (path[0] === "birth_place") return ["place_of_birth", ...path.slice(1)];
+  if (path.length === 1) {
+    const mapped = SD_JWT_PID_CLAIM_PATHS[path[0] ?? ""];
+    if (mapped) return mapped;
+  }
+  return path;
+}
 
 export function defaultSelectedClaimIds(
   configuration?: IssuerMetadataForDcql,
@@ -97,9 +132,12 @@ export function defaultSelectedClaimIds(
     return claims.map((claim) => claim.id);
   }
 
+  const sdJwtPid = configuration?.format === "dc+sd-jwt";
   const defaults = claims.filter((claim) => {
-    const name = claim.path[claim.path.length - 1];
-    return name !== undefined && DEFAULT_PID_CLAIM_NAMES.has(name);
+    const path = sdJwtPid ? sdJwtPidClaimPath(claim.path) : claim.path;
+    const name = path[path.length - 1];
+    const names = sdJwtPid ? SD_JWT_PID_DEFAULT_CLAIM_NAMES : DEFAULT_PID_CLAIM_NAMES;
+    return name !== undefined && names.has(name);
   });
   return defaults.length > 0
     ? defaults.map((claim) => claim.id)
@@ -162,12 +200,15 @@ export function dcqlFromIssuerMetadata(
   if (selectedClaims.length === 0) {
     throw new Error("at least one claim must be selected");
   }
+  const sdJwtPid =
+    configuration.format === "dc+sd-jwt" &&
+    isPidConfiguration(configuration, configurationId);
   return {
     id: dcqlCredentialQueryId(configurationId),
     format: configuration.format,
     meta: dcqlMetaFromIssuerMetadata(configuration),
     claims: selectedClaims.map((claim) => ({
-      path: claim.path,
+      path: sdJwtPid ? sdJwtPidClaimPath(claim.path) : claim.path,
     })),
   };
 }
