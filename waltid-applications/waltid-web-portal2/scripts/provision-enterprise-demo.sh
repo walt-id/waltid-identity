@@ -150,7 +150,7 @@ configurations = {
             "claims": [
                 claim(["family_name"], "Family name"),
                 claim(["given_name"], "Given name"),
-                claim(["birth_date"], "Birth date"),
+                claim(["birthdate"], "Birth date"),
             ],
         },
     },
@@ -215,13 +215,13 @@ profiles = {
         "credentialData": {
             "family_name": "Musterfrau",
             "given_name": "Anna",
-            "birth_date": "1990-01-01",
+            "birthdate": "1990-01-01",
         },
         "selectiveDisclosure": {
             "fields": {
                 "family_name": {"sd": True},
                 "given_name": {"sd": True},
-                "birth_date": {"sd": True},
+                "birthdate": {"sd": True},
             },
             "decoyMode": "NONE",
             "decoys": 0,
