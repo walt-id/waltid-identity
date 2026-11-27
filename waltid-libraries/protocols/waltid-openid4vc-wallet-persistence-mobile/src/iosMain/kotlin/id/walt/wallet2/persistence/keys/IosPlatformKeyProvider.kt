@@ -31,9 +31,6 @@ import platform.Foundation.NSProcessInfo
 
 /** Managed-key provider backed by iOS Keychain and Secure Enclave. */
 public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
-    private val backend = IosSignumKeyBackend()
-    private val signumProvider = SignumManagedKeyProvider(backend)
-
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
         val signumPolicy = requirements.nativePolicy()
@@ -139,6 +136,9 @@ public class IosPlatformKeyProvider : PlatformManagedKeyProvider {
             throw cause.toKeyUseAuthorizationException(stored.id.value) ?: cause
         }
     }
+
+    private val backend = IosSignumKeyBackend()
+    private val signumProvider = SignumManagedKeyProvider(backend)
 
     private fun WalletKeyRequirements.nativePolicy(prompt: KeyUseAuthorizationPrompt = KeyUseAuthorizationPrompt()): SignumKeyPolicy =
         toSignumPolicy(prompt)

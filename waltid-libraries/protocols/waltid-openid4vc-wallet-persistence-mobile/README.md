@@ -62,19 +62,21 @@ import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 
-val databaseName = "wallet_wallet-id"
+val walletId = "wallet-id"
+val databaseName = "wallet_$walletId"
 val databaseKey = AndroidDatabaseEncryptionKeyProvider(context)
-    .getOrCreateKey(walletId = "wallet-id", databaseName = databaseName)
+    .getOrCreateKey(walletId, databaseName)
 val driver = DriverFactory(context).createEncryptedDriver(
     databaseName = databaseName,
     encryptionKey = databaseKey,
+    walletId = walletId,
 )
 val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
 
 val keyProvider = AndroidPlatformKeyProvider(context, interactionContextProvider = { currentActivity })
-val keyStore = SqlDelightKeyStore(keyProvider, queries)
+val keyStore = SqlDelightKeyStore(keyProvider, queries, identityWalletId = walletId)
 val credentialStore = SqlDelightCredentialStore(queries)
-val didStore = SqlDelightDidStore(queries)
+val didStore = SqlDelightDidStore(queries, identityWalletId = walletId)
 ```
 
 The higher-level `waltid-openid4vc-wallet-mobile` facade performs this wiring automatically. Use this module directly only when assembling custom platform persistence.
@@ -82,23 +84,21 @@ The higher-level `waltid-openid4vc-wallet-mobile` facade performs this wiring au
 `SqlDelightKeyStore` persists one versioned Crypto2 `StoredKey` descriptor per
 key. The SQL schema remains `key_id`, `created_at`, and `stored_key`; key type,
 backing, authorization policy, and native alias metadata are authoritative in
-the descriptor rather than duplicated SQL columns. Protected requests are
-preflighted and never downgraded to a software key. Unprotected requests use a
-managed key when supported and otherwise use a `StoredKey.Software` descriptor
-from Crypto2. Missing ordinary managed keys return `null`; missing protected keys surface
+the descriptor rather than duplicated SQL columns. The store checks the native provider before generation. It can fall back to a
+`StoredKey.Software` descriptor only with default protection and platform
+settings, no key-use authorization and no native attestation challenge. Missing ordinary managed keys return `null`; missing protected keys surface
 `KeyUseAuthorizationFailure.ProtectedKeyUnavailable`.
 
 The host-configurable authorization prompt is captured when a protected key is
-created and remains associated with that persisted Signum policy. Runtime prompt
-replacement is intentionally outside this PR.
+created and remains associated with that persisted Signum policy. The stored policy applies when the key is restored.
 
 ## Encryption and cleanup
 
-The wallet SDK opens encrypted databases by default and keeps managed database keys in platform-protected storage. Android stores the wrapped database key with Android KeyStore-backed material and app-private preferences. iOS stores the database key as a Keychain generic-password item using device-local accessibility.
+Even when an app supplies both a credential store and a DID store, opening the wallet still opens SQLCipher for signing-identity state and pending issuance. The SDK keeps managed database keys in platform-protected storage. Android stores the wrapped database key with Android KeyStore-backed material and app-private preferences. iOS stores the database key as a Keychain generic-password item using device-local accessibility.
 
 `DatabaseEncryptionKeyProvider` is the boundary for provided database keys. Implement it when an app needs KMS-backed recovery or enterprise key ownership. The SDK will request key material for opening the local SQLCipher database and call `deleteKey(walletId, databaseName)` when `Wallet.deleteLocalData()` deletes local wallet data. External KMS recovery state remains the app's responsibility.
 
-`DriverFactory.deleteDatabase(databaseName)` removes the database file and SQLite sidecars used by the platform driver. For complete wallet deletion, close the driver first, remove managed signing keys referenced by `SqlDelightKeyStore`, delete database files, and then delete the database encryption key.
+`DriverFactory.deleteDatabase(databaseName)` removes the database file and SQLite sidecars used by the platform driver. Use `Wallet.deleteLocalData()` for complete wallet deletion. It clears configured stores and referenced signing keys while the database is open, closes the driver, removes the database files, and then asks the provider to delete the database key.
 
 ## Store Implementations
 
@@ -107,16 +107,13 @@ The wallet SDK opens encrypted databases by default and keeps managed database k
 | `WalletKeyStore` | `SqlDelightKeyStore` | Versioned managed or software key descriptors |
 | `WalletCredentialStore` | `SqlDelightCredentialStore` | Stored credentials with metadata |
 | `WalletDidStore` | `SqlDelightDidStore` | DIDs and their documents |
+| `AtomicWalletIssuanceSessionCreationStore` | `SqlDelightIssuanceSessionStore` | Pending issuance records and atomic claims |
+
+`SqlDelightStatusMaintenanceStore` manages background status grants and scan progress. Its sessions use the existing encrypted wallet database.
 
 ## Database Schema
 
-The mobile schema includes the following tables:
-
-- `key_references` - Versioned managed or software key descriptors
-- `credentials` - Stored credentials
-- `dids` - Stored DIDs
-
-This is a fresh mobile schema; it does not migrate or retain legacy key references. Schema creation is managed by SQLDelight on the target platform driver.
+The [SQLDelight schema](src/commonMain/sqldelight/id/walt/wallet2/persistence/db/WalletPersistence.sq) contains key references, credentials, DIDs, credential-status snapshots and maintenance state, issuance sessions, and the signing-identity journal and active binding. The foreground driver applies the versioned SQLDelight migrations when opening the database.
 
 ## API documentation
 

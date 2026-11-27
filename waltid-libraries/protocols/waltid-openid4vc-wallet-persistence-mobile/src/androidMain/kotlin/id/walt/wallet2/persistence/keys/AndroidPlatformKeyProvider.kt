@@ -10,13 +10,14 @@ import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.crypto2.keys.reuseSeconds
 import id.walt.crypto2.keys.toAuthorizationFailure
-import id.walt.crypto2.keys.PlatformKeyConfiguration
-import id.walt.crypto2.keys.HardwarePreference
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.uuid.Uuid
+import id.walt.crypto2.keys.HardwarePreference
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import android.content.pm.PackageManager
 import android.app.KeyguardManager
 import android.content.Context
 import androidx.biometric.BiometricManager
@@ -46,40 +47,15 @@ public class AndroidPlatformKeyProvider(
     context: Context,
     private val interactionContextProvider: () -> FragmentActivity? = { null },
 ) : PlatformManagedKeyProvider {
-    private val applicationContext = context.applicationContext
-    private val backend = AndroidSignumKeyBackend(applicationContext, interactionContextProvider)
-    private val signumProvider = SignumManagedKeyProvider(backend)
-    private val capabilityMutex = Mutex()
-    private val hardwareCapabilities = mutableMapOf<id.walt.crypto2.keys.HardwarePreference, Boolean>()
-
-    // Feature declarations are not reliable evidence of a P-256 key's actual execution tier.
-    // Probe an owned, unauthenticated alias once per backing preference and always remove it.
-    private suspend fun supportsHardware(policy: SignumKeyPolicy): Boolean = capabilityMutex.withLock {
-        val backing = (policy.platform as? id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore)?.strongBox
-            ?: id.walt.crypto2.keys.HardwarePreference.DISCOURAGED
-        hardwareCapabilities[backing]?.let { return@withLock it }
-        val alias = "wallet_capability_${Uuid.random()}"
-        val probe = SignumKeyPolicy(hardware = id.walt.crypto2.keys.HardwarePreference.REQUIRED,
-            platform = id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore(strongBox = backing))
-        val supported = try {
-            backend.create(alias, KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY), probe)
-            true
-        } catch (_: SignumKeyPolicyMismatchException) { false }
-        finally { withContext(NonCancellable) { backend.delete(alias, probe) } }
-        hardwareCapabilities[backing] = supported
-        supported
-    }
-
-
     override suspend fun preflight(requirements: WalletKeyRequirements): KeyUseAuthorizationSupport {
         val signumPolicy = requirements.nativePolicy()
-        val settings = signumPolicy.platform as? id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore
-        if ((settings?.strongBox == id.walt.crypto2.keys.HardwarePreference.REQUIRED &&
-                !applicationContext.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_STRONGBOX_KEYSTORE)) ||
+        val settings = signumPolicy.platform as? PlatformKeyConfiguration.AndroidKeystore
+        if ((settings?.strongBox == HardwarePreference.REQUIRED &&
+                !applicationContext.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)) ||
             !backend.supports(requirements.spec, requirements.usages, signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
-        if (signumPolicy.hardware == id.walt.crypto2.keys.HardwarePreference.REQUIRED &&
+        if (signumPolicy.hardware == HardwarePreference.REQUIRED &&
             !supportsHardware(signumPolicy)) {
             return KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
         }
@@ -176,6 +152,31 @@ public class AndroidPlatformKeyProvider(
         }
     }
 
+    private val applicationContext = context.applicationContext
+    private val backend = AndroidSignumKeyBackend(applicationContext, interactionContextProvider)
+    private val signumProvider = SignumManagedKeyProvider(backend)
+    private val capabilityMutex = Mutex()
+    private val hardwareCapabilities = mutableMapOf<HardwarePreference, Boolean>()
+
+    // Feature declarations are not reliable evidence of a P-256 key's actual execution tier.
+    // Probe an owned, unauthenticated alias once per backing preference and always remove it.
+    private suspend fun supportsHardware(policy: SignumKeyPolicy): Boolean = capabilityMutex.withLock {
+        val backing = (policy.platform as? PlatformKeyConfiguration.AndroidKeystore)?.strongBox
+            ?: HardwarePreference.DISCOURAGED
+        hardwareCapabilities[backing]?.let { return@withLock it }
+        val alias = "wallet_capability_${Uuid.random()}"
+        val probe = SignumKeyPolicy(hardware = HardwarePreference.REQUIRED,
+            platform = PlatformKeyConfiguration.AndroidKeystore(strongBox = backing))
+        val supported = try {
+            backend.create(alias, KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY), probe)
+            true
+        } catch (_: SignumKeyPolicyMismatchException) { false }
+        finally { withContext(NonCancellable) { backend.delete(alias, probe) } }
+        hardwareCapabilities[backing] = supported
+        supported
+    }
+
+
     private fun authenticationAvailability(policy: KeyUseAuthorizationPolicy): Int =
         if (policy is KeyUseAuthorizationPolicy.None) BiometricManager.BIOMETRIC_SUCCESS
         else BiometricManager.from(applicationContext).canAuthenticate(when (policy) {
@@ -203,15 +204,15 @@ public class AndroidPlatformKeyProvider(
         toSignumPolicy(prompt).let { policy ->
             if (spec != KeySpec.Ec(EcCurve.P256)) return@let policy
             val settings = when (val platform = policy.platform) {
-                id.walt.crypto2.keys.PlatformKeyConfiguration.Default -> id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore()
-                is id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore -> platform
+                PlatformKeyConfiguration.Default -> PlatformKeyConfiguration.AndroidKeystore()
+                is PlatformKeyConfiguration.AndroidKeystore -> platform
                 else -> return@let policy
             }
             // API 31 import wraps absent StrongBox in a generic KeyStoreException. Use the public
             // capability flag before import rather than interpreting exception text or weakening hardware.
-            val effective = if (settings.strongBox == id.walt.crypto2.keys.HardwarePreference.PREFERRED &&
-                !applicationContext.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_STRONGBOX_KEYSTORE))
-                settings.copy(strongBox = id.walt.crypto2.keys.HardwarePreference.DISCOURAGED) else settings
+            val effective = if (settings.strongBox == HardwarePreference.PREFERRED &&
+                !applicationContext.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE))
+                settings.copy(strongBox = HardwarePreference.DISCOURAGED) else settings
             policy.copy(platform = effective)
         }
 
