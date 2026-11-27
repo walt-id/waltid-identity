@@ -37,11 +37,13 @@ class ConformanceEligibilityTest(unittest.TestCase):
             root = Path(directory)
             output, calls = root / "output", root / "calls"
             output.touch()
+            paths = root / "paths"
+            paths.write_bytes(file.encode() + b"\0")
             gh = root / "gh"
             gh.write_text('#!/bin/sh\necho called >> "$GH_CALL_LOG"\nprintf "%s\\n" "$CHANGED_FILE"\nexit "$FAKE_GH_EXIT_CODE"\n')
             gh.chmod(0o755)
             env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"],
-                   "GH_TOKEN": "", "GH_CALL_LOG": str(calls), "CHANGED_FILE": file,
+                   "GH_TOKEN": "", "GH_CALL_LOG": str(calls), "CHANGED_PATHS": str(paths), "FULL_COVERAGE": "false", "CHANGED_FILE": file,
                    "FAKE_GH_EXIT_CODE": str(gh_exit),
                    "GITHUB_OUTPUT": str(output), "GITHUB_REPOSITORY": "walt-id/waltid-identity",
                    "EVENT_NAME": event, "REF": ref, "PR_NUMBER": "1",

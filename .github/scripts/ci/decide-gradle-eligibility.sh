@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Skip Linux Gradle and macos-predicate-tests when every changed file is a
-# docs/asset path that used to be listed in build.yml paths-ignore. The
-# workflow itself must still start so ci-gate can run as a required check.
+# Route PR-only release workflow changes to the release contract checks.
 set -euo pipefail
 
 set_decision() {
@@ -27,15 +25,43 @@ is_docs_or_asset() {
   return 1
 }
 
+if [[ "${EVENT_NAME:-}" == pull_request ]]; then
+  gradle=false
+  release=false
+  only_release=true
+  if [[ -s "${CHANGED_PATHS:-}" ]]; then
+    while IFS= read -r -d '' path; do
+      case "$path" in
+        .github/workflows/api-docker.yml|.github/workflows/promote.yml|.github/workflows/release-candidate.yml|.github/tests/release/*)
+          release=true ;;
+        *)
+          only_release=false
+          is_docs_or_asset "$path" || gradle=true
+          case "$path" in
+            .github/workflows/build.yml|.github/scripts/ci/decide-gradle-eligibility.sh|.github/actions/pr-change-scope/*|.github/workflows/data/api-docker-matrix.json)
+              release=true ;;
+          esac ;;
+      esac
+    done < "$CHANGED_PATHS"
+  else
+    gradle=true
+    release=true
+    only_release=false
+  fi
+  if [[ "${FULL_COVERAGE:-true}" != false ]]; then
+    gradle=true
+    only_release=false
+  fi
+  {
+    echo "release=$release"
+    echo "release-only=$only_release"
+  } >> "${GITHUB_OUTPUT:-/dev/stdout}"
+  set_decision "$gradle" "PR paths and companion branches evaluated"
+  exit 0
+fi
+
 changed_files=()
 case "${EVENT_NAME:-}" in
-  pull_request)
-    while IFS= read -r changed_file; do
-      [[ -n "$changed_file" ]] && changed_files+=("$changed_file")
-    done < <(
-      gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename'
-    )
-    ;;
   push)
     if [[ -n "${BEFORE:-}" && "${BEFORE}" != "0000000000000000000000000000000000000000" ]]; then
       while IFS= read -r changed_file; do

@@ -66,7 +66,8 @@ maintainers enforce the completion policy during review.
 | `enterprise` | wallet-mobile / persistence-mobile / wallet-sdk-ios / shared build-logic | Enterprise iOS mobile integration against Identity | Community Identity-only compilation |
 | `sdk-docs` | Mobile SDK modules, DocC/Dokka workflow, or `ci:sdk-docs` | Linux Dokka + snippets; macOS `checkKotlinAbi` with iOS targets, iOS-enabled Dokka, and Swift DocC | Demo Xcode tests |
 | `crypto2-platform-tests` | crypto2/jose/cose paths, or `ci:crypto2` | Windows + macOS x64 + macOS arm64/iOS crypto2 tests | Unrelated library changes |
-| `macos-predicate-tests` | Code changes (skipped for docs/asset-only PRs and pushes) | Fixture coverage of the A3 path predicates and conformance eligibility, summary, and gate behavior | Runtime job success |
+| `macos-predicate-tests` | Existing CI and visual contracts, except PRs limited to supported release workflows | Fixture coverage of the A3 path predicates and conformance eligibility, summary, and gate behavior | Runtime job success |
+| `release-workflows` | PR changes to the candidate, promotion, API image workflow or their contract fixtures | Workflow lint, dispatch outcomes, and image digest and provenance checks | Hosted signing and publishing |
 
 `compose-demo` excludes the opt-in `CredentialStatusBackendE2ETest` class. Run its issuer lifecycle
 and process-retention drivers using the [controlled status fixture](../waltid-applications/mobile-e2e-fixtures/status/README.md),
@@ -92,3 +93,5 @@ PR and main run:
 - cancellation rate on `main` versus pull requests
 
 Heap, swap, daemon, and remote-cache changes wait on that evidence.
+
+For a PR limited to these release workflows, the release checks replace the full Linux Gradle build. A matching integrated repository branch or incomplete change information selects Gradle as well.
