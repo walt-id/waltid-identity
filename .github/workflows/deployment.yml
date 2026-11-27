@@ -69,6 +69,9 @@ jobs:
             name: waltid-enterprise
             namespace: ${{ inputs.enterprise }}
           - k8s: waltid-identity-enterprise/k8s
+            name: waltid-enterprise-postgres
+            namespace: test-enterprise-postgres
+          - k8s: waltid-identity-enterprise/k8s
             name: waltid-enterprise-sandbox
             namespace: sandbox-enterprise-main
 
@@ -80,7 +83,7 @@ jobs:
           resolved-refs: ${{ inputs.checkout-refs }}
 
       - name: Prepare CD - ${{ matrix.services.name }}
-        if: matrix.services.name != 'waltid-enterprise' && matrix.services.name != 'waltid-enterprise-sandbox'
+        if: matrix.services.name != 'waltid-enterprise' && matrix.services.name != 'waltid-enterprise-sandbox' && matrix.services.name != 'waltid-enterprise-postgres'
         run: |
           sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \
             sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
@@ -90,6 +93,11 @@ jobs:
           sed "s/_DEFAULT_DEPLOYMENT_/${GITHUB_SHA}/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | 
           sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" |
           sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
+      - name: Prepare CD
+        if: matrix.services.name == 'waltid-enterprise-postgres'
+        run: |
+          sed "s/_DEFAULT_DEPLOYMENT_/${GITHUB_SHA}/g" ${{ matrix.services.k8s }}/deployment-postgres-dev.yaml |
+          sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
       - name: Prepare CD
         if: matrix.services.name == 'waltid-enterprise-sandbox' && inputs.deployment == 'prod'
         run: |
