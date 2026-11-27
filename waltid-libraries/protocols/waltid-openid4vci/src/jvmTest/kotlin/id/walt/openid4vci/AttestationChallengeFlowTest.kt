@@ -2,6 +2,7 @@
 
 package id.walt.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.clientauth.*
@@ -64,7 +65,7 @@ class AttestationChallengeFlowTest {
     @Test
     fun `preauthorized grant survives missing expired and rotated challenges`() = runTest {
         val fixture = Fixture().apply { initialize() }
-        val code = fixture.config.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+        val code = fixture.provider.requirePreAuthorizedCodeIssuer().issue(PreAuthorizedCodeIssueRequest(
             clientId = "wallet", session = DefaultSession(subject = "holder"),
         )).code
         val parameters = mapOf("grant_type" to listOf(GrantType.PreAuthorizedCode.value), "pre-authorized_code" to listOf(code), "client_id" to listOf("wallet"))
@@ -81,7 +82,7 @@ class AttestationChallengeFlowTest {
         val fixture = Fixture().apply { initialize() }
         val first = fixture.challenge()
         fixture.issuer = "https://second.example"
-        val code = fixture.config.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+        val code = fixture.provider.requirePreAuthorizedCodeIssuer().issue(PreAuthorizedCodeIssueRequest(
             clientId = "wallet", session = DefaultSession(subject = "holder"),
         )).code
         val parameters = mapOf("grant_type" to listOf(GrantType.PreAuthorizedCode.value), "pre-authorized_code" to listOf(code), "client_id" to listOf("wallet"))

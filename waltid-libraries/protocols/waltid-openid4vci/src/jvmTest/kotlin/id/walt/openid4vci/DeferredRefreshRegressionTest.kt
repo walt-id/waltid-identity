@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.core.buildOAuth2Provider
@@ -40,7 +41,7 @@ class DeferredRefreshRegressionTest {
         }
         val config = createTestConfig(accessTokenIssuer = signer, dpopProofVerifier = DefaultDPoPProofVerifier(), refreshTokenRepository = repository)
         val provider = buildOAuth2Provider(config)
-        val code = config.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+        val code = provider.requirePreAuthorizedCodeIssuer().issue(PreAuthorizedCodeIssueRequest(
             scopes = setOf("credential"), audience = setOf(issuer), session = DefaultSession(subject = "offer"),
         )).code
         suspend fun proof(id: String) = wallet.signJws(buildJsonObject {

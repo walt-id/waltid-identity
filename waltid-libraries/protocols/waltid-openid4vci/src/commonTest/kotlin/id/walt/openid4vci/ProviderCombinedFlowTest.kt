@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.core.buildOAuth2Provider
@@ -70,7 +71,7 @@ class ProviderCombinedFlowTest {
         assertTrue(tokenResponse.accessToken.isNotBlank())
 
         // Pre-authorized code flow
-        val issuedCode = config.preAuthorizedCodeIssuer.issue(
+        val issuedCode = provider.requirePreAuthorizedCodeIssuer().issue(
             PreAuthorizedCodeIssueRequest(
                 scopes = setOf("openid"),
                 audience = setOf("aud:issuer"),

@@ -219,7 +219,8 @@ object OpenId4VciRoutesDocs {
 
     fun token(): RouteConfig.() -> Unit = {
         summary = "Token endpoint"
-        description = "The token endpoint. A DPoP proof binds the issued access token to the proof key." +
+        description = "A DPoP proof binds the issued access token to the proof key." +
+                " A pre-authorized grant that reaches its transaction code attempt limit closes the issuance session." +
                 ATTESTATION_CHALLENGE_RETRY
         request {
             body<Map<String, List<String>>> {

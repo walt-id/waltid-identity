@@ -1,5 +1,8 @@
 package id.walt.openid4vci.responses.token
 
+import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
 import id.walt.openid4vci.requests.credential.CredentialAuthorization
@@ -17,6 +20,8 @@ data class TokenCredentialAuthorization(
     val includeInResponse: Boolean,
     /** Fixed deferred authorization deadline, supplied only by the resolved issuance session. */
     val issuanceDeadline: kotlin.time.Instant? = null,
+    /** Optional access-token ceiling for an immediate pre-authorized issuance session. */
+    val accessTokenDeadline: kotlin.time.Instant? = null,
 ) {
     val credentialIdentifiers: List<String>
         get() = authorizationDetails.flatMap { it.credentialIdentifiers.orEmpty() }
@@ -25,8 +30,13 @@ data class TokenCredentialAuthorization(
         mapOf("authorization_details" to Json.encodeToJsonElement(authorizationDetails))
 }
 
-class InvalidTokenCredentialAuthorization(val request: AccessTokenRequest, message: String) :
-    IllegalArgumentException(message)
+class InvalidTokenCredentialAuthorization(
+    val request: AccessTokenRequest,
+    message: String,
+    val errorCode: String,
+) : IllegalArgumentException(message) {
+    constructor(request: AccessTokenRequest, message: String) : this(request, message, OAuthErrorCodes.INVALID_REQUEST)
+}
 
 /** Apply a credential grant without treating a missing grant as an unrestricted grant. */
 fun Collection<CredentialAuthorization>.withinAuthorizationDetails(
@@ -54,7 +64,33 @@ fun Collection<CredentialAuthorization>.authorizedByVerifiedToken(
     else selected.takeIf { size == 1 }.orEmpty()
 }
 
-/** The embedding issuer resolves scope names and supplies only configurations backed by the validated grant. */
+/**
+ * The embedding issuer supplies the configurations, scope mapping and [currentOffer] from the
+ * same issuance-session snapshot. A pre-authorized exchange requires its current offer.
+ */
+fun resolveTokenCredentialAuthorization(
+    request: AccessTokenRequest,
+    candidates: List<CredentialAuthorization>,
+    grantConfigurationIds: Set<String>,
+    tokenScopeConfigurationIds: Set<String>,
+    establishedSelection: List<String>?,
+    refreshGrant: List<AuthorizationDetail>?,
+    includeInResponse: Boolean,
+    currentOffer: CredentialOffer?,
+): TokenCredentialAuthorization {
+    if (GrantType.PreAuthorizedCode.value in request.grantTypes) {
+        val expectedCode = currentOffer?.grants?.preAuthorizedCode?.preAuthorizedCode
+        if (expectedCode == null || expectedCode != request.requestForm["pre-authorized_code"]?.singleOrNull()) {
+            throw InvalidTokenCredentialAuthorization(request, "Pre-authorized code is invalid", OAuthErrorCodes.INVALID_GRANT)
+        }
+    }
+    return resolveTokenCredentialAuthorization(
+        request, candidates, grantConfigurationIds, tokenScopeConfigurationIds,
+        establishedSelection, refreshGrant, includeInResponse,
+    )
+}
+
+/** Apply an already validated credential grant, independently of offer resolution. */
 fun resolveTokenCredentialAuthorization(
     request: AccessTokenRequest,
     candidates: List<CredentialAuthorization>,

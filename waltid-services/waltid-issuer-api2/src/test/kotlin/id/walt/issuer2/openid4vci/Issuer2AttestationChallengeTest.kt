@@ -40,6 +40,7 @@ import id.walt.openid4vci.clientauth.attestation.challenge.JwtAttestationChallen
 import id.walt.openid4vci.metadata.issuer.signing.MetadataSigningMethod
 import id.walt.openid4vci.metadata.issuer.signing.SignedMetadataConfig
 import id.walt.openid4vci.offers.AuthenticationMethod
+import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.proofs.CredentialNonceBinding
 import id.walt.openid4vci.proofs.CredentialNonceValidationResult
@@ -78,6 +79,7 @@ import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 class Issuer2AttestationChallengeTest {
     private val catalogues = mutableListOf<IssuerTypeMetadataCatalogue>()
@@ -540,19 +542,18 @@ class Issuer2AttestationChallengeTest {
             instanceKey, "wallet", issuer, challenge,
         )
 
-        suspend fun session(method: AuthenticationMethod): DefaultSession {
-            val session = IssuanceSession(
-                sessionId = UUID.randomUUID().toString(), authenticationMethod = method,
+        private fun issuanceSession(id: String, method: AuthenticationMethod, expiresAt: Instant, offer: CredentialOffer? = null) =
+            IssuanceSession(
+                sessionId = id, authenticationMethod = method,
                 issuanceRequests = listOf(IssuanceRequest("credential", "profile", "identity", JsonObject(emptyMap()),
                     credentialData = JsonObject(emptyMap()))),
-                expiresAt = Clock.System.now() + 10.minutes,
+                expiresAt = expiresAt, credentialOffer = offer,
             )
-            sessions.createSession(session)
-            return DefaultSession(subject = session.sessionId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to session.expiresAt))
-        }
 
         suspend fun authorizationCode(verifier: String? = null): String {
-            val session = session(AuthenticationMethod.AUTHORIZED)
+            val issuance = issuanceSession(UUID.randomUUID().toString(), AuthenticationMethod.AUTHORIZED, Clock.System.now() + 10.minutes)
+            sessions.createSession(issuance)
+            val session = DefaultSession(subject = issuance.sessionId, expiresAt = mapOf(TokenType.ACCESS_TOKEN to issuance.expiresAt))
             val request = assertIs<AuthorizationRequestResult.Success>(module.oauth2Provider.createAuthorizationRequest(
                 mapOf("response_type" to listOf("code"), "client_id" to listOf("wallet"),
                     "redirect_uri" to listOf(REDIRECT), "scope" to listOf("identity")) +
@@ -562,9 +563,15 @@ class Issuer2AttestationChallengeTest {
             return assertIs<AuthorizationResponseResult.Success>(module.oauth2Provider.createAuthorizationResponse(request, session)).response.code
         }
 
-        suspend fun preAuthorizedCode(clientId: String?) = module.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
-            clientId = clientId, scopes = setOf("identity"), session = session(AuthenticationMethod.PRE_AUTHORIZED),
-        )).code
+        suspend fun preAuthorizedCode(clientId: String?): String {
+            val id = UUID.randomUUID().toString()
+            val grant = module.preAuthorizedCodeIssuer.issue(PreAuthorizedCodeIssueRequest(
+                clientId = clientId, scopes = setOf("identity"), session = DefaultSession(subject = id), issuanceSessionId = id,
+            ))
+            val offer = CredentialOffer.withPreAuthorizedCodeGrant(issuer, listOf("identity"), grant.code)
+            sessions.createSession(issuanceSession(id, AuthenticationMethod.PRE_AUTHORIZED, grant.expiresAt, offer))
+            return grant.code
+        }
 
         suspend fun expiredChallenge() = JwtAttestationChallengeService(
             JwtSigningKeyResolver { tokenKey }, JwtVerificationKeyResolver { tokenKey },

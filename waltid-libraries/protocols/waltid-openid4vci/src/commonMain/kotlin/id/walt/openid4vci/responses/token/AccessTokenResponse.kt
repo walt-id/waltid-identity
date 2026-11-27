@@ -80,6 +80,9 @@ suspend fun AccessTokenResponse.withOptions(
 ): AccessTokenResponse =
     withAuthorizationDetails(options.resolveAuthorizationDetails(request))
 
+/** Grant-specific information for the embedding issuer. OAuth clients receive the standard error. */
+interface TokenGrantFailure
+
 sealed class AccessTokenResponseResult {
     data class Success(
         val request: AccessTokenRequest,
@@ -90,6 +93,8 @@ sealed class AccessTokenResponseResult {
     data class Failure(
         val request: AccessTokenRequest,
         val error: OAuthError,
+        /** Library outcome for the embedding issuer. HTTP responses serialize [error]. */
+        val grantFailure: TokenGrantFailure? = null,
     ) : AccessTokenResponseResult()
 
     fun isSuccess(): Boolean = this is Success

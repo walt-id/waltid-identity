@@ -1,5 +1,6 @@
 package id.walt.issuer2.application.openid4vci
 
+import id.walt.openid4vci.preauthorized.requirePreAuthorizedCodeIssuer
 import id.walt.openid4vci.attestation.*
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
@@ -37,7 +38,6 @@ import id.walt.openid4vci.dpop.DefaultDPoPProofVerifier
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
-import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.proofs.CredentialNonceService
 import id.walt.openid4vci.proofs.CredentialProofVerifier
@@ -121,10 +121,6 @@ data class OpenId4VciModule(
             val verificationKeyResolver = JwtVerificationKeyResolver {
                 KeyManager.resolveSerializedKey(config.ciTokenKey)
             }
-            val preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(
-                repository = preAuthorizedCodeRepository,
-                anonymousAccessSupported = config.supportsPreAuthAnonymous(),
-            )
             val credentialNonceService = crypto2TokenKey?.let { signingKey ->
                 JwtCredentialNonceService.crypto2(
                     signingKeyResolver = Crypto2JwtSigningKeyResolver { signingKey },
@@ -215,14 +211,15 @@ data class OpenId4VciModule(
                     refreshTokenIssuer = refreshTokenIssuer,
                     refreshTokenVerifier = refreshTokenVerifier,
 
-                    preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
+                    preAuthorizedCodeConfig = config.preAuthorizedCode,
+                    preAuthorizedCodeAnonymousAccessSupported = config.supportsPreAuthAnonymous(),
                 )
             )
 
             return OpenId4VciModule(
                 oauth2Provider = provider,
                 pkceServiceConfig = pkceServiceConfig,
-                preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
+                preAuthorizedCodeIssuer = provider.requirePreAuthorizedCodeIssuer(),
                 credentialNonceService = credentialNonceService,
                 crypto2TokenSigningKey = crypto2TokenKey,
                 attestationChallengeService = attestationChallengeService,
