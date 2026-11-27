@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import id.walt.wallet2.issuance.CredentialReceiptTrustException
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -172,3 +173,10 @@ sealed interface WalletIssuanceOutcome {
         ): Failed = Failed(sessionId, error, storedCredentialIds, deferredCredentials, failure)
     }
 }
+
+internal class IssuanceStageException(
+    val code: WalletIssuanceErrorCode,
+    cause: Throwable? = null,
+    val failure: CredentialIssuanceFailure? = null,
+    val receiptFailure: CredentialReceiptTrustException? = null,
+) : Exception(code.name, cause)
