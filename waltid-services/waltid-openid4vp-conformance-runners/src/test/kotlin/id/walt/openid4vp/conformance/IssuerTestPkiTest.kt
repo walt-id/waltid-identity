@@ -22,8 +22,24 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.jsonArray
+import kotlin.test.assertNotEquals
 
 class IssuerTestPkiTest {
+    @Test
+    fun secondaryVerifierHasADistinctKeyAndTrustedClientCertificate() {
+        val fixture = IssuerTestPki("https://fixture.example/issuer.crl")
+        val key = ECKey.parse(fixture.additionalVerifierJwks.getValue("keys").jsonArray.single().toString())
+        val factory = CertificateFactory.getInstance("X.509")
+        val root = factory.generateCertificate(TestKeyMaterial.CREDENTIAL_ISSUER_CA_PEM.byteInputStream()) as X509Certificate
+        val leaf = factory.generateCertificate(key.x509CertChain.first().decode().inputStream()) as X509Certificate
+        leaf.verify(root.publicKey)
+        leaf.checkValidity()
+        assertEquals(key.toECPublicKey(), leaf.publicKey)
+        assertTrue("1.3.6.1.5.5.7.3.2" in leaf.extendedKeyUsage)
+        assertNotEquals(ECKey.parse(TestKeyMaterial.SUITE_VERIFIER_SIGNING_KEY).toECPublicKey(), key.toECPublicKey())
+    }
+
     @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun issuedMdocMsoDoesNotOutliveItsDocumentSigner() = runTest {

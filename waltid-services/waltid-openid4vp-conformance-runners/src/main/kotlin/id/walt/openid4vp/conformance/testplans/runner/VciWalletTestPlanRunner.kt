@@ -237,7 +237,8 @@ class VciWalletTestPlanRunner(
 
         println("   Credential Offer Endpoint: $walletAdapterUrl/credential-offer")
 
-        val walletResponse = if (module.testModule.startsWith("fapi2-security-profile-final-client-test-")) {
+        val walletResponse = if (module.testModule.startsWith("fapi2-security-profile-final-client-test-") ||
+            (testPlan.grantType == "authorization_code" && testPlan.authFlowVariant == "wallet_initiated")) {
             var issuer: String? = null
             repeat(OFFER_POLL_ATTEMPTS) {
                 if (issuer == null) {
@@ -247,12 +248,14 @@ class VciWalletTestPlanRunner(
                     if (issuer == null) delay(POLL_INTERVAL_MILLISECONDS)
                 }
             }
-            checkNotNull(issuer) { "FAPI VCI module did not expose a credential issuer" }
-            val offer = conformance.getTestRun(testId).getBrowserUrls().firstOrNull()
+            checkNotNull(issuer) { "VCI module did not expose a credential issuer" }
+            val offer = if (testPlan.authFlowVariant == "wallet_initiated") null else
+                conformance.getTestRun(testId).getBrowserUrls().firstOrNull()
             walletHttpClient.post("$walletAdapterUrl/issuance-session") {
                 parameter("credential_issuer", issuer)
                 offer?.let { parameter("offer_url", it) }
                 parameter("format", testPlan.credentialFormat)
+                parameter("batch", module.testModule.endsWith("-batch-credential-issuance"))
             }
         } else deliverCredentialOfferToWallet(testId, module.testModule.endsWith("-batch-credential-issuance"))
         val observedWalletStatus = if (walletResponse.status.isSuccess()) "STORED" else "REJECTED"
@@ -428,6 +431,7 @@ class VciWalletTestPlanRunner(
         println("   Delivering $parameterName to the wallet adapter")
         val response = walletHttpClient.post("$walletAdapterUrl/credential-offer") {
             parameter(parameterName, parameterValue)
+            parameter("grant_type", testPlan.grantType)
             parameter("batch", batch)
         }
         val body = response.bodyAsText()

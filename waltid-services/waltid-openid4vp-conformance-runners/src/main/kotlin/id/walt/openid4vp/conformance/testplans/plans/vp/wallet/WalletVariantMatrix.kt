@@ -97,8 +97,7 @@ object WalletVariantMatrix {
      * Client identifier prefixes driven against Wallet2.
      *
      * Excluded, with reasons:
-     * - `web-origin`: absent from `id.walt.openid4vp.clientidprefix.ClientIdPrefix`, so Wallet2
-     *   cannot authenticate it at all. It is also DC-API-only in practice.
+     * - `web-origin`: belongs to the separate SDK DC API driver, not this HTTP matrix.
      * - `pre_registered`: needs the verifier's metadata in
      *   `OSSWallet2ServiceConfig.clientIdTrust.preRegisteredClients`, which the conformance wallet
      *   does not configure yet.
@@ -147,7 +146,7 @@ object WalletVariantMatrix {
         }
     }
 
-    /** HAIP fixes x509_hash + a signed request + an encrypted response. */
+    /** HTTP HAIP fixes x509_hash + a signed request + an encrypted response. */
     fun haip(): List<WalletVariant> = credentialFormats.map { credentialFormat ->
         WalletVariant(
             credentialFormat = credentialFormat,
@@ -168,9 +167,9 @@ object WalletVariantMatrix {
      * annotations, so the suite is never asked for a plan it would reject with
      * "No test modules ... applicable". The second group is what Wallet2 and this harness can drive.
      *
-     * `dc_api` / `dc_api.jwt` never appear in [responseModes]: they need the browser Digital
-     * Credentials API, whereas this harness talks HTTP to the wallet. `request_uri_multisigned` is
-     * consequently unreachable too - the suite declares it DC-API-only (OID4VP Appendix A.3.2).
+     * `dc_api` / `dc_api.jwt` never appear in this HTTP [responseModes] matrix. The separate
+     * opt-in SDK DC API driver inventories those plans, including capability blockers for unsupported
+     * protocols. `request_uri_multisigned` is consequently unreachable in this HTTP matrix - the suite declares it DC-API-only (OID4VP Appendix A.3.2).
      */
     fun isApplicable(variant: WalletVariant): Boolean = when {
         // --- Suite rules ---

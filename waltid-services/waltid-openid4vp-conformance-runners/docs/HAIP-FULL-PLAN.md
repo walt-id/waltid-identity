@@ -34,24 +34,29 @@ shared evidence. Existing full-run evidence remains tied to its tested source.
 |------|--------|----------------------|
 | VP wallet | SD-JWT VC | `x509_hash`, `request_uri_signed`, encrypted `direct_post.jwt` |
 | VP wallet | mdoc (`iso_mdl`) | `x509_hash`, `request_uri_signed`, encrypted `direct_post.jwt` |
+| VP wallet SDK | SD-JWT VC | `dc_api.jwt`; all suite-provided unsigned, signed and multisigned groups |
+| VP wallet SDK | mdoc (`iso_mdl`) | `dc_api.jwt`; all suite-provided unsigned, signed and multisigned groups |
 | VP verifier | SD-JWT VC | `x509_hash`, `request_uri_signed`, encrypted `direct_post.jwt` |
 | VP verifier | mdoc (`iso_mdl`) | `x509_hash`, `request_uri_signed`, encrypted `direct_post.jwt` |
 | VCI wallet | SD-JWT VC | Issuer-initiated authorization code, offer by value, client attestation, DPoP |
 | VCI wallet | mdoc | Issuer-initiated authorization code, offer by value, client attestation, DPoP |
+| VCI wallet | SD-JWT VC | Issuer-initiated authorization code, offer by reference, client attestation, DPoP |
+| VCI wallet | mdoc | Issuer-initiated authorization code, offer by reference, client attestation, DPoP |
+| VCI wallet | SD-JWT VC | Wallet-initiated authorization code, client attestation, DPoP |
+| VCI wallet | mdoc | Wallet-initiated authorization code, client attestation, DPoP |
 
-These are six selected combinations, not every possible HAIP combination. For each
+These are the twelve selected HAIP wallet/verifier certification combinations. DC API entries exercise the real Wallet2 SDK behind a simulated browser/platform transport boundary; they do not establish browser, OS picker or mobile UI behavior. For each
 VCI wallet format, the suite supplies immediate/plain, deferred/plain and
 immediate/encrypted credential issuance variants, plus applicable FAPI client tests.
-Wallet-initiated VCI and offers by reference are not added here. Issuer-side
-combinations remain in the separate issuer work.
+Issuer-side combinations remain in the separate issuer work. Selection does not imply that a combination has passed or has certification evidence; inspect its source-pinned run report.
 
 ## Selection and commands
 
 Full-plan mode selects the two HAIP verifier variants, the two HAIP VP wallet
-variants, and two VCI wallet profiles: SD-JWT VC and mdoc, both issuer-initiated with offers by value.
+HTTP variants, the two DC API SDK combinations, and six VCI wallet profiles: SD-JWT VC and mdoc, each with issuer-initiated offers by value/by reference and wallet-initiated issuance.
 Each VCI wallet profile uses client attestation and DPoP; the suite expands immediate/plain,
 deferred/plain and immediate/encrypted issuance plus its applicable FAPI client modules.
-The mdoc profile is enabled only in this upgraded-suite mode; ordinary CI selection stays unchanged.
+The additional mdoc, by-reference and wallet-initiated combinations are enabled only in this upgraded-suite mode; ordinary CI selection stays unchanged.
 The VCI wallet runner rejects module/variant slices in full-plan mode.
 Ordinary CI retains its existing selection, including deferred and FAPI skips.
 Explicitly selected checks can exercise those modules independently.
@@ -138,3 +143,38 @@ This is the verifier/wallet foundation (PR1). The issuer upgrade will be stacked
 it separately (PR2). Report functionality gaps for allocation rather than including
 unassigned product fixes. Validate the combined local HAIP results before upgrading
 the shared remote suite pin and merging the combined work into main.
+
+## Additional VCI entry paths
+
+By-reference offers remain references when passed to Wallet2: the adapter wraps
+`credential_offer_uri` in the deep-link source expected by the API and routes the
+authorization-code grant through its authorization flow. It does not substitute
+inline metadata for the by-reference case.
+
+Wallet-initiated modules start the retained SDK session with the suite-exposed
+credential issuer and a configuration matching the selected format, without a
+credential offer. Batch modules select two configured wallet holder keys. The SDK
+continues to own metadata discovery, PAR, PKCE/state, DPoP, client attestation,
+credential requests and storage. Deferred session outcomes are polled by their
+returned handles and intervals until stored, rejected or the adapter's polling
+budget expires. Parent cancellation still propagates.
+
+## DC API SDK transport boundary
+
+The upgraded-suite VP wallet task includes `runDcApiConformanceTests` for both
+formats. Ordinary CI leaves this test disabled. The suite creates every offered
+request group inside each plan; module applicability uses the group's effective
+variants, and reports distinguish repeated module names by those variants.
+
+The driver takes the caller origin from the configured suite origin, passes the
+request to Wallet2's real DC API preview and submit handlers, and relays the
+returned protocol/data envelope to the suite's browser API submission endpoint.
+Only the browser/platform boundary is simulated: no suite-generated mock wallet
+response or synthetic UI evidence is used. Foreign-origin submission endpoints
+are rejected before invoking the wallet. Unsupported SDK protocols remain
+explicit capability blockers, including negative modules whose intended guard
+was not reached. SDK rejection and caller cancellation stay distinct.
+
+This mode requires no physical device. Genuine browser/OS integration, wallet
+consent and result screenshots remain separate evidence obligations. Neither a
+successful SDK response nor the suite result replaces those observations.

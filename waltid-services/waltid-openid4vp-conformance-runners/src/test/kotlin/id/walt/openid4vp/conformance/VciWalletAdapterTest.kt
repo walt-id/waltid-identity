@@ -4,12 +4,17 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import id.walt.openid4vp.conformance.adapter.VciWalletConformanceAdapter
 import id.walt.openid4vp.conformance.adapter.resolveAuthorizationRedirect
+import id.walt.openid4vp.conformance.adapter.completeSessionIssuance
+import id.walt.wallet2.handlers.WalletDeferredCredential
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import kotlinx.coroutines.CancellationException
 import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
 import io.ktor.client.HttpClient
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
 import kotlinx.coroutines.runBlocking
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -18,8 +23,69 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class VciWalletAdapterTest {
+    @Test
+    fun sdkDeferredIssuanceRetainsStoredCopiesAndResumesUpdatedHandles() = runBlocking<Unit> {
+        val ids = mutableListOf<String>()
+        val initial = WalletIssuanceOutcome.Deferred("session", listOf("already-stored"),
+            listOf(WalletDeferredCredential("first", "config", 0)))
+        val result = completeSessionIssuance(initial, 1_000) { id ->
+            ids += id
+            when (id) {
+                "first" -> WalletIssuanceOutcome.Deferred("session", listOf("second-stored"),
+                    listOf(WalletDeferredCredential("next", "config", 0)))
+                "next" -> WalletIssuanceOutcome.Stored("session", listOf("third-stored"))
+                else -> error("Polled a handle outside this issuance")
+            }
+        }
+        assertEquals(listOf("first", "next"), ids)
+        assertEquals(WalletIssuanceOutcome.Stored("session", listOf("already-stored", "second-stored", "third-stored")), result)
+    }
+
+    @Test
+    fun sdkDeferredDeadlineDoesNotPollEarlyAndParentCancellationPropagates() = runBlocking<Unit> {
+        val waiting = WalletIssuanceOutcome.Deferred("session", emptyList(),
+            listOf(WalletDeferredCredential("pending", "config", 60)))
+        assertNull(completeSessionIssuance(waiting, 25) { error("Polled before issuer interval") })
+        val ready = waiting.copy(credentials = listOf(WalletDeferredCredential("pending", "config", 0)))
+        assertFailsWith<CancellationException> {
+            completeSessionIssuance(ready, 1_000) { throw CancellationException("parent cancelled") }
+        }
+    }
+
+    @Test
+    fun referencedAuthorizationOfferUsesTheResolverAndPreservesTheReferenceUri() = runBlocking<Unit> {
+        val reference = "https://issuer.example/offer?id=one&hint=a%2Fb"
+        var receivedReference: String? = null
+        val unexpectedReceives = AtomicInteger()
+        withAdapter { backend, client, endpoint ->
+            backend.createContext("/wallet/test/credentials/receive/resolve-offer") { exchange ->
+                val request = Json.parseToJsonElement(exchange.requestBody.readBytes().decodeToString()).jsonObject
+                receivedReference = Url(request.getValue("offerUrl").jsonPrimitive.content).parameters["credential_offer_uri"]
+                exchange.json(400, "{\"error\":\"resolver-reached\"}")
+            }
+            backend.createContext("/wallet/test/credentials/receive") { exchange ->
+                unexpectedReceives.incrementAndGet()
+                exchange.json(500, "{}")
+            }
+            backend.start()
+            val response = client.post(endpoint) {
+                parameter("credential_offer_uri", reference)
+                parameter("grant_type", "authorization_code")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("resolver-reached"))
+            assertEquals(reference, receivedReference)
+            assertEquals(0, unexpectedReceives.get(), "Authorization offers must not enter pre-authorized receive")
+        }
+    }
+
     @Test
     fun callbackDoesNotInheritAuthorizationRequestParameters() {
         val callback = "http://127.0.0.1:7007/callback?code=test-code&state=expected&iss=https%3A%2F%2Fissuer.example"
@@ -33,7 +99,7 @@ class VciWalletAdapterTest {
     }
 
     @Test
-    fun deferredIssuanceResumesOnlyNewHandlesWithoutRedeemingTheOfferAgain() = runBlocking {
+    fun deferredIssuanceResumesOnlyNewHandlesWithoutRedeemingTheOfferAgain() = runBlocking<Unit> {
         val received = AtomicBoolean()
         val redemptions = AtomicInteger()
         val polls = AtomicInteger()
@@ -65,7 +131,7 @@ class VciWalletAdapterTest {
     }
 
     @Test
-    fun deferredPollingDeadlineReturnsAFailedClaimRatherThanCancellation() = runBlocking {
+    fun deferredPollingDeadlineReturnsAFailedClaimRatherThanCancellation() = runBlocking<Unit> {
         val received = AtomicBoolean()
         val polls = AtomicInteger()
         withAdapter(deferredTimeoutMillis = 100) { backend, client, endpoint ->
@@ -89,7 +155,7 @@ class VciWalletAdapterTest {
     }
 
     @Test
-    fun walletFailureIsNotReportedAsSuccessfulOfferProcessing() = runBlocking {
+    fun walletFailureIsNotReportedAsSuccessfulOfferProcessing() = runBlocking<Unit> {
         withAdapter { backend, client, endpoint ->
             backend.createContext("/wallet/test/credentials/receive") { exchange ->
                 if (exchange.requestURI.path.endsWith("/deferred")) exchange.json(200, "[]")

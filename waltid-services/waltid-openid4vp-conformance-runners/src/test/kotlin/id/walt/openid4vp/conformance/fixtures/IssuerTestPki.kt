@@ -1,6 +1,11 @@
 package id.walt.openid4vp.conformance.fixtures
 
 import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.gen.ECKeyGenerator
+import com.nimbusds.jose.util.JSONObjectUtils
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.x500.X500Name
@@ -39,6 +44,7 @@ internal class IssuerTestPki(
     val trustAnchorPem: String
     val signerCertificate: ByteArray
     val crl: ByteArray
+    val additionalVerifierJwks: JsonObject
 
     init {
         val originalRoot = CertificateFactory.getInstance("X.509").generateCertificate(
@@ -53,6 +59,25 @@ internal class IssuerTestPki(
             }
         }
         val rootName = X500Name.getInstance(originalRoot.subjectX500Principal.encoded)
+        // A distinct trusted client identity lets the suite build genuine two-signature requests.
+        val verifierKey = ECKeyGenerator(Curve.P_256).keyID("conformance-secondary-verifier").generate()
+        val verifierNow = Instant.now()
+        val verifierBuilder = JcaX509v3CertificateBuilder(
+            rootName, BigInteger(128, SecureRandom()).setBit(127),
+            Date.from(verifierNow.minusSeconds(60)),
+            Date.from(minOf(verifierNow.plus(30, ChronoUnit.DAYS), originalRoot.notAfter.toInstant())),
+            X500Name("CN=Conformance secondary verifier"), verifierKey.toECPublicKey(),
+        )
+        verifierBuilder.addExtension(Extension.keyUsage, true, KeyUsage(KeyUsage.digitalSignature))
+        verifierBuilder.addExtension(Extension.extendedKeyUsage, false, ExtendedKeyUsage(KeyPurposeId.id_kp_clientAuth))
+        val verifierDer = verifierBuilder.build(JcaContentSignerBuilder("SHA256withECDSA").build(privateKey)).encoded
+        val jwk = verifierKey.toJSONObject().apply {
+            put("alg", "ES256")
+            put("use", "sig")
+            put("x5c", listOf(java.util.Base64.getEncoder().encodeToString(verifierDer)))
+        }
+        additionalVerifierJwks = Json.parseToJsonElement(JSONObjectUtils.toJSONString(
+            mapOf("keys" to listOf(jwk)))).let { it as JsonObject }
         // Reuse only the public test CA key, adding the IACA issuer alternative name.
         val rootBuilder = JcaX509v3CertificateBuilder(
             rootName, originalRoot.serialNumber,

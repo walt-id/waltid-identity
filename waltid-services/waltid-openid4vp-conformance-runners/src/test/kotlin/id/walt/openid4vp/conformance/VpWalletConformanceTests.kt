@@ -6,6 +6,10 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.openid4vp.conformance.adapter.VpWalletConformanceAdapter
+import id.walt.openid4vp.conformance.adapter.DcApiWalletConformanceDriver
+import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.certificate.x509.X509CertificateUtil
+import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
@@ -33,6 +37,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.AfterAll
@@ -76,6 +81,10 @@ class VpWalletConformanceTests {
         val isConformanceAvailable = conformanceServerVersionResult.isSuccess
 
         @JvmStatic
+        fun isDcApiCheckEnabled(): Boolean = isConformanceAvailable &&
+            ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN
+
+        @JvmStatic
         @AfterAll
         fun writeSkippedSummaryIfSuiteUnavailable() {
             if (isConformanceAvailable) return
@@ -117,7 +126,14 @@ class VpWalletConformanceTests {
 
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun runWallet2ConformanceTests() {
+    fun runWallet2ConformanceTests() = runWalletPlans(dcApi = false)
+
+    /** Protocol/SDK coverage only: the browser and OS transport are simulated. */
+    @Test
+    @EnabledIf("isDcApiCheckEnabled")
+    fun runDcApiConformanceTests() = runWalletPlans(dcApi = true)
+
+    private fun runWalletPlans(dcApi: Boolean) {
         E2ETest(WALLET_HOST, WALLET_PORT, failEarly = true).testBlock(
             // 22 matrix points, and any module the suite cannot complete costs a 60 s poll budget
             // before it is recorded. Full runs can exceed 30 min; a shorter timeout reports an
@@ -158,18 +174,30 @@ class VpWalletConformanceTests {
             try {
                 adapter.start(adapterHttp)
                 val results = mutableListOf<TestPlanResult>()
-                Oid4vpWalletVariantPlan.supportedByWallet2(
+                val dcApiDriver = if (dcApi) DcApiWalletConformanceDriver(
+                    requireNotNull(OSSWallet2Service.resolver.resolveWallet(walletId)),
+                    ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore(listOf(
+                        X509CertificateUtil.parseCertificatePem(TestKeyMaterial.CREDENTIAL_ISSUER_CA_PEM),
+                    ))),
+                ) else null
+                val plans = if (dcApi) Oid4vpWalletVariantPlan.dcApiHaip(
+                    ConformanceConfig.WALLET_ADAPTER_URL, conformanceHost, conformancePort,
+                    mdocTestPki.trustAnchorPem, mdocTestPki.additionalVerifierJwks,
+                ) else Oid4vpWalletVariantPlan.supportedByWallet2(
                     walletApiUrl = ConformanceConfig.WALLET_ADAPTER_URL,
                     conformanceHost = conformanceHost,
                     conformancePort = conformancePort,
                     credentialTrustAnchorPem = mdocTestPki.trustAnchorPem,
-                ).filter(::isSelected).forEach { plan ->
+                ).filter(::isSelected)
+                plans.forEach { plan ->
                     println("\n" + "=".repeat(80))
                     println("Running wallet plan: ${plan.name}")
                     println("=".repeat(80))
                     val planResults = runCatching {
-                        WalletTestPlanRunner(plan, adapterHttp, conformanceHost, conformancePort).test()
+                        WalletTestPlanRunner(plan, adapterHttp, conformanceHost, conformancePort,
+                            dcApiPresent = dcApiDriver?.let { it::present }).test()
                     }.getOrElse { error ->
+                        if (error is CancellationException) throw error
                         println("Plan ${plan.name} failed: ${error.message}")
                         listOf(
                             TestPlanResult(

@@ -40,6 +40,15 @@ data class TestRunResult(
         }
     }
 
+    /** DC API interactions exposed by the suite, without manufacturing a browser response. */
+    fun getBrowserApiRequests(): List<BrowserApiRequest> = browser.browserApiRequests.map { entry ->
+        val value = requireNotNull(entry as? JsonObject) { "Malformed browser API interaction" }
+        BrowserApiRequest(value.getValue("request").jsonObject,
+            value.getValue("submitUrl").jsonPrimitive.content)
+    }
+
+    data class BrowserApiRequest(val request: JsonObject, val submitUrl: String)
+
     @Serializable
     data class Browser(
         val browserApiRequests: List<JsonElement?> = listOf(),

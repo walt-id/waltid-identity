@@ -23,6 +23,7 @@ class Oid4vpWalletVariantPlan(
     conformanceHost: String,
     conformancePort: Int,
     credentialTrustAnchorPem: String = TestKeyMaterial.CREDENTIAL_ISSUER_CA_PEM,
+    secondaryVerifierJwks: JsonObject? = null,
 ) : WalletTestPlan {
 
     val name: String = walletVariant.id
@@ -102,16 +103,31 @@ class Oid4vpWalletVariantPlan(
                 "authorization_encrypted_response_alg": "ECDH-ES",
                 "authorization_encrypted_response_enc": "A256GCM"
             },
+            ${secondaryVerifierJwks?.let { "\"client2\": {\"jwks\": $it}," }.orEmpty()}
             "publish": "everything"
         }
         """.trimIndent()
     )
 
     companion object {
+        /** Two certification combinations; the suite expands all DC API request groups inside each. */
+        fun dcApiHaip(
+            walletApiUrl: String,
+            conformanceHost: String,
+            conformancePort: Int,
+            credentialTrustAnchorPem: String,
+            secondaryVerifierJwks: JsonObject,
+        ): List<Oid4vpWalletVariantPlan> = listOf("sd_jwt_vc", "iso_mdl").map { format ->
+            Oid4vpWalletVariantPlan(
+                WalletVariant(format, "x509_hash", "request_uri_signed", "dc_api.jwt", "haip"),
+                walletApiUrl, conformanceHost, conformancePort, credentialTrustAnchorPem, secondaryVerifierJwks,
+            )
+        }
+
         /** SAN DNS entry of the leaf in [TestKeyMaterial.SUITE_VERIFIER_SIGNING_KEY]'s `x5c`. */
         private const val VERIFIER_SAN_DNS = "verifier.example.com"
 
-        /** Every matrix point the wallet can be driven through; both formats are provisioned. */
+        /** HTTP matrix points; [dcApiHaip] selects the separate SDK DC API combinations. */
         fun supportedByWallet2(
             walletApiUrl: String,
             conformanceHost: String = ConformanceConfig.CONFORMANCE_HOST,

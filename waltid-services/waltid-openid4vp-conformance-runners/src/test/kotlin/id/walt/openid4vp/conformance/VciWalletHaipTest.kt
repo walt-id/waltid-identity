@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 
 class VciWalletHaipTest {
     @Test
-    fun formatsSelectMatchingConfigurationsWithoutOverridingSuiteHaipDefaults() = runBlocking {
+    fun formatsSelectMatchingConfigurationsWithoutOverridingSuiteHaipDefaults() = runBlocking<Unit> {
         val authority = ClientAttestationTestAuthority.create(clientId = "wallet-conformance-test")
         val plans = listOf("sd_jwt_vc", "mdoc").map { format ->
             VciWalletHaip("http://wallet", "http://adapter/credential-offer", "http://adapter/callback",
@@ -48,7 +48,36 @@ class VciWalletHaipTest {
     }
 
     @Test
-    fun unsupportedCredentialFormatCannotSilentlyUseSdJwtConfiguration() = runBlocking {
+    fun offerDeliverySelectsDistinctCertificationCombinations() = runBlocking<Unit> {
+        val authority = ClientAttestationTestAuthority.create(clientId = "wallet-conformance-test")
+        for (format in listOf("sd_jwt_vc", "mdoc")) {
+            val plans = listOf("by_value", "by_reference").map { delivery ->
+                VciWalletHaip("http://wallet", "http://adapter/credential-offer", "http://adapter/callback",
+                    "localhost", 8443, attestationAuthority = authority,
+                    credentialFormat = format, credentialOfferVariant = delivery)
+            }
+            assertEquals("by_value", plans[0].variant["vci_credential_offer_variant"])
+            assertEquals("by_reference", plans[1].variant["vci_credential_offer_variant"])
+            assertNotEquals(plans[0].producerId, plans[1].producerId)
+            val walletInitiated = VciWalletHaip("http://wallet", "http://adapter/credential-offer", "http://adapter/callback",
+                "localhost", 8443, attestationAuthority = authority,
+                credentialFormat = format, authFlowVariant = "wallet_initiated")
+            assertEquals("wallet_initiated", walletInitiated.variant["vci_authorization_code_flow_variant"])
+            assertTrue(walletInitiated.producerId !in plans.map { it.producerId })
+        }
+        assertFailsWith<IllegalArgumentException> {
+            VciWalletHaip("http://wallet", "http://adapter/credential-offer", "http://adapter/callback",
+                "localhost", 8443, attestationAuthority = authority, credentialOfferVariant = "unsupported")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            VciWalletHaip("http://wallet", "http://adapter/credential-offer", "http://adapter/callback",
+                "localhost", 8443, attestationAuthority = authority,
+                authFlowVariant = "wallet_initiated", credentialOfferVariant = "by_reference")
+        }
+    }
+
+    @Test
+    fun unsupportedCredentialFormatCannotSilentlyUseSdJwtConfiguration() = runBlocking<Unit> {
         val authority = ClientAttestationTestAuthority.create(clientId = "wallet-conformance-test")
         assertFailsWith<IllegalArgumentException> {
             VciWalletHaip("http://wallet", "http://adapter/credential-offer", "http://adapter/callback",

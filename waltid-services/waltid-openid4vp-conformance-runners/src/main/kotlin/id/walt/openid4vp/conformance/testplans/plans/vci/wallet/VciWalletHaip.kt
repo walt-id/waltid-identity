@@ -49,10 +49,21 @@ class VciWalletHaip(
      */
     val attestationAuthority: ClientAttestationTestAuthority,
     override val credentialFormat: String = "sd_jwt_vc",
+    override val credentialOfferVariant: String = "by_value",
+    override val authFlowVariant: String = "issuer_initiated",
 ) : VciWalletTestPlan {
 
     init {
         require(credentialFormat in setOf("sd_jwt_vc", "mdoc")) { "Unsupported HAIP credential format: $credentialFormat" }
+        require(credentialOfferVariant in setOf("by_value", "by_reference")) {
+            "Unsupported HAIP credential offer variant: $credentialOfferVariant"
+        }
+        require(authFlowVariant in setOf("issuer_initiated", "wallet_initiated")) {
+            "Unsupported HAIP authorization flow: $authFlowVariant"
+        }
+        require(authFlowVariant != "wallet_initiated" || credentialOfferVariant == "by_value") {
+            "Wallet-initiated issuance has no credential offer delivery variant"
+        }
     }
 
     private val formatLabel = if (credentialFormat == "mdoc") "ISO mdoc" else "SD-JWT VC"
@@ -95,7 +106,7 @@ class VciWalletHaip(
         """.trimIndent()
     }
 
-    override val description = "VCI Wallet: $formatLabel + authorization_code (HAIP target)"
+    override val description = "VCI Wallet: $formatLabel + $authFlowVariant + $credentialOfferVariant (HAIP target)"
     override val planName: String = "oid4vci-1_0-wallet-haip-test-plan"
     override val isHaip: Boolean = true
     override val clientAuthType: String = "client_attestation"
@@ -104,11 +115,11 @@ class VciWalletHaip(
 
     override val variant = mapOf(
         "credential_format" to credentialFormat,
-        "vci_authorization_code_flow_variant" to "issuer_initiated",
+        "vci_authorization_code_flow_variant" to authFlowVariant,
         // The HAIP plan fixes authorization_request_type itself and rejects it being restated
         // ("Variant 'authorization_request_type' has been set by user, but test plan already sets
         // this variant"), so unlike the non-HAIP plans it must not appear here.
-        "vci_credential_offer_variant" to "by_value"
+        "vci_credential_offer_variant" to credentialOfferVariant
     )
 
     override val configuration: JsonObject = buildJsonObject {

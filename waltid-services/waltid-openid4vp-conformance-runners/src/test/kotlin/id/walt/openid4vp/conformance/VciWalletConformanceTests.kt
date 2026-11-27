@@ -84,7 +84,7 @@ class VciWalletConformanceTests {
 
     companion object {
         @JvmStatic
-        fun isMdocHaipCheckEnabled(): Boolean =
+        fun isAdditionalHaipCheckEnabled(): Boolean =
             ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN && isConformanceAvailable
 
         /** Request field the adapter's attester reads the wallet's public JWK from. */
@@ -472,8 +472,29 @@ class VciWalletConformanceTests {
 
     /** Additional upgraded-suite profile; ordinary CI keeps its existing selection. */
     @Test
-    @EnabledIf("isMdocHaipCheckEnabled")
+    @EnabledIf("isAdditionalHaipCheckEnabled")
     fun vciWalletIsoMdocAuthorizationCodeHaipFullTarget() = runHaipWallet(credentialFormat = "mdoc")
+
+    /** Offer-by-reference is a separate certification combination on the upgraded suite. */
+    @Test
+    @EnabledIf("isAdditionalHaipCheckEnabled")
+    fun vciWalletSdJwtVcByReferenceAuthorizationCodeHaipFullTarget() =
+        runHaipWallet(credentialOfferVariant = "by_reference")
+
+    @Test
+    @EnabledIf("isAdditionalHaipCheckEnabled")
+    fun vciWalletIsoMdocByReferenceAuthorizationCodeHaipFullTarget() =
+        runHaipWallet(credentialFormat = "mdoc", credentialOfferVariant = "by_reference")
+
+    @Test
+    @EnabledIf("isAdditionalHaipCheckEnabled")
+    fun vciWalletSdJwtVcWalletInitiatedAuthorizationCodeHaipFullTarget() =
+        runHaipWallet(authFlowVariant = "wallet_initiated")
+
+    @Test
+    @EnabledIf("isAdditionalHaipCheckEnabled")
+    fun vciWalletIsoMdocWalletInitiatedAuthorizationCodeHaipFullTarget() =
+        runHaipWallet(credentialFormat = "mdoc", authFlowVariant = "wallet_initiated")
 
     /** Fast live gate for the SDK/PAR/token/credential driver before running the full matrix. */
     @Test
@@ -481,7 +502,12 @@ class VciWalletConformanceTests {
     fun vciWalletSdJwtHaipFapiHappyPath() = runHaipWallet(
         requiredModules = setOf("fapi2-security-profile-final-client-test-happy-path"))
 
-    private fun runHaipWallet(requiredModules: Set<String> = emptySet(), credentialFormat: String = "sd_jwt_vc") = withInProcessWallet { walletId ->
+    private fun runHaipWallet(
+        requiredModules: Set<String> = emptySet(),
+        credentialFormat: String = "sd_jwt_vc",
+        credentialOfferVariant: String = "by_value",
+        authFlowVariant: String = "issuer_initiated",
+    ) = withInProcessWallet { walletId ->
         // Minted per run: the suite is told the trust anchor, and the adapter signs with the matching
         // leaf, so nothing about the attester has to be committed or kept in sync by hand.
         val attestationAuthority = ClientAttestationTestAuthority.create(
@@ -497,6 +523,8 @@ class VciWalletConformanceTests {
                 adapterHost = adapterHostIp,
                 attestationAuthority = attestationAuthority,
                 credentialFormat = credentialFormat,
+                credentialOfferVariant = credentialOfferVariant,
+                authFlowVariant = authFlowVariant,
             ),
             walletId,
             attestationAuthority,
