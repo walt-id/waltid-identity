@@ -7,10 +7,11 @@ import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto2.jose.CompactJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.openid4vp.clientidprefix.isMissing
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.prefixes.ClientIdX509Trust.authorizeX509Chain
+import id.walt.openid4vp.clientidprefix.prefixes.ClientIdX509Trust.validateX509Chain
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.coroutines.CancellationException
@@ -54,7 +55,7 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
 
         val x5cHeader = decodedJws.protectedHeader["x5c"] as? JsonArray
             ?: return ClientValidationResult.Failure(ClientIdError.MissingX5cHeader)
-        if (trustConfiguration.x509TrustAnchors.isMissing()) {
+        if (!trustConfiguration.hasX509Trust) {
             return ClientValidationResult.Failure(ClientIdError.MissingX509TrustAnchors)
         }
 
@@ -66,8 +67,9 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         val leafCertificate = certificates.firstOrNull()
             ?: return ClientValidationResult.Failure(ClientIdError.EmptyX5cHeader)
 
-        // 1. Validate the certificate path, trust anchor, validity, constraints, and client-auth usage.
-        ClientIdCrypto2.validateCertificateChain(certificates, trustConfiguration.x509TrustStore)?.let { error ->
+        // 1. With static anchors, validate the certificate path, trust anchor, validity, constraints and
+        // client-auth usage. With a trust registry, check the leaf profile here and ask the registry in step 6.
+        trustConfiguration.validateX509Chain(certificates)?.let { error ->
             return error
         }
 
@@ -104,8 +106,8 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         // i.e. response_mode direct_post or direct_post.jwt - is governed by §14.3.1 instead, which
         // lets the Wallet "rely on a Client Identifier Prefix in conjunction with Client
         // Authentication and integrity protection of the request to establish trust in the Response
-        // URI": precisely what steps 1-4 above established, by validating the chain against a
-        // configured trust anchor and verifying the request object's signature.
+        // URI": precisely what steps 1-4 (and, with a trust registry, step 6) establish, by deciding
+        // trust in the chain and verifying the request object's signature.
         //
         // Applying the redirect_uri rule to response_uri rejected every conformant direct_post
         // request whose verifier receives responses on a different host than its certificate names -
@@ -123,6 +125,12 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
                     ClientIdError.RedirectUriHostMismatch(clientId.dnsName, redirectUriHost)
                 )
             }
+        }
+
+        // 6. With a trust registry, ask it last, so that only a signed request bound to this client id
+        // reaches it. With static anchors, step 1 already decided trust.
+        trustConfiguration.authorizeX509Chain(certificates)?.let { error ->
+            return error
         }
 
         val metadataJson = context.clientMetadata

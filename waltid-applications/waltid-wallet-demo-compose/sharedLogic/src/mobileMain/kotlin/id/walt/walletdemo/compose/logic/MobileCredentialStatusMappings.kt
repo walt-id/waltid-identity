@@ -15,6 +15,9 @@ fun WalletCredentialStatusSnapshot.toDemoStatuses(): WalletDemoCredentialStatuse
     },
     refreshing.mapTo(mutableSetOf()) { it.credentialId },
     nextRefreshAt?.toString(),
+    pendingNotices = pendingNotices.map {
+        WalletDemoCredentialStatusNotice(it.reference.credentialId, it.version, it.kind.name, it.checkedAt.toString(), it.historical)
+    },
 )
 
 internal fun WalletCredentialStatus.toDemoStatus(): WalletDemoCredentialStatus =

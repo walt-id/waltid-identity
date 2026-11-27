@@ -13,6 +13,10 @@ import kotlinx.serialization.json.put
 
 object Wallet2OpenApiDocs {
 
+    /** For every route that resolves an OpenID4VP request URL. */
+    const val REQUEST_TRUST_SOURCE_UNAVAILABLE =
+        "The trust registry that authenticates the signed Request Object could not answer (X509TrustSourceUnavailable). Retry later."
+
     fun createWallet(): RouteConfig.() -> Unit = {
         tags = listOf("Wallet Management")
         summary = "Create a new wallet"

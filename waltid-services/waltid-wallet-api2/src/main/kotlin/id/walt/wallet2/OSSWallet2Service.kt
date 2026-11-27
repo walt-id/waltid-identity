@@ -7,6 +7,8 @@ import id.walt.verifier.openid.transactiondata.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.openid4vp.clientidprefix.ClientIdX509TrustRegistry
+import id.walt.trust.decision.HttpTrustDecisionEvaluator
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.auth.ExposedWallet2AccountStore
 import id.walt.wallet2.auth.InMemoryWallet2AccountStore
@@ -257,12 +259,19 @@ object OSSWallet2Service {
         }
     }
 
-    private fun ClientIdTrustConfig.toDomain() = ClientIdTrustConfiguration(
+    internal fun ClientIdTrustConfig.toDomain() = ClientIdTrustConfiguration(
         x509TrustAnchors = x509TrustAnchors.map(X509CertificateUtil::parseCertificatePem)
             .ifEmpty { null }
             ?.let { InMemoryTrustStore(it) },
         trustedVerifierAttestationIssuers = trustedVerifierAttestationIssuers,
         preRegisteredClients = preRegisteredClients,
+        x509TrustRegistry = trustRegistry?.let { registry ->
+            ClientIdX509TrustRegistry(
+                evaluator = HttpTrustDecisionEvaluator(registry.resolveCertificateChainUrl) { registry.headers },
+                expectedEntityTypes = registry.expectedEntityTypes,
+                requireAuthenticatedSource = registry.requireAuthenticatedSource,
+            )
+        },
     )
 
     internal fun configuredClientIdTrustConfiguration(): ClientIdTrustConfiguration =

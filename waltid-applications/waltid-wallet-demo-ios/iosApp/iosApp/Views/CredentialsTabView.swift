@@ -12,6 +12,7 @@ struct CredentialsTabView: View {
     var onShareNearby: (() -> Void)? = nil
     var nearbyPreparing = false
     var nearbyEnabled = true
+    var statusNotices: [PendingCredentialStatusNotice] = []
     @Environment(\.walletDemoBranding) private var branding
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmDelete = false
@@ -86,7 +87,7 @@ struct CredentialsTabView: View {
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: expanded?.id)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if selectedDetailsID == nil { WalletTabFeedback(viewModel: viewModel, tab: .credentials) }
+                if selectedDetailsID == nil { homeFeedback }
             }
             .background(Color(.systemGroupedBackground))
             .animation(WalletMotion.navigation(reduceMotion: reduceMotion), value: selectedDetailsID)
@@ -168,6 +169,35 @@ struct CredentialsTabView: View {
         }
     }
 
+    @ViewBuilder
+    private var homeFeedback: some View {
+        let operation = WalletTabStatusBanner(viewModel: viewModel, tab: .credentials)
+        let operationKind = viewModel.statusKind(for: .credentials)
+        let credentialNotices = statusNotices.compactMap { notice in
+            cards.first { $0.id == notice.credentialID }.map { (notice, $0.summary.title) }
+        }
+        if operation.isVisible || !credentialNotices.isEmpty {
+            WalletFooter {
+                Group {
+                    if operation.isVisible && (operationKind == .busy || operationKind == .error) {
+                        operation
+                    } else if let (notice, title) = credentialNotices.first {
+                        CredentialStatusHomeNotice(title: title, notice: notice, remaining: credentialNotices.count - 1, onOpen: {
+                            openDetails(notice.credentialID)
+                            viewModel.acknowledgeCredentialStatusNotice(notice)
+                        }, onDismiss: {
+                            viewModel.acknowledgeCredentialStatusNotice(notice)
+                        })
+                        .id(notice.version)
+                    } else {
+                        operation
+                    }
+                }
+                .frame(maxWidth: credentialCardMaxWidth).frame(maxWidth: .infinity)
+            }
+        }
+    }
+
     private func openDetails(_ id: String) {
         expanded = nil
         withAnimation(WalletMotion.navigation(reduceMotion: reduceMotion)) { selectedDetailsID = id }
@@ -175,5 +205,95 @@ struct CredentialsTabView: View {
 
     private func closeDetails() {
         withAnimation(WalletMotion.navigation(reduceMotion: reduceMotion)) { selectedDetailsID = nil }
+    }
+}
+
+private struct CredentialStatusHomeNotice: View {
+    let title: String
+    let notice: PendingCredentialStatusNotice
+    let remaining: Int
+    let onOpen: () -> Void
+    let onDismiss: () -> Void
+    @Environment(\.locale) private var locale
+    @Environment(\.timeZone) private var timeZone
+    @Environment(\.sizeCategory) private var sizeCategory
+
+    private var kind: String {
+        switch notice.kind {
+        case .revoked: String(localized: "Revoked")
+        case .suspended: String(localized: "Suspended")
+        default: String(localized: "Invalid")
+        }
+    }
+
+    private var checked: String {
+        let minute = Date(timeIntervalSince1970: floor(notice.checkedAt.timeIntervalSince1970 / 60) * 60)
+        let date = WalletInstant(minute).formatted(timeZone: timeZone, locale: locale).fullText
+        return notice.historical
+            ? String(localized: "Checked: \(date) (last known)")
+            : String(localized: "Checked: \(date)")
+    }
+
+    var body: some View {
+        WalletNoticeCard(tone: .warning, onDismiss: onDismiss) {
+            ZStack(alignment: .topTrailing) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(title) - \(kind)").font(.callout.weight(.semibold))
+                    Text(checked).font(.footnote)
+                    noticeActions
+                }
+                .multilineTextAlignment(.leading)
+                .padding(.leading, 14).padding(.trailing, 50).padding(.top, 12).padding(.bottom, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                WalletNoticeClose(label: String(localized: "Dismiss credential status notice"), action: onDismiss)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var noticeActions: some View {
+        if remaining == 0 {
+            openButton
+        } else if #available(iOS 16, *) {
+            ViewThatFits(in: .horizontal) {
+                inlineActions.fixedSize(horizontal: true, vertical: false)
+                stackedActions
+            }
+        } else if sizeCategory.isAccessibilityCategory {
+            stackedActions
+        } else {
+            inlineActions
+        }
+    }
+
+    private var inlineActions: some View {
+        HStack(spacing: 8) {
+            openButton
+            remainingText
+        }
+    }
+
+    private var stackedActions: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            openButton
+            remainingText
+        }
+    }
+
+    private var openButton: some View {
+        Button(action: onOpen) {
+            Text("View credential")
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 10).padding(.vertical, 10)
+                .background { RoundedRectangle(cornerRadius: 8).fill(.foreground).opacity(0.12) }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var remainingText: some View {
+        Text("\(remaining) more").font(.footnote)
     }
 }

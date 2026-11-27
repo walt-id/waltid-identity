@@ -45,6 +45,8 @@ kotlin {
             implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
             implementation(project(":waltid-libraries:crypto:waltid-jose"))
             api(project(":waltid-libraries:crypto:waltid-x509"))
+            // ClientIdX509TrustRegistry exposes the trust-decision port
+            api(project(":waltid-libraries:credentials:waltid-trust-decision"))
             implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
             implementation(project(":waltid-libraries:waltid-did"))
         }

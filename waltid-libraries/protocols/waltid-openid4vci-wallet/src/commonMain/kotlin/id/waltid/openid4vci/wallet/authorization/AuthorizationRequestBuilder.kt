@@ -12,6 +12,7 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
 
@@ -284,6 +285,7 @@ class AuthorizationRequestBuilder(
         parameters["client_id"] = clientConfig.clientId
         parameters["redirect_uri"] = redirectUri ?: clientConfig.primaryRedirectUri
         parameters["state"] = state
+        parameters["nonce"] = Uuid.random().toString()
         // OID4VCI 1.0 Section 5.1.2 offers two alternative ways to say which credential is wanted:
         // `authorization_details` (RAR) or a `scope` the issuer publishes on the credential
         // configuration. They are alternatives, not companions - sending both leaves the authorization

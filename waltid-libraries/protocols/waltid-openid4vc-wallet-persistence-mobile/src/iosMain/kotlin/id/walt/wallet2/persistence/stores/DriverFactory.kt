@@ -9,7 +9,10 @@ import co.touchlab.sqliter.JournalMode
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
+import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSFileManager
+import platform.Foundation.NSSearchPathForDirectoriesInDomains
+import platform.Foundation.NSUserDomainMask
 
 /**
  * iOS SQLDelight driver factory for native SQLite wallet databases.
@@ -102,6 +105,24 @@ public actual class DriverFactory {
         joinToString(separator = "") { byte ->
             (byte.toInt() and 0xff).toString(16).padStart(2, '0')
         }
+
+    /** Identifies the container used by the foreground wallet. */
+    public fun existingLocation(): String = appGroupIdentifier ?: "sandbox"
+
+    /** Opens the authorized container's existing database without creating or migrating it. */
+    public fun openExistingEncryptedDriver(
+        databaseName: String, location: String, encryptionKey: DatabaseEncryptionKey, walletId: String,
+    ): SqlDriver? {
+        require(databaseName.none { it == '/' || it == '\\' || it == '\u0000' })
+        if (location != existingLocation()) return null
+        val directory = sharedDatabasePath(walletId) ?: run {
+            // Match SQLiter's default path without its create-directory side effect.
+            val support = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true)
+                .firstOrNull() as? String ?: return null
+            "$support/databases"
+        }
+        return ExistingSqlCipherDriver.open("$directory/$databaseName.db", encryptionKey.material.toSqlCipherPassphrase())
+    }
 
     /**
      * Deletes the native database file and SQLite sidecar files for [databaseName].

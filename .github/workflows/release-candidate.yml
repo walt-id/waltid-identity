@@ -143,29 +143,44 @@ jobs:
     runs-on: ubuntu-latest
     needs: tag
     steps:
-      - name: Dispatch integration-test-aws.yml and wait
+      - name: Dispatch integration-test-aws.yml
+        id: dispatch
         uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-aws.yml
           repo: walt-id/waltid-identity-enterprise
           ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
-          wait-for-completion: true
-          sync-status: true
+      - &wait-for-dispatched-run
+        name: Require the dispatched run to succeed
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          RUN_URL: ${{ steps.dispatch.outputs.runUrl }}
+        run: |
+          set -euo pipefail
+          : "${RUN_URL:?Dispatch did not return a run URL}"
+          while true; do
+            result="$(gh api "$RUN_URL" --jq '[.status, .conclusion // ""] | join("/")')"
+            case "$result" in
+              completed/success) exit 0 ;;
+              queued/|in_progress/|pending/|requested/|waiting/) sleep 30 ;;
+              *) echo "::error::Dispatched workflow at $RUN_URL returned '$result'."; exit 1 ;;
+            esac
+          done
   integration-test-azure:
     name: Integration Tests - Azure
     runs-on: ubuntu-latest
     needs: tag
     steps:
-      - name: Dispatch integration-test-azure.yml and wait
+      - name: Dispatch integration-test-azure.yml
+        id: dispatch
         uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: integration-test-azure.yml
           repo: walt-id/waltid-identity-enterprise
           ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
-          wait-for-completion: true
-          sync-status: true
+      - *wait-for-dispatched-run
   sonar-snapshot:
     name: SonarQube Cloud release scan
     runs-on: ubuntu-latest
@@ -246,16 +261,16 @@ jobs:
     needs: [ version, tag, gradle, docker, api-docker, sdk-docs, sonar-snapshot, integration-test-aws, integration-test-azure ]
     if: ${{ needs.tag.outputs.is-latest == 'true' }}
     steps:
-      - name: Dispatch deploy-k8s.yml and wait
+      - name: Dispatch deploy-k8s.yml
+        id: dispatch
         uses: benc-uk/workflow-dispatch@v1.3.3
         with:
           workflow: deploy-k8s.yml
           repo: walt-id/waltid-identity-enterprise-license
           ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
-          wait-for-completion: true
-          sync-status: true
           inputs: '{"version": "${{ needs.version.outputs.release_version }}", "k8s_file": "waltid-license-server/k8s/deployment-dev.yaml"}'
+      - *wait-for-dispatched-run
   deploy:
     uses: ./.github/workflows/deployment.yml
     secrets: inherit

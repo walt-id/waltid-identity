@@ -13,10 +13,10 @@
     <string name="settings_reader_authentication">Reader authentication</string>
     <string name="settings_reader_subtitle">Reader policy and trust material</string>
     <string name="settings_dc_api">Digital Credentials API</string>
-    <string name="settings_show_review">Show wallet review</string>
-    <string name="settings_review_on">Wallet review on</string>
-    <string name="settings_review_off">Wallet review off</string>
-    <string name="settings_review_description">Show the wallet review after you select a credential in the system picker. Turning this off skips only the wallet review. System consent and any required signing approval still apply.</string>
+    <string name="settings_skip_review">Skip credential status checks</string>
+    <string name="settings_review_on">Review and status checks on</string>
+    <string name="settings_review_off">Status checks off</string>
+    <string name="settings_review_description">When enabled, the wallet skips warnings about suspended or revoked credentials.</string>
     <string name="settings_lock">Lock wallet</string>
     <string name="settings_reset">Reset wallet</string>
     <string name="settings_reset_question">Reset wallet?</string>
@@ -117,8 +117,8 @@
     <string name="reader_trust_bundle">Trust bundle</string>
     <string name="reader_trust_role">Role</string>
     <string name="reader_trust_anchor">Reader trust anchor</string>
-    <string name="settings_dc_requirements_android">Requires Google Play services and a compatible app or browser. This setting controls wallet review only.</string>
-    <string name="settings_dc_requirements_ios">Requires iOS 26 or later and a compatible app or browser. This setting controls wallet review only.</string>
+    <string name="settings_dc_requirements_android">When enabled, you share from the system picker. Your device may ask you to approve signing. Requires Google Play services and a compatible app or browser.</string>
+    <string name="settings_dc_requirements_ios">Review the requester and requested data, then tap Share. Requires iOS 26 or later and a compatible app or browser.</string>
     <string name="settings_dc_requirements_web">System credential sharing is not available in this web demo.</string>
     <string name="settings_show_tooltip">Show tooltip</string>
     <string name="settings_sign_out">Sign out</string>

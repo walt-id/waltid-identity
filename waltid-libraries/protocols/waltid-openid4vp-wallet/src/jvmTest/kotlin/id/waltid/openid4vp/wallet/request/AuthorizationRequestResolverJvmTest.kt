@@ -2,6 +2,7 @@
 
 package id.waltid.openid4vp.wallet.request
 
+import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -9,9 +10,15 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.openid4vp.clientidprefix.ClientIdX509TrustRegistry
+import id.walt.trust.decision.TrustDecisionEvaluator
+import id.walt.trust.model.TrustDecision
+import id.walt.trust.model.TrustDecisionCode
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.RequestConfiguration
 import id.waltid.openid4vp.wallet.PresentationRequestValidator
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.ktor.client.*
@@ -418,7 +425,7 @@ class AuthorizationRequestResolverJvmTest {
             AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
                 vpFormatsSupported = jsonObjectOf(),
                 trustConfiguration = ClientIdTrustConfiguration(
-                    x509TrustAnchors = InMemoryTrustStore(),
+                    x509TrustAnchors = InMemoryTrustStore(listOf(X509CertificateUtil.parseCertificatePem(ANCHOR_PEM))),
                     trustedVerifierAttestationIssuers = setOf("did:example:attester"),
                 ),
             )
@@ -428,6 +435,72 @@ class AuthorizationRequestResolverJvmTest {
             listOf("redirect_uri", "x509_san_dns", "x509_hash", "decentralized_identifier", "verifier_attestation"),
             metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
         )
+    }
+
+    @Test
+    fun `wallet metadata advertises x509 client id prefixes with a trust registry and no anchors`() {
+        val metadata = Json.parseToJsonElement(
+            AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = jsonObjectOf(),
+                trustConfiguration = ClientIdTrustConfiguration(
+                    x509TrustRegistry = ClientIdX509TrustRegistry(
+                        TrustDecisionEvaluator { TrustDecision(TrustDecisionCode.NOT_TRUSTED) }
+                    ),
+                ),
+            )
+        ).jsonObject
+
+        assertEquals(
+            listOf("redirect_uri", "x509_san_dns", "x509_hash", "decentralized_identifier"),
+            metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun `wallet metadata does not advertise x509 client id prefixes with an empty trust store`() {
+        val metadata = Json.parseToJsonElement(
+            AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                vpFormatsSupported = jsonObjectOf(),
+                trustConfiguration = ClientIdTrustConfiguration(x509TrustAnchors = InMemoryTrustStore()),
+            )
+        ).jsonObject
+
+        assertEquals(
+            listOf("redirect_uri", "decentralized_identifier"),
+            metadata.getValue("client_id_prefixes_supported").jsonArray.map { it.jsonPrimitive.content },
+        )
+    }
+
+    @Test
+    fun `without local PKIX only a trust registry enables the x509 client id prefixes`() {
+        val registry = ClientIdX509TrustRegistry(TrustDecisionEvaluator { TrustDecision(TrustDecisionCode.NOT_TRUSTED) })
+        val anchors = InMemoryTrustStore(listOf(X509CertificateUtil.parseCertificatePem(ANCHOR_PEM)))
+
+        assertTrue(ClientIdTrustConfiguration(x509TrustRegistry = registry).supportsX509ClientIdPrefixes(pkixAvailable = false))
+        assertTrue(
+            ClientIdTrustConfiguration(x509TrustAnchors = anchors, x509TrustRegistry = registry)
+                .supportsX509ClientIdPrefixes(pkixAvailable = false)
+        )
+        assertFalse(ClientIdTrustConfiguration(x509TrustAnchors = anchors).supportsX509ClientIdPrefixes(pkixAvailable = false))
+        assertFalse(ClientIdTrustConfiguration().supportsX509ClientIdPrefixes(pkixAvailable = false))
+        assertTrue(ClientIdTrustConfiguration(x509TrustAnchors = anchors).supportsX509ClientIdPrefixes(pkixAvailable = true))
+    }
+
+    @Test
+    fun `an unavailable trust source answers 503 temporarily_unavailable, a rejection 400`() {
+        val unavailable = AuthorizationRequestResolver.SignedAuthorizationRequestValidationException(ClientIdError.X509TrustSourceUnavailable)
+        assertEquals(503, unavailable.status)
+        assertEquals("temporarily_unavailable", unavailable.errorCode)
+
+        val rejected = AuthorizationRequestResolver.SignedAuthorizationRequestValidationException(
+            ClientIdError.X509TrustRegistryRejected("Trust decision is NOT_TRUSTED")
+        )
+        assertEquals(400, rejected.status)
+        assertEquals("invalid_request", rejected.errorCode)
+
+        val invalidClient = AuthorizationRequestResolver.SignedAuthorizationRequestValidationException(ClientIdError.InvalidClient)
+        assertEquals(400, invalidClient.status)
+        assertEquals("invalid_client", invalidClient.errorCode)
     }
 
     @Test
@@ -450,6 +523,34 @@ class AuthorizationRequestResolverJvmTest {
             JwsAlgorithm.entries.filterNot { it == JwsAlgorithm.ED448 }.map { it.identifier },
             metadata.getValue("request_object_signing_alg_values_supported").jsonArray.map { it.jsonPrimitive.content },
         )
+    }
+
+    @Test
+    fun `request URI negotiation advertises only the representations supported by each policy`() = runBlocking {
+        val jwt = "application/oauth-authz-req+jwt"
+        val configuration = WebDataFetchingConfiguration(
+            request = RequestConfiguration(headers = mapOf(HttpHeaders.Accept to "application/json")),
+        )
+        val requests = mutableListOf<Pair<HttpMethod, List<String>?>>()
+        HttpClient(MockEngine { request ->
+            requests += request.method to request.headers.getAll(HttpHeaders.Accept)
+            respond("request-object", headers = headersOf(HttpHeaders.ContentType, jwt))
+        }) { configuration.applyConfigurationToHttpClient(this) }.use { client ->
+            val fetcher = WebDataFetcher.wrapping(client, "negotiation-test", configuration)
+            for (method in listOf(null, RequestUriHttpMethod.GET, RequestUriHttpMethod.POST)) {
+                for (policy in AuthorizationRequestResolver.UnsignedRequestObjectPolicy.entries) {
+                    AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        fetcher, "https://verifier.example/request", method,
+                        sendWalletMetadata = false, unsignedRequestObjectPolicy = policy,
+                    )
+                    val post = method == RequestUriHttpMethod.POST
+                    val accept = if (post || policy == AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED)
+                        jwt else "$jwt, application/json;q=0.9"
+                    assertEquals((if (post) HttpMethod.Post else HttpMethod.Get) to listOf(accept), requests.single())
+                    requests.clear()
+                }
+            }
+        }
     }
 
     @Test
@@ -1262,5 +1363,21 @@ class AuthorizationRequestResolverJvmTest {
         put("use", "enc")
         put("alg", "ECDH-ES")
         put("kid", "enc-key")
+    }
+
+    private companion object {
+        /** The demo verifier certificate from wallet-api2's `wallet-service.conf`, used as a pinned anchor. */
+        const val ANCHOR_PEM = """-----BEGIN CERTIFICATE-----
+MIIB2DCCAX+gAwIBAgIUHM9IDlzSNPwZcKStPxhcDrQBxPEwCgYIKoZIzj0EAwIw
+MTEdMBsGA1UEAwwUdmVyaWZpZXIuZXhhbXBsZS5jb20xEDAOBgNVBAoMB3dhbHQu
+aWQwHhcNMjYwODEzMDAwMDAwWhcNMjgwODEzMDAwMDAwWjAxMR0wGwYDVQQDDBR2
+ZXJpZmllci5leGFtcGxlLmNvbTEQMA4GA1UECgwHd2FsdC5pZDBZMBMGByqGSM49
+AgEGCCqGSM49AwEHA0IABBv04AXNAZJjIqYkP+oJGpiJ95pqe4XE62bsqy05pJz9
+VkRMZdXYXSMff5AJLrnHiN0x5MV6u/8vrAcytGUe4z6jdTBzMAwGA1UdEwEB/wQC
+MAAwDgYDVR0PAQH/BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMCMB8GA1UdEQQY
+MBaCFHZlcmlmaWVyLmV4YW1wbGUuY29tMB0GA1UdDgQWBBSCJZ2bjB1VuLM8lvN8
+e/M4MYmLvzAKBggqhkjOPQQDAgNHADBEAiAI8wYnWdTWeqNLKMVw8UU4xPPnZkR4
+5NhD/iUNKexRdgIgCdTIULB9hbTNdm+S7nANVTuVw3Kw0tnUjF7Ihdia/dw=
+-----END CERTIFICATE-----"""
     }
 }

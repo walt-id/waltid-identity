@@ -1024,6 +1024,7 @@ object WalletPresentFunctionality2 {
                     AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
                         webResolveAuthReq = fetcher,
                         requestUri = requestUri,
+                        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                         requestUriMethod = requestUriMethod,
                         requestUriPostWalletMetadata = requestUriPostWalletMetadata,
                         sendWalletMetadata = true,

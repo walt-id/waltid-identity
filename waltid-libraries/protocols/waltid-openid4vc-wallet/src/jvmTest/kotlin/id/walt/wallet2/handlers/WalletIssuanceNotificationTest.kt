@@ -375,7 +375,7 @@ class WalletIssuanceNotificationTest {
 
     private suspend fun signedCredential(): String =
         JWKKey.generate(KeyType.Ed25519).signJws(
-            """{"iss":"$ISSUER","sub":"did:example:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","PID"],"issuer":"did:example:issuer","credentialSubject":{"id":"did:example:holder"}}}"""
+            """{"iss":"$ISSUER","sub":"did:example:holder","vc":{"@context":["https://www.w3.org/2018/credentials/v1"],"type":["VerifiableCredential","PID"],"issuer":"$ISSUER","credentialSubject":{"id":"did:example:holder"}}}"""
                 .encodeToByteArray(),
         )
 

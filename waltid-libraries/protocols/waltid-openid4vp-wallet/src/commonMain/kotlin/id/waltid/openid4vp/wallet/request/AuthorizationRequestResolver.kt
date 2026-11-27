@@ -6,6 +6,7 @@ import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.crypto.utils.UuidUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto2.jose.JwsAlgorithm
+import id.walt.errors.HttpStatusError
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.ClientIdPrefix
@@ -55,17 +56,28 @@ object AuthorizationRequestResolver {
         isLenient = true
     }
 
+    /**
+     * The request could not be authenticated. A rejected request is a client error (400); an unavailable trust
+     * source ([ClientIdError.X509TrustSourceUnavailable]) is not the request's fault and answers 503.
+     */
     class SignedAuthorizationRequestValidationException(
         val clientIdError: ClientIdError,
     ) : IllegalArgumentException(
         "Could not verify signed AuthorizationRequest with client id prefix: ${clientIdError::class.simpleName} - ${clientIdError.message}",
-    ) {
+    ), HttpStatusError {
         val errorCode: String
             get() = when (clientIdError) {
                 is ClientIdError.InvalidClient,
                 is ClientIdError.PreRegisteredClientNotFound,
                 -> "invalid_client"
+                ClientIdError.X509TrustSourceUnavailable -> "temporarily_unavailable"
                 else -> "invalid_request"
+            }
+
+        override val status: Int
+            get() = when (clientIdError) {
+                ClientIdError.X509TrustSourceUnavailable -> HttpStatusCode.ServiceUnavailable.value
+                else -> HttpStatusCode.BadRequest.value
             }
     }
 
@@ -142,7 +154,7 @@ object AuthorizationRequestResolver {
                     if (unsignedRequestObjectPolicy == UnsignedRequestObjectPolicy.REQUIRE_SIGNED) {
                         add(ClientIdPrefix.REDIRECT_URI)
                     }
-                    if (trustConfiguration.x509TrustAnchors == null || !platformSupportsPkixCertificatePathValidation) {
+                    if (!trustConfiguration.supportsX509ClientIdPrefixes()) {
                         add(ClientIdPrefix.X509_SAN_DNS)
                         add(ClientIdPrefix.X509_HASH)
                     }
@@ -196,9 +208,9 @@ object AuthorizationRequestResolver {
         requestUriMethod: RequestUriHttpMethod?,
         requestUriPostWalletMetadata: String? = null,
         sendWalletMetadata: Boolean = true,
-    ): RequestUriFetchResponse = fetchRequestUri(
+    ): RequestUriFetchResponse = fetchRequestUriWithWebDataFetcher(
         webResolveAuthReq, requestUri, requestUriMethod, requestUriPostWalletMetadata,
-        sendWalletMetadata, audienceOverride = null,
+        sendWalletMetadata, unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
     )
 
     /**
@@ -212,18 +224,21 @@ object AuthorizationRequestResolver {
         requestUriPostWalletMetadata: String? = null,
         sendWalletMetadata: Boolean = true,
         expectedRequestObjectAudience: String,
-    ): RequestUriFetchResponse = fetchRequestUri(
+    ): RequestUriFetchResponse = fetchRequestUriWithWebDataFetcher(
         webResolveAuthReq, requestUri, requestUriMethod, requestUriPostWalletMetadata,
-        sendWalletMetadata, audienceOverride = expectedRequestObjectAudience,
+        sendWalletMetadata, unsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        expectedRequestObjectAudience = expectedRequestObjectAudience,
     )
 
-    private suspend fun fetchRequestUri(
+    /** Use the resolver's signing policy when negotiating the request object representation. */
+    suspend fun fetchRequestUriWithWebDataFetcher(
         webResolveAuthReq: WebDataFetcher,
         requestUri: String,
         requestUriMethod: RequestUriHttpMethod?,
-        requestUriPostWalletMetadata: String?,
-        sendWalletMetadata: Boolean,
-        audienceOverride: String?,
+        requestUriPostWalletMetadata: String? = null,
+        sendWalletMetadata: Boolean = true,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+        expectedRequestObjectAudience: String? = null,
     ): RequestUriFetchResponse {
         if (requestUriMethod == RequestUriHttpMethod.POST) {
             val url = Url(requestUri)
@@ -246,16 +261,18 @@ object AuthorizationRequestResolver {
                 put("issuer", DEFAULT_REQUEST_OBJECT_AUDIENCE)
                 Json.parseToJsonElement(requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata)
                     .jsonObject.forEach { (name, value) -> put(name, value) }
-                audienceOverride?.let { put("issuer", it) }
+                expectedRequestObjectAudience?.let { put("issuer", it) }
             }.toString(),
         )
 
-        val response = when (requestUriMethod) {
-            null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
-            RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
+        val requestObjectType = "application/$REQUEST_OBJECT_TYPE"
+        val acceptsJson = requestUriMethod != RequestUriHttpMethod.POST &&
+            unsignedRequestObjectPolicy == UnsignedRequestObjectPolicy.ALLOW_UNSIGNED
+        val response = webResolveAuthReq.rawFetch(requestUri) {
+            headers[HttpHeaders.Accept] = if (acceptsJson) "$requestObjectType, application/json;q=0.9" else requestObjectType
+            if (requestUriMethod == RequestUriHttpMethod.POST) {
                 method = HttpMethod.Post
                 contentType(ContentType.Application.FormUrlEncoded)
-                accept(ContentType.parse("application/oauth-authz-req+jwt"))
                 setBody(
                     buildRequestUriPostBody(
                         walletNonce = requireNotNull(walletNonce),
@@ -925,3 +942,11 @@ object AuthorizationRequestResolver {
     }
 
 }
+
+/**
+ * Whether the wallet can authenticate `x509_san_dns` / `x509_hash` Request Objects. A trust registry does the path
+ * validation itself, so it works on every platform; static anchors need local PKIX, which some platforms (JS) lack.
+ */
+internal fun ClientIdTrustConfiguration.supportsX509ClientIdPrefixes(
+    pkixAvailable: Boolean = platformSupportsPkixCertificatePathValidation,
+): Boolean = x509TrustRegistry != null || (hasX509Trust && pkixAvailable)

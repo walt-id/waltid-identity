@@ -90,6 +90,13 @@ data class Wallet(
 ) {
     private val credentialStatusMutex = Mutex()
     private var statusService: WalletCredentialStatusService? = null
+    private var statusServiceFactory: ((Wallet) -> WalletCredentialStatusService)? = null
+
+    /** Configures lazy status service construction before the wallet is used. */
+    fun configureCredentialStatusService(create: (Wallet) -> WalletCredentialStatusService): Wallet = apply {
+        check(statusService == null && statusServiceFactory == null) { "Status service is already configured" }
+        statusServiceFactory = create
+    }
 
     /** Configures status ownership without changing the published wallet constructor. */
     fun attachCredentialStatusService(service: WalletCredentialStatusService): Wallet = apply {
@@ -100,7 +107,7 @@ data class Wallet(
 
     /** Local metadata is initialized lazily; obtaining the service never checks an issuer endpoint. */
     suspend fun credentialStatuses(): WalletCredentialStatusService = credentialStatusMutex.withLock {
-        statusService ?: WalletCredentialStatusService(this).also { statusService = it }
+        statusService ?: (statusServiceFactory?.invoke(this) ?: WalletCredentialStatusService(this)).also { statusService = it }
     }
 
     /** Cancels status work and observation without initializing an unused status service. */

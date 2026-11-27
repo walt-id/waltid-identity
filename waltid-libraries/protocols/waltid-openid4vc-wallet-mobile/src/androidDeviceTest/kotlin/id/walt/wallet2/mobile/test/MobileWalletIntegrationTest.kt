@@ -438,13 +438,13 @@ class MobileWalletIntegrationTest {
         val walletConfig = walletConfig("eudi-pid-sd-jwt-persistence")
 
         val client1 = createEudiWallet(walletConfig)
-        val (ids, checkedAt) = try {
+        val (ids, checkedById) = try {
             client1.signingIdentity.initialize().activeIdentity()
             val offer = EudiTestBackend.generateOffer(EUDI_PID_SD_JWT_CREDENTIAL_ID)
             val ids = client1.receiveCredential(offer.offerUrl, offer.txCode)
             client1.checkEudiPidStatus(ids)
             ids to client1.credentialStatusSnapshot().credentials.associate {
-                it.reference.credentialId to assertNotNull(it.presentation.lastCheckedAt)
+                it.reference.credentialId to it.presentation
             }
         } finally {
             client1.close()
@@ -453,15 +453,24 @@ class MobileWalletIntegrationTest {
         try {
             val credentials = client2.credentials()
             assertEquals(ids.toSet(), credentials.map { it.id }.toSet(), "The issued credentials must survive recreation")
-            val restored = client2.credentialStatusSnapshot().credentials
-            assertEquals(ids.toSet(), restored.map { it.reference.credentialId }.toSet())
-            restored.forEach {
-                assertEquals(checkedAt.getValue(it.reference.credentialId), it.presentation.lastCheckedAt)
-                assertEquals(CredentialStatusFreshness.STALE, it.presentation.freshness, "Restored evidence is historical until authenticated again")
+            val restored = client2.credentialStatusSnapshot()
+            assertEquals(ids.toSet(), restored.credentials.map { it.reference.credentialId }.toSet())
+            restored.credentials.forEach { record ->
+                val checked = checkedById.getValue(record.reference.credentialId)
+                val freshUntil = assertNotNull(checked.references.single().freshUntil)
+                assertEquals(checked.lastCheckedAt, record.presentation.lastCheckedAt)
+                assertEquals(freshUntil, record.presentation.references.single().freshUntil)
+                val expected = if (restored.evaluatedAt < freshUntil) {
+                    CredentialStatusFreshness.FRESH
+                } else {
+                    CredentialStatusFreshness.STALE
+                }
+                assertEquals(expected, record.presentation.freshness, "Restored evidence must honor its original freshness deadline")
             }
             client2.checkEudiPidStatus(ids)
             client2.credentialStatusSnapshot().credentials.forEach {
-                assertTrue(assertNotNull(it.presentation.lastCheckedAt) > assertNotNull(checkedAt.getValue(it.reference.credentialId)))
+                val previousCheck = assertNotNull(checkedById.getValue(it.reference.credentialId).lastCheckedAt)
+                assertTrue(assertNotNull(it.presentation.lastCheckedAt) > previousCheck)
             }
         } finally {
             client2.close()

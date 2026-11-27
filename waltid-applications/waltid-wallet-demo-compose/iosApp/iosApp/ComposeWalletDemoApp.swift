@@ -1,10 +1,15 @@
 import SwiftUI
 import WalletDemoIdentityDocumentSupport
-import sharedUI
+@preconcurrency import sharedUI
+import UIKit
+import WalletDemoBackgroundStatus
 
 @main
 struct ComposeWalletDemoApp: App {
+    @UIApplicationDelegateAdaptor(ComposeBackgroundStatusDelegate.self) private var backgroundStatusDelegate
     @Environment(\.scenePhase) private var scenePhase
+    @State private var activated = false
+    @State private var enteredForeground = false
 
     private let walletId: String
     private let attestationBaseUrl: String
@@ -28,41 +33,68 @@ struct ComposeWalletDemoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(
-                walletId: walletId,
-                attestationBaseUrl: attestationBaseUrl,
-                attestationAttesterPath: attestationAttesterPath,
-                attestationBearerToken: attestationBearerToken,
-                attestationHostHeader: attestationHostHeader,
-                transactionDataProfilesUrl: transactionDataProfilesUrl,
-                appGroupIdentifier: Self.namespace.appGroupIdentifier,
-                keychainAccessGroup: Self.requiredKeychainAccessGroup,
-                // The wallet republishes its desired projection, which is not Apple's store; only this
-                // process may write that.
-                onDigitalCredentialRegistryChanged: {
-                    Task { await Self.reconcileRegistrations() }
-                },
-                signingProtectionMode: signingProtectionMode
-            )
-            .ignoresSafeArea()
+            Group {
+                if activated || scenePhase == .active {
+                    foregroundWallet
+                }
+            }
+            .onChange(of: scenePhase) { if $0 == .active { activated = true } }
             .onOpenURL { url in
                 sharedUI.WalletDemoIosKt.handleWalletDemoDeepLink(url: url.absoluteString)
             }
-            .task {
-                sharedUI.WalletDemoIosKt.handleWalletDemoApplicationForegrounded()
-                await Self.reconcileRegistrations()
+            .onReceive(NotificationCenter.default.publisher(for: WalletDemoCredentialStatusNotifications.openHome)) { _ in
+                handleStatusNotification()
             }
-            .onChange(of: scenePhase) { phase in
-                // Reconciling requests authorization on a first run, and afterwards picks up a status
-                // the user changed in Settings - neither carries a notification, so becoming active
-                // is the first moment this app can act on it.
-                guard phase == .active else {
-                    if phase == .background { sharedUI.WalletDemoIosKt.handleWalletDemoApplicationBackgrounded() }
-                    return
-                }
-                sharedUI.WalletDemoIosKt.handleWalletDemoApplicationForegrounded()
+        }
+    }
+
+    private var foregroundWallet: some View {
+        ContentView(
+            walletId: walletId,
+            attestationBaseUrl: attestationBaseUrl,
+            attestationAttesterPath: attestationAttesterPath,
+            attestationBearerToken: attestationBearerToken,
+            attestationHostHeader: attestationHostHeader,
+            transactionDataProfilesUrl: transactionDataProfilesUrl,
+            appGroupIdentifier: Self.namespace.appGroupIdentifier,
+            keychainAccessGroup: Self.requiredKeychainAccessGroup,
+            // The wallet republishes its desired projection, which is not Apple's store; only this
+            // process may write that.
+            onDigitalCredentialRegistryChanged: {
                 Task { await Self.reconcileRegistrations() }
+            },
+            signingProtectionMode: signingProtectionMode,
+            onBackgroundStatusEnrollmentChanged: { WalletDemoBackgroundStatusScheduler.shared.reconcile(binding: $0) },
+            onCredentialStatusNoticesCleared: { WalletDemoCredentialStatusNotifications.shared.clear() },
+            backgroundStatusSchedulingAvailable: { WalletDemoBackgroundStatusScheduler.shared.canSchedule }
+        )
+        .ignoresSafeArea()
+        .task { await enterForeground() }
+        .onChange(of: scenePhase) { phase in
+            if phase == .background {
+                enteredForeground = false
+                sharedUI.WalletDemoIosKt.handleWalletDemoApplicationBackgrounded()
             }
+            if phase == .active { Task { await enterForeground() } }
+        }
+    }
+
+    private func enterForeground() async {
+        guard scenePhase == .active else { return }
+        activated = true
+        handleStatusNotification()
+        sharedUI.WalletDemoIosKt.setWalletDemoBackgroundStatusSchedulingAvailable(
+            available: WalletDemoBackgroundStatusScheduler.shared.canSchedule
+        )
+        guard !enteredForeground else { return }
+        enteredForeground = true
+        sharedUI.WalletDemoIosKt.handleWalletDemoApplicationForegrounded()
+        await Self.reconcileRegistrations()
+    }
+
+    private func handleStatusNotification() {
+        if WalletDemoCredentialStatusNotifications.shared.takeHomeRequest() {
+            sharedUI.WalletDemoIosKt.handleWalletDemoCredentialStatusNotification()
         }
     }
 
@@ -87,6 +119,37 @@ struct ComposeWalletDemoApp: App {
         guard #available(iOS 26.0, *) else { return }
         await IdentityDocumentRegistrationCoordinator(namespace: namespace)
             .reconcileFromPlatformCallback()
+    }
+}
+
+@MainActor
+private final class ComposeBackgroundStatusDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        WalletDemoCredentialStatusNotifications.shared.register()
+        WalletDemoBackgroundStatusScheduler.shared.register { binding, finish in
+            let namespace = IdentityDocumentNamespace.composeDemo
+            guard let keychain = namespace.keychainAccessGroup else {
+                finish(.deferred)
+                return {}
+            }
+            let run = sharedUI.WalletDemoIosKt.startWalletDemoBackgroundStatus(
+                binding: binding, appGroupIdentifier: namespace.appGroupIdentifier, keychainAccessGroup: keychain,
+                onFinished: { outcome in
+                    MainActor.assumeIsolated {
+                        switch outcome {
+                        case .finished: finish(.finished)
+                        case .finishedWithNotice: finish(.finishedWithNotice)
+                        case .ineligible: finish(.ineligible)
+                        default: finish(.deferred)
+                        }
+                    }
+                }
+            )
+            return { run.cancel() }
+        } onResult: {
+            sharedUI.WalletDemoIosKt.handleWalletDemoBackgroundStatusCompleted()
+        }
+        return true
     }
 }
 

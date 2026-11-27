@@ -13,6 +13,8 @@ data class DemoWalletConfig(
     val transactionDataProfilesUrl: String = DemoPublicBackendDefaults.transactionDataProfilesUrl,
     /** Product constraint for runtime signing protection selection. */
     val signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
+    /** Independent issuer identifiers and public signing JWKs for payment consent verification. */
+    val paymentCredentialIssuerKeys: Map<String, String> = emptyMap(),
 )
 
 object DemoPublicBackendDefaults {

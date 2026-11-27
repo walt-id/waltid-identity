@@ -25,6 +25,7 @@
 		CEB46067C0B18C64C703CB04 /* KotlinMultiplatformLinkedPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 048F7E5AEC614F5A89E08F1D /* KotlinMultiplatformLinkedPackage */; };
 		C0DE00000000000000001021 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001011 /* WalletSDK */; };
 		C0DE00000000000000001022 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001012 /* WalletDemoIdentityDocumentSupport */; };
+		B17530000000000000000001 /* WalletDemoBackgroundStatus in Frameworks */ = {isa = PBXBuildFile; productRef = B17530000000000000000002 /* WalletDemoBackgroundStatus */; };
 		C0DE00000000000000001023 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001013 /* WalletSDK */; };
 		C0DE00000000000000001024 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DE00000000000000001014 /* WalletDemoIdentityDocumentSupport */; };
 		C0DE00000000000000001041 /* IdentityDocumentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000001033 /* IdentityDocumentProvider.swift */; };
@@ -110,6 +111,7 @@
 				CEB46067C0B18C64C703CB04 /* KotlinMultiplatformLinkedPackage in Frameworks */,
 				C0DE00000000000000001021 /* WalletSDK in Frameworks */,
 				C0DE00000000000000001022 /* WalletDemoIdentityDocumentSupport in Frameworks */,
+				B17530000000000000000001 /* WalletDemoBackgroundStatus in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -244,6 +246,7 @@
 				048F7E5AEC614F5A89E08F1D /* KotlinMultiplatformLinkedPackage */,
 				C0DE00000000000000001011 /* WalletSDK */,
 				C0DE00000000000000001012 /* WalletDemoIdentityDocumentSupport */,
+				B17530000000000000000002 /* WalletDemoBackgroundStatus */,
 			);
 			productName = iosApp;
 			productReference = B33B17E62C2C394F001A32F7 /* iosApp.app */;
@@ -873,6 +876,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C0DE00000000000000001002 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
 			productName = WalletDemoIdentityDocumentSupport;
+		};
+		B17530000000000000000002 /* WalletDemoBackgroundStatus */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0DE00000000000000001002 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoBackgroundStatus;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

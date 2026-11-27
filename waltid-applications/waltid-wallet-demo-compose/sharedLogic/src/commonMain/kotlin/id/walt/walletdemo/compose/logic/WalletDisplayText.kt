@@ -2,20 +2,18 @@ package id.walt.walletdemo.compose.logic
 
 import io.ktor.http.Url
 
-internal enum class WalletDeepLinkScheme(val scheme: String) {
-    CredentialOffer("openid-credential-offer"),
-    PresentationRequest("openid4vp"),
-    AuthorizationCallback("openid"),
-    ;
+internal enum class WalletDeepLinkScheme {
+    CredentialOffer, PresentationRequest, AuthorizationCallback;
 
     companion object {
-        fun parse(rawUrl: String): WalletDeepLinkScheme? {
-            val scheme = rawUrl.substringBefore(':', missingDelimiterValue = "").takeIf { it.isNotBlank() }
-                ?: return null
-            entries.firstOrNull { it.scheme.equals(scheme, ignoreCase = true) }?.let { return it }
-            val isHttp = scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)
-            return if (isHttp && hasAuthorizationResponseParameter(rawUrl)) AuthorizationCallback else null
-        }
+        fun parse(rawUrl: String): WalletDeepLinkScheme? =
+            when (rawUrl.substringBefore(':', missingDelimiterValue = "").lowercase()) {
+                "openid-credential-offer" -> CredentialOffer
+                in walletPresentationSchemes -> PresentationRequest
+                "openid" -> AuthorizationCallback
+                "http", "https" -> AuthorizationCallback.takeIf { hasAuthorizationResponseParameter(rawUrl) }
+                else -> null
+            }
 
         private fun hasAuthorizationResponseParameter(rawUrl: String): Boolean {
             val query = rawUrl.substringAfter('?', "").substringBefore('#')

@@ -22,34 +22,36 @@ class AttestationX509CertificateValidator : X509CertificateValidator {
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-
-        // RFC 5280 §4.2.1.3: KeyUsage restricts the key only when the extension is present.
-        val keyUsage = x509Certificate.data.extensionKeyUsage
-        if (keyUsage != null && KeyUsage.digitalSignature !in keyUsage.keyPurposeIdList) {
-            context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "Certificate does not contain client Key Usage 'digitalSignature'"
-            )
-        }
-
-        // RFC 5280 §4.2.1.12: ExtendedKeyUsage is unrestricted when absent. When present, the
-        // listed purposes must include one this wallet uses for a verifier: TLS clientAuth, or
-        // ISO mdoc reader authentication. OpenID4VP authenticates the chain and client id; it
-        // does not require the TLS clientAuth purpose.
-        val extendedKeyUsage = x509Certificate.data.extensionExtendedKeyUsage
-        if (extendedKeyUsage != null &&
-            extendedKeyUsage.keyPurposeIdList.none { it in acceptedVerifierExtendedKeyUsageOids }
-        ) {
-            context.addLogEntry(
-                ValidationResult.Severity.ERROR,
-                "Certificate Extended Key Usage does not include a verifier purpose " +
-                    "(clientAuth ${ExtendedKeyUsageExtension.KeyUsage.clientAuth.id} or " +
-                    "mdoc reader authentication $mdocReaderAuthenticationEkuOid)"
-            )
+        leafProfileViolations(x509Certificate).forEach { violation ->
+            context.addLogEntry(ValidationResult.Severity.ERROR, violation)
         }
     }
 
     companion object {
+        /** Why [certificate] cannot sign a verifier's request; empty when it can. Also used without PKIX, in registry mode. */
+        internal fun leafProfileViolations(certificate: X509Certificate): List<String> = buildList {
+            // RFC 5280 §4.2.1.3: KeyUsage restricts the key only when the extension is present.
+            val keyUsage = certificate.data.extensionKeyUsage
+            if (keyUsage != null && KeyUsage.digitalSignature !in keyUsage.keyPurposeIdList) {
+                add("Certificate does not contain client Key Usage 'digitalSignature'")
+            }
+
+            // RFC 5280 §4.2.1.12: ExtendedKeyUsage is unrestricted when absent. When present, the
+            // listed purposes must include one this wallet uses for a verifier: TLS clientAuth, or
+            // ISO mdoc reader authentication. OpenID4VP authenticates the chain and client id; it
+            // does not require the TLS clientAuth purpose.
+            val extendedKeyUsage = certificate.data.extensionExtendedKeyUsage
+            if (extendedKeyUsage != null &&
+                extendedKeyUsage.keyPurposeIdList.none { it in acceptedVerifierExtendedKeyUsageOids }
+            ) {
+                add(
+                    "Certificate Extended Key Usage does not include a verifier purpose " +
+                        "(clientAuth ${ExtendedKeyUsageExtension.KeyUsage.clientAuth.id} or " +
+                        "mdoc reader authentication $mdocReaderAuthenticationEkuOid)"
+                )
+            }
+        }
+
         const val id = "attestation-leaf"
 
         /** ISO/IEC 18013-5 reader-authentication EKU. */

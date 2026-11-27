@@ -185,9 +185,9 @@ class KeySetupNavigationAndroidTest {
         onNodeWithText("Connection method").performScrollToContent(this).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithText("Digital Credentials API").performScrollToContent(this).performClick()
-        onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).assertIsOn().performClick().assertIsOff()
+        onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).assertIsOff().performClick().assertIsOn()
         restoration.emulateSaveAndRestore()
-        onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).assertIsOff()
+        onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview).assertIsOn()
         onNodeWithTag(WalletUiTestTags.SettingsBack).performClick()
         onNodeWithText("Signing key").performScrollToContent(this).performClick()
         runOnUiThread { state.value = state.value.copy(identityError = "Backup provider unavailable") }

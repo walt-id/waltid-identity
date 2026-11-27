@@ -15,8 +15,9 @@ data class ItbRunReport(
     val walletExecution: WalletExecution = WalletExecution.JVM_SOFTWARE,
     val keyAttestation: KeyAttestation,
     val androidApkSha256: String? = null,
+    val walletAppApkSha256: String? = null,
 ) {
-    enum class WalletExecution { JVM_SOFTWARE, ANDROID_NATIVE }
+    enum class WalletExecution { JVM_SOFTWARE, ANDROID_NATIVE, ANDROID_DEMO_UNATTENDED, ANDROID_DEMO_ATTENDED }
     enum class KeyAttestation { SYNTHETIC_TEST_FIXTURE }
 }
 
@@ -33,8 +34,9 @@ object ItbReportWriter {
             appendLine()
             appendLine("Build: `${report.buildRevision}`. Catalogue: ${report.catalogueObservedOn}.")
             appendLine("Wallet execution: ${report.walletExecution}.")
-            appendLine("Key attestation: ${report.keyAttestation}; security, certification and status claims are simulated.")
+            appendLine("Key attestation: ${report.keyAttestation}. The attestation's security, certification and status claims are simulated.")
             report.androidApkSha256?.let { appendLine("Android test APK SHA-256: `$it`.") }
+            report.walletAppApkSha256?.let { appendLine("Android demo app APK SHA-256: `$it`.") }
             appendLine("${report.cases.size - failures}/${report.cases.size} passed; $failures non-passing.")
             appendLine()
             appendLine("| Suite | Case | Runner result | Reason | Wallet | ITB verdict | Session |")
@@ -43,14 +45,18 @@ object ItbReportWriter {
                 val wallet = when {
                     result.walletSucceeded -> "succeeded"
                     result.outcome == ItbCaseResult.Outcome.AUTH_UNAVAILABLE -> "not authorized"
-                    result.adapterInvoked -> "failed"
+                    result.outcome == ItbCaseResult.Outcome.WALLET_FAILED -> "failed"
+                    result.adapterInvoked -> "incomplete"
                     else -> "not run"
                 }
-                val reason = result.errorCode ?: result.errorType ?: "—"
+                val reason = rejectionReason(result) ?: "—"
                 appendLine("| ${result.suite} | ${result.case} | ${result.outcome} | $reason | $wallet | ${result.testBedVerdict ?: "unavailable"} | ${result.session ?: "not started"} |")
             }
             appendLine()
-            appendLine("Wallet protocol execution with a portal interaction bridge. Native mode uses operator authentication on Android; neither mode qualifies transaction-consent UI, browser/OS DC API delivery or formal SCA assurance.")
+            report.cases.filter { it.statusObservations.isNotEmpty() }.forEach { result ->
+                val labels = result.statusObservations.joinToString(", ") { "${it.initial} → ${it.refreshed}" }
+                appendLine("- `${result.suite}/${result.case}` displayed $labels after Check status.")
+            }
         })
         writeAtomically(directory.resolve("junit.xml"), buildString {
             appendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
@@ -58,7 +64,7 @@ object ItbReportWriter {
             report.cases.forEach { result ->
                 appendLine("  <testcase classname=\"${escape(result.suite)}\" name=\"${escape(result.case)}\">")
                 if (result.outcome != ItbCaseResult.Outcome.PASSED) {
-                    appendLine("    <failure type=\"${result.outcome}\" message=\"${result.phase}: ${escape(result.errorType ?: result.outcome.name)}\">" +
+                    appendLine("    <failure type=\"${result.outcome}\" message=\"${result.phase}: ${escape(rejectionReason(result) ?: result.outcome.name)}\">" +
                         "ITB=${result.testBedVerdict ?: "unavailable"}; session=${escape(result.session ?: "not started")}; " +
                         "adapterInvoked=${result.adapterInvoked}; cleanupFailed=${result.cleanupFailed}</failure>")
                 }
@@ -67,6 +73,12 @@ object ItbReportWriter {
             appendLine("</testsuite>")
         })
     }
+
+    private fun rejectionReason(result: ItbCaseResult): String? =
+        ItbWalletRejection.describe(result.errorCode) ?: result.errorCode ?: when (result.errorType) {
+            "TargetClosedError" -> "The browser closed the test tab or disconnected."
+            else -> result.errorType
+        }
 
     private fun escape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         .replace("\"", "&quot;").replace("'", "&apos;")

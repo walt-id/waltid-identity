@@ -80,7 +80,28 @@ or system sharing sheets. A failed check retains useful previous observations ra
 the credential.
 
 Managed encrypted persistence stores minimal last-known metadata, never signed lists or history.
-The default mobile trust policy restores this as historical, stale evidence after reopening the
-wallet. A response with `no-store` is not persisted. Custom credential stores do not gain status
+Matching signed credentials, references and managed trust configuration can retain unexpired
+freshness across reopen. Other observations are historical. Responses with `no-store` stay in the
+active session. Custom credential stores do not gain status
 durability automatically. Advanced signer/reference authorization and stable policy identities are
 configured in the shared core; the Swift facade does not expose arbitrary policy callbacks.
+
+
+### Maintain status from an app-owned background task
+
+From an authorized foreground wallet, enable maintenance with
+``Wallet/setCredentialStatusMaintenance(_:)`` and retain its opaque binding in app-private state.
+At background delivery, call ``Wallet/refreshDueStatusesForExistingWallet(binding:crossProcessAccess:maxItems:budget:)``
+with the binding and the original App Group and Keychain access group, if configured. The operation
+checks due records in existing managed storage and reports a flag when it commits a new retainable
+adverse change, including when its budget expires after a commit. The app owns consent, scheduling and mapping
+expiration to cancellation. Custom stores remain eligible for foreground refresh.
+
+Use ``Wallet/reconcileCredentialStatusMaintenance(automaticChecks:resumePaused:)`` to reconcile the
+app's automatic-check preference. Only an explicit re-enable resumes a paused opt-in. Pause or
+retire the grant before cancelling the OS request. On unlock, reload the local observation before
+requesting another check. Show ``CredentialStatusSnapshot/pendingNotices`` on Home and acknowledge
+the displayed version with ``Wallet/acknowledgeCredentialStatusNotice(credentialID:version:)``.
+A generic alert can link to Home. Check that its binding is still current before posting it.
+Restricted observations can appear in a foreground session. A cold pass can leave a pending
+notice only when it can retain the observation.

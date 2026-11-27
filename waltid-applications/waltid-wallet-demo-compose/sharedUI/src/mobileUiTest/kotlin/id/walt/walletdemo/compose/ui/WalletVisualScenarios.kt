@@ -29,6 +29,7 @@ import id.walt.walletdemo.compose.logic.WalletAccessOperation
 import id.walt.walletdemo.compose.logic.WalletAccessState
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatusNotice
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement
 import id.walt.walletdemo.compose.logic.WalletDemoSharingRequest
@@ -155,6 +156,14 @@ internal class WalletVisualScenarios(
             ready.credentials.associate { it.id to WalletVisualFixtures.credentialStatus("revoked_partial") }))
         captureIdentifier = "status.home.issue"
         walletHome()
+    }
+
+    fun credentialStatusHomeNotice(dark: Boolean = false) {
+        val ready = WalletVisualFixtures.partialResult.session as WalletSessionState.Ready
+        val credential = ready.credentials.single()
+        captureIdentifier = if (dark) "status.home.notice.dark" else "status.home.notice"
+        walletHome(notice = WalletDemoCredentialStatusNotice(credential.id, "revoked-v1", "REVOKED",
+            "2026-11-20T12:00:37Z", false))
     }
 
     fun credentialStatusMixedArtwork(rtl: Boolean = false) = with(test) {
@@ -338,6 +347,13 @@ internal class WalletVisualScenarios(
                 assertEquals(emptyList(), preferenceChanges)
             }
         }
+    }
+
+    fun credentialStatusBackgroundSettings(paused: Boolean = false) {
+        statusContext = CredentialStatusUiContext(automatic = !paused, setAutomatic = {},
+            background = paused, setBackground = {}, checkAll = {})
+        captureIdentifier = if (paused) "status.settings.background_paused" else "status.settings.background_off"
+        settingsRoot("credential_status")
     }
 
     fun controls(rtl: Boolean = false) = with(test) {
@@ -612,11 +628,16 @@ internal class WalletVisualScenarios(
             "credential_status", "credential_status_help" -> {
                 onNodeWithTag("settings-credential-status").performClick()
                 if (destination == "credential_status_help") onNodeWithTag("settings-credential-status-how").performClick()
+                if (statusContext.setBackground != null) {
+                    val background = onNodeWithTag("settings-credential-status-background").assertIsOff()
+                    if (statusContext.automatic) background.assertIsEnabled() else background.assertIsNotEnabled()
+                    onNodeWithTag("settings-credential-status-check-all").assertIsEnabled()
+                }
             }
             "dc_api" -> {
                 onNodeWithTag(WalletUiTestTags.SettingsDigitalCredentialsApi).performClick()
                 val toggle = onNodeWithTag(WalletUiTestTags.SettingsShowDcApiPreview)
-                if (reviewEnabled) toggle.assertIsOn() else toggle.assertIsOff()
+                if (reviewEnabled) toggle.assertIsOff() else toggle.assertIsOn()
             }
             "nearby", "connection", "reader", "reader_required" -> {
                 onNodeWithTag(WalletUiTestTags.SettingsProximityPresentation).performClick()
@@ -641,18 +662,42 @@ internal class WalletVisualScenarios(
         } else capture("settings.$destination.$stateId")
     }
 
-    fun walletHome(empty: Boolean = false) = with(test) {
+    fun walletHome(empty: Boolean = false, notice: WalletDemoCredentialStatusNotice? = null) = with(test) {
         val ready = WalletVisualFixtures.partialResult.session as WalletSessionState.Ready
+        val operationMessage = "Wallet operation completed"
+        val other = notice?.let {
+            ready.credentials.single().copy(id = "queued-credential", format = "jwt_vc_json", label = "Access card",
+                metadataJson = null, credentialDataJson = """{"given_name":"Ada"}""")
+        }
+        val pending = listOfNotNull(notice, other?.let {
+            WalletDemoCredentialStatusNotice(it.id, "suspended-v1", "SUSPENDED", "2026-11-20T12:01:00Z", false)
+        })
+        if (notice != null && other != null) {
+            statusContext = CredentialStatusUiContext(WalletDemoCredentialStatuses(mapOf(
+                notice.credentialId to WalletVisualFixtures.credentialStatus("revoked_current"),
+                other.id to WalletVisualFixtures.credentialStatus("suspended"),
+            )))
+        }
         val state = WalletVisualFixtures.partialResult.copy(
-            selectedTab = WalletDemoTab.Credentials, operation = WalletOperationState.Idle,
-            session = ready.copy(credentials = if (empty) emptyList() else ready.credentials),
+            selectedTab = WalletDemoTab.Credentials,
+            operation = if (notice == null) WalletOperationState.Idle else WalletOperationState.Succeeded(operationMessage),
+            session = ready.copy(credentials = if (empty) emptyList() else ready.credentials + listOfNotNull(other)),
+            credentialStatuses = WalletDemoCredentialStatuses(pendingNotices = pending),
         )
         content {
             Column(Modifier.fillMaxSize()) {
                 WalletHeader(state, onSettings = {}, onScan = {}, onShareNearby = {})
-                CredentialsTab(state.session, modifier = Modifier.weight(1f))
-                WalletFooter(feedback = { StatusCard(state, {}, {}) })
+                CredentialsTab(state, modifier = Modifier.weight(1f), isVisible = true)
             }
+        }
+        if (notice != null) {
+            waitUntil { onAllNodesWithTag(WalletUiTestTags.CredentialStatusNotice).fetchSemanticsNodes().isNotEmpty() }
+            onNodeWithText("Resident card - Revoked", useUnmergedTree = true).assertIsDisplayed()
+            onNodeWithText("Checked: Nov 20, 2026, 12:00", substring = true, useUnmergedTree = true).assertIsDisplayed()
+            onNodeWithText("View credential", useUnmergedTree = true).assertIsDisplayed()
+            onNodeWithContentDescription("Dismiss credential status notice").assertIsDisplayed()
+            onNodeWithText("1 more").assertIsDisplayed()
+            onNodeWithText(operationMessage).assertDoesNotExist()
         }
         if (empty) onNodeWithTag(WalletUiTestTags.CredentialsEmpty).assertIsDisplayed()
         else {

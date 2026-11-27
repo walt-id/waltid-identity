@@ -73,6 +73,7 @@ internal fun SettingsScreen(
     onClose: (() -> Unit)? = null,
     closeEnabled: Boolean = true,
     showHeader: Boolean = true,
+    onDismissStatusMessage: ((String) -> Unit)? = null,
 ) {
     val currentState by rememberUpdatedState(state)
     val currentReaderPolicy by rememberUpdatedState(readerTrustPolicySummary)
@@ -291,11 +292,19 @@ internal fun SettingsScreen(
                                 SettingsDestination.CredentialStatus -> CredentialStatusSettings(custodial = onSignOut != null)
                                 SettingsDestination.DigitalCredentialsApi -> {
                                     WalletSection(footer = stringResource(Res.string.settings_review_description)) {
-                                    SettingsToggleRow(stringResource(Res.string.settings_show_review), currentState.showDcApiPresentationPreview,
-                                        onShowDcApiPresentationPreviewChange, Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview))
+                                        SettingsToggleRow(stringResource(Res.string.settings_skip_review), !currentState.showDcApiPresentationPreview,
+                                            { skipReview -> onShowDcApiPresentationPreviewChange(!skipReview) },
+                                            Modifier.testTag(WalletUiTestTags.SettingsShowDcApiPreview))
                                     }
                                     SettingsNotice(stringResource(digitalCredentialsRequirements))
                                 }
+                            }
+                        }
+                        if (destination == SettingsDestination.CredentialStatus && destination == path.last() &&
+                            onDismissStatusMessage != null
+                        ) {
+                            currentState.credentialStatusNotice?.let { message ->
+                                WalletFooter(feedback = { CredentialStatusMessage(message, onDismissStatusMessage) })
                             }
                         }
                     }

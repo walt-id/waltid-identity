@@ -137,7 +137,7 @@ final class AnnexCPresentationModelTests: XCTestCase {
 
         await model.submit()
 
-        XCTAssertEqual(model.failure, StubWalletFailure().localizedDescription)
+        XCTAssertEqual(model.directSubmissionFailure, StubWalletFailure().localizedDescription)
         XCTAssertNil(context.sentResponse, "A wallet that could not seal a response must not hand the platform any bytes")
         XCTAssertFalse(
             model.isSubmitting,
@@ -168,6 +168,85 @@ final class AnnexCPresentationModelTests: XCTestCase {
         XCTAssertEqual(wallet.submitted?.selectedCredentialOptions.map(\.credentialID), ["cred-mdl"])
         XCTAssertEqual(context.sentResponse, Data([0xfb, 0xff, 0xbe, 0x02, 0x7f]))
         XCTAssertEqual(wallet.closed, 1)
+    }
+
+    @MainActor
+    func testOneTapSharesThePickedCredentialWithoutConsultingItsCachedStatus() async throws {
+        let status = try WalletVisualFixtures().credentialStatus("revoked_current")
+        let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [
+            CredentialStatusRecord(credentialID: "cred-mdl", storeIndex: 0, value: status),
+        ], refreshingCredentialIDs: [])
+        let context = StubRequestContext(rawRequest: Self.rawRequestJSON)
+        let wallet = StubWallet(preview: Self.preview(documentTypes: ["org.iso.18013.5.1.mDL"]),
+            responseJSON: #"{"response":"-_--An8"}"#, statusSnapshot: snapshot)
+        let model = AnnexCPresentationModel(context: context, makeWallet: { wallet })
+
+        await model.prepare(reviewStatus: false)
+        await model.submit()
+
+        XCTAssertEqual(wallet.statusReadCount, 0)
+        XCTAssertEqual(wallet.statusSubscriptionCount, 0)
+        XCTAssertNil(wallet.reviewedStatus)
+        XCTAssertEqual(wallet.ordinarySubmissions, 1)
+        XCTAssertEqual(context.sentResponse, Data([0xfb, 0xff, 0xbe, 0x02, 0x7f]))
+    }
+
+    @MainActor
+    func testOneTapFailureOpensAStatusReviewAndWaitsForExplicitRetry() async throws {
+        let status = try WalletVisualFixtures().credentialStatus("revoked_current")
+        let snapshot = CredentialStatusSnapshot(evaluatedAt: Date(), credentials: [
+            CredentialStatusRecord(credentialID: "cred-mdl", storeIndex: 0, value: status),
+        ], refreshingCredentialIDs: [])
+        let context = StubRequestContext(rawRequest: Self.rawRequestJSON)
+        let wallet = StubWallet(preview: Self.preview(documentTypes: ["org.iso.18013.5.1.mDL"]),
+            responseJSON: #"{"response":"-_--An8"}"#, statusSnapshot: snapshot,
+            directSubmitFailure: StubWalletFailure())
+        let model = AnnexCPresentationModel(context: context, makeWallet: { wallet })
+
+        await model.prepare(reviewStatus: false)
+        XCTAssertEqual(wallet.statusReadCount, 0)
+        await model.submit()
+
+        XCTAssertFalse(model.isSubmitting)
+        XCTAssertNil(model.failure)
+        XCTAssertEqual(model.directSubmissionFailure, StubWalletFailure().localizedDescription)
+        XCTAssertNil(context.sentResponse)
+        XCTAssertEqual(context.sendResponseCount, 1)
+        XCTAssertEqual(wallet.statusReadCount, 1)
+        let review = try XCTUnwrap(model.review)
+        let ui = model.credentialStatusUIContext
+        let selected = ui.selectedStatuses(review: review, selection: model.selection)
+        let revisions = try XCTUnwrap(ui.reviewedRevisions(for: selected))
+        XCTAssertEqual(revisions, ["cred-mdl": status.presentation.advisoryRevision])
+
+        await model.submit(reviewedStatus: revisions)
+        XCTAssertEqual(context.sendResponseCount, 2)
+        XCTAssertEqual(wallet.ordinarySubmissions, 1)
+        XCTAssertEqual(wallet.reviewedStatus, revisions)
+        XCTAssertEqual(context.sentResponse, Data([0xfb, 0xff, 0xbe, 0x02, 0x7f]))
+        XCTAssertEqual(wallet.closed, 1)
+    }
+
+    @MainActor
+    func testCancellingAFailedOneTapAttemptStopsThePendingStatusReview() async {
+        let started = expectation(description: "Loading the recovery review")
+        let gate = PreparationGate(started: started)
+        let context = StubRequestContext(rawRequest: Self.rawRequestJSON)
+        let wallet = StubWallet(preview: Self.preview(documentTypes: ["org.iso.18013.5.1.mDL"]),
+            directSubmitFailure: StubWalletFailure(), statusReadGate: gate)
+        let model = AnnexCPresentationModel(context: context, makeWallet: { wallet })
+        await model.prepare(reviewStatus: false)
+        let direct = Task { await model.submit() }
+        await fulfillment(of: [started], timeout: 5)
+
+        model.cancel()
+        await gate.release()
+        await direct.value
+
+        XCTAssertEqual(context.cancelCount, 1)
+        XCTAssertEqual(context.sendResponseCount, 1)
+        XCTAssertNil(context.sentResponse)
+        XCTAssertEqual(wallet.statusSubscriptionCount, 0)
     }
 
     @MainActor
@@ -312,13 +391,16 @@ final class AnnexCPresentationModelTests: XCTestCase {
         private let preview: AnnexCPresentationPreview
         private let responseJSON: String
         private let submitFailure: (any Error)?
+        private let directSubmitFailure: (any Error)?
         private let previewGate: PreparationGate?
+        private let statusReadGate: PreparationGate?
         private let statusSnapshot: CredentialStatusSnapshot?
         private let failStatusReread: Bool
         private let lock = NSLock()
         private var recorded: SubmittedPresentation?
         private var recordedStatus: [String: String]?
         private var statusReads = 0
+        private var statusSubscriptions = 0
         private var ordinaryCount = 0
         private var closeCount = 0
 
@@ -327,6 +409,8 @@ final class AnnexCPresentationModelTests: XCTestCase {
         var reviewedStatus: [String: String]? { lock.withLock { recordedStatus } }
         var ordinarySubmissions: Int { lock.withLock { ordinaryCount } }
         var closed: Int { lock.withLock { closeCount } }
+        var statusReadCount: Int { lock.withLock { statusReads } }
+        var statusSubscriptionCount: Int { lock.withLock { statusSubscriptions } }
 
         init(
             preview: AnnexCPresentationPreview,
@@ -334,20 +418,30 @@ final class AnnexCPresentationModelTests: XCTestCase {
             submitFailure: (any Error)? = nil,
             previewGate: PreparationGate? = nil,
             statusSnapshot: CredentialStatusSnapshot? = nil,
-            failStatusReread: Bool = false
+            failStatusReread: Bool = false,
+            directSubmitFailure: (any Error)? = nil,
+            statusReadGate: PreparationGate? = nil
         ) {
             self.preview = preview
             self.responseJSON = responseJSON
             self.submitFailure = submitFailure
+            self.directSubmitFailure = directSubmitFailure
             self.previewGate = previewGate
+            self.statusReadGate = statusReadGate
             self.statusSnapshot = statusSnapshot
             self.failStatusReread = failStatusReread
         }
 
         func cachedCredentialStatuses() async throws -> CredentialStatusSnapshot? {
+            await statusReadGate?.wait()
             let shouldFail = lock.withLock { statusReads += 1; return failStatusReread && statusReads > 1 }
             if shouldFail { throw StubWalletFailure() }
             return statusSnapshot
+        }
+
+        func cachedCredentialStatusUpdates() async throws -> AsyncThrowingStream<CredentialStatusSnapshot, Error> {
+            lock.withLock { statusSubscriptions += 1 }
+            return AsyncThrowingStream { $0.finish() }
         }
 
         func closeStatusWallet() async throws { lock.withLock { closeCount += 1 } }
@@ -369,6 +463,7 @@ final class AnnexCPresentationModelTests: XCTestCase {
             selectedCredentialOptions: [PresentationCredentialSelection]
         ) async throws -> DigitalCredentialResponse {
             lock.withLock { ordinaryCount += 1 }
+            if let directSubmitFailure { throw directSubmitFailure }
             return try seal(requestID: requestID, verifiedOrigin: verifiedOrigin,
                 deviceRequestBase64URL: deviceRequestBase64URL, encryptionInfoBase64URL: encryptionInfoBase64URL,
                 selectedCredentialOptions: selectedCredentialOptions)

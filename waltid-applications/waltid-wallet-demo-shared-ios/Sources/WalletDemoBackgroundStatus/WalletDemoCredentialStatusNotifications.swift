@@ -1,0 +1,96 @@
+import Dispatch
+import Foundation
+import UIKit
+import UserNotifications
+
+/// App-level delivery. The system gets no wallet or credential identifiers.
+@MainActor
+public final class WalletDemoCredentialStatusNotifications: NSObject, UNUserNotificationCenterDelegate {
+    public static let shared = WalletDemoCredentialStatusNotifications { removeStatusNotifications() }
+    public static let openHome = Notification.Name("wallet.credential-status.open-home")
+    nonisolated private static let identifier = "wallet.credential-status"
+    private let removeNotifications: @Sendable () -> Void
+    private var openRequested = false
+    private var requestingPermission = false
+    private var clearing: Task<Void, Never>?
+
+    init(removeNotifications: @escaping @Sendable () -> Void) {
+        self.removeNotifications = removeNotifications
+    }
+
+    public func register() {
+        UNUserNotificationCenter.current().delegate = self
+    }
+
+    public func takeHomeRequest() -> Bool {
+        defer { openRequested = false }
+        return openRequested
+    }
+
+    func requestPermissionIfNeeded() {
+        guard !requestingPermission, UIApplication.shared.applicationState == .active else { return }
+        requestingPermission = true
+        Task {
+            defer { requestingPermission = false }
+            let center = UNUserNotificationCenter.current()
+            guard await center.notificationSettings().authorizationStatus == .notDetermined,
+                  UIApplication.shared.applicationState == .active else { return }
+            _ = try? await center.requestAuthorization(options: [.alert])
+        }
+    }
+
+    func postIfAllowed(isCurrent: @MainActor () -> Bool) async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        // Finish clearing an older alert before posting its replacement.
+        while let clearing { await clearing.value }
+        guard isCurrent(), UIApplication.shared.applicationState == .background,
+              settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+        let content = UNMutableNotificationContent()
+        content.body = String(localized: "A credential needs your attention.")
+        try? await center.add(UNNotificationRequest(identifier: Self.identifier, content: content, trigger: nil))
+    }
+
+    public func clear() {
+        guard clearing == nil else { return }
+        clearing = Task { [removeNotifications] in
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                // The system notification service can block removal calls.
+                DispatchQueue.global(qos: .utility).async {
+                    removeNotifications()
+                    continuation.resume()
+                }
+            }
+            clearing = nil
+        }
+    }
+
+    nonisolated private static func removeStatusNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.identifier])
+        center.removeDeliveredNotifications(withIdentifiers: [Self.identifier])
+    }
+
+    public nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        await handleResponse(identifier: response.notification.request.identifier, action: response.actionIdentifier)
+    }
+
+    func handleResponse(identifier: String, action: String) {
+        guard identifier == Self.identifier, action == UNNotificationDefaultActionIdentifier else { return }
+        openRequested = true
+        NotificationCenter.default.post(name: Self.openHome, object: nil)
+    }
+
+    #if DEBUG
+    @_spi(WalletDemoTesting)
+    public func simulateTapForUITest() {
+        handleResponse(identifier: Self.identifier, action: UNNotificationDefaultActionIdentifier)
+    }
+    #endif
+
+    public nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions { [] }
+}

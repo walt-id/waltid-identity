@@ -21,6 +21,8 @@ import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.JwtVcJsonMeta
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier2.data.SameDeviceFlowSetup
+import id.walt.verifier2.data.Verification2Session.VerificationSessionRedirects
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.DcApiAnnexDFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
@@ -71,9 +73,12 @@ class OSSVerifier2RequestUriPostIntegrationTest {
             useBoundVerifierAddress()
             val http = testHttpClient()
             assertEquals(HttpStatusCode.NotFound, http.get("/verification-session/missing-session/request").status)
-            for (mode in listOf("unsigned", "signed", "encrypted")) {
+            val modes = listOf(false, true).flatMap { sameDevice ->
+                listOf("unsigned", "signed", "encrypted").map { sameDevice to it }
+            }
+            for ((sameDevice, mode) in modes) {
                 val encrypted = mode == "encrypted"
-                val setup: VerificationSessionSetup = CrossDeviceFlowSetup(
+                val base = CrossDeviceFlowSetup(
                     core = GeneralFlowConfig(
                         dcqlQuery = DcqlQuery(
                             credentials = listOf(
@@ -88,6 +93,9 @@ class OSSVerifier2RequestUriPostIntegrationTest {
                         encryptedRequest = encrypted,
                     )
                 )
+                val setup: VerificationSessionSetup = if (sameDevice) SameDeviceFlowSetup(
+                    core = base.core, redirects = VerificationSessionRedirects(successRedirectUri = Url("https://example.com/success")),
+                ) else base
                 val created = http.post("/verification-session/create") {
                     setBody(setup)
                 }.body<VerificationSessionCreationResponse>()
@@ -143,7 +151,7 @@ class OSSVerifier2RequestUriPostIntegrationTest {
                     },
                 )
 
-                test("configured service key signs the nonce-bound request (encrypted=$encrypted)") {
+                test("configured service key signs the nonce-bound request (sameDevice=$sameDevice, encrypted=$encrypted)") {
                     assertEquals(HttpStatusCode.OK, response.status)
                     assertEquals(
                         ContentType.parse("application/oauth-authz-req+jwt"),

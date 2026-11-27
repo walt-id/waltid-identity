@@ -29,17 +29,18 @@ public class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEn
      */
     public override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
         val keyId = keyId(walletId, databaseName)
-        val stored = preferences.getString(keyId, null)
-        if (stored != null) {
-            return DatabaseEncryptionKey(
-                keyId = keyId,
-                material = decryptStoredKey(walletId, keyId, stored),
-            )
-        }
+        readExistingKey(walletId, databaseName)?.let { return it }
 
         val material = ByteArray(DATABASE_KEY_BYTES).also(secureRandom::nextBytes)
         persistStoredKey(walletId, keyId, encryptKeyMaterial(keyId, material))
         return DatabaseEncryptionKey(keyId = keyId, material = material)
+    }
+
+    /** Reads the stored key using its existing Keystore alias. Missing material is never provisioned. */
+    public fun readExistingKey(walletId: String, databaseName: String): DatabaseEncryptionKey? {
+        val keyId = keyId(walletId, databaseName)
+        val stored = preferences.getString(keyId, null) ?: return null
+        return DatabaseEncryptionKey(keyId, decryptStoredKey(walletId, keyId, stored))
     }
 
     /**
