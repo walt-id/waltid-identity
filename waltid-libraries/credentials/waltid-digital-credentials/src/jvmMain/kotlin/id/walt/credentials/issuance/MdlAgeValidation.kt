@@ -77,26 +77,35 @@ object MdlAgeValidation {
         }
     }
 
-    /** Update a profile's inherited year when a literal offer override changes the birth date. */
-    fun reconcileInheritedBirthYear(
+    fun birthYearOrigin(
         credentialData: JsonObject,
         credentialDataOverride: JsonObject?,
         mapping: JsonObject?,
-        mappingOverride: JsonObject?,
+        loginClaimDestinations: Collection<String>,
+    ): MdlBirthYear? {
+        val namespaceOverride = credentialDataOverride?.get(MdlAge.NAMESPACE) as? JsonObject
+        namespaceOverride?.get(MdlAge.AGE_BIRTH_YEAR)?.let { return MdlBirthYear.Explicit(it) }
+        val namespace = credentialData[MdlAge.NAMESPACE] as? JsonObject
+        val namespaceMapping = mapping?.get(MdlAge.NAMESPACE) as? JsonObject
+        val login = MdlLoginClaimMapping.forDestinations(loginClaimDestinations)
+        return MdlBirthYear.Inherited.takeIf {
+            namespace?.containsKey(MdlAge.AGE_BIRTH_YEAR) == true &&
+                namespaceMapping?.containsKey(MdlAge.AGE_BIRTH_YEAR) != true &&
+                !login.canSupplyBirthYear
+        }
+    }
+
+    /** Update an inherited year early when its effective birth date is already known. */
+    fun reconcileInheritedBirthYear(
+        credentialData: JsonObject,
+        mapping: JsonObject?,
+        loginClaimDestinations: Collection<String>,
     ): JsonObject {
         val namespace = credentialData[MdlAge.NAMESPACE] as? JsonObject ?: return credentialData
-        val namespaceOverride = credentialDataOverride?.get(MdlAge.NAMESPACE) as? JsonObject
-        val namespaceMapping = mapping?.get(MdlAge.NAMESPACE) as? JsonObject
-        val namespaceMappingOverride = mappingOverride?.get(MdlAge.NAMESPACE) as? JsonObject
-        if (MdlAge.AGE_BIRTH_YEAR !in namespace ||
-            namespaceOverride?.containsKey(MdlAge.AGE_BIRTH_YEAR) == true ||
-            namespaceMapping?.containsKey(MdlAge.AGE_BIRTH_YEAR) == true
-        ) return credentialData
-        if (namespaceOverride?.containsKey(MdlAge.BIRTH_DATE) != true &&
-            namespaceMappingOverride?.containsKey(MdlAge.BIRTH_DATE) != true
-        ) return credentialData
-
-        val mappedBirthDate = namespaceMapping?.get(MdlAge.BIRTH_DATE)
+        val mappedBirthDate = (mapping?.get(MdlAge.NAMESPACE) as? JsonObject)?.get(MdlAge.BIRTH_DATE)
+        if (mappedBirthDate == null && MdlLoginClaimMapping.forDestinations(loginClaimDestinations).canSupplyBirthDate) {
+            return credentialData
+        }
         val birthDate = mappedBirthDate ?: namespace[MdlAge.BIRTH_DATE] ?: return credentialData
         if (birthDate == JsonNull || isDataFunction(birthDate)) return credentialData
         val source = if (mappedBirthDate == null) "credentialData" else "mapping"

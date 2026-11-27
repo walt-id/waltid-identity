@@ -2,6 +2,7 @@ package id.walt.issuer2.service
 
 import id.walt.credentials.issuance.CredentialDataMergeUtils.validateMdocNamespaceMappingShape
 import id.walt.credentials.issuance.MdlAgeValidation
+import id.walt.credentials.issuance.MdlBirthYear
 import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.sdjwt.metadata.type.validateIssuanceInput
 
@@ -18,7 +19,6 @@ import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.openid4vci.CredentialFormat
 import id.walt.mdoc.issuance.MsoData
-import id.walt.mdoc.issuance.MdlAge
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -75,18 +75,21 @@ class CredentialOfferService(
             val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
             val mapping = overrides?.mapping ?: profile.mapping
             val msoData = (profile.msoData ?: MsoData()).merge(overrides?.msoData).takeUnless { it.isEmpty() }
+            val canUseLoginClaims = request.authMethod == AuthenticationMethod.AUTHORIZED
+            val loginClaimDestinations = if (canUseLoginClaims) idTokenClaimsMapping.orEmpty().values else emptyList()
+            val mdlBirthYear = if (profileService.isMdl(profile.credentialConfigurationId)) {
+                MdlAgeValidation.birthYearOrigin(mergedData, overrides?.credentialData, mapping, loginClaimDestinations)
+            } else null
             val credentialData = try {
-                val resolvedData = if (profileService.isMdl(profile.credentialConfigurationId)) {
-                    MdlAgeValidation.reconcileInheritedBirthYear(mergedData, overrides?.credentialData, mapping, overrides?.mapping)
+                val resolvedData = if (mdlBirthYear == MdlBirthYear.Inherited) {
+                    MdlAgeValidation.reconcileInheritedBirthYear(mergedData, mapping, loginClaimDestinations)
                 } else {
                     mergedData
                 }
-                val explicitBirthYear = (overrides?.credentialData?.get(MdlAge.NAMESPACE) as? JsonObject)
-                    ?.get(MdlAge.AGE_BIRTH_YEAR)
                 profileService.validateMdlAge(
                     profile.credentialConfigurationId, resolvedData, mapping, idTokenClaimsMapping, msoData,
-                    canUseLoginClaims = request.authMethod == AuthenticationMethod.AUTHORIZED,
-                    explicitBirthYear = explicitBirthYear,
+                    canUseLoginClaims = canUseLoginClaims,
+                    explicitBirthYear = (mdlBirthYear as? MdlBirthYear.Explicit)?.value,
                 )
                 resolvedData
             } catch (e: IllegalArgumentException) {
@@ -118,6 +121,7 @@ class CredentialOfferService(
                 authorizedTransactionDataTypes = overrides?.authorizedTransactionDataTypes
                     ?: profile.authorizedTransactionDataTypes,
                 msoData = msoData,
+                mdlBirthYear = mdlBirthYear,
                 x5Chain = overrides?.x5Chain ?: profile.x5Chain,
                 issuerDid = overrides?.issuerDid ?: profile.issuerDid,
                 credentialStatus = credentialStatus,

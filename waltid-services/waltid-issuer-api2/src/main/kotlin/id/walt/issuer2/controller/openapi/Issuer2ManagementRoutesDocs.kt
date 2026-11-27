@@ -114,13 +114,13 @@ object Issuer2ManagementRoutesDocs {
               runtime overrides. The issuer checks it against the final `birth_date` and the UTC date of MSO
               `validFrom` before signing. Offers with fixed values are also checked at creation.
               Leave `msoData.validFrom` unset in the profile and offer to start validity at the MSO signing timestamp.
-            - If an offer changes the mDL birth date and inherits `age_birth_year`, a literal birth date updates
-              the inherited year. A conflicting explicit year returns HTTP 400 when the birth date is known.
-              Before signing, Issuer2 checks any supplied year against the final birth date, even when
-              `age_in_years` is omitted.
+            - Issuer2 updates an inherited `age_birth_year` from the final `birth_date` before signing.
+              A conflicting explicit year returns HTTP 400 if the conflict is known at offer creation.
+              Issuer2 also checks the year when `age_in_years` is omitted.
             - Non-empty `runtimeOverrides.msoData` is accepted only for `mso_mdoc`. Blank validity values are rejected.
               Null `expectedUpdate` clears the profile value; null `validFrom` or `validUntil` inherits it.
-            - Validity must satisfy `signed <= validFrom < validUntil`. `expectedUpdate` is optional;
+            - Data functions use the wallet's claim time. Validity must satisfy `signed <= validFrom < validUntil`
+              using the timestamps recorded in the MSO. `expectedUpdate` is optional;
               this issuer does not require it to fall within that window.
             - Without a configured `validUntil`, the default is 365 days, rounded to a 12-hour UTC bucket
               when rounding is enabled. Explicit `validUntil` timestamps and resolved data functions are not rounded.

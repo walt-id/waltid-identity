@@ -64,25 +64,41 @@ class MdocDataMappingTest {
         assertContains(error.message.orEmpty(), "credentialData.${MdlAge.NAMESPACE}.age_in_years must be 36")
     }
 
+    private val dataWithBirthYear = buildJsonObject {
+        putJsonObject(MdlAge.NAMESPACE) {
+            put(MdlAge.BIRTH_DATE, "1988-08-25")
+            put(MdlAge.AGE_BIRTH_YEAR, 1988)
+            put(MdlAge.AGE_IN_YEARS, 36)
+        }
+    }
+    private val birthDateMapping = buildJsonObject {
+        putJsonObject(MdlAge.NAMESPACE) {
+            put(MdlAge.BIRTH_DATE, "<date-before:13242d>")
+        }
+    }
+    private val claimTime = Instant.parse("2026-11-27T14:00:00Z")
+
     @Test
-    fun rejectsInheritedBirthYearWhenResolvedMappingChangesTheBirthDate() = runTest {
-        val credentialData = buildJsonObject {
-            putJsonObject(MdlAge.NAMESPACE) {
-                put(MdlAge.BIRTH_DATE, "1988-08-25")
-                put(MdlAge.AGE_BIRTH_YEAR, 1988)
-            }
-        }
-        val birthDateMapping = buildJsonObject {
-            putJsonObject(MdlAge.NAMESPACE) {
-                put(MdlAge.BIRTH_DATE, "<date-before:365d>")
-            }
-        }
+    fun updatesInheritedBirthYearWhenResolvedMappingChangesTheBirthDate() = runTest {
+        val resolved = MdocDataMapping.resolve(
+            dataWithBirthYear, birthDateMapping, MdlAge.DOC_TYPE, claimTime, InstantClock(claimTime),
+            mdlBirthYear = MdlBirthYear.Inherited,
+        ) { emptyMap() }
+        val namespace = resolved.getValue(MdlAge.NAMESPACE).jsonObject
+        assertEquals(JsonPrimitive("1990-08-26"), namespace[MdlAge.BIRTH_DATE])
+        assertEquals(JsonPrimitive(1990), namespace[MdlAge.AGE_BIRTH_YEAR])
+        assertEquals(JsonPrimitive(36), namespace[MdlAge.AGE_IN_YEARS])
+    }
+
+    @Test
+    fun rejectsExplicitBirthYearWhenResolvedMappingChangesTheBirthDate() = runTest {
         val error = assertFailsWith<IllegalArgumentException> {
             MdocDataMapping.resolve(
-                credentialData, birthDateMapping, MdlAge.DOC_TYPE, validFrom, InstantClock(issuedAt),
+                dataWithBirthYear, birthDateMapping, MdlAge.DOC_TYPE, claimTime, InstantClock(claimTime),
+                mdlBirthYear = MdlBirthYear.Explicit(JsonPrimitive(1988)),
             ) { emptyMap() }
         }
-        assertContains(error.message.orEmpty(), "credentialData.${MdlAge.NAMESPACE}.age_birth_year must be 2026")
+        assertContains(error.message.orEmpty(), "credentialData.${MdlAge.NAMESPACE}.age_birth_year must be 1990")
     }
 
     @Test

@@ -675,8 +675,12 @@ class Issuer2MsoDataWalletFlowTest {
     }
 
     @OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
-    private fun assertSignedBirthDateAndAge(payload: JsonObject, age: Int? = 36) {
-        assertEquals(AGE_VALID_FROM, mdocValidityInfo(payload).validFrom)
+    private fun assertSignedBirthDateAndAge(
+        payload: JsonObject,
+        age: Int? = 36,
+        expectedValidFrom: Instant = AGE_VALID_FROM,
+    ) {
+        assertEquals(expectedValidFrom, mdocValidityInfo(payload).validFrom)
         val claims = assertNotNull(decodeIssuerSigned(payload).namespaces?.get(ISO_MDL_NAMESPACE))
             .entries.associate { it.value.elementIdentifier to it.value.elementValue }
         val missing = setOf(
@@ -691,6 +695,46 @@ class Issuer2MsoDataWalletFlowTest {
             assertTrue(claims.keys.none { it.startsWith("age_") })
         } else {
             assertEquals(CborInteger(1990), claims["age_birth_year"])
+        }
+    }
+
+    @Test
+    fun validityUsesRecordedSigningTimeAndTemplatesUseWalletClaimTime() = testApplication {
+        val claimTime = Instant.parse("2026-11-27T14:00:00Z")
+        val recordedSigned = Instant.parse("2026-11-27T12:00:00Z")
+        val explicitStart = Instant.parse("2026-11-27T13:00:00Z")
+        val expectedUpdate = Instant.parse("2026-11-28T14:00:00Z")
+        pinMdlIssuanceClock(claimTime)
+        installIssuer2WithConfigFiles(configureProfilesConfig = { config ->
+            val id = Issuer2CredentialScenarios.ISO_MDL_PROFILE_ID
+            val profile = config.profiles.getValue(id).copy(
+                msoData = MsoData(validUntil = "<timestamp-in:365d>", expectedUpdate = "<timestamp-in:1d>"),
+            )
+            config.copy(profiles = config.profiles + (id to profile))
+        })
+        val client = apiClient()
+        val mapping = buildJsonObject {
+            putJsonObject(ISO_MDL_NAMESPACE) {
+                put("birth_date", "<date-before:13242d>")
+            }
+        }
+        val data = buildJsonObject {
+            putJsonObject(ISO_MDL_NAMESPACE) { put("age_in_years", 36) }
+        }
+        val variants = listOf(
+            Triple(MsoData(), recordedSigned, expectedUpdate),
+            Triple(MsoData(validFrom = "<timestamp>"), claimTime, expectedUpdate),
+            Triple(MsoData(validFrom = explicitStart.toString(), expectedUpdateCleared = true), explicitStart, null),
+        )
+        for ((override, expectedStart, expectedHint) in variants) {
+            val payload = client.issueIsoMdlCredential(
+                CredentialOfferRuntimeOverrides(credentialData = data, mapping = mapping, msoData = override),
+            )
+            val validity = mdocValidityInfo(payload)
+            assertEquals(recordedSigned, validity.signed)
+            assertEquals(claimTime + 365.days, validity.validUntil)
+            assertEquals(expectedHint, validity.expectedUpdate)
+            assertSignedBirthDateAndAge(payload, expectedValidFrom = expectedStart)
         }
     }
 
@@ -791,9 +835,13 @@ class Issuer2MsoDataWalletFlowTest {
         runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
         configureProfiles: (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { it },
     ): JsonObject {
-        val scenario = Issuer2CredentialScenarios.isoMdl
         installIssuer2WithConfigFiles(configureProfilesConfig = configureProfiles)
-        val client = apiClient()
+        return apiClient().issueIsoMdlCredential(runtimeOverrides)
+    }
+
+    private suspend fun HttpClient.issueIsoMdlCredential(runtimeOverrides: CredentialOfferRuntimeOverrides?): JsonObject {
+        val scenario = Issuer2CredentialScenarios.isoMdl
+        val client = this
         val walletFlow = Issuer2WalletFlowDriver(client)
 
         val createdOffer = client.createWalletFlowCredentialOffer(

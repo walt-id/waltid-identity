@@ -1,5 +1,7 @@
 package id.walt.openid4vci.handlers.endpoints.credential
 
+import id.walt.credentials.issuance.MdlBirthYear
+import id.walt.mdoc.issuance.MsoData
 import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.proofs.VerifiedCredentialBinding
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -18,6 +20,9 @@ import kotlinx.serialization.json.JsonPrimitive
 data class CredentialIssuanceInput(
     val credentialData: JsonObject,
     val credentialStatus: Status? = null,
+    /** Profile and offer validity settings shared by the entire mDoc batch. */
+    val msoData: MsoData? = null,
+    val mdlBirthYear: MdlBirthYear? = null,
 )
 
 /**

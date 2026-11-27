@@ -46,9 +46,8 @@ import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.handlers.endpoints.credential.Crypto2CredentialSigningKey
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInput
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialIssuanceInputProvider
-import id.walt.credentials.issuance.MsoDataMapping
-import id.walt.credentials.issuance.InstantClock
 import id.walt.credentials.issuance.IssuanceClock
+import id.walt.credentials.issuance.MdlAgeValidation
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.toDefaultAuthorizationRequest
@@ -1309,6 +1308,7 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
         var claimFinalized = false
         var committedProofKeyJwks: List<JsonObject>? = null
         try {
+            val issuedAt = currentCoroutineContext()[IssuanceClock]?.clock?.now() ?: Clock.System.now()
             val issuerKey = KeyManager.resolveSerializedKey(issuanceRequest.issuerKey)
             val crypto2IssuerKey = restoreSessionIssuerCrypto2Key(issuanceRequest, crypto2Runtime)
             val x5Chain = issuanceRequest.x5Chain?.map { X509CertificateUtil.parseCertificatePem(it) }
@@ -1319,19 +1319,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             var statusOperation: CredentialStatusIssuanceOperation? = null
             var statusHolderKeys = emptyList<String>()
             var proofPublicKeyJwks: List<JsonObject>? = null
-            val issuedAt = currentCoroutineContext()[IssuanceClock]?.clock?.now() ?: Clock.System.now()
-            val resolvedMsoValidity = if (configuration.format == CredentialFormat.MSO_MDOC) {
-                MsoDataMapping.resolve(
-                    issuanceRequest.msoData,
-                    signed = issuedAt,
-                    clock = InstantClock(issuedAt),
-                )
-            } else {
-                require(issuanceRequest.msoData == null || issuanceRequest.msoData.isEmpty()) {
-                    "msoData is only supported for mso_mdoc credentials"
-                }
-                null
-            }
+            require(configuration.format == CredentialFormat.MSO_MDOC ||
+                issuanceRequest.msoData == null || issuanceRequest.msoData.isEmpty()
+            ) { "msoData is only supported for mso_mdoc credentials" }
 
             val issuanceInputData = object : CredentialIssuanceInputProvider {
                 override suspend fun prepare(bindings: List<VerifiedCredentialBinding>): CredentialResponseResult? {
@@ -1380,7 +1370,12 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                             val value = CredentialStatusConfiguration.credentialValue(group, configuration.format)
                             if (configuration.format == CredentialFormat.MSO_MDOC) {
                                 val status = MdocStatus(statusList = CredentialStatusConfiguration.tokenStatusList(value))
-                                CredentialIssuanceInput(issuanceRequest.credentialData, status)
+                                CredentialIssuanceInput(
+                                    credentialData = issuanceRequest.credentialData,
+                                    credentialStatus = status,
+                                    msoData = issuanceRequest.msoData,
+                                    mdlBirthYear = issuanceRequest.mdlBirthYear,
+                                )
                             } else {
                                 createCredentialIssuanceInput(issuanceRequest, configuration.format, value)
                             }
@@ -1402,9 +1397,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         x5Chain = x5Chain,
                         mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
                         authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
-                        validFrom = resolvedMsoValidity?.validFrom,
-                        validUntil = resolvedMsoValidity?.validUntil,
-                        expectedUpdate = resolvedMsoValidity?.expectedUpdate,
                         proofValidationContext = proofValidationContext,
                         notificationId = notificationId,
                     )
@@ -1420,9 +1412,6 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
                         x5Chain = x5Chain,
                         mDocNameSpacesDataMappingConfig = issuanceRequest.mDocNameSpacesDataMappingConfig,
                         authorizedTransactionDataTypes = issuanceRequest.authorizedTransactionDataTypes,
-                        validFrom = resolvedMsoValidity?.validFrom,
-                        validUntil = resolvedMsoValidity?.validUntil,
-                        expectedUpdate = resolvedMsoValidity?.expectedUpdate,
                         proofValidationContext = proofValidationContext,
                         notificationId = notificationId,
                     )
@@ -1902,6 +1891,9 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             authorizedTransactionDataTypes = authorizedTransactionDataTypes,
             msoData = msoData,
+            mdlBirthYear = if (profileService.isMdl(credentialConfigurationId)) {
+                MdlAgeValidation.birthYearOrigin(credentialData, null, mapping, idTokenClaimsMapping.orEmpty().values)
+            } else null,
             x5Chain = x5Chain,
             issuerDid = issuerDid,
             credentialStatus = profileService.statusForIssuance(profile),
@@ -2171,8 +2163,12 @@ class OpenId4VciProtocolService @JvmOverloads constructor(
             CredentialFormat.SD_JWT_VC -> JsonObject(request.credentialData + ("status" to status))
             else -> request.credentialData
         }
-        return CredentialIssuanceInput(data,
-            if (format == CredentialFormat.MSO_MDOC && status != null) parseSharedMdocStatus(status) else null)
+        return CredentialIssuanceInput(
+            credentialData = data,
+            credentialStatus = if (format == CredentialFormat.MSO_MDOC && status != null) parseSharedMdocStatus(status) else null,
+            msoData = request.msoData,
+            mdlBirthYear = request.mdlBirthYear,
+        )
     }
 
     private fun CredentialError.isRetryableProofFailure(): Boolean =

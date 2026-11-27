@@ -3,6 +3,7 @@ package id.walt.issuer2.domain
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.mdoc.issuance.MsoData
+import id.walt.credentials.issuance.MdlBirthYear
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.requests.notification.IssuedCredentialNotification
@@ -40,6 +41,7 @@ data class IssuanceRequest(
     /** OpenID4VP transaction_data types the issued key may sign, embedded in the mdoc MSO. */
     val authorizedTransactionDataTypes: List<String>? = null,
     val msoData: MsoData? = null,
+    val mdlBirthYear: MdlBirthYear? = null,
     val x5Chain: List<String>? = null,
     val issuerDid: String? = null,
     val credentialStatus: JsonElement? = null,
