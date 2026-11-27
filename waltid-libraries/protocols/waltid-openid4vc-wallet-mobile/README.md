@@ -46,11 +46,17 @@ only runtime state, such as the wallet database. A host already using Kotlin or 
 share dependencies with the SDK.
 
 On Android, enable R8 optimization and resource shrinking in the app's release build.
-The X.509 library supplies the Bouncy Castle keystore rules used by Android TLS.
+The X.509 AAR supplies the Bouncy Castle keystore rules used by Android TLS.
+Kotlin serialization and SQLCipher supply their own consumer rules. The built-in wallet
+stores use SQLDelight queries and Kotlin serializers and need no app-specific keep rules.
 Build APKs from each release bundle for the same bundletool device spec and compare
 `bundletool get-size total --apks=<file> --device-spec=<spec>`. For installed size,
 compare the app's `StorageStats.appBytes` on the same device at first launch. Record
 wallet data and cache separately.
+
+To check an upgrade, receive a test credential with the previous minified release.
+Install the new release over it with the same application ID and signing key, reopen the
+wallet and present the stored credential. Clearing app data would skip the migration.
 
 On iOS, archive each Release host and export it with app thinning for the same device.
 Compare the compressed and uncompressed entries for that device in Xcode's App Thinning
