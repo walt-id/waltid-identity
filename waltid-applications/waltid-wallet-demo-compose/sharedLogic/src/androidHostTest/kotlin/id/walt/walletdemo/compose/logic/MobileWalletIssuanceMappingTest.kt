@@ -63,9 +63,17 @@ class MobileWalletIssuanceMappingTest {
             sessionId = "issuance-terminal",
             error = WalletIssuanceError(WalletIssuanceErrorCode.ISSUER_RESPONSE, "Issuer rejected the offer", canRetryOffer = false),
         ).toDemoIssuanceOutcome() as WalletDemoIssuanceOutcome.Failed
+        val signing = WalletIssuanceOutcome.Failed(
+            sessionId = "issuance-signing",
+            error = WalletIssuanceError(WalletIssuanceErrorCode.STORAGE, "Could not read the issuance session"),
+            signingApprovalRequired = true,
+        ).toDemoIssuanceOutcome() as WalletDemoIssuanceOutcome.Failed
 
         assertFalse(retryable.offerConsumed)
+        assertFalse(retryable.signingApprovalRequired)
         assertTrue(terminal.offerConsumed)
+        assertFalse(signing.offerConsumed)
+        assertTrue(signing.signingApprovalRequired)
     }
 
     @Test

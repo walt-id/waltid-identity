@@ -1289,7 +1289,8 @@ public struct IssuanceFailure: Equatable, Sendable {
     /// Whether the caller may submit the same reviewed offer again after this transition.
     public let canRetryOffer: Bool
 
-    /// The holder can approve the remaining proof on the same session.
+    /// The holder can retry signing using the same session ID. A read failure can leave this
+    /// available without new target details.
     public let signingApprovalRequired: Bool
 
     /// Creates a sanitized issuance failure.

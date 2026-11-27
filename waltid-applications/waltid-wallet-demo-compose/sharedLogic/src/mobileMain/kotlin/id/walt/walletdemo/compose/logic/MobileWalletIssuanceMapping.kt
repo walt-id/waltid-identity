@@ -79,7 +79,8 @@ fun WalletIssuanceOutcome.toDemoIssuanceOutcome(): WalletDemoIssuanceOutcome =
             deferredCredentials = deferredCredentials.map { it.toDemoDeferredCredential() },
             failedTargetCount = if (failure == null) 0 else 1,
             notAttemptedTargetCount = failure?.notAttempted?.size ?: 0,
-            offerConsumed = !error.canRetryOffer,
+            offerConsumed = !error.canRetryOffer && !signingApprovalRequired,
+            signingApprovalRequired = signingApprovalRequired,
             remainingSigningTargets = failure?.takeIf { signingApprovalRequired }?.let { stopped ->
                 (listOf(stopped.target) + stopped.notAttempted).map { it.credentialConfigurationId }
             }.orEmpty(),

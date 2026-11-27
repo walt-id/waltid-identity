@@ -12,7 +12,8 @@ class SigningRecoveryTest {
         val offer = wallet.startIssuance(MobileWalletIssuanceRequest(MobileWalletCredentialOffer.Uri(issuer.offer),
             clientId = "wallet", redirectUri = "wallet://callback", keyId = "holder"))
         val failure = assertIs<WalletIssuanceOutcome.Failed>(wallet.continuePreAuthorizedIssuance(offer.id))
-        assertTrue(failure.error.canRetryOffer && failure.signingApprovalRequired)
+        assertFalse(failure.error.canRetryOffer)
+        assertTrue(failure.signingApprovalRequired)
         assertEquals(listOf(1, 1, 0, 0), listOf(issuer.exchanges, issuer.prompts, issuer.signatures, issuer.deliveries))
         wallet.close()
 

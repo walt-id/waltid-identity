@@ -90,7 +90,8 @@ class DigitalCredentialCreateModelTest {
     @Test fun browserReturnUsesTheSameBatchAndIgnoresUnrelatedOrDuplicateCallbacks() = runTest(dispatcher) {
         val client = Client(WalletDemoIssuanceGrant.AuthorizationCode)
         client.outcome = WalletDemoIssuanceOutcome.Failed(
-            "Signing was dismissed", storedCredentialIds = listOf("first"), remainingSigningTargets = listOf("mdl"),
+            "Signing was dismissed", storedCredentialIds = listOf("first"),
+            signingApprovalRequired = true, remainingSigningTargets = listOf("mdl"),
         )
         val model = model(client)
         val host = Robolectric.buildActivity(FragmentActivity::class.java).setup()
@@ -116,10 +117,15 @@ class DigitalCredentialCreateModelTest {
         assertEquals(listOf("first"), review.preview.signingReview?.storedCredentialIds)
         assertTrue(review.errorMessage.orEmpty().contains("Saved credentials: 1"))
         assertEquals(0, client.signingApprovals)
+        client.outcome = WalletDemoIssuanceOutcome.Failed("Could not read session", signingApprovalRequired = true)
+        model.accept(null, emptyMap()); runCurrent()
+        val stillReviewing = assertIs<WalletDemoOfferCreateUiState.Review>(model.state)
+        assertEquals(listOf("mdl"), stillReviewing.preview.signingReview?.remainingSigningTargets)
+        assertEquals(listOf("first"), stillReviewing.preview.signingReview?.storedCredentialIds)
         client.outcome = WalletDemoIssuanceOutcome.Stored(listOf("first", "second"))
         model.accept(null, emptyMap()); runCurrent()
         assertEquals(1, client.callbacks)
-        assertEquals(1, client.signingApprovals)
+        assertEquals(2, client.signingApprovals)
         assertEquals(listOf("first", "second"), assertIs<WalletDemoOfferCreateUiState.Receipt>(model.state).receivedIds.toList())
         val resume = assertNotNull(shadowOf(host.get()).nextStartedActivity)
         assertEquals(DigitalCredentialCreateActivity::class.java.name, resume.component?.className)
@@ -130,19 +136,30 @@ class DigitalCredentialCreateModelTest {
         host.pause().stop().destroy()
     }
 
-    @Test fun decliningSigningKeepsPreviouslyReturnedDeliveryHandles() = runTest(dispatcher) {
+    @Test fun decliningSigningWaitsForConfirmationAndKeepsEarlierDeliveries() = runTest(dispatcher) {
         val client = Client()
         val pending = WalletDemoDeferredCredential("earlier", "pid", 5)
         client.outcome = WalletDemoIssuanceOutcome.Failed("Signing dismissed", deferredCredentials = listOf(pending),
-            remainingSigningTargets = listOf("mdl"))
+            signingApprovalRequired = true, remainingSigningTargets = listOf("mdl"))
         val model = model(client)
         model.start(Intent(), false); runCurrent()
         model.accept("1234", mapOf("pid" to 1, "mdl" to 1)); runCurrent()
         val review = assertIs<WalletDemoOfferCreateUiState.Review>(model.state)
         assertEquals(listOf(pending.id), review.preview.signingReview?.deferredCredentials?.map { it.id })
+        client.declineOutcome = WalletDemoIssuanceOutcome.Failed("Could not decline signing", offerConsumed = true)
+        model.cancel(); runCurrent()
+        val failedDecline = assertIs<WalletDemoOfferCreateUiState.Review>(model.state)
+        assertEquals("Could not decline signing", failedDecline.errorMessage)
+        assertEquals(listOf(pending.id), failedDecline.preview.signingReview?.deferredCredentials?.map { it.id })
+        assertNull(model.takeResult())
+
+        client.declineOutcome = WalletDemoIssuanceOutcome.Cancelled
         model.cancel()
+        assertNull(model.takeResult())
+        runCurrent()
+        assertNotNull(model.takeResult())
         store.clear(); runCurrent()
-        assertEquals(1, client.signingDeclines)
+        assertEquals(2, client.signingDeclines)
         assertEquals(0, client.cancels)
     }
 
@@ -275,7 +292,11 @@ class DigitalCredentialCreateModelTest {
             signingApprovals++
             return outcome
         }
-        override suspend fun declineSigning(id: String): WalletDemoIssuanceOutcome { signingDeclines++; return WalletDemoIssuanceOutcome.Cancelled }
+        var declineOutcome: WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Cancelled
+        override suspend fun declineSigning(id: String): WalletDemoIssuanceOutcome {
+            signingDeclines++
+            return declineOutcome
+        }
         var signingDeclines = 0
         override suspend fun cancel(id: String) { cancels++ }
         override suspend fun resume(id: String): WalletDemoIssuanceOutcome { resumes++; return outcome }

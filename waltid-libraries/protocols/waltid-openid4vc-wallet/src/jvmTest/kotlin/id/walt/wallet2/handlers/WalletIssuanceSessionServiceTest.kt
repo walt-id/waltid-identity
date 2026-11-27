@@ -2802,13 +2802,36 @@ class WalletIssuanceSessionServiceTest {
     @Test fun approvingSigningResumesOnlyTheRemainingAcceptedTarget() = runTest {
         val attempt = dismissSigning(targets = listOf("first", "second"))
         val original = attempt.failure.storedCredentialIds.single()
-        assertIs<WalletIssuanceOutcome.Failed>(attempt.open().continuePreAuthorized(attempt.id))
+        assertTrue(attempt.failure.signingApprovalRequired)
+        assertFalse(attempt.failure.error.canRetryOffer)
+        val replay = assertIs<WalletIssuanceOutcome.Failed>(attempt.open().continuePreAuthorized(attempt.id))
+        assertEquals(WalletIssuanceErrorCode.INVALID_SESSION, replay.error.code)
+        assertEquals(1, attempt.requests)
         val receipt = assertIs<WalletIssuanceOutcome.Stored>(attempt.open().retrySigning(attempt.id))
         assertEquals(original, receipt.credentialIds.first())
         assertEquals(2, receipt.credentialIds.distinct().size)
         assertEquals(receipt.credentialIds, attempt.credentials.credentials.map { it.id })
         assertIs<WalletIssuanceOutcome.Failed>(attempt.open().retrySigning(attempt.id))
         assertEquals(2, attempt.requests)
+    }
+
+    @Test fun aReadFailureBeforeClaimingApprovalLeavesSigningAvailableBySessionId() = runTest {
+        val attempt = dismissSigning()
+        val recordsBeforeRetry = attempt.records.records.toMap()
+        // A reopened service reads the record and then confirms it still owns the same snapshot.
+        for (readsBeforeFailure in 0..1) {
+            attempt.records.readsBeforeFailure = readsBeforeFailure
+            val blocked = assertIs<WalletIssuanceOutcome.Failed>(attempt.open().retrySigning(attempt.id))
+            assertEquals(WalletIssuanceErrorCode.STORAGE, blocked.error.code)
+            assertTrue(blocked.signingApprovalRequired)
+            assertFalse(blocked.error.canRetryOffer)
+            assertNull(blocked.failure)
+            assertEquals(recordsBeforeRetry, attempt.records.records)
+            assertEquals(0, attempt.requests)
+        }
+        val stored = assertIs<WalletIssuanceOutcome.Stored>(attempt.open().retrySigning(attempt.id))
+        assertEquals(stored.credentialIds.single(), attempt.credentials.credentials.single().id)
+        assertEquals(1, attempt.requests)
     }
 
     @Test fun onlyOneWalletCanApproveSigningAfterBrowserAuthorization() = runTest {
@@ -3213,8 +3236,18 @@ class WalletIssuanceSessionServiceTest {
 
     private class RecordingSessionStore : AtomicWalletIssuanceSessionStore {
         val records = linkedMapOf<String, WalletIssuanceSessionRecord>()
+        var readsBeforeFailure: Int? = null
 
-        override suspend fun get(id: String): WalletIssuanceSessionRecord? = records[id]
+        override suspend fun get(id: String): WalletIssuanceSessionRecord? {
+            readsBeforeFailure?.let { left ->
+                if (left == 0) {
+                    readsBeforeFailure = null
+                    throw IOException("Issuance session store temporarily unavailable")
+                }
+                readsBeforeFailure = left - 1
+            }
+            return records[id]
+        }
         override suspend fun list(): List<WalletIssuanceSessionRecord> = records.values.toList()
         override suspend fun put(record: WalletIssuanceSessionRecord) {
             records[record.id] = record

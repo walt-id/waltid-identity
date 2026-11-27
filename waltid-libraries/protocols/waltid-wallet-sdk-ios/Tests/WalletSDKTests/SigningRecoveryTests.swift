@@ -16,7 +16,8 @@ final class SigningRecoveryTests: XCTestCase {
         let offer = try await wallet.startIssuance(.init(offer: XCTUnwrap(URL(string: issuer.offer)), clientID: "wallet", redirectURI: XCTUnwrap(URL(string: "wallet://callback")), keyID: "holder"))
         guard case .failed(_, let failure, let committed, let pending) = try await wallet.continuePreAuthorizedIssuance(sessionID: offer.id)
         else { return XCTFail("Expected signing dismissal") }
-        XCTAssertTrue(failure.canRetryOffer && failure.signingApprovalRequired)
+        XCTAssertFalse(failure.canRetryOffer)
+        XCTAssertTrue(failure.signingApprovalRequired)
         XCTAssertTrue(committed.isEmpty && pending.isEmpty)
         XCTAssertEqual([issuer.exchanges, issuer.prompts, issuer.signatures, issuer.deliveries], [1, 1, 0, 0])
         try await wallet.close()

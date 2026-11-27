@@ -34,6 +34,13 @@ class ReleasedIssuanceContinuationTest {
         val copied = failed.copy(storedCredentialIds = listOf("saved"))
         assertEquals(failed.deferredCredentials, copied.deferredCredentials)
         assertEquals(failed.failure, copied.failure)
+        val previousFailure = strict.encodeToString(failed)
+        assertFalse("signingApprovalRequired" in strict.parseToJsonElement(previousFailure).jsonObject)
+        assertEquals(failed, strict.decodeFromString<WalletIssuanceOutcome.Failed>(previousFailure))
+        val approval = failed.copy(signingApprovalRequired = true)
+        assertTrue(approval.copy(storedCredentialIds = listOf("saved")).signingApprovalRequired)
+        assertTrue(approval.copy(deferredCredentials = emptyList()).signingApprovalRequired)
+        assertEquals(approval, strict.decodeFromString<WalletIssuanceOutcome.Failed>(strict.encodeToString(approval)))
         assertFailsWith<IllegalArgumentException> {
             strict.decodeFromString<WalletDeferredCredential>("""{"id":"handle","credentialConfigurationId":null,"intervalSeconds":2}""")
         }

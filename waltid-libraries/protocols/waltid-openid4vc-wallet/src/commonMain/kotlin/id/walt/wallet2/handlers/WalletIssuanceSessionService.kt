@@ -71,6 +71,8 @@ import id.waltid.openid4vci.wallet.credential.acceptCredentialResponse
 import id.waltid.openid4vci.wallet.credential.isApplicationJwt
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
 import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
@@ -392,10 +394,18 @@ sealed interface WalletIssuanceOutcome {
         val storedCredentialIds: List<String> = emptyList(),
         val deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
         val failure: CredentialIssuanceFailure? = null,
+        /** Whether the holder can explicitly retry signing with this session ID. */
+        @OptIn(ExperimentalSerializationApi::class)
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        val signingApprovalRequired: Boolean = false,
     ) : WalletIssuanceOutcome {
-        /** The remaining selected proof can be approved without redeeming the offer again. */
-        val signingApprovalRequired: Boolean
-            get() = requiresSigningApproval(error.code, error.canRetryOffer, failure)
+        constructor(
+            sessionId: String,
+            error: WalletIssuanceError,
+            storedCredentialIds: List<String> = emptyList(),
+            deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
+            failure: CredentialIssuanceFailure? = null,
+        ) : this(sessionId, error, storedCredentialIds, deferredCredentials, failure, signingApprovalRequired = false)
 
         constructor(
             sessionId: String,
@@ -408,12 +418,17 @@ sealed interface WalletIssuanceOutcome {
             sessionId: String = this.sessionId,
             error: WalletIssuanceError = this.error,
             storedCredentialIds: List<String> = this.storedCredentialIds,
-        ): Failed = Failed(sessionId, error, storedCredentialIds, deferredCredentials, failure)
+        ): Failed = copy(sessionId, error, storedCredentialIds, deferredCredentials, failure, signingApprovalRequired)
+
+        fun copy(
+            sessionId: String = this.sessionId,
+            error: WalletIssuanceError = this.error,
+            storedCredentialIds: List<String> = this.storedCredentialIds,
+            deferredCredentials: List<WalletIssuanceContinuation> = this.deferredCredentials,
+            failure: CredentialIssuanceFailure? = this.failure,
+        ): Failed = copy(sessionId, error, storedCredentialIds, deferredCredentials, failure, signingApprovalRequired)
     }
 }
-
-private fun requiresSigningApproval(code: WalletIssuanceErrorCode, canRetryOffer: Boolean, failure: CredentialIssuanceFailure?) =
-    canRetryOffer && code == WalletIssuanceErrorCode.CRYPTO && failure?.stage == CredentialIssuanceStage.PROOF
 
 /**
  * Stateful OpenID4VCI 1.0 engine shared by pre-authorized and authorization-code grants.
@@ -635,7 +650,7 @@ class WalletIssuanceSessionService(
         } catch (error: CancellationException) {
             throw error
         } catch (_: ActiveSessionReadException) {
-            return failed(sessionId, WalletIssuanceErrorCode.STORAGE, canRetryOffer = true)
+            return failed(sessionId, WalletIssuanceErrorCode.STORAGE, retry = IssuanceRetry.OFFER)
         } catch (error: IssuanceStageException) {
             return failed(sessionId, error.code)
         } catch (error: Exception) {
@@ -719,6 +734,9 @@ class WalletIssuanceSessionService(
             beginTransition(sessionId, SessionState.AWAITING_SIGNATURE)
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (_: ActiveSessionReadException) {
+            return failed(sessionId, WalletIssuanceErrorCode.STORAGE, retry = IssuanceRetry.SIGNING,
+                message = "Could not read the issuance session. Try approving signing again.")
         } catch (error: IssuanceStageException) {
             return failed(sessionId, error.code)
         } catch (_: Exception) {
@@ -745,7 +763,7 @@ class WalletIssuanceSessionService(
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
-        failed(sessionId, WalletIssuanceErrorCode.STORAGE)
+        failed(sessionId, WalletIssuanceErrorCode.STORAGE, message = "Could not save the signing decision. Try declining again.")
     }
 
     /** Cancels idle work. A transition already processing a remote response must finish first. */
@@ -1187,7 +1205,8 @@ class WalletIssuanceSessionService(
                     deadline, dismissed.failure.target, storedIds.toList(), deferredResults.map { it.id })
                 val retained = retainProof(active, proof)
                 return failed(active.public.id, WalletIssuanceErrorCode.CRYPTO, storedIds, deferredResults,
-                    dismissed.failure, canRetryOffer = retained)
+                    dismissed.failure, retry = IssuanceRetry.SIGNING.takeIf { retained },
+                    message = "Signing approval was not completed. Approve signing to continue this issuance.".takeIf { retained })
             }
             removeSession(active.public.id)
             if (deferredResults.isNotEmpty()) {
@@ -1881,13 +1900,14 @@ class WalletIssuanceSessionService(
         if (mutex.withLock { runtime.closed }) return null
         val cached = mutex.withLock { sessions[sessionId] }
         val store = sessionStore
-        val record = try {
+        suspend fun readRecord() = try {
             store?.get(activeRecordId(sessionId))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
             throw ActiveSessionReadException(error)
         }
+        val record = readRecord()
         if (cached != null && (!cached.persistable || store == null || record == cached.persistedSnapshot)) {
             if (cached.expiresAtEpochMilliseconds <= nowEpochMilliseconds()) {
                 invalidateActiveSessionBestEffort(sessionId)
@@ -1990,7 +2010,7 @@ class WalletIssuanceSessionService(
         )
         return mutex.withLock {
             if (runtime.closed) return@withLock null
-            sessions[sessionId] ?: if (store.get(activeRecordId(sessionId)) == record) {
+            sessions[sessionId] ?: if (readRecord() == record) {
                 active.also { sessions[sessionId] = it }
             } else null
         }
@@ -2443,7 +2463,7 @@ class WalletIssuanceSessionService(
         } catch (error: Exception) {
             return failAndRemove(active, (error as? IssuanceStageException)?.code ?: WalletIssuanceErrorCode.STORAGE)
         }
-        return failed(active.public.id, code, canRetryOffer = canRetry)
+        return failed(active.public.id, code, retry = IssuanceRetry.OFFER.takeIf { canRetry })
     }
 
     private suspend fun rollbackAuthorizationStart(active: ActiveSession) {
@@ -2472,22 +2492,25 @@ class WalletIssuanceSessionService(
         return failed(active.public.id, code, storedIds, deferredCredentials, failure)
     }
 
+    private enum class IssuanceRetry { OFFER, SIGNING }
+
     private suspend fun failed(
         sessionId: String,
         code: WalletIssuanceErrorCode,
         storedIds: List<String> = emptyList(),
         deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
         failure: CredentialIssuanceFailure? = null,
-        canRetryOffer: Boolean = false,
+        retry: IssuanceRetry? = null,
+        message: String? = null,
     ): WalletIssuanceOutcome.Failed {
         emitEvent(WalletSessionEvent.issuance_failed)
         return WalletIssuanceOutcome.Failed(
             sessionId = sessionId,
-            error = WalletIssuanceError(code, if (requiresSigningApproval(code, canRetryOffer, failure))
-                "Signing approval was not completed. Approve signing to continue this issuance." else code.publicDescription(), canRetryOffer),
+            error = WalletIssuanceError(code, message ?: code.publicDescription(), canRetryOffer = retry == IssuanceRetry.OFFER),
             storedCredentialIds = storedIds.toList(),
             deferredCredentials = deferredCredentials.toList(),
             failure = failure,
+            signingApprovalRequired = retry == IssuanceRetry.SIGNING,
         )
     }
 

@@ -101,8 +101,23 @@ internal class DigitalCredentialCreateModel(
     fun cancel() {
         if (busy()) return
         if (state is WalletDemoOfferCreateUiState.Receipt) { done(); return }
-        if ((state as? WalletDemoOfferCreateUiState.Review)?.preview?.awaitingSigning == true) {
-            preserveContinuations = false
+        val review = state as? WalletDemoOfferCreateUiState.Review
+        if (review?.preview?.awaitingSigning == true) {
+            val sessionId = session?.id ?: return
+            state = review.copy(submitting = true, errorMessage = null)
+            perform {
+                val failure = try {
+                    client.declineSigning(sessionId).signingDeclineError()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    error.message ?: "Could not decline signing."
+                }
+                currentCoroutineContext().ensureActive()
+                if (failure == null) finish(Intent().also { AndroidDigitalCredentialCreateProvider.setCancellation(it) })
+                else state = review.copy(errorMessage = failure)
+            }
+            return
         }
         val data = Intent()
         if (state is WalletDemoOfferCreateUiState.Failure) AndroidDigitalCredentialCreateProvider.setFailure(data)
@@ -165,11 +180,13 @@ internal class DigitalCredentialCreateModel(
         }
         val outcome = mapped.withContinuations(latest, resumingId)
         if (previous == null && outcome is WalletDemoIssuanceOutcome.Failed && !outcome.offerConsumed &&
-            (outcome.remainingSigningTargets.isNotEmpty() || (session?.grant == WalletDemoIssuanceGrant.PreAuthorizedCode &&
+            (outcome.signingApprovalRequired || (session?.grant == WalletDemoIssuanceGrant.PreAuthorizedCode &&
                 outcome.storedCredentialIds.isEmpty() && outcome.deferredCredentials.isEmpty()))) {
-            preserveContinuations = outcome.remainingSigningTargets.isNotEmpty()
-            val preview = requireNotNull(session).preview.copy(signingReview = outcome.takeIf { it.remainingSigningTargets.isNotEmpty() })
-            state = WalletDemoOfferCreateUiState.Review(preview, errorMessage = outcome.messageWithProgress())
+            val currentReview = (state as? WalletDemoOfferCreateUiState.Review)?.preview?.signingReview
+            val signingReview = outcome.signingReviewAfter(currentReview)
+            preserveContinuations = signingReview != null
+            val preview = requireNotNull(session).preview.copy(signingReview = signingReview)
+            state = WalletDemoOfferCreateUiState.Review(preview, errorMessage = (signingReview ?: outcome).messageWithProgress())
             return
         }
         val newIds: List<String>
@@ -226,10 +243,7 @@ internal class DigitalCredentialCreateModel(
         session?.id?.let { id ->
             DigitalCredentialCreateAuthHandoff.clear(context, id)
             // Leave both completed and interrupted remote work for the SDK continuation path.
-            if (!preserveContinuations) runCatching {
-                if ((state as? WalletDemoOfferCreateUiState.Review)?.preview?.awaitingSigning == true) client.declineSigning(id)
-                else client.cancel(id)
-            }
+            if (!preserveContinuations) runCatching { client.cancel(id) }
         }
     }
 }
