@@ -90,11 +90,11 @@ internal class DefaultWalletSdkBridgeOperations(
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
+        clientId: String?,
         transactionCode: String?,
         credentials: List<IssuanceCredentialSelection>?,
-        clientId: String?,
     ): WalletIssuanceOutcome =
-        wallet.continuePreAuthorizedIssuance(sessionId, transactionCode, credentials, clientId)
+        wallet.continuePreAuthorizedIssuance(sessionId, clientId, transactionCode, credentials)
 
     override suspend fun completeAuthorization(
         authorizationId: String,

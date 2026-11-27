@@ -697,9 +697,9 @@ public class Wallet internal constructor(
     /** Continues a pre-authorized session after review and optional transaction-code collection. */
     internal suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
+        clientId: String?,
         transactionCode: String?,
         credentials: List<IssuanceCredentialSelection>?,
-        clientId: String?,
     ): WalletIssuanceOutcome = lifecycle.use {
         issuanceKeys.withSelections(credentials) { prepare, accepted ->
             issuanceSessions.continuePreAuthorized(

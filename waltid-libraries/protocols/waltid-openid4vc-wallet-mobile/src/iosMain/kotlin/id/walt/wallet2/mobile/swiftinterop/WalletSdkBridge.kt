@@ -223,11 +223,11 @@ public class WalletSdkBridge private constructor(
     /** Continues one reviewed pre-authorized issuance session. */
     public suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
+        clientId: String?,
         transactionCode: String? = null,
         credentials: List<IssuanceCredentialSelection>? = null,
-        clientId: String?,
     ): WalletBridgeResult<WalletIssuanceOutcome> =
-        walletBridgeCall { operations.continuePreAuthorizedIssuance(sessionId, transactionCode, credentials, clientId) }
+        walletBridgeCall { operations.continuePreAuthorizedIssuance(sessionId, clientId, transactionCode, credentials) }
 
     /** Continues one authorization-code issuance session after its browser callback. */
     public suspend fun completeAuthorization(

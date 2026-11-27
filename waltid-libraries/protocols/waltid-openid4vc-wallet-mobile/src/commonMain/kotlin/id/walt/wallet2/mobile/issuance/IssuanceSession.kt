@@ -69,7 +69,7 @@ public sealed class IssuanceSession private constructor(
             transactionCode: String? = null,
             credentials: List<IssuanceCredentialSelection>? = null,
             clientId: String? = null,
-        ): WalletIssuanceOutcome = wallet.continuePreAuthorizedIssuance(id.value, transactionCode, credentials, clientId)
+        ): WalletIssuanceOutcome = wallet.continuePreAuthorizedIssuance(id.value, clientId, transactionCode, credentials)
     }
 
     internal companion object {
