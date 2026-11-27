@@ -15,7 +15,7 @@ import kotlin.time.Duration
  * Preserves the JVM constructor descriptor from before VICAL fetch mode became configurable.
  */
 data class OSSVerifier2ServiceConfig @JvmOverloads constructor(
-    /** When omitted, unsigned cross-device sessions use `redirect_uri:<response_uri>`. Signed requests require an explicit value. */
+    /** When omitted, unsigned same-device and cross-device sessions use `redirect_uri:<response_uri>`. Signed requests require an explicit value. */
     val clientId: String? = null,
     val clientMetadata: ClientMetadata? = null,
     val urlPrefix: String,
