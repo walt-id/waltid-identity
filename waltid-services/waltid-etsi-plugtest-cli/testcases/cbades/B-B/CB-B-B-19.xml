@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign1 Tagged="false">
+        <ProtectedHeader>
+            <alg/>
+            <CWTClaims>
+                <iat/>
+            </CWTClaims>
+            <x5chain/>
+            <adoTst>
+                <tstTokens>
+                    <TstToken/>
+                </tstTokens>
+            </adoTst>
+        </ProtectedHeader>
+        <payload/>
+        <signature/>
+    </COSE_Sign1>
+    <Documentation>
+        This test case tests a CB-AdES-B-B signature built on an untagged COSE_Sign1 structure with attached payload. Apart from the protected header parameters alg, CWT Claims (enclosing iat) and x5chain, the implementation shall add the protected adoTst header parameter (label 265) encapsulating, within a tstContainer, one IETF RFC 3161 time-stamp token obtained before the signature production, whose message imprint shall be computed on the CBOR byte string of the payload field (clause 5.2.6). The type, encoding and specRef members of the TstToken shall not be present. No other optional component shall be present. The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

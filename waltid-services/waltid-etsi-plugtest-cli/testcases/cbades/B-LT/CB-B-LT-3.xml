@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Signature>
+    <PayloadToBeSigned File="Data/toBeSigned.txt" Detached="false"/>
+    <COSE_Sign Tagged="false">
+        <payload/>
+        <signatures>
+            <COSE_Signature>
+                <ProtectedHeader>
+                    <alg/>
+                    <CWTClaims>
+                        <iat/>
+                    </CWTClaims>
+                    <x5chain/>
+                    <srCms/>
+                </ProtectedHeader>
+                <UnprotectedHeader>
+                    <uHeaders>
+                        <sigTst/>
+                        <valData>
+                            <xVals>
+                                <x509Cert/>
+                            </xVals>
+                            <rVals>
+                                <ocspVals/>
+                                <crlVals/>
+                            </rVals>
+                        </valData>
+                    </uHeaders>
+                </UnprotectedHeader>
+                <signature/>
+            </COSE_Signature>
+            <COSE_Signature>
+                <ProtectedHeader>
+                    <alg/>
+                    <CWTClaims>
+                        <iat/>
+                    </CWTClaims>
+                    <x5chain/>
+                    <srCms/>
+                </ProtectedHeader>
+                <UnprotectedHeader>
+                    <uHeaders>
+                        <sigTst/>
+                        <valData>
+                            <xVals>
+                                <x509Cert/>
+                            </xVals>
+                            <rVals>
+                                <ocspVals/>
+                                <crlVals/>
+                            </rVals>
+                        </valData>
+                    </uHeaders>
+                </UnprotectedHeader>
+                <signature/>
+            </COSE_Signature>
+        </signatures>
+    </COSE_Sign>
+    <Documentation>
+        This test case tests a CB-AdES-B-LT signature obtained by adding the valData component to test case CB-B-T-3. The signature shall be built on an untagged COSE_Sign structure with attached payload and two signers, each COSE_Signature including the protected header parameters alg, CWT Claims (enclosing iat), srCms and x5chain. The uHeaders unprotected header parameter of each COSE_Signature (signer layer; the body layer shall not contain uHeaders) shall contain, in this order: a sigTst unsigned component (label 1) encapsulating one IETF RFC 3161 time-stamp token time-stamping the COSE signature value, and a valData unsigned component (label 2) placed immediately after sigTst, containing within xVals (key 1) the certificates required for validating the signing certificate and the signing certificate of the time-stamp token in sigTst that are not already present in the signature (duplication of certificate values should be avoided, Table 14 requirement e), and within rVals (key 2) the revocation values (OCSP responses in ocspVals and/or CRLs in crlVals) required for validating the signing certificate, the certificates of its path and the TSA certificate of sigTst (Table 14 requirements h and i). The x5chain header parameter shall be a protected header parameter. At least the signing certificate shall be included in x5chain; the certificates needed for building the certification path should also be included.
+    </Documentation>
+</Signature>

@@ -83,7 +83,8 @@ class X509CertificateSignatureValidator(
         signatureAlreadyVerified: Boolean
     ) {
 
-        if (issuerCertificate.data.subjectDn == certificate.data.subjectDn) {
+        if (issuerCertificate.data.subjectDn == certificate.data.subjectDn &&
+            issuerCertificate.data.subjectPublicKeyInfo.keyId == certificate.data.subjectPublicKeyInfo.keyId) {
             if (issuerCertificate.fingerprintSha256 != certificate.fingerprintSha256) {
                 context.addLogEntry(
                     ValidationResult.Severity.ERROR,

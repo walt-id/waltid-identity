@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SignatureRequest>
+  <SignedDocument File="../ETSI/CB-B-BN-4.cbor"/>
+  <Documentation>This is a negative test case for checking a revoked signing certificate referenced by the CB-AdES signing-certificate identification information. This test data contains a signature created with a revoked signing certificate.
+    ETSI Invalid-Cert Revoked SN:7CE2FF
+    22-Oct-2021 14:23:23Z - signer certificate revoked SN:7CE2FF
+  </Documentation>
+</SignatureRequest>

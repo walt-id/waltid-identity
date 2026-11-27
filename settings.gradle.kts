@@ -100,6 +100,15 @@ val modules = listOfNotNull(
         "waltid-mobile-test-utils" whenEnabled enableAndroidBuild,
     ),
 
+    * "$libraries:ades".group(
+        "waltid-ades-core",
+        "waltid-cbades",
+        "waltid-jades",
+        "waltid-xades",
+        "waltid-pades",
+        "waltid-ades-test",
+    ),
+
     * "$libraries:sdjwt".group(
         "waltid-sdjwt",
     ),
@@ -121,6 +130,7 @@ val modules = listOfNotNull(
     "$libraries:waltid-did",
     "$libraries:waltid-java-compat",
     "$libraries:waltid-library-commons",
+    "$libraries:waltid-json-canonicalization",
     "$libraries:waltid-usage-examples",
 
     // Service commons

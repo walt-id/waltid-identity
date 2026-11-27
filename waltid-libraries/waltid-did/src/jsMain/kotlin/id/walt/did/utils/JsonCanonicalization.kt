@@ -1,10 +1,10 @@
 package id.walt.did.utils
 
-import canonicalize
+import id.walt.json.JsonCanonicalization as SharedJsonCanonicalization
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 actual object JsonCanonicalization {
-    actual fun getCanonicalBytes(json: String): ByteArray = getCanonicalString(json).encodeToByteArray()
-    actual fun getCanonicalString(json: String): String = canonicalize(JSON.parse<dynamic>(json))
+    actual fun getCanonicalBytes(json: String): ByteArray = SharedJsonCanonicalization.getCanonicalBytes(json)
+    actual fun getCanonicalString(json: String): String = SharedJsonCanonicalization.getCanonicalString(json)
 }
