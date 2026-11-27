@@ -1,18 +1,19 @@
-package id.walt.wallet2.mobile.credentials
+package id.walt.wallet2.mobile.persistence
 
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 
 /**
- * Wallet-local persistence configuration.
+ * Selects the database key source and optional credential and DID stores.
+ * The wallet opens SQLCipher for signing-identity state and pending issuance even with both store overrides.
  *
- * @property databaseKey Owner of the SQLCipher key used for the encrypted local wallet database.
+ * @property databaseKeySource Owner of the SQLCipher key used for the encrypted local wallet database.
  * @property credentialStore Optional credential-store override. `null` uses the encrypted SQLDelight store.
  * @property didStore Optional DID-store override. `null` uses the encrypted SQLDelight store.
  */
 public data class WalletPersistence(
-    public val databaseKey: WalletDatabaseKey = WalletDatabaseKey.Managed,
+    public val databaseKeySource: DatabaseKeySource = DatabaseKeySource.Managed,
     public val credentialStore: WalletCredentialStore? = null,
     public val didStore: WalletDidStore? = null,
 )
@@ -20,11 +21,11 @@ public data class WalletPersistence(
 /**
  * Selects who owns the encrypted wallet database key.
  */
-public sealed interface WalletDatabaseKey {
+public sealed interface DatabaseKeySource {
     /**
      * Uses platform-protected storage to create, load, and delete the database key.
      */
-    public data object Managed : WalletDatabaseKey
+    public data object Managed : DatabaseKeySource
 
     /**
      * Uses key material supplied by application code.
@@ -33,5 +34,5 @@ public sealed interface WalletDatabaseKey {
      */
     public data class Provided(
         public val provider: DatabaseEncryptionKeyProvider,
-    ) : WalletDatabaseKey
+    ) : DatabaseKeySource
 }

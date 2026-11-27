@@ -6,13 +6,13 @@ The managed key is device-local. It protects local wallet data at rest, but it i
 
 <!-- doc-snippet:start swift-provided-database-key -->
 ```swift
-struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
-    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+struct KMSDatabaseKeyProvider: DatabaseEncryptionKeyProvider {
+    func getOrCreateKey(walletID: String, databaseName: String) async throws -> DatabaseEncryptionKey {
         let keyData = try await loadOrCreateKeyData(walletID: walletID, databaseName: databaseName)
-        return WalletDatabaseKey(keyID: "\(walletID):\(databaseName)", material: keyData)
+        return DatabaseEncryptionKey(keyID: "\(walletID):\(databaseName)", material: keyData)
     }
 
-    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+    func deleteKey(walletID: String, databaseName: String) async throws {
         try await deleteKeyData(walletID: walletID, databaseName: databaseName)
     }
 }
@@ -21,7 +21,7 @@ let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
         persistence: WalletPersistence(
-            databaseKey: .provided(KMSDatabaseKeyProvider())
+            databaseKeySource: .provided(KMSDatabaseKeyProvider())
         )
     )
 )
@@ -68,9 +68,9 @@ let wallet = try await Wallet(
 ```
 <!-- doc-snippet:end swift-custom-credential-store -->
 
-Apps that own more wallet durability can also provide a DID store. Omitted credential and DID stores use the encrypted local database. The signing identity’s `storage` records whether its key uses hardware, native storage or the encrypted database. This example assumes `AppDidStore` implements the corresponding store protocol.
+Even when an app supplies both a credential store and a DID store, opening the wallet still opens SQLCipher for signing-identity state and pending issuance. The app protects and migrates the records in the stores it supplies. Omitted credential and DID stores use the encrypted local database. The signing identity’s `storage` records whether its key uses hardware, native storage or the encrypted database. This example assumes `AppDidStore` implements the corresponding store protocol.
 
-<!-- doc-snippet:start swift-full-store-overrides -->
+<!-- doc-snippet:start swift-credential-and-did-overrides -->
 ```swift
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
@@ -82,7 +82,7 @@ let wallet = try await Wallet(
     )
 )
 ```
-<!-- doc-snippet:end swift-full-store-overrides -->
+<!-- doc-snippet:end swift-credential-and-did-overrides -->
 
 Provided database keys and custom stores can be combined when an app owns both database-key recovery and wallet-record durability:
 
@@ -92,7 +92,7 @@ let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
         persistence: WalletPersistence(
-            databaseKey: .provided(KMSDatabaseKeyProvider()),
+            databaseKeySource: .provided(KMSDatabaseKeyProvider()),
             credentialStore: AppCredentialStore(),
             didStore: AppDidStore()
         )

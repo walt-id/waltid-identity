@@ -36,7 +36,8 @@ session and its lifecycle. Import feature types from these packages under `id.wa
 | Package | Public responsibilities |
 | --- | --- |
 | [identity](src/commonMain/kotlin/id/walt/wallet2/mobile/identity) | Signing identities, key authorization, custody and recovery |
-| [credentials](src/commonMain/kotlin/id/walt/wallet2/mobile/credentials) | Stored credentials, status reads, background checks and local persistence settings |
+| [credentials](src/commonMain/kotlin/id/walt/wallet2/mobile/credentials) | Stored credentials, status reads and background checks |
+| [persistence](src/commonMain/kotlin/id/walt/wallet2/mobile/persistence) | Database key ownership and credential and DID store overrides |
 | [issuance](src/commonMain/kotlin/id/walt/wallet2/mobile/issuance) | Offers, holder bindings, accepted credentials and attestation settings |
 | [presentation](src/commonMain/kotlin/id/walt/wallet2/mobile/presentation) | Verifier requests, disclosure choices, consent and response delivery |
 | [proximity](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity) | Nearby transport, approval and session state |

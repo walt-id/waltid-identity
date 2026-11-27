@@ -2,7 +2,7 @@
 
 `WalletConfiguration()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
 
-The database key protects the local database at rest. Use `WalletDatabaseKey.Provided` when the app manages or recovers that key. Credential and DID store overrides are independent of the signing identity. Its `storage` records whether the signing key is hardware-backed, uses native storage or is held in the encrypted database.
+The database key protects the local database at rest. Use `DatabaseKeySource.Provided` when the app manages or recovers that key. Credential and DID store overrides are independent of the signing identity. Its `storage` records whether the signing key is hardware-backed, uses native storage or is held in the encrypted database.
 
 `WalletConfiguration()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `presentation.transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
 
@@ -53,7 +53,7 @@ class KmsDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
 val config = WalletConfiguration(
     walletId = "consumer-wallet",
     persistence = WalletPersistence(
-        databaseKey = WalletDatabaseKey.Provided(
+        databaseKeySource = DatabaseKeySource.Provided(
             provider = KmsDatabaseKeyProvider()
         )
     )
@@ -78,7 +78,7 @@ val config = WalletConfiguration(
 ```
 <!-- doc-snippet:end kotlin-custom-credential-store -->
 
-KMP apps can supply credential and DID stores together. The signing identity retains its selected key storage.
+Even when an app supplies both a credential store and a DID store, opening the wallet still opens SQLCipher for signing-identity state and pending issuance. The app protects and migrates the records in the stores it supplies. The signing identity retains its selected key storage.
 
 <!-- doc-snippet:start kotlin-store-overrides -->
 ```kotlin

@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile
 
-import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.persistence.WalletPersistence
 import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialsConfiguration
 import id.walt.wallet2.mobile.identity.WalletKeyAuthorization
 import id.walt.wallet2.mobile.identity.SigningIdentityConfiguration

@@ -11,8 +11,8 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.mobile.WalletStoreAdapter
 import id.walt.wallet2.mobile.WalletStoreOwner
-import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.persistence.DatabaseKeySource
+import id.walt.wallet2.mobile.persistence.WalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import kotlin.time.Instant
@@ -153,8 +153,8 @@ public interface WalletBridgeDidStore {
 }
 
 internal fun WalletBridgePersistence.toWalletPersistence(): WalletPersistence = WalletPersistence(
-    databaseKey = databaseKeyProvider?.let { WalletDatabaseKey.Provided(BridgeDatabaseEncryptionKeyProvider(it)) }
-        ?: WalletDatabaseKey.Managed,
+    databaseKeySource = databaseKeyProvider?.let { DatabaseKeySource.Provided(BridgeDatabaseEncryptionKeyProvider(it)) }
+        ?: DatabaseKeySource.Managed,
     credentialStore = credentialStore?.let(::BridgeCredentialStore),
     didStore = didStore?.let(::BridgeDidStore),
 )

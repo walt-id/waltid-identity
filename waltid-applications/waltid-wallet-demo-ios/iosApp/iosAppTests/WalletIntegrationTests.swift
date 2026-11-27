@@ -365,8 +365,8 @@ final class WalletIntegrationTests: XCTestCase {
     }
 
     func testProvidedDatabaseKeyProviderBootstrapsAcrossRecreationAndDeletesProviderKey() async throws {
-        let provider = RecordingWalletDatabaseKeyProvider()
-        let persistence = WalletPersistence(databaseKey: .provided(provider))
+        let provider = RecordingDatabaseEncryptionKeyProvider()
+        let persistence = WalletPersistence(databaseKeySource: .provided(provider))
         let wallet1 = try await makeWallet(persistence: persistence)
 
         let first = try await initializeSigningIdentity(wallet1)
@@ -1076,20 +1076,20 @@ private struct ValueCredentialStore: WalletCredentialStore {
     func removeCredential(id: String) async throws -> Bool { try await backing.removeCredential(id: id) }
 }
 
-private actor RecordingWalletDatabaseKeyProvider: WalletDatabaseKeyProvider {
-    private let key = WalletDatabaseKey(
+private actor RecordingDatabaseEncryptionKeyProvider: DatabaseEncryptionKeyProvider {
+    private let key = DatabaseEncryptionKey(
         keyID: "ios-unit-test-provider-key",
         material: Data((0..<32).map { UInt8($0 + 1) })
     )
     private(set) var requestedKeys: [String] = []
     private(set) var deletedKeys: [String] = []
 
-    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+    func getOrCreateKey(walletID: String, databaseName: String) async throws -> DatabaseEncryptionKey {
         requestedKeys.append("\(walletID):\(databaseName)")
         return key
     }
 
-    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+    func deleteKey(walletID: String, databaseName: String) async throws {
         deletedKeys.append("\(walletID):\(databaseName)")
     }
 }

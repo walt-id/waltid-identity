@@ -20,8 +20,8 @@ import id.walt.wallet2.mobile.WalletEventPhase
 import id.walt.wallet2.mobile.WalletEventStatus
 import id.walt.wallet2.mobile.credentials.WalletCredential
 import id.walt.wallet2.mobile.credentials.CredentialWithStatus
-import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.persistence.DatabaseKeySource
+import id.walt.wallet2.mobile.persistence.WalletPersistence
 import id.walt.wallet2.mobile.identity.WalletKeyType
 import id.walt.wallet2.mobile.issuance.IssuanceCredentialSelection
 import id.walt.wallet2.mobile.issuance.IssuanceHolderBinding
@@ -434,11 +434,11 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         val persistence = capturedConfig?.persistence
-        val databaseKey = assertIs<WalletDatabaseKey.Provided>(persistence?.databaseKey)
-        val key = databaseKey.provider.getOrCreateKey("swift-managed-wallet", "wallet_swift-managed-wallet")
+        val databaseKeySource = assertIs<DatabaseKeySource.Provided>(persistence?.databaseKeySource)
+        val key = databaseKeySource.provider.getOrCreateKey("swift-managed-wallet", "wallet_swift-managed-wallet")
 
         assertEquals(DatabaseEncryptionKey("swift-key", byteArrayOf(1, 2, 3)), key)
-        databaseKey.provider.deleteKey("swift-managed-wallet", "wallet_swift-managed-wallet")
+        databaseKeySource.provider.deleteKey("swift-managed-wallet", "wallet_swift-managed-wallet")
         assertEquals(listOf("swift-managed-wallet:wallet_swift-managed-wallet"), bridgeKeyProvider.deletedKeys)
     }
 
@@ -462,7 +462,7 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         val persistence = capturedConfig?.persistence
-        assertIs<WalletDatabaseKey.Managed>(persistence?.databaseKey)
+        assertIs<DatabaseKeySource.Managed>(persistence?.databaseKeySource)
         assertNull(persistence?.didStore)
         val credentialStore = persistence?.credentialStore
         assertEquals(true, credentialStore?.removeCredential("credential-1"))
@@ -535,7 +535,7 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         val persistence = requireNotNull(capturedConfig).persistence
-        assertIs<WalletDatabaseKey.Managed>(persistence.databaseKey)
+        assertIs<DatabaseKeySource.Managed>(persistence.databaseKeySource)
 
         val didStore = requireNotNull(persistence.didStore)
         assertEquals(
@@ -577,8 +577,8 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         val persistence = capturedConfig?.persistence
-        val databaseKey = assertIs<WalletDatabaseKey.Provided>(persistence?.databaseKey)
-        val key = databaseKey.provider.getOrCreateKey("swift-combined-wallet", "wallet_swift-combined-wallet")
+        val databaseKeySource = assertIs<DatabaseKeySource.Provided>(persistence?.databaseKeySource)
+        val key = databaseKeySource.provider.getOrCreateKey("swift-combined-wallet", "wallet_swift-combined-wallet")
 
         assertEquals(DatabaseEncryptionKey("swift-key", byteArrayOf(4, 5, 6)), key)
         assertNull(persistence?.didStore)

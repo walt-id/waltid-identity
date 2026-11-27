@@ -31,7 +31,7 @@ The [Identity](Sources/WalletSDK/Identity), [Credentials](Sources/WalletSDK/Cred
 [Issuance](Sources/WalletSDK/Issuance) and [Presentation](Sources/WalletSDK/Presentation)
 directories follow the same journey as the native API. [Proximity](Sources/WalletSDK/Proximity)
 owns nearby sessions and reader trust. [DigitalCredentials](Sources/WalletSDK/DigitalCredentials)
-owns system registration and Annex C requests. [Interop](Sources/WalletSDK/Interop)
+owns system registration and Annex C requests. [Persistence](Sources/WalletSDK/Persistence) contains database key ownership and the credential and DID store protocols. [Interop](Sources/WalletSDK/Interop)
 connects the actor to the shared core. All of these features use `import WalletSDK`.
 
 ## Status

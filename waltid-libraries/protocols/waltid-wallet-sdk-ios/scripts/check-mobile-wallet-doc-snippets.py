@@ -84,7 +84,7 @@ SNIPPETS = (
         (REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/docs/persistence.md",),
     ),
     Snippet(
-        "swift-full-store-overrides",
+        "swift-credential-and-did-overrides",
         REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/WalletPersistenceSnippetsTests.swift",
         (
             REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/docs/persistence.md",

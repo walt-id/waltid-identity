@@ -36,18 +36,18 @@ opens a SQLCipher-encrypted local wallet database and stores the per-wallet
 database key in iOS Keychain. Normal Swift SDK users do not provide database
 key material.
 
-Use ``WalletPersistence`` with ``WalletDatabaseKeyConfiguration/provided(_:)`` when an app
+Use ``WalletPersistence`` with ``DatabaseKeySource/provided(_:)`` when an app
 needs enterprise/KMS ownership or recoverable database-key material:
 
 <!-- doc-snippet:start swift-provided-database-key -->
 ```swift
-struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
-    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+struct KMSDatabaseKeyProvider: DatabaseEncryptionKeyProvider {
+    func getOrCreateKey(walletID: String, databaseName: String) async throws -> DatabaseEncryptionKey {
         let keyData = try await loadOrCreateKeyData(walletID: walletID, databaseName: databaseName)
-        return WalletDatabaseKey(keyID: "\(walletID):\(databaseName)", material: keyData)
+        return DatabaseEncryptionKey(keyID: "\(walletID):\(databaseName)", material: keyData)
     }
 
-    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+    func deleteKey(walletID: String, databaseName: String) async throws {
         try await deleteKeyData(walletID: walletID, databaseName: databaseName)
     }
 }
@@ -56,21 +56,21 @@ let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
         persistence: WalletPersistence(
-            databaseKey: .provided(KMSDatabaseKeyProvider())
+            databaseKeySource: .provided(KMSDatabaseKeyProvider())
         )
     )
 )
 ```
 <!-- doc-snippet:end swift-provided-database-key -->
 
-``WalletDatabaseKey`` descriptions redact raw key material, but apps should still
+``DatabaseEncryptionKey`` descriptions redact raw key material, but apps should still
 avoid logging, serializing, or otherwise exposing the `material` bytes.
 
-Use ``WalletPersistence/credentialStore`` or ``WalletPersistence/didStore`` when an app owns credential or DID durability. Omitted
+Use ``WalletPersistence/credentialStore`` or ``WalletPersistence/didStore`` when an app owns credential or DID durability. Even when an app supplies both a credential store and a DID store, opening the wallet still opens SQLCipher for signing-identity state and pending issuance. Omitted
 stores use the encrypted local database. The signing identity’s `storage` records whether its key uses hardware, native storage or the encrypted database. This example assumes
 app-defined store types that implement the corresponding protocols.
 
-<!-- doc-snippet:start swift-full-store-overrides -->
+<!-- doc-snippet:start swift-credential-and-did-overrides -->
 ```swift
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
@@ -82,7 +82,7 @@ let wallet = try await Wallet(
     )
 )
 ```
-<!-- doc-snippet:end swift-full-store-overrides -->
+<!-- doc-snippet:end swift-credential-and-did-overrides -->
 
 Provided database keys and custom stores can be combined when an app owns both
 database-key recovery and wallet-record durability.
@@ -97,7 +97,7 @@ idempotent. Open a new wallet only after cleanup succeeds.
 This removes wallet records, platform signing keys referenced by the wallet,
 encrypted database files and sidecars, and managed database keys. When using
 a provided database-key provider, deletion also calls
-``WalletDatabaseKeyProvider/deleteDatabaseKey(walletID:databaseName:)``. Old
+``DatabaseEncryptionKeyProvider/deleteKey(walletID:databaseName:)``. Old
 local development databases created before encrypted persistence may need this
 reset; plaintext-to-encrypted migration is not performed.
 
@@ -127,9 +127,9 @@ reset; plaintext-to-encrypted migration is not performed.
 - ``Credential``
 - ``CredentialStatusRecord``
 - ``WalletPersistence``
-- ``WalletDatabaseKeyConfiguration``
-- ``WalletDatabaseKeyProvider``
-- ``WalletDatabaseKey``
+- ``DatabaseKeySource``
+- ``DatabaseEncryptionKeyProvider``
+- ``DatabaseEncryptionKey``
 - ``WalletCredentialStore``
 - ``WalletDidStore``
 - ``StoredCredential``

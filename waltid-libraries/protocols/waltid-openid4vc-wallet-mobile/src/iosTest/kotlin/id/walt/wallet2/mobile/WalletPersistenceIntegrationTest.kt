@@ -5,8 +5,8 @@ import id.walt.credentials.formats.MdocsCredential
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
-import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.persistence.DatabaseKeySource
+import id.walt.wallet2.mobile.persistence.WalletPersistence
 import id.walt.wallet2.mobile.digitalcredentials.IosIdentityDocumentRegistry
 import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistrationResult
 import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistry
@@ -133,7 +133,7 @@ class WalletPersistenceIntegrationTest {
         val config = WalletConfiguration(
             walletId = walletId,
             persistence = WalletPersistence(
-                databaseKey = WalletDatabaseKey.Provided(provider),
+                databaseKeySource = DatabaseKeySource.Provided(provider),
             ),
         )
 
@@ -163,7 +163,7 @@ class WalletPersistenceIntegrationTest {
         val config = WalletConfiguration(
             walletId = walletId,
             persistence = WalletPersistence(
-                databaseKey = WalletDatabaseKey.Provided(databaseKeyProvider),
+                databaseKeySource = DatabaseKeySource.Provided(databaseKeyProvider),
                 credentialStore = credentialStore,
             ),
         )
@@ -185,7 +185,7 @@ class WalletPersistenceIntegrationTest {
     ): WalletConfiguration = WalletConfiguration(
         walletId = "ios-registry-projection-${Uuid.random()}",
         persistence = WalletPersistence(
-            databaseKey = WalletDatabaseKey.Provided(
+            databaseKeySource = DatabaseKeySource.Provided(
                 RecordingDatabaseKeyProvider(DatabaseEncryptionKey("provided-key", ByteArray(32) { 11 })),
             ),
             credentialStore = RecordingCredentialStore(credentials),

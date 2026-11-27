@@ -11,8 +11,8 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.mobile.WalletConfiguration
 import id.walt.wallet2.mobile.WalletFactory
-import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.persistence.DatabaseKeySource
+import id.walt.wallet2.mobile.persistence.WalletPersistence
 import id.walt.wallet2.mobile.identity.WalletKeyAuthorization
 import id.walt.wallet2.mobile.identity.SigningIdentity
 import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
@@ -227,7 +227,7 @@ class WalletEncryptionTest {
         val config = WalletConfiguration(
             walletId = walletId,
             persistence = WalletPersistence(
-                databaseKey = WalletDatabaseKey.Provided(provider),
+                databaseKeySource = DatabaseKeySource.Provided(provider),
             ),
             keyAuthorization = WalletKeyAuthorization(policy = KeyUseAuthorizationPolicy.None),
         )

@@ -4,8 +4,8 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.persistence.DatabaseKeySource
+import id.walt.wallet2.mobile.persistence.WalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import kotlin.test.Test
@@ -24,7 +24,7 @@ class WalletPersistenceSnippetsTest {
         // doc-snippet:end kotlin-default-persistence
 
         assertEquals("consumer-wallet", config.walletId)
-        assertIs<WalletDatabaseKey.Managed>(config.persistence.databaseKey)
+        assertIs<DatabaseKeySource.Managed>(config.persistence.databaseKeySource)
     }
 
     @Test
@@ -44,14 +44,14 @@ class WalletPersistenceSnippetsTest {
         val config = WalletConfiguration(
             walletId = "consumer-wallet",
             persistence = WalletPersistence(
-                databaseKey = WalletDatabaseKey.Provided(
+                databaseKeySource = DatabaseKeySource.Provided(
                     provider = KmsDatabaseKeyProvider()
                 )
             )
         )
         // doc-snippet:end kotlin-provided-database-key
 
-        assertIs<WalletDatabaseKey.Provided>(config.persistence.databaseKey)
+        assertIs<DatabaseKeySource.Provided>(config.persistence.databaseKeySource)
     }
 
     @Test

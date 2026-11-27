@@ -81,8 +81,8 @@ import id.walt.wallet2.handlers.WalletIssuanceGrant
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecord
 import id.walt.wallet2.handlers.WalletIssuanceSessionRecordKind
-import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.persistence.DatabaseKeySource
+import id.walt.wallet2.mobile.persistence.WalletPersistence
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCDocumentRequest
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCParsedRequest
 import id.walt.wallet2.mobile.digitalcredentials.AnnexCRequest
@@ -453,7 +453,7 @@ class WalletTest {
         assertTrue(config.presentation.transactionDataProfiles.isEmpty())
         assertTrue(config.presentation.paymentCredentialIssuers.isEmpty())
         assertNull(config.presentation.verifierTrust.x509TrustAnchors)
-        assertIs<WalletDatabaseKey.Managed>(config.persistence.databaseKey)
+        assertIs<DatabaseKeySource.Managed>(config.persistence.databaseKeySource)
         assertEquals(null, config.persistence.credentialStore)
         assertEquals(null, config.persistence.didStore)
     }
@@ -629,12 +629,12 @@ class WalletTest {
         val databaseKeyProvider = RecordingDatabaseKeyProvider()
 
         val persistence = WalletPersistence(
-            databaseKey = WalletDatabaseKey.Provided(databaseKeyProvider),
+            databaseKeySource = DatabaseKeySource.Provided(databaseKeyProvider),
             credentialStore = credentialStore,
             didStore = didStore,
         )
 
-        assertSame(databaseKeyProvider, assertIs<WalletDatabaseKey.Provided>(persistence.databaseKey).provider)
+        assertSame(databaseKeyProvider, assertIs<DatabaseKeySource.Provided>(persistence.databaseKeySource).provider)
         assertSame(credentialStore, persistence.credentialStore)
         assertSame(didStore, persistence.didStore)
     }

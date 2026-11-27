@@ -5,31 +5,31 @@ import Foundation
 extension WalletPersistence {
     func toKMPPersistence() -> WalletBridgePersistence {
         WalletBridgePersistence(
-            databaseKeyProvider: databaseKey.toKMPDatabaseKeyProvider(),
+            databaseKeyProvider: databaseKeySource.toKMPDatabaseKeyProvider(),
             credentialStore: credentialStore.map { KMPWalletCredentialStoreAdapter(store: $0) },
             didStore: didStore.map { KMPWalletDidStoreAdapter(store: $0) }
         )
     }
 }
 
-private extension WalletDatabaseKeyConfiguration {
+private extension DatabaseKeySource {
     func toKMPDatabaseKeyProvider() -> WalletBridgeDatabaseEncryptionKeyProvider? {
         switch self {
         case .managed:
             return nil
         case let .provided(provider):
-            return KMPWalletDatabaseKeyProviderAdapter(provider: provider)
+            return KMPDatabaseEncryptionKeyProviderAdapter(provider: provider)
         }
     }
 }
 
-private final class KMPWalletDatabaseKeyProviderAdapter: WalletBridgeDatabaseEncryptionKeyProvider, @unchecked Sendable {
-    init(provider: any WalletDatabaseKeyProvider) {
+private final class KMPDatabaseEncryptionKeyProviderAdapter: WalletBridgeDatabaseEncryptionKeyProvider, @unchecked Sendable {
+    init(provider: any DatabaseEncryptionKeyProvider) {
         self.provider = provider
     }
 
     func __getOrCreateKey(walletId: String, databaseName: String) async throws -> WalletBridgeDatabaseEncryptionKey {
-        let key = try await provider.databaseKey(walletID: walletId, databaseName: databaseName)
+        let key = try await provider.getOrCreateKey(walletID: walletId, databaseName: databaseName)
         return WalletBridgeDatabaseEncryptionKey(
             keyId: key.keyID,
             material: key.material.toKotlinByteArray()
@@ -37,10 +37,10 @@ private final class KMPWalletDatabaseKeyProviderAdapter: WalletBridgeDatabaseEnc
     }
 
     func __deleteKey(walletId: String, databaseName: String) async throws {
-        try await provider.deleteDatabaseKey(walletID: walletId, databaseName: databaseName)
+        try await provider.deleteKey(walletID: walletId, databaseName: databaseName)
     }
 
-    private let provider: any WalletDatabaseKeyProvider
+    private let provider: any DatabaseEncryptionKeyProvider
 }
 
 private final class KMPWalletCredentialStoreAdapter: WalletBridgeCredentialStore, WalletBridgeStoreIdentity, @unchecked Sendable {

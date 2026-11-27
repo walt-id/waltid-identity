@@ -9,7 +9,7 @@ import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.mdoc.proximity.mobile.WifiAwareProximityTransportFactory
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.mobile.credentials.StatusMaintenanceEnrollmentStore
-import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
+import id.walt.wallet2.mobile.persistence.DatabaseKeySource
 import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistry
 import id.walt.wallet2.mobile.digitalcredentials.UnavailableCredentialRegistry
 import id.walt.wallet2.mobile.digitalcredentials.RegistryProjection
@@ -56,9 +56,9 @@ internal suspend fun openEncryptedSqlDelightWallet(
     // Resolver state belongs to this process, including when all wallet keys already exist.
     WalletDidSupport.ensureInitialized()
     val databaseName = "wallet_${config.walletId}"
-    val databaseKeyProvider = when (val databaseKey = config.persistence.databaseKey) {
-        is WalletDatabaseKey.Managed -> managedDatabaseKeyProvider
-        is WalletDatabaseKey.Provided -> databaseKey.provider
+    val databaseKeyProvider = when (val databaseKeySource = config.persistence.databaseKeySource) {
+        is DatabaseKeySource.Managed -> managedDatabaseKeyProvider
+        is DatabaseKeySource.Provided -> databaseKeySource.provider
     }
     val lease = WalletStorageLease(databaseLocation, keyNamespace,
         listOfNotNull(config.persistence.credentialStore, config.persistence.didStore))
@@ -69,7 +69,7 @@ internal suspend fun openEncryptedSqlDelightWallet(
         val driver = openEncryptedDriver(
             databaseName,
             encryptionKey,
-            config.persistence.databaseKey is WalletDatabaseKey.Managed,
+            config.persistence.databaseKeySource is DatabaseKeySource.Managed,
             config.walletId,
         )
         return try {
@@ -119,7 +119,7 @@ internal fun openSqlDelightWallet(
     registrationProjection: RegistryProjection = RegistryProjection.Full,
 ): Wallet {
     val queries = db.walletPersistenceQueries
-    val managedStatus = config.persistence.databaseKey == WalletDatabaseKey.Managed && config.persistence.credentialStore == null
+    val managedStatus = config.persistence.databaseKeySource == DatabaseKeySource.Managed && config.persistence.credentialStore == null
     val keyStore = SqlDelightKeyStore(keyProvider, queries, config.walletId)
     val credentialStore = config.persistence.credentialStore ?: SqlDelightCredentialStore(queries)
     val didStore = config.persistence.didStore?.let { delegate ->

@@ -44,8 +44,8 @@ import id.walt.mdoc.proximity.mobile.BleProximityTransportConfiguration
 import id.walt.mdoc.proximity.mobile.BleProximityTransportFactory
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenancePreference
-import id.walt.wallet2.mobile.credentials.WalletDatabaseKey
-import id.walt.wallet2.mobile.credentials.WalletPersistence
+import id.walt.wallet2.mobile.persistence.DatabaseKeySource
+import id.walt.wallet2.mobile.persistence.WalletPersistence
 import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
 import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialRequest
 import id.walt.wallet2.mobile.identity.*
@@ -286,7 +286,7 @@ class WalletFactoryTest {
             }
             override suspend fun deleteKey(walletId: String, databaseName: String) = Unit
         }
-        val config = WalletConfiguration(persistence = WalletPersistence(WalletDatabaseKey.Provided(keys)))
+        val config = WalletConfiguration(persistence = WalletPersistence(DatabaseKeySource.Provided(keys)))
         database().use { database ->
             var opens = 0
             val job = async { encryptedWallet(config, database, FakePlatformManagedKeyProvider()) { opens++ } }

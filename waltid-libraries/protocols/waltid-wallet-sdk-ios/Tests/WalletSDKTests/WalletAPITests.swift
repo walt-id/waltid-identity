@@ -152,7 +152,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(configuration.walletID, "default")
         XCTAssertTrue(configuration.registersDigitalCredentials)
         XCTAssertFalse(WalletConfiguration(registersDigitalCredentials: false).registersDigitalCredentials)
-        XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
+        XCTAssertTrue(configuration.persistence.databaseKeySource.isManaged)
         XCTAssertNil(configuration.persistence.credentialStore)
         XCTAssertNil(configuration.persistence.didStore)
         XCTAssertNil(configuration.issuance.attestation)
@@ -210,20 +210,20 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testPublicPersistenceConfigurationUsesEncryptedDefault() {
-        let configuration = WalletConfiguration(persistence: WalletPersistence(databaseKey: .managed))
+        let configuration = WalletConfiguration(persistence: WalletPersistence(databaseKeySource: .managed))
 
         acceptsSendable(configuration.persistence)
-        XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
+        XCTAssertTrue(configuration.persistence.databaseKeySource.isManaged)
     }
 
     func testPublicPersistenceConfigurationAcceptsProvidedDatabaseKeyProvider() {
         let provider = FakeDatabaseKeyProvider()
         let configuration = WalletConfiguration(
-            persistence: WalletPersistence(databaseKey: .provided(provider))
+            persistence: WalletPersistence(databaseKeySource: .provided(provider))
         )
 
         acceptsSendable(configuration.persistence)
-        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
+        XCTAssertTrue(configuration.persistence.databaseKeySource.isProvided)
     }
 
     func testPublicPersistenceConfigurationAcceptsCustomCredentialStore() {
@@ -241,13 +241,13 @@ final class WalletAPITests: XCTestCase {
         let store = FakeCredentialStore()
         let configuration = WalletConfiguration(
             persistence: WalletPersistence(
-                databaseKey: .provided(provider),
+                databaseKeySource: .provided(provider),
                 credentialStore: store
             )
         )
 
         acceptsSendable(configuration.persistence)
-        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
+        XCTAssertTrue(configuration.persistence.databaseKeySource.isProvided)
         XCTAssertNotNil(configuration.persistence.credentialStore)
     }
 
@@ -265,14 +265,14 @@ final class WalletAPITests: XCTestCase {
     }
 
     func testWalletDatabaseKeyDescriptionRedactsMaterial() {
-        let key = WalletDatabaseKey(
+        let key = DatabaseEncryptionKey(
             keyID: "consumer-wallet:wallet_consumer-wallet",
             material: Data([1, 2, 3, 4])
         )
 
         XCTAssertEqual(
             String(describing: key),
-            "WalletDatabaseKey(keyID: consumer-wallet:wallet_consumer-wallet, material: <redacted>)"
+            "DatabaseEncryptionKey(keyID: consumer-wallet:wallet_consumer-wallet, material: <redacted>)"
         )
         XCTAssertEqual(String(reflecting: key), String(describing: key))
         XCTAssertFalse(String(describing: key).contains("1 bytes"))
@@ -1174,7 +1174,7 @@ final class WalletAPITests: XCTestCase {
     }
 }
 
-private extension WalletDatabaseKeyConfiguration {
+private extension DatabaseKeySource {
     var isManaged: Bool {
         switch self {
         case .managed:
@@ -1194,12 +1194,12 @@ private extension WalletDatabaseKeyConfiguration {
     }
 }
 
-private struct FakeDatabaseKeyProvider: WalletDatabaseKeyProvider {
-    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
-        WalletDatabaseKey(keyID: "\(walletID)-\(databaseName)", material: Data(repeating: 7, count: 32))
+private struct FakeDatabaseKeyProvider: DatabaseEncryptionKeyProvider {
+    func getOrCreateKey(walletID: String, databaseName: String) async throws -> DatabaseEncryptionKey {
+        DatabaseEncryptionKey(keyID: "\(walletID)-\(databaseName)", material: Data(repeating: 7, count: 32))
     }
 
-    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+    func deleteKey(walletID: String, databaseName: String) async throws {
         _ = walletID
         _ = databaseName
     }

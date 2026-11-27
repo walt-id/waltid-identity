@@ -58,7 +58,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
                 return authorized
             }
         let wallet = try await Wallet(configuration: .init(walletID: "custody-contract-\(UUID())",
-            persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
+            persistence: .init(databaseKeySource: .provided(CustodyDatabaseKeyFixture())),
             signingIdentity: .init(authorization: .explicit(.none), keyCustodians: [adapter])))
         do {
             let identities = await wallet.signingIdentity
@@ -96,7 +96,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
                 }
         }
         let wallet = try await Wallet(configuration: .init(walletID: "custody-errors-\(UUID())",
-            persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
+            persistence: .init(databaseKeySource: .provided(CustodyDatabaseKeyFixture())),
             signingIdentity: .init(authorization: .explicit(.none), keyCustodians: adapters)))
         do {
             let identities = await wallet.signingIdentity
@@ -122,7 +122,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
         await healthy.allowStore()
         await broken.failListing()
         let wallet = try await Wallet(configuration: .init(walletID: "discovery-contract-\(UUID())",
-            persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
+            persistence: .init(databaseKeySource: .provided(CustodyDatabaseKeyFixture())),
             signingIdentity: .init(authorization: .explicit(.none), recoveryProviders: [healthy, broken])))
         do {
             let manager = await wallet.signingIdentity
@@ -141,7 +141,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
     func testSwiftProviderFailureSurvivesKotlinBridgeAndPendingRetry() async throws {
         let provider = FailingRecoveryFixture()
         let wallet = try await Wallet(configuration: .init(walletID: "provider-error-\(UUID())",
-            persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
+            persistence: .init(databaseKeySource: .provided(CustodyDatabaseKeyFixture())),
             signingIdentity: .init(authorization: .explicit(.none), recoveryProviders: [provider])))
         do {
             let identities = await wallet.signingIdentity
@@ -221,10 +221,10 @@ private actor FailingRecoveryFixture: IdentityRecoveryProvider {
     func delete(recordID: String) async throws -> WalletRecoveryReceipt { records[recordID] = nil; return .confirmedByProvider }
 }
 /// Public, test-only encryption material. Each fixture has a unique wallet database.
-private struct CustodyDatabaseKeyFixture: WalletDatabaseKeyProvider {
-    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
-        WalletDatabaseKey(keyID: "fixture-\(walletID)", material: Data(repeating: 0x74, count: 32))
+private struct CustodyDatabaseKeyFixture: DatabaseEncryptionKeyProvider {
+    func getOrCreateKey(walletID: String, databaseName: String) async throws -> DatabaseEncryptionKey {
+        DatabaseEncryptionKey(keyID: "fixture-\(walletID)", material: Data(repeating: 0x74, count: 32))
     }
-    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {}
+    func deleteKey(walletID: String, databaseName: String) async throws {}
 }
 #endif
