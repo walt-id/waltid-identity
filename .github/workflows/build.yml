@@ -127,6 +127,8 @@ jobs:
 
   macos-predicate-tests:
     name: CI eligibility and visual contracts
+    needs: gradle-eligibility
+    if: needs.gradle-eligibility.outputs.release-only != 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
@@ -254,22 +256,52 @@ jobs:
       pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
       pr-draft: ${{ github.event.pull_request.draft || false }}
   gradle-eligibility:
+    permissions:
+      contents: read
     runs-on: ubuntu-22.04
     outputs:
       should-run: ${{ steps.decide.outputs.should-run }}
+      release: ${{ steps.decide.outputs.release }}
+      release-only: ${{ steps.decide.outputs.release-only }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          persist-credentials: false
+      - id: scope
+        if: github.event_name == 'pull_request'
+        uses: walt-id/waltid-identity/.github/actions/pr-change-scope@f3840c94878be43439a42913c0cf080a63ff808d
+        with:
+          token: ${{ github.event.pull_request.head.repo.full_name == github.repository && secrets.GH_ACCESS_TOKEN || '' }}
       - name: Decide whether the Linux Gradle job should run
         id: decide
         env:
           EVENT_NAME: ${{ github.event_name }}
-          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
-          GH_TOKEN: ${{ github.token }}
+          CHANGED_PATHS: ${{ steps.scope.outputs.files }}
+          FULL_COVERAGE: ${{ steps.scope.outputs.full }}
           BEFORE: ${{ github.event.before || '' }}
           AFTER: ${{ github.sha }}
         run: .github/scripts/ci/decide-gradle-eligibility.sh
+  release-workflows:
+    needs: gradle-eligibility
+    if: needs.gradle-eligibility.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Validate release workflows and shell steps
+        env:
+          SHELLCHECK_OPTS: --severity=warning
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          # actionlint 1.7.12 predates GitHub's concurrency.queue setting.
+          "$(go env GOPATH)/bin/actionlint" -ignore 'unexpected key "queue" for "concurrency" section' \
+            .github/workflows/{api-docker,promote,release-candidate}.yml
+      - name: Test release evidence and dispatch handling
+        run: ruby .github/tests/release/workflows_test.rb
   sdk-docs:
     uses: ./.github/workflows/mobile-sdk-docs.yml
     needs: macos-eligibility
@@ -342,6 +374,7 @@ jobs:
       - crypto2-eligibility
       - cacheless-eligibility
       - gradle-eligibility
+      - release-workflows
       - gradle-build
       - android-device-tests
       - ios-tests
@@ -381,6 +414,13 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
+          if ! jq -e '
+              .["gradle-eligibility"].outputs as $plan |
+              ($plan.release != "true" or .["release-workflows"].result == "success") and
+              ($plan["should-run"] != "true" or .["gradle-build"].result == "success")' <<< "$NEEDS" >/dev/null; then
+            echo "::error::Selected Gradle or release workflow checks did not pass."
+            fail=1
+          fi
           job_results="$(jq -r 'to_entries[] | "\(.key)=\(.value.result)"' <<< "$NEEDS")"
           while IFS= read -r line; do
             job="${line%%=*}"

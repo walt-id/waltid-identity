@@ -1,0 +1,24 @@
+name: Identify pull request changes
+description: Collect a complete PR diff and check for matching branches in the integrated repositories.
+inputs:
+  token:
+    description: Token with read access to the companion repositories
+    required: true
+outputs:
+  files:
+    description: Local file containing NUL-delimited changed paths
+    value: ${{ steps.scope.outputs.files }}
+  full:
+    description: Select broad coverage for a coordinated branch or incomplete information
+    value: ${{ steps.scope.outputs.full }}
+runs:
+  using: composite
+  steps:
+    - id: scope
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        HEAD_BRANCH: ${{ github.head_ref }}
+      run: bash "$GITHUB_ACTION_PATH/scope.sh"
