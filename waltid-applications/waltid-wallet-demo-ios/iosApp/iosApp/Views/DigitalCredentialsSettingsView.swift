@@ -7,12 +7,14 @@ struct DigitalCredentialsSettingsView: View {
     var body: some View {
         List {
             Section {
-                Toggle("Show wallet review", isOn: $showWalletReview)
+                Toggle("Skip credential status checks", isOn: Binding(
+                    get: { !showWalletReview }, set: { showWalletReview = !$0 }
+                ))
                     .accessibilityIdentifier(WalletAccessibilityID.settingsShowDcApiPreview)
             } footer: {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Show the wallet review after you select a credential in the system picker. Turning this off skips only the wallet review. System consent and any required signing approval still apply.")
-                    Text("Requires iOS 26 or later and a compatible app or browser. This setting controls wallet review only.")
+                    Text("When enabled, the wallet skips warnings about suspended or revoked credentials.")
+                    Text("Review the requester and requested data, then tap Share. Requires iOS 26 or later and a compatible app or browser.")
                 }
             }
         }

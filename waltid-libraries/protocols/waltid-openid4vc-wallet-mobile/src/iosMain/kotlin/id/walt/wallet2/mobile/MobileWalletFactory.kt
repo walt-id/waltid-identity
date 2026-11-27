@@ -63,6 +63,7 @@ public actual class MobileWalletFactory(
             proximityWifiAwareTransportFactory = IosWifiAwareProximityTransportFactory(),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
+            maintenanceLocation = { driverFactory.existingLocation() },
         )
     }
 }

@@ -232,13 +232,25 @@ object Verifier2Service {
 
                     get("info", {
                         summary = "View data of existing verification session"
-                        request { pathParameter<String>(VERIFICATION_SESSION) }
+                        request {
+                            pathParameter<String>(VERIFICATION_SESSION)
+                            headerParameter<String>("X-Response-Code") {
+                                description = "Wallet redirect code required for a successful same-device result. Valid for five minutes; repeated reads are allowed within that window. Keep the session ID bound to the browser transaction on your backend."
+                                required = false
+                            }
+                        }
                         response { HttpStatusCode.OK to { body<Verification2Session>() } }
                     }) {
+                        call.response.headers.append(HttpHeaders.CacheControl, "no-store")
                         val verifierSession =
                             repository.get(call.parameters.getOrFail(VERIFICATION_SESSION))?.session
                                 ?: throw VerificationSessionNotFoundException(call.parameters.getOrFail(VERIFICATION_SESSION))
-                        call.respond(verifierSession.publicView())
+                        val view = try {
+                            verifierSession.completionView(call.request.headers["X-Response-Code"])
+                        } catch (cause: IllegalArgumentException) {
+                            throw BadRequestException(cause.message.orEmpty(), cause)
+                        }
+                        call.respond(view)
                     }
 
                     delete("", {

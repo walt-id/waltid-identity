@@ -203,7 +203,7 @@ object VerificationSessionCreator {
         val isAnnexC = setup is DcApiAnnexCFlowSetup
         val isSignedRequest = setup.core.signedRequest || setup.core.encryptedRequest
         val isEncryptedResponse = setup.core.encryptedResponse || isAnnexC
-        val isCrossDevice = setup is CrossDeviceFlowSetup
+        val isDirectPost = setup is UrlBearingDeviceFlowSetup
         val isDcApi = setup is DcApiAnnexDFlowSetup || isAnnexC
         require(!setup.core.encryptedRequest || !isDcApi) {
             "encrypted_request requires request_uri_method=post and is not supported for DC API"
@@ -212,7 +212,7 @@ object VerificationSessionCreator {
         val openIdConfig = (setup as? OpenID4VP1FlowSetup)?.openid
         val responseType = openIdConfig?.responseType ?: OpenID4VPResponseType.VP_TOKEN
         val isSiop = responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
-        require(!isSiop || isCrossDevice) { "SIOPv2 combined responses require an OpenID4VP cross-device flow" }
+        require(!isSiop || isDirectPost) { "SIOPv2 combined responses require an OpenID4VP same-device or cross-device flow" }
         val origins =
             if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) setup.expectedOrigins else null
 
@@ -225,11 +225,11 @@ object VerificationSessionCreator {
             require(!urlHost.startsWith("openid4vp://authorize")) { "URL Host has to be set to the DC API origin" }
         }
 
-        require(isCrossDevice || isDcApi || isAnnexC) { "No flow is selected" }
+        require(isDirectPost || isDcApi || isAnnexC) { "No flow is selected" }
         val responseUri = when {
             isDcApi || isAnnexC -> null
-            isCrossDevice -> {
-                requireNotNull(urlPrefix) { "urlPrefix is required for cross-device flows" }
+            isDirectPost -> {
+                requireNotNull(urlPrefix) { "urlPrefix is required for same-device and cross-device flows" }
                 "$urlPrefix/$sessionId/response"
             }
             else -> throw IllegalStateException("No flow is selected")
@@ -428,7 +428,7 @@ object VerificationSessionCreator {
             // For Signed DC API, it MUST be present.
             clientId = effectiveClientId,
             issuer = effectiveClientId.takeIf { isSignedRequest },
-            redirectUri = null, // For Same-Device flow (fragment/query/after code exchange etc)
+            redirectUri = null, // Both device flows return redirects in the direct_post response, not in the request.
             // TODO: url building (handle host alias)
             responseUri = responseUri,
             scope = openIdConfig?.scope,//OPTIONAL. OAuth 2.0 Scope value. Can be used for pre-defined DCQL queries or OpenID Connect scopes (e.g., "openid").
@@ -437,8 +437,8 @@ object VerificationSessionCreator {
             responseMode = when {
                 isDcApi && isEncryptedResponse -> OpenID4VPResponseMode.DC_API_JWT // HAIP requires dc_api.jwt (encrypted)
                 isDcApi -> OpenID4VPResponseMode.DC_API
-                isCrossDevice && isEncryptedResponse -> OpenID4VPResponseMode.DIRECT_POST_JWT
-                isCrossDevice -> OpenID4VPResponseMode.DIRECT_POST
+                isDirectPost && isEncryptedResponse -> OpenID4VPResponseMode.DIRECT_POST_JWT
+                isDirectPost -> OpenID4VPResponseMode.DIRECT_POST
 
                 isAnnexC -> null // not OpenID4VP
 
@@ -521,14 +521,14 @@ object VerificationSessionCreator {
             }
         }
 
-        // A signed cross-device session exposes a self-contained full URL. The bootstrap URL
+        // A signed same-device or cross-device session exposes a self-contained full URL. The bootstrap URL
         // remains the request_uri entry point for wallets that need nonce-bound POST retrieval.
         // DC API keeps request_uri-based authorizationRequestUrl construction.
         // Encrypted requests must use POST key delivery, including the full URL returned by the API.
         val walletFacingAuthorizationRequest = authorizationRequest.withoutPreRegisteredInBandMetadata()
         val authorizationRequestUrl = if (setup.core.encryptedRequest) {
             requireNotNull(bootstrapAuthorizationRequest).toHttpUrl(URLBuilder(urlHost))
-        } else if (signedAuthorizationRequest != null && isCrossDevice) {
+        } else if (signedAuthorizationRequest != null && isDirectPost) {
             walletFacingAuthorizationRequest.copy(
                 request = signedAuthorizationRequest,
                 requestUri = null,
@@ -720,7 +720,7 @@ object VerificationSessionCreator {
 
     /**
      * A provided client_id (per-session or already resolved from service config) is kept.
-     * When it is omitted, unsigned cross-device sessions use `redirect_uri:<response destination>`.
+     * When it is omitted, unsigned same-device and cross-device sessions use `redirect_uri:<response destination>`.
      * That prefix cannot be signed.
      */
     private fun resolveEffectiveClientId(
@@ -748,7 +748,7 @@ object VerificationSessionCreator {
         }
         val destination = requireNotNull(responseUri) {
             "A redirect_uri client identifier is the Response URI, so it is only available for " +
-                "cross-device flows"
+                "same-device and cross-device flows"
         }
         return "$REDIRECT_URI_CLIENT_ID_PREFIX:$destination"
     }

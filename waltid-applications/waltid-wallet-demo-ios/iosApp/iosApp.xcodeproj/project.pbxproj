@@ -40,6 +40,7 @@
 		A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006AAAA000000000006 /* StatusBannerView.swift */; };
 		A1000420AAAA000100000020 /* WalletClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000420AAAA000000000020 /* WalletClient.swift */; };
 		A1000421AAAA000100000021 /* MockWalletClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000421AAAA000000000021 /* MockWalletClient.swift */; };
+		A1753000AAAA000100000021 /* MockAnnexCScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1753000AAAA000000000021 /* MockAnnexCScene.swift */; };
 		A1000422AAAA000100000022 /* CredentialsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000422AAAA000000000022 /* CredentialsTabView.swift */; };
 		A1000424AAAA000100000024 /* EmptyCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000424AAAA000000000024 /* EmptyCredentialsView.swift */; };
 		A1000430AAAA000100000030 /* OfferReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000430AAAA000000000030 /* OfferReviewView.swift */; };
@@ -61,6 +62,7 @@
 		A75200000000000000000011 /* IdentityDocumentRegistrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000010 /* IdentityDocumentRegistrationCoordinator.swift */; };
 		A75200000000000000000012 /* IdentityDocumentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000013 /* IdentityDocumentProvider.swift */; };
 		A75200000000000000000024 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */; };
+		B17530000000000000000001 /* WalletDemoBackgroundStatus in Frameworks */ = {isa = PBXBuildFile; productRef = B17530000000000000000002 /* WalletDemoBackgroundStatus */; };
 		A75200000000000000000025 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000022 /* WalletDemoIdentityDocumentSupport */; };
 		A75200000000000000000026 /* WalletDemoIdentityDocumentSupport in Frameworks */ = {isa = PBXBuildFile; productRef = A75200000000000000000023 /* WalletDemoIdentityDocumentSupport */; };
 		A75200000000000000000031 /* SharedWalletConfigurationAssertions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75200000000000000000030 /* SharedWalletConfigurationAssertions.swift */; };
@@ -207,6 +209,7 @@
 		A1000006AAAA000000000006 /* StatusBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBannerView.swift; sourceTree = "<group>"; };
 		A1000420AAAA000000000020 /* WalletClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletClient.swift; sourceTree = "<group>"; };
 		A1000421AAAA000000000021 /* MockWalletClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWalletClient.swift; sourceTree = "<group>"; };
+		A1753000AAAA000000000021 /* MockAnnexCScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockAnnexCScene.swift; sourceTree = "<group>"; };
 		A1000422AAAA000000000022 /* CredentialsTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialsTabView.swift; sourceTree = "<group>"; };
 		A1000424AAAA000000000024 /* EmptyCredentialsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyCredentialsView.swift; sourceTree = "<group>"; };
 		A1000430AAAA000000000030 /* OfferReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferReviewView.swift; sourceTree = "<group>"; };
@@ -296,6 +299,7 @@
 				0221E8E7784E493B08CF5888 /* WalletSDK in Frameworks */,
                 A74900000000000000000001 /* WalletSDKKeychainRecovery in Frameworks */,
 				A75200000000000000000024 /* WalletDemoIdentityDocumentSupport in Frameworks */,
+				B17530000000000000000001 /* WalletDemoBackgroundStatus in Frameworks */,
 				A75200000000000000000043 /* WalletDemoSharingUI in Frameworks */,
 				A53800000000000000000004 /* WalletDemoKeyAttestation in Frameworks */,
 				A1000500AAAA000100000050 /* WalletDemoQRScanner in Frameworks */,
@@ -354,6 +358,7 @@
 				A1000450AAAA000000000050 /* WalletSigningProtection.swift */,
 				A1000420AAAA000000000020 /* WalletClient.swift */,
 				A1000421AAAA000000000021 /* MockWalletClient.swift */,
+				A1753000AAAA000000000021 /* MockAnnexCScene.swift */,
 				A1000443AAAA000000000043 /* DemoPinStore.swift */,
 				A1000444AAAA000000000044 /* DemoBiometricAuthenticator.swift */,
 			);
@@ -580,6 +585,7 @@
 				256D4E3F703216DC04F0C650 /* WalletSDK */,
                 A74900000000000000000002 /* WalletSDKKeychainRecovery */,
 				A75200000000000000000021 /* WalletDemoIdentityDocumentSupport */,
+				B17530000000000000000002 /* WalletDemoBackgroundStatus */,
 				A75200000000000000000040 /* WalletDemoSharingUI */,
 				A53800000000000000000002 /* WalletDemoKeyAttestation */,
 				A1000501AAAA000000000051 /* WalletDemoQRScanner */,
@@ -802,6 +808,7 @@
 				A1000463AAAA000100000063 /* DemoClientIdTrust.swift in Sources */,
 				A1000420AAAA000100000020 /* WalletClient.swift in Sources */,
 				A1000421AAAA000100000021 /* MockWalletClient.swift in Sources */,
+				A1753000AAAA000100000021 /* MockAnnexCScene.swift in Sources */,
 				A1000002AAAA000100000002 /* HomeView.swift in Sources */,
 				13330001AAAA000100000001 /* WalletScanView.swift in Sources */,
 				13330004AAAA000100000003 /* PresentationErrorView.swift in Sources */,
@@ -1505,6 +1512,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A53800000000000000000001 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-test-fixtures/key-attestation" */;
 			productName = WalletDemoKeyAttestation;
+		};
+		B17530000000000000000002 /* WalletDemoBackgroundStatus */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A75200000000000000000020 /* XCLocalSwiftPackageReference "../../waltid-wallet-demo-shared-ios" */;
+			productName = WalletDemoBackgroundStatus;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -34,6 +34,24 @@ function expectTransport(fixture) {
   expect(fixture.errors).toEqual([]);
 }
 
+test('manual refresh shows the status change while Settings is open', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  const title = 'Status review credential';
+  const fixture = await createWalletFixture(page, { cards: [{ id: 'status-review', title, status: 'clear' }],
+    refreshTo: 'revoked_partial', noStore: true });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: /^Status review credential(,|$)/ })).toBeVisible();
+  await clickControl(page, page.getByRole('button', { name: 'Settings', exact: true }));
+  await clickControl(page, page.getByRole('button', { name: /^Credential status/ }));
+  await clickControl(page, page.getByRole('button', { name: 'Check statuses', exact: true }));
+  const notice = page.getByText(`Status changed: ${title}. Open the marked cards for details.`, { exact: true });
+  await expect(notice).toBeVisible();
+  await expect(page.getByText('Processed', { exact: true })).toBeVisible();
+  await expect(notice).toHaveCount(0);
+  expect(fixture.refreshes.filter(request => request.mode === 'FORCE')).toHaveLength(1);
+  expectTransport(fixture);
+});
+
 for (const scenario of catalogue.states.filter(state => state.id.includes('.status.'))) {
   test.describe(scenario.id, () => {
     test.use({ locale: scenario.locale || 'en-US', timezoneId: scenario.timezoneId || 'UTC' });

@@ -39,6 +39,30 @@ SELECT * FROM credentials;
 selectCredentialById:
 SELECT * FROM credentials WHERE id = ?;
 
+selectStatusInput:
+SELECT credentials.id, credentials.serialized_credential, snapshots.snapshot, snapshots.notice
+FROM credentials LEFT JOIN credential_status_snapshots AS snapshots ON snapshots.credential_id = credentials.id
+WHERE credentials.id = ?;
+
+firstMaintenanceIds:
+SELECT id FROM credentials ORDER BY id LIMIT 64;
+
+nextMaintenanceIds:
+SELECT id FROM credentials WHERE id > ? ORDER BY id LIMIT 64;
+
+firstStatusPage:
+SELECT credentials.id, credentials.serialized_credential, snapshots.snapshot, snapshots.notice
+FROM credentials LEFT JOIN credential_status_snapshots AS snapshots ON snapshots.credential_id = credentials.id
+ORDER BY credentials.id LIMIT ?;
+
+nextStatusPage:
+SELECT credentials.id, credentials.serialized_credential, snapshots.snapshot, snapshots.notice
+FROM credentials LEFT JOIN credential_status_snapshots AS snapshots ON snapshots.credential_id = credentials.id
+WHERE credentials.id > ? ORDER BY credentials.id LIMIT ?;
+
+countStatusInputsAfter:
+SELECT count(*) FROM credentials WHERE id > ?;
+
 insertCredential:
 INSERT OR REPLACE INTO credentials (id, serialized_credential, format, label, added_at, metadata, holder_key_binding)
 VALUES (?, ?, ?, ?, ?, ?, ?);
@@ -49,15 +73,22 @@ DELETE FROM credentials WHERE id = ?;
 -- Small authenticated observations, protected by the same encrypted database as credentials.
 CREATE TABLE credential_status_snapshots (
     credential_id TEXT NOT NULL PRIMARY KEY REFERENCES credentials(id) ON DELETE CASCADE,
-    snapshot TEXT NOT NULL
+    snapshot TEXT NOT NULL,
+    notice TEXT
 );
 
 selectCredentialStatus:
 SELECT snapshot FROM credential_status_snapshots WHERE credential_id = ?;
 
+selectCredentialStatusNotice:
+SELECT notice FROM credential_status_snapshots WHERE credential_id = ?;
+
+updateCredentialStatusNotice:
+UPDATE credential_status_snapshots SET notice = :notice WHERE credential_id = :credential_id;
+
 saveCredentialStatusIfCurrent:
-INSERT OR REPLACE INTO credential_status_snapshots (credential_id, snapshot)
-SELECT id, :snapshot FROM credentials
+INSERT OR REPLACE INTO credential_status_snapshots (credential_id, snapshot, notice)
+SELECT id, :snapshot, :notice FROM credentials
 WHERE id = :credential_id AND serialized_credential = :expected_credential
 AND (SELECT snapshot FROM credential_status_snapshots WHERE credential_id = :credential_id) IS :expected_snapshot;
 
@@ -66,6 +97,27 @@ SELECT changes();
 
 deleteCredentialStatus:
 DELETE FROM credential_status_snapshots WHERE credential_id = ?;
+
+-- Foreground opt-in with a nullable generation while automatic checks are paused.
+CREATE TABLE credential_status_maintenance (
+    wallet_id TEXT NOT NULL PRIMARY KEY,
+    grant_id TEXT,
+    cursor_id TEXT
+);
+
+selectCredentialStatusMaintenance:
+SELECT * FROM credential_status_maintenance WHERE wallet_id = ?;
+
+setCredentialStatusMaintenance:
+INSERT OR REPLACE INTO credential_status_maintenance(wallet_id, grant_id, cursor_id)
+VALUES (:wallet_id, :grant_id, (SELECT cursor_id FROM credential_status_maintenance WHERE wallet_id = :wallet_id));
+
+advanceCredentialStatusMaintenance:
+UPDATE credential_status_maintenance SET cursor_id = :next_id
+WHERE wallet_id = :wallet_id AND grant_id = :grant_id AND cursor_id IS :previous_id;
+
+deleteCredentialStatusMaintenance:
+DELETE FROM credential_status_maintenance WHERE wallet_id = ?;
 
 -- DIDs
 

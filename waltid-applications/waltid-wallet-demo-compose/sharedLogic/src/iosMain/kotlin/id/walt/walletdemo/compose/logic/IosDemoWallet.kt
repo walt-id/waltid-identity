@@ -43,7 +43,7 @@ fun createIosDemoWallet(
                     attestationConfig = config.toWalletAttestationConfig(),
                     walletProvider = config.toWalletProviderConfig(),
                     transactionDataProfiles = transactionDataProfiles.profiles,
-                paymentCredentialIssuers = demoPaymentCredentialIssuers,
+                paymentCredentialIssuers = config.paymentCredentialIssuers(),
                     preferredLocales = NSLocale.preferredLanguages.mapNotNull { it as? String },
                     crossProcessAccess = crossProcessAccess,
                     onDigitalCredentialRegistryChanged = onDigitalCredentialRegistryChanged,

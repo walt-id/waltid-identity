@@ -36,6 +36,118 @@ private val presentationPreviewHandle = WalletDemoPresentationPreviewHandle("pre
 class WalletDemoControllerTest {
 
     @Test
+    fun anInterruptedPauseIsRestoredBeforeAnyAutomaticRefresh() = runTest {
+        val finishRecovery = CompletableDeferred<Unit>()
+        val finishManual = CompletableDeferred<Unit>()
+        val base = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val refreshes = mutableListOf<Boolean>()
+        var recovering = false
+        val wallet = object : DemoWallet by base {
+            override suspend fun reconcileBackgroundStatus(automaticChecks: Boolean, resumePaused: Boolean): DemoBackgroundStatusEnrollment {
+                if (resumePaused) return DemoBackgroundStatusEnrollment(DemoBackgroundStatusPreference.ENABLED, "new-grant")
+                recovering = true
+                finishRecovery.await()
+                return DemoBackgroundStatusEnrollment(DemoBackgroundStatusPreference.PAUSED, null)
+            }
+
+            override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                refreshes += force
+                if (force) finishManual.await()
+                return WalletDemoStatusRefreshSummary(1, 0, 0, 0)
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this, reconcileBackgroundStatusSchedule = {})
+        assertTrue(recovering)
+        assertTrue(controller.state.value.credentialStatuses.available)
+        val details = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(sampleCredential.id) }
+        runCurrent()
+        assertTrue(refreshes.isEmpty(), "A due check must wait for the saved pause")
+
+        controller.checkCredentialStatuses()
+        runCurrent()
+        assertEquals(listOf(true), refreshes)
+        finishRecovery.complete(Unit)
+        runCurrent()
+        assertFalse(controller.state.value.automaticCredentialStatusChecks)
+        assertEquals(listOf(true), refreshes)
+        finishManual.complete(Unit)
+        runCurrent()
+        assertEquals(1, controller.state.value.credentialStatusSummary?.completed)
+
+        details.cancel()
+        controller.setAutomaticCredentialStatusChecks(true)
+        runCurrent()
+        assertEquals(listOf(true, false), refreshes)
+    }
+
+    @Test
+    fun onlyTheVisibleDetailsCredentialChecksAfterEnabledRecovery() = runTest {
+        val recovery = CompletableDeferred<Unit>()
+        val selected = sampleCredential.copy(id = "selected-credential")
+        val base = FakeDemoWallet(credentials = listOf(sampleCredential, selected))
+        val requests = mutableListOf<Set<String>?>()
+        val wallet = object : DemoWallet by base {
+            override suspend fun reconcileBackgroundStatus(automaticChecks: Boolean, resumePaused: Boolean): DemoBackgroundStatusEnrollment {
+                recovery.await()
+                return DemoBackgroundStatusEnrollment(DemoBackgroundStatusPreference.ENABLED, "new-grant")
+            }
+
+            override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                assertFalse(force)
+                requests += ids
+                return WalletDemoStatusRefreshSummary(0, 1, 0, 0)
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this, reconcileBackgroundStatusSchedule = {})
+        val previous = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(sampleCredential.id) }
+        runCurrent()
+        previous.cancel()
+        val details = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(selected.id) }
+        runCurrent()
+        assertTrue(requests.isEmpty())
+
+        recovery.complete(Unit)
+        runCurrent()
+        assertEquals(listOf(setOf(selected.id)), requests.filterNotNull())
+        details.cancel()
+    }
+
+    @Test
+    fun aPresentationEntryDefersAutomaticChecksUntilWalletUseAndDetailsRespectTheSetting() = runTest {
+        val calls = mutableListOf<Set<String>?>()
+        val base = FakeDemoWallet(credentials = listOf(sampleCredential), presentationPreview = statusReviewPreview())
+        val wallet = object : DemoWallet by base {
+            override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary {
+                assertFalse(force)
+                calls += ids
+                return WalletDemoStatusRefreshSummary(0, 1, 0, 0)
+            }
+        }
+        val controller = unlockedControllerWith(wallet, this, initialForeground = false)
+        controller.handleDeepLink("openid4vp://example")
+        controller.handleApplicationForegrounded()
+        runCurrent()
+        assertIs<WalletExternalFlow.Pending>(controller.state.value.externalFlow)
+        controller.prepareExternalFlow()
+        runCurrent()
+        assertNotNull(controller.state.value.presentationReview)
+        assertTrue(calls.isEmpty())
+
+        assertTrue(controller.closeExternalFlow())
+        runCurrent()
+        assertEquals(listOf<Set<String>?>(null), calls)
+        val details = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(sampleCredential.id) }
+        runCurrent()
+        assertEquals(listOf(null, setOf(sampleCredential.id)), calls)
+        controller.setAutomaticCredentialStatusChecks(false)
+        details.cancel()
+        val disabledDetails = backgroundScope.launch { controller.checkCredentialStatusWhileViewingDetails(sampleCredential.id) }
+        runCurrent()
+        disabledDetails.cancel()
+        assertEquals(2, calls.size)
+    }
+
+    @Test
     fun explicitReviewCheckWaitsForItsRenderedResultAndPreservesTheSelection() = runTest {
         val finish = CompletableDeferred<Unit>()
         var forcedChecks = 0
@@ -1762,13 +1874,20 @@ class WalletDemoControllerTest {
     fun resetWalletDisablesTheSessionOnDeletionFailureAndAllowsRetry() = runTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         wallet.deleteWalletError = IllegalStateException("HTTP 500")
-        val controller = unlockedControllerWith(wallet, this)
+        val schedules = mutableListOf<String?>()
+        val controller = unlockedControllerWith(object : DemoWallet by wallet {
+            override suspend fun setBackgroundStatusPreference(preference: DemoBackgroundStatusPreference): DemoBackgroundStatusEnrollment? {
+                error("Wallet deletion owns retiring the grant")
+            }
+        }, this, reconcileBackgroundStatusSchedule = { schedules += it })
         assertTrue(controller.state.value.session is WalletSessionState.Ready)
+        schedules.clear()
 
         controller.resetWallet()
         runCurrent()
 
         assertEquals(1, wallet.deleteWalletCalls)
+        assertTrue(schedules.isEmpty())
         assertEquals(listOf(sampleCredential), wallet.credentials)
         assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
         assertTrue(controller.state.value.session is WalletSessionState.Failed)
@@ -1783,6 +1902,7 @@ class WalletDemoControllerTest {
         controller.resetWallet()
         runCurrent()
         assertEquals(2, wallet.deleteWalletCalls)
+        assertEquals(listOf<String?>(null), schedules)
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
 
@@ -3473,18 +3593,20 @@ class WalletDemoControllerTest {
 
     @Test
     fun handleDeepLinkRoutesCredentialOffersAndPresentationRequests() = runTest {
-        val controller = controllerWith(FakeDemoWallet(), this)
-        val offerUrl = "openid-credential-offer://example"
-        val presentationUrl = "openid4vp://example"
+        for (scheme in listOf("openid4vp", "eu-eaap", "haip-vp")) {
+            val controller = controllerWith(FakeDemoWallet(), this)
+            val offerUrl = "openid-credential-offer://example"
+            val presentationUrl = "$scheme://example"
 
-        controller.handleDeepLink(offerUrl)
-        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
-        controller.handleDeepLink(presentationUrl)
-        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
-        controller.handleDeepLink("https://example.com/ignored")
+            controller.handleDeepLink(offerUrl)
+            assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+            controller.handleDeepLink(presentationUrl)
+            assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
+            controller.handleDeepLink("https://example.com/ignored")
 
-        assertEquals("", controller.state.value.requestDrafts.offerUrl)
-        assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
+            assertEquals("", controller.state.value.requestDrafts.offerUrl)
+            assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
+        }
     }
 
     @Test
@@ -4060,6 +4182,8 @@ class WalletDemoControllerTest {
         signingProtectionMode: WalletDemoSigningProtectionMode = WalletDemoSigningProtectionMode.Optional,
         signingProtectionStore: WalletDemoSigningProtectionStore = InMemoryWalletDemoSigningProtectionStore(),
         sharingSettings: DemoSharingSettingsStore = InMemoryDemoSharingSettingsStore(),
+        initialForeground: Boolean = true,
+        reconcileBackgroundStatusSchedule: (suspend (String?) -> Unit)? = null,
     ): WalletDemoController =
         WalletDemoController(
             wallet = wallet,
@@ -4068,6 +4192,8 @@ class WalletDemoControllerTest {
             signingProtectionMode = signingProtectionMode,
             signingProtectionStore = signingProtectionStore,
             sharingSettings = sharingSettings,
+            initialForeground = initialForeground,
+            reconcileBackgroundStatusSchedule = reconcileBackgroundStatusSchedule,
             scope = scope.backgroundScope,
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )
@@ -4092,8 +4218,14 @@ class WalletDemoControllerTest {
         }
     }
 
-    private fun unlockedControllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController {
-        val controller = controllerWith(wallet, scope)
+    private fun unlockedControllerWith(
+        wallet: DemoWallet,
+        scope: TestScope,
+        initialForeground: Boolean = true,
+        reconcileBackgroundStatusSchedule: (suspend (String?) -> Unit)? = null,
+    ): WalletDemoController {
+        val controller = controllerWith(wallet, scope, initialForeground = initialForeground,
+            reconcileBackgroundStatusSchedule = reconcileBackgroundStatusSchedule)
         controller.updatePin("1234")
         controller.submitPin()
         controller.updatePinConfirmation("1234")

@@ -7,6 +7,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,9 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -41,33 +48,58 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialCardDisplayData
 import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatusNotice
+import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.WalletStatusKind
+import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.statusBanner
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.LocalWalletVisualPreferences
+import id.walt.walletdemo.compose.ui.LocalWalletTimeFormatter
 import id.walt.walletdemo.compose.ui.SystemBackHandler
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
+import id.walt.walletdemo.compose.ui.components.CredentialCardMaxWidth
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.CredentialDetailsContent
+import id.walt.walletdemo.compose.ui.components.CredentialStatusMessage
 import id.walt.walletdemo.compose.ui.components.CredentialTechnicalInformation
 import id.walt.walletdemo.compose.ui.components.Id1AspectRatio
 import id.walt.walletdemo.compose.ui.components.walletNavigationMotion
 import id.walt.walletdemo.compose.ui.components.WalletMotion
 import id.walt.walletdemo.compose.ui.components.WalletCredentialContentMaxWidth
+import id.walt.walletdemo.compose.ui.components.StatusCard
+import id.walt.walletdemo.compose.ui.components.WalletFooter
+import id.walt.walletdemo.compose.ui.components.WalletNoticeCard
+import id.walt.walletdemo.compose.ui.components.WalletNoticeClose
+import id.walt.walletdemo.compose.ui.components.WalletNoticeTone
 import id.walt.walletdemo.compose.ui.components.walletNavigationBackground
 import id.walt.walletdemo.compose.ui.plainTextClipEntry
+import id.walt.walletdemo.compose.ui.resources.*
+import org.jetbrains.compose.resources.stringResource
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Instant
 
 @Composable
 internal fun CredentialsTab(
-    session: WalletSessionState,
+    state: WalletDemoUiState,
     modifier: Modifier = Modifier,
     onDeleteCredential: ((String) -> Unit)? = null,
     onDetailsChromeChange: (CredentialDetailsChrome?) -> Unit = {},
+    onDetailsVisible: suspend (String) -> Unit = {},
+    isVisible: Boolean = false,
+    onDismissStatus: () -> Unit = {},
+    onToggleStatusExpanded: () -> Unit = {},
+    onDismissStatusMessage: (String) -> Unit = {},
+    onAcknowledgeStatusNotice: (WalletDemoCredentialStatusNotice) -> Unit = {},
+    openStatusNoticeOnHome: Boolean = false,
+    onStatusNoticeOpenedOnHome: () -> Unit = {},
 ) {
+    val session = state.session
     val credentials = (session as? WalletSessionState.Ready)?.credentials.orEmpty()
     val cards by produceState<List<CredentialCardDisplayData>>(emptyList(), credentials) {
         value = emptyList()
@@ -95,6 +127,16 @@ internal fun CredentialsTab(
     fun requestClose() { technicalOpen = false; expandedId = null }
     fun toggleCard(id: String) { expandedId = id.takeUnless { it == expandedId } }
 
+    val visibleDetailsId = selectedCredential?.id?.takeIf { isVisible }
+    LaunchedEffect(visibleDetailsId) {
+        visibleDetailsId?.let { onDetailsVisible(it) }
+    }
+    LaunchedEffect(openStatusNoticeOnHome) {
+        if (openStatusNoticeOnHome) {
+            requestClose()
+            onStatusNoticeOpenedOnHome()
+        }
+    }
     LaunchedEffect(expandedId) { technicalOpen = false }
     LaunchedEffect(showingDetails, technicalOpen, rawCredential, onDeleteCredential, clipboard) {
         onDetailsChromeChange(
@@ -127,7 +169,7 @@ internal fun CredentialsTab(
         if (technicalOpen) technicalOpen = false else requestClose()
     }
 
-    Box(
+    Column(
         modifier = modifier
             .fillMaxSize()
             .then(
@@ -135,8 +177,10 @@ internal fun CredentialsTab(
                 else Modifier,
             ),
     ) {
-        AnimatedContent(technicalOpen, transitionSpec = { walletNavigationMotion(targetState, reduceMotion, rtl) },
-            label = "stored-credential-page") { technical ->
+        AnimatedContent(
+            technicalOpen, modifier = Modifier.weight(1f),
+            transitionSpec = { walletNavigationMotion(targetState, reduceMotion, rtl) }, label = "stored-credential-page",
+        ) { technical ->
             savedPages.SaveableStateProvider("${expandedId ?: "collection"}:$technical") {
                 Column(
                     modifier = Modifier
@@ -183,6 +227,12 @@ internal fun CredentialsTab(
                 }
             }
         }
+        if (isVisible && !confirmDelete) {
+            CredentialScreenFeedback(
+                state, cards, showingDetails, onDismissStatus, onToggleStatusExpanded, onDismissStatusMessage,
+                onAcknowledgeStatusNotice, onOpenDetails = { expandedId = it },
+            )
+        }
     }
 
     if (confirmDelete) {
@@ -212,6 +262,113 @@ internal fun CredentialsTab(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun CredentialScreenFeedback(
+    state: WalletDemoUiState,
+    cards: List<CredentialCardDisplayData>,
+    showingDetails: Boolean,
+    onDismissStatus: () -> Unit,
+    onToggleStatusExpanded: () -> Unit,
+    onDismissStatusMessage: (String) -> Unit,
+    onAcknowledgeStatusNotice: (WalletDemoCredentialStatusNotice) -> Unit,
+    onOpenDetails: (String) -> Unit,
+) {
+    val operation = state.statusBanner()?.takeUnless { showingDetails || it.key == state.statusDismissedKey }
+    val allowStatus = state.externalFlow == null && state.presentationReview == null && state.offerPreview == null && !state.isBusy
+    val credentialNotices = if (!showingDetails && allowStatus && state.credentialStatuses.available) {
+        state.credentialStatuses.pendingNotices.orEmpty().mapNotNull { notice ->
+            cards.firstOrNull { it.id == notice.credentialId }?.let { notice to it.title }
+        }
+    } else emptyList()
+    val credentialNotice = credentialNotices.firstOrNull()
+    val statusMessage = state.credentialStatusNotice.takeIf { allowStatus }
+    if (operation == null && credentialNotice == null && statusMessage == null) return
+
+    WalletFooter(feedback = {
+        Box(Modifier.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = CredentialCardMaxWidth)) {
+            when {
+                operation?.kind == WalletStatusKind.Busy || operation?.kind == WalletStatusKind.Error ->
+                    StatusCard(state, onDismissStatus, onToggleStatusExpanded)
+                credentialNotice != null -> {
+                    val (notice, title) = credentialNotice
+                    key(notice.credentialId, notice.version) {
+                        CredentialStatusHomeNotice(
+                            title = title,
+                            notice = notice,
+                            remaining = credentialNotices.size - 1,
+                            onOpen = {
+                                onOpenDetails(notice.credentialId)
+                                onAcknowledgeStatusNotice(notice)
+                            },
+                            onDismiss = { onAcknowledgeStatusNotice(notice) },
+                        )
+                    }
+                }
+                statusMessage != null -> CredentialStatusMessage(statusMessage, onDismissStatusMessage)
+                else -> StatusCard(state, onDismissStatus, onToggleStatusExpanded)
+            }
+        }
+    })
+}
+
+@Composable
+private fun CredentialStatusHomeNotice(
+    title: String,
+    notice: WalletDemoCredentialStatusNotice,
+    remaining: Int,
+    onOpen: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val kind = stringResource(when (notice.kind) {
+        "REVOKED" -> Res.string.credential_status_revoked
+        "SUSPENDED" -> Res.string.credential_status_suspended
+        else -> Res.string.credential_status_invalid
+    })
+    val instant = Instant.parse(notice.checkedAt)
+    val minute = Instant.fromEpochSeconds(instant.epochSeconds - instant.epochSeconds.mod(60))
+    val checked = LocalWalletTimeFormatter.current(minute).fullText
+    WalletNoticeCard(
+        modifier = Modifier.testTag(WalletUiTestTags.CredentialStatusNotice),
+        tone = WalletNoticeTone.Warning,
+        onDismiss = onDismiss,
+    ) {
+        Box {
+            Column(
+                Modifier.fillMaxWidth().padding(start = 14.dp, end = 50.dp, top = 12.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(stringResource(Res.string.credential_status_notice_title, title, kind),
+                    style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(if (notice.historical) Res.string.credential_status_notice_historical
+                    else Res.string.credential_status_notice_checked, checked),
+                    style = MaterialTheme.typography.bodySmall)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val foreground = LocalContentColor.current
+                    TextButton(
+                        onClick = onOpen,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            containerColor = foreground.copy(alpha = 0.12f), contentColor = foreground,
+                        ),
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                    ) {
+                        Text(stringResource(Res.string.credential_status_notice_view), fontWeight = FontWeight.SemiBold)
+                    }
+                    if (remaining > 0) {
+                        Text(stringResource(Res.string.credential_status_notice_remaining, remaining),
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            WalletNoticeClose(stringResource(Res.string.credential_status_notice_dismiss), onDismiss,
+                Modifier.align(Alignment.TopEnd))
+        }
     }
 }
 

@@ -3,6 +3,124 @@ import XCTest
 
 @MainActor
 final class MockWalletUITests: XCTestCase {
+    func testDirectAnnexCFailureRequiresAnExplicitReviewedShare() throws {
+        guard #available(iOS 26.0, *) else { throw XCTSkip("Identity document presentation requires iOS 26") }
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        WalletE2EUI(app: app).launch(environment: [
+            "E2E_ANNEX_C_SCENARIO": "retry", "E2E_MOCK_WALLET": "1", "E2E_MOCK_STATUS": "revoked_current",
+        ], unlock: false)
+
+        let share = app.buttons["wallet.presentationSubmitButton"]
+        XCTAssertTrue(share.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Response calls: 0"].exists)
+        share.tap()
+        XCTAssertTrue(app.staticTexts["Direct response failed"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Revoked"].exists)
+        XCTAssertTrue(app.staticTexts["Mobile Driving Licence"].exists)
+        XCTAssertTrue(app.staticTexts["Delivered responses: 0"].exists)
+        share.tap()
+        let confirm = app.alerts["Share with status issues?"].buttons["credential-status-confirm"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Delivered responses: 0"].exists)
+        confirm.tap()
+        XCTAssertTrue(app.staticTexts["Delivered responses: 1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(share.isEnabled)
+    }
+
+    func testDirectAnnexCRequiresShareForThisRequest() throws {
+        let app = try openDirectAnnexCRequest()
+        defer { app.terminate() }
+        app.buttons["wallet.presentationSubmitButton"].tap()
+        XCTAssertTrue(app.staticTexts["Delivered responses: 1"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Response calls: 1"].exists)
+    }
+
+    func testCancellingDirectAnnexCReleasesNothing() throws {
+        let app = try openDirectAnnexCRequest()
+        defer { app.terminate() }
+        app.buttons["wallet.presentationCancelButton"].tap()
+        XCTAssertTrue(app.staticTexts["Cancelled: yes"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Response calls: 0"].exists)
+    }
+
+    private func openDirectAnnexCRequest() throws -> XCUIApplication {
+        guard #available(iOS 26.0, *) else { throw XCTSkip("Identity document presentation requires iOS 26") }
+        let app = XCUIApplication()
+        WalletE2EUI(app: app).launch(environment: [
+            "E2E_ANNEX_C_SCENARIO": "direct", "E2E_MOCK_WALLET": "1", "E2E_MOCK_STATUS": "revoked_current",
+        ], unlock: false)
+        XCTAssertTrue(app.staticTexts["Mobile Driving Licence"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "reader.example")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["Family name"].exists)
+        XCTAssertFalse(app.staticTexts["Revoked"].exists)
+        XCTAssertTrue(app.staticTexts["Response calls: 0"].exists)
+        return app
+    }
+
+    func testStatusNotificationOpensCredentialAfterUnlockAndAcknowledgesIt() {
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        let ui = WalletE2EUI(app: app)
+        ui.launch(environment: [
+            "E2E_MOCK_WALLET": "1",
+            "E2E_MOCK_STATUS": "revoked_current",
+            "E2E_MOCK_STATUS_NOTIFICATION": "1",
+            "E2E_MOCK_STATUS_QUEUE": "1",
+        ], unlock: false)
+
+        let action = app.buttons["View credential"]
+        let pin = ui.textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        XCTAssertTrue(pin.waitForExistence(timeout: 10))
+        XCTAssertFalse(action.exists)
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Travel credential")).firstMatch.exists)
+
+        ui.unlockWallet()
+        XCTAssertTrue(action.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["1 more"].exists)
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH %@", "Checked: ")).firstMatch.exists)
+        app.staticTexts["Travel credential - Revoked"].tap()
+        XCTAssertTrue(action.exists)
+        XCTAssertFalse(app.otherElements["wallet.credentialDetailsScreen"].exists)
+        captureGallery(app, name: "native-ios-status-unlocked-notice")
+        action.tap()
+        ui.assertExists(identifier: "wallet.credentialDetailsScreen", timeout: 10)
+        XCTAssertTrue(app.staticTexts["Travel credential"].exists)
+        captureGallery(app, name: "native-ios-status-notice-details")
+        ui.tapNavigationBack()
+        XCTAssertTrue(app.buttons["wallet.scanButton"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Access credential - Revoked"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["1 more"].exists)
+        XCTAssertFalse(app.staticTexts["Travel credential - Revoked"].exists)
+        captureGallery(app, name: "native-ios-status-next-notice")
+        app.buttons["Dismiss credential status notice"].tap()
+        XCTAssertTrue(action.waitForNonExistence(timeout: 5))
+    }
+
+    func testClosingTheCredentialStatusNoticeStaysOnHome() {
+        assertDismissingTheCredentialStatusNotice { $0.buttons["Dismiss credential status notice"].tap() }
+    }
+
+    func testSwipingTheCredentialStatusNoticeStaysOnHome() {
+        assertDismissingTheCredentialStatusNotice { $0.staticTexts["Travel credential - Revoked"].swipeLeft() }
+    }
+
+    private func assertDismissingTheCredentialStatusNotice(_ dismiss: (XCUIApplication) -> Void) {
+        let app = XCUIApplication()
+        defer { app.terminate() }
+        WalletE2EUI(app: app).launch(environment: [
+            "E2E_MOCK_WALLET": "1",
+            "E2E_MOCK_STATUS": "revoked_current",
+            "E2E_MOCK_STATUS_NOTIFICATION": "1",
+        ])
+
+        let action = app.buttons["View credential"]
+        XCTAssertTrue(action.waitForExistence(timeout: 10))
+        dismiss(app)
+        XCTAssertTrue(action.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["wallet.scanButton"].exists)
+    }
+
     func testCredentialStatusSettingsToggleAndBatchReport() async {
         continueAfterFailure = false
         let app = XCUIApplication()

@@ -115,7 +115,7 @@ class BoundedDocumentSession(
 }
 
 /** RFC 3986 section 5.2.4, operating on encoded segments so escaped dots keep their meaning. */
-private fun removeDotSegments(path: String): String {
+fun removeDotSegments(path: String): String {
     val segments = mutableListOf<String>()
     path.split('/').forEach { segment ->
         when (segment) {

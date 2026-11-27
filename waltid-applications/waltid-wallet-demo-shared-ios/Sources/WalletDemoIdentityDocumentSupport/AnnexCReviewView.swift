@@ -28,8 +28,8 @@ public struct AnnexCReviewView: View {
     ///
     /// - Parameters:
     ///   - context: Apple's request context.
-    ///   - showDcApiPresentationPreview: When `false`, the wallet review is skipped and the default
-    ///     selection is submitted after prepare, leaving only the system picker and biometrics.
+    ///   - showDcApiPresentationPreview: When `false`, the holder still authorizes this request,
+    ///     while the provider skips credential status checks until a failed direct submission.
     ///   - makeWallet: Opens the wallet shared with the host app.
     public init(
         context: any AnnexCRequestContext,
@@ -45,43 +45,34 @@ public struct AnnexCReviewView: View {
     public var body: some View {
         let renderedSelection = model.selection
         let renderedReview = model.review
-        Group {
-            if showDcApiPresentationPreview || model.failure != nil {
-                SharingReviewScreen(
-                    title: "Share documents",
-                    requestIdentity: ObjectIdentifier(model),
-                    review: model.review,
-                    selection: model.selection,
-                    selectionComplete: model.hasCompleteSelection,
-                    failure: model.failure,
-                    isSubmitting: model.isSubmitting,
-                    onToggleCredential: model.toggleCredential,
-                    onToggleDisclosure: model.toggleDisclosure,
-                    onSubmit: { revisions in
-                        Task {
-                            guard renderedSelection == model.selection, renderedReview == model.review else { return }
-                            await model.submit(reviewedStatus: revisions)
-                        }
-                    },
-                    // No Reject action: IdentityDocumentServices has no way to tell the reader it was
-                    // refused, so cancelling is the only truthful decline. Offering both would promise the
-                    // requester learns something it never learns.
-                    onReject: nil,
-                    onCancel: model.cancel,
-                    statusNotice: model.statusReviewNotice
-                )
-            } else {
-                ProgressView("Preparing presentation")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .accessibilityIdentifier(WalletAccessibilityID.presentationPreparing)
-            }
-        }
+        let notices = [model.directSubmissionFailure, model.statusReviewNotice].compactMap { $0 }
+        SharingReviewScreen(
+            title: "Share documents",
+            requestIdentity: ObjectIdentifier(model),
+            review: model.review,
+            selection: model.selection,
+            selectionComplete: model.hasCompleteSelection,
+            reviewsCredentialStatus: showDcApiPresentationPreview || model.directSubmissionFailure != nil,
+            failure: model.failure,
+            isSubmitting: model.isSubmitting,
+            onToggleCredential: model.toggleCredential,
+            onToggleDisclosure: model.toggleDisclosure,
+            onSubmit: { revisions in
+                Task {
+                    guard renderedSelection == model.selection, renderedReview == model.review else { return }
+                    await model.submit(reviewedStatus: revisions)
+                }
+            },
+            // No Reject action: IdentityDocumentServices has no way to tell the reader it was
+            // refused, so cancelling is the only truthful decline. Offering both would promise the
+            // requester learns something it never learns.
+            onReject: nil,
+            onCancel: model.cancel,
+            statusNotice: notices.isEmpty ? nil : notices.joined(separator: "\n")
+        )
         .environment(\.credentialStatusUI, model.credentialStatusUIContext)
         .task {
-            await model.prepare()
-            if !showDcApiPresentationPreview, model.failure == nil {
-                await model.submit()
-            }
+            await model.prepare(reviewStatus: showDcApiPresentationPreview)
         }
     }
 }

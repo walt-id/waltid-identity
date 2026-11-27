@@ -160,6 +160,9 @@ This is where the Wallet POSTs the `vp_token`. This is where validation happens 
 
 When the Wallet POSTs the presentation, the verifier parses the `vp_token`, runs the configured VP policies for each presentation format, checks DCQL fulfillment, and finally applies the configured VC policies. The built-in direct-post flow in this library delegates that work to `Verifier2VPDirectPostHandler` and `PresentationVerificationEngine`.
 
+For `jwt_vc_json`, the default `jwt_vc_json/holder-binding` policy checks every embedded credential against the verified VP signer. An explicit holder confirmation key must match the signing key; otherwise the credential subject must match the signer's DID. Missing or unsupported holder confirmation fails. DCQL `require_cryptographic_holder_binding: true` (the default) enforces this check even when custom VP policies replace the defaults. Intentionally unbound credentials require both an explicit DCQL opt-out and a policy list without holder binding.
+
+
 ```kotlin
 post("/api/v2/verification/{sessionId}/response") {
     val sessionId = call.parameters["sessionId"] ?: error("Missing sessionId")
@@ -278,3 +281,7 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
+
+### Failed same-device sessions
+
+Failed same-device sessions expose diagnostic summaries through info, session lists, webhooks and SSE: the failure category, failed policy names, and policy pass/fail outcomes. A response code is not required for these summaries. Raw presentation data, credential claims, policy payloads, raw exception messages and wallet-provided descriptions remain hidden. Successful same-device completion still requires the browser's callback response code. Stored operator details and cross-device views are unchanged.

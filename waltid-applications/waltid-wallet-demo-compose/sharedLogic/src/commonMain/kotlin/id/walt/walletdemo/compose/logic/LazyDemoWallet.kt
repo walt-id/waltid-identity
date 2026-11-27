@@ -39,10 +39,20 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     ): WalletDemoSigningProtectionAvailability =
         wallet().signingProtectionAvailability(signingProtection)
 
+    override suspend fun reconcileBackgroundStatus(automaticChecks: Boolean, resumePaused: Boolean) =
+        mutex.withLock { wallet?.reconcileBackgroundStatus(automaticChecks, resumePaused) }
+    override suspend fun setBackgroundStatusPreference(preference: DemoBackgroundStatusPreference) =
+        mutex.withLock { wallet?.setBackgroundStatusPreference(preference) }
+    override suspend fun invalidateCredentialStatusSnapshot() {
+        mutex.withLock { wallet?.invalidateCredentialStatusSnapshot() }
+    }
+
     override fun credentialStatusSnapshots(): Flow<WalletDemoCredentialStatuses> = flow {
         wallet().credentialStatusSnapshots().collect { emit(it) }
     }
     override suspend fun credentialStatusSnapshot(): WalletDemoCredentialStatuses = wallet().credentialStatusSnapshot()
+    override suspend fun acknowledgeCredentialStatusNotice(credentialId: String, version: String) =
+        wallet().acknowledgeCredentialStatusNotice(credentialId, version)
     override suspend fun refreshCredentialStatuses(ids: Set<String>?, force: Boolean): WalletDemoStatusRefreshSummary = wallet().refreshCredentialStatuses(ids, force)
     override suspend fun submitStatusReviewedPresentation(
         previewHandle: WalletDemoPresentationPreviewHandle,

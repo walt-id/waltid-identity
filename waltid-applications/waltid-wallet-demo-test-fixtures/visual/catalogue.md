@@ -894,6 +894,38 @@ Open an image for its full size. Compact, large-text, dark and RTL captures are 
 | --- | --- | --- |
 | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.payment.confirmation.png" alt="One combined unsigned-payment and credential-status warning with the payment action, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.payment.confirmation.png" alt="One combined unsigned-payment and credential-status warning with the payment action, Compose iOS" width="240"> | No reference |
 
+## status-settings-background_off
+
+**Background status checks default off**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.settings.background_off.png" alt="Background status checks default off, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.settings.background_off.png" alt="Background status checks default off, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-settings-background_off.native-ios27_0-phone-en-light.png" alt="Background status checks default off, Native iOS" width="240"> |
+
+## status-settings-background_paused
+
+**Pausing automatic checks**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.settings.background_paused.png" alt="Pausing automatic checks, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.settings.background_paused.png" alt="Pausing automatic checks, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-settings-background_paused.native-ios27_0-phone-en-light.png" alt="Pausing automatic checks, Native iOS" width="240"> |
+
+## status-home-notice
+
+**Dated revocation notice on unlocked Home**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.home.notice.png" alt="Dated revocation notice on unlocked Home, Compose Android" width="240"> | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.home.notice.png" alt="Dated revocation notice on unlocked Home, Compose iOS" width="240"> | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-home-notice.native-ios27_0-phone-en-light.png" alt="Dated revocation notice on unlocked Home, Native iOS" width="240"> |
+
+## status-home-notice-dark
+
+**Dated revocation notice on unlocked Home in dark mode**
+
+| Compose Android | Compose iOS | Native iOS |
+| --- | --- | --- |
+| <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/androidHostTest/android-api35-phone-en-light/status.home.notice.dark.png" alt="Dated revocation notice on unlocked Home in dark mode, Compose Android" width="240"><br>393×852, dark | <img src="../../waltid-wallet-demo-compose/sharedUI/src/visualTest/snapshots/iosSimulatorArm64/compose-ios-phone-en-light/status.home.notice.dark.png" alt="Dated revocation notice on unlocked Home in dark mode, Compose iOS" width="240"><br>393×852, dark | <img src="../../waltid-wallet-demo-ios/iosApp/iosAppTests/__Snapshots__/WalletVisualTests/status-home-notice-dark.native-ios27_0-phone-en-light.png" alt="Dated revocation notice on unlocked Home in dark mode, Native iOS" width="240"><br>390×844, dark |
+
 ## status-settings-partial
 
 **Foreground preference and structured completed, unchanged, deferred and error counts**

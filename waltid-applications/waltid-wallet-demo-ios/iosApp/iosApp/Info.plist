@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER).credential-status-refresh</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>walt.id</string>
 	<!--
@@ -29,6 +37,8 @@
 				<string>openid</string>
 				<string>openid-credential-offer</string>
 				<string>openid4vp</string>
+				<string>eu-eaap</string>
+				<string>haip-vp</string>
 			</array>
 		</dict>
 	</array>

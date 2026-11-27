@@ -1,5 +1,23 @@
 import XCTest
 
+@MainActor
+func waitForPreparedWallet(_ app: XCUIApplication, timeout: TimeInterval) -> String? {
+    // These controls are rendered after the initial credential read. A whole-app snapshot
+    // can stall XCTest during the transition from signing-key setup to Home.
+    let prepared = app.descendants(matching: .any).matching(NSPredicate(
+        format: "identifier == %@ OR identifier BEGINSWITH %@",
+        "wallet.credentials.empty", "wallet.credentialCard."
+    )).firstMatch
+    let failure = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Bootstrap failed")).firstMatch
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if prepared.exists { return "Wallet ready" }
+        if failure.exists { return failure.label }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+    }
+    return nil
+}
+
 /// First-use mdoc registration is an expected system step, separate from wallet receipt rendering.
 @MainActor
 func allowIdentityDocumentRegistrationIfRequested(file: StaticString = #filePath, line: UInt = #line) {

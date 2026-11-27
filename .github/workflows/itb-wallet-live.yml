@@ -5,24 +5,24 @@ on:
   workflow_dispatch:
     inputs:
       cases:
-        description: Comma-separated unattended case IDs; leave empty for all 18 CI cases
+        description: Comma-separated suite/case selectors (or unique case IDs). Empty runs the 21 core unattended cases.
         type: string
         default: ''
 
 permissions:
   contents: read
 
-# Keep this tenant's sessions sequential across manual runs; do not interrupt another run.
 concurrency:
   group: itb-wallet-live
   cancel-in-progress: false
 
 jobs:
   wallet:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
     env:
       CI: 'true'
+      ANDROID_SERIAL: emulator-5554
       KLOGGING_CONFIG_PATH: ${{ github.workspace }}/.github/ci/klogging.conf
     steps:
       - uses: actions/checkout@v4
@@ -35,13 +35,66 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
         with:
           cache-read-only: true
-      - name: Prepare runner browser
-        run: >-
-          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers
-          -Pplaywright.browser=chromium -Pplaywright.installWithDeps=true
-          --max-workers=2 --console=plain
-      - name: Run selected deployed cases
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '16111833'
+          packages: ''
+      - name: Prepare runner browser and Android Preview app
+        run: |
+          # QEMU links PulseAudio even when launched with -noaudio.
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libpulse0
+          sdkmanager 'emulator' 'platform-tools' 'build-tools;37.0.0' 'platforms;android-37.0' \
+            'system-images;android-37.0;google_apis;x86_64'
+          "$ANDROID_HOME/emulator/emulator" -version
+          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:installPlaywrightBrowsers \
+            -Pplaywright.browser=chromium -Pplaywright.installWithDeps=true --max-workers=2 --console=plain
+          ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebug \
+            :waltid-applications:waltid-wallet-demo-compose:androidApp:assemblePreviewDebugAndroidTest \
+            -PenableAndroidBuild=true -PwalletSigningProtectionMode=disabled --max-workers=2 --console=plain
+      - name: Start a clean Android emulator with Chrome
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          emulator_bin="$ANDROID_HOME/emulator/emulator"
+          "$emulator_bin" -accel-check
+          adb start-server
+          avdmanager create avd -n itb-wallet -k 'system-images;android-37.0;google_apis;x86_64' -d pixel_7 <<< no
+          emulator_log="$RUNNER_TEMP/itb-emulator.log"
+          trap 'if (( $? != 0 )); then tail -n 160 "$emulator_log" || true; adb devices -l || true; fi' EXIT
+          # Match the graphics and cold-boot settings of the Android DC API device-test lane.
+          nohup "$emulator_bin" -avd itb-wallet -port "${ANDROID_SERIAL#emulator-}" -cores 4 -memory 4096 -partition-size 6144 \
+            -no-snapshot -no-snapshot-save -no-window -gpu auto -noaudio -no-boot-anim -camera-back none \
+            -feature GLDirectMem,HasSharedSlotsHostMemoryAllocator > "$emulator_log" 2>&1 </dev/null &
+          emulator_pid=$!
+          boot_deadline=$((SECONDS + 600))
+          until [[ "$(timeout 5 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; do
+            if ! kill -0 "$emulator_pid" 2>/dev/null; then
+              echo 'Android emulator exited before boot completed.' >&2
+              exit 1
+            fi
+            if (( SECONDS >= boot_deadline )); then
+              echo 'Android boot timed out.' >&2
+              exit 1
+            fi
+            sleep 2
+          done
+          source .github/scripts/mobile-ci/prepare-android-dc-api-device.sh
+          wait_for_android_dc_api_device
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb shell pm path com.android.chrome | grep '^package:'
+          adb shell dumpsys package com.android.chrome | awk -F= '/versionName=/ && !version {version=$2} END {print "Chrome version: " version}'
+          # Chrome on this image predates the default Digital Credentials issuance rollout.
+          adb shell 'printf "%s\n" "chrome --disable-fre --no-first-run --enable-features=WebIdentityDigitalCredentialsCreation" > /data/local/tmp/chrome-command-line'
+          adb shell am set-debug-app --persistent com.android.chrome
+          adb shell cmd role add-role-holder android.app.role.BROWSER com.android.chrome
+      - name: Run selected deployed cases in the Android demo app
+        id: cases
         env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
           ITB_ORGANISATION_KEY: ${{ secrets.ITB_ORGANISATION_KEY }}
           ITB_USERNAME: ${{ secrets.ITB_USERNAME }}
           ITB_PASSWORD: ${{ secrets.ITB_PASSWORD }}
@@ -49,21 +102,18 @@ jobs:
           ITB_BUILD_REVISION: ${{ github.sha }}
           ITB_CASES: ${{ inputs.cases }}
           ITB_REPORT_DIR: ${{ github.workspace }}/build/reports/itb-wallet
-        run: |
-          # CI=true restricts the runner to the 18 unattended cases, including manual dispatches.
-          if [ -z "$ITB_CASES" ]; then unset ITB_CASES; fi
-          ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:itbWallet --max-workers=2 --console=plain
+        run: scripts/itb/android-demo.sh unattended "$ANDROID_SERIAL"
       - name: Summarize every selected case
         if: always()
         run: |
           if [ -f build/reports/itb-wallet/summary.md ]; then
             cat build/reports/itb-wallet/summary.md >> "$GITHUB_STEP_SUMMARY"
           else
-            echo 'ITB setup did not produce a case report; no passing result is implied.' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
+            echo 'No ITB case report was produced. See the setup and execution steps for the failure.' >> "$GITHUB_STEP_SUMMARY"
+            if [[ '${{ steps.cases.outcome }}' == success ]]; then exit 1; fi
           fi
       - name: Preserve sanitized case outcomes
-        if: always()
+        if: always() && hashFiles('build/reports/itb-wallet/summary.md') != ''
         uses: actions/upload-artifact@v7
         with:
           name: itb-wallet-live-${{ github.sha }}

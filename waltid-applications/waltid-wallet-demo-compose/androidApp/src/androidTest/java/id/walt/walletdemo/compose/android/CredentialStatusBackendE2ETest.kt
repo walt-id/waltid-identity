@@ -1,6 +1,5 @@
 package id.walt.walletdemo.compose.android
 
-import android.graphics.Rect
 import android.os.Process as AndroidProcess
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -9,6 +8,7 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import id.walt.mobile.test.backend.DemoTestBackend
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.tapStoredCard
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
@@ -389,15 +389,6 @@ class CredentialStatusBackendE2ETest {
         val state = AccessibilityNodeInfoCompat.wrap(disclosure.accessibilityNodeInfo).stateDescription?.toString()
         assertTrue("The disclosure must expose its accessible state: $state", state in setOf("Expanded", "Collapsed"))
         if (state == "Collapsed") clickByTag(device, tag)
-    }
-
-    private fun tapStoredCard(device: UiDevice, id: String) {
-        val frame = requireNotNull(device.findObject(By.res(id))).visibleBounds
-        val lowerEdge = device.findObjects(By.res(Pattern.compile("wallet\\.credentialCard\\..*")))
-            .filter { it.resourceName != id }.map { it.visibleBounds }
-            .filter { it.top > frame.top && Rect.intersects(it, frame) }.minOfOrNull { it.top } ?: frame.bottom
-        assertTrue("The selected card needs an exposed band", lowerEdge > frame.top)
-        device.click(frame.centerX(), (frame.top + lowerEdge) / 2)
     }
 
     @Test

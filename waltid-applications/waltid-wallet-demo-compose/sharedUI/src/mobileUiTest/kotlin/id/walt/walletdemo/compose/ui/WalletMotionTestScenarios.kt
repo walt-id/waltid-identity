@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.toCardDisplayData
 import id.walt.walletdemo.compose.ui.components.CredentialCardStack
 import id.walt.walletdemo.compose.ui.components.ExpandableMetadataCard
@@ -42,7 +43,7 @@ class WalletMotionTestScenarios(
         val first = session.credentials.single()
         var chrome: CredentialDetailsChrome? = null
         setContent {
-            theme { CredentialsTab(session.copy(credentials = listOf(first, first.copy(id = "motion-second"))),
+            theme { CredentialsTab(WalletDemoUiState(session = session.copy(credentials = listOf(first, first.copy(id = "motion-second")))),
                 onDetailsChromeChange = { chrome = it }) }
         }
         val card = onNodeWithTag(WalletUiTestTags.credentialCard(first.id))

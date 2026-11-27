@@ -121,6 +121,18 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertNil(model.externalFlow)
     }
 
+    func testExternalPresentationLinksPreserveTheURIAndIgnoreWebOffersAndRequests() {
+        for scheme in ["openid4vp", "eu-eaap", "haip-vp"] {
+            let model = WalletViewModel(walletClient: TransactionCodeWalletClient(transactionCode: nil), identityDocumentRegistrationUpdate: {})
+            model.handleDeepLink(URL(string: "https://wallet.example/?request_uri=https%3A%2F%2Fexample.org")!)
+            model.handleDeepLink(URL(string: "https://wallet.example/?credential_offer_uri=offer")!)
+            XCTAssertNil(model.externalFlow)
+            let url = URL(string: "\(scheme)://?request_uri=https%3A%2F%2Fexample.org")!
+            model.handleDeepLink(url)
+            XCTAssertEqual(model.externalFlow, .pending(url, .presentation))
+        }
+    }
+
     func testExternalLinkCannotReplaceNearbySession() {
         let model = WalletViewModel(walletClient: TransactionCodeWalletClient(transactionCode: nil), identityDocumentRegistrationUpdate: {})
         model.proximityPresentation.start()

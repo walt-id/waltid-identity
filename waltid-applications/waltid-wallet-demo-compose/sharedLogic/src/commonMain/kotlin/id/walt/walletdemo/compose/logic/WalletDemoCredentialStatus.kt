@@ -79,9 +79,18 @@ data class WalletDemoCredentialStatuses(
     val legacySubmission: Boolean = false,
     /** Host-only review lifetime marker. It is neither issuer status nor persisted evidence. */
     val reviewEpoch: Long = 0,
+    val pendingNotices: List<WalletDemoCredentialStatusNotice>? = null,
 ) {
     val available: Boolean get() = readState == WalletDemoStatusReadState.Available
 }
+
+data class WalletDemoCredentialStatusNotice(
+    val credentialId: String,
+    val version: String,
+    val kind: String,
+    val checkedAt: String,
+    val historical: Boolean,
+)
 
 data class WalletDemoStatusRefreshSummary(val completed: Int, val unchanged: Int, val deferred: Int, val checkErrors: Int)
 

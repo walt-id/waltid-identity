@@ -110,7 +110,9 @@ kotlin {
                 // ANNEX-C-MATCHER.md records its origin and how to refresh it.
             }
             val androidHostTest = getByName("androidHostTest") {
+                kotlin.srcDir("../../credentials/waltid-credential-status/src/jvmTestFixtures/kotlin")
                 dependencies {
+                    implementation(project(":waltid-libraries:credentials:waltid-status-list"))
                     implementation(kotlin("test"))
                     implementation(identityLibs.junit)
                     implementation(identityLibs.robolectric)

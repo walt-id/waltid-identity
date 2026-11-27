@@ -75,6 +75,7 @@ public actual class MobileWalletFactory(
             proximityWifiAwareTransportFactory = AndroidWifiAwareProximityTransportFactory(applicationContext),
             openEncryptedDriver = driverFactory::createEncryptedDriver,
             deleteDatabase = driverFactory::deleteDatabase,
+            maintenanceLocation = driverFactory::existingLocation,
         )
     }
 }

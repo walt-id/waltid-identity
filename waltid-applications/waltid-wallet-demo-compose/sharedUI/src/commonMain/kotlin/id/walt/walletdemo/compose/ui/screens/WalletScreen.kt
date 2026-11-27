@@ -30,9 +30,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.canDismissExternalFlow
 import id.walt.walletdemo.compose.ui.WalletReviewHost
-import id.walt.walletdemo.compose.logic.isStatusVisible
-import id.walt.walletdemo.compose.ui.components.StatusCard
-import id.walt.walletdemo.compose.ui.components.WalletFooter
+import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.rememberAuthorizationRequestOpener
 
 @Composable
@@ -77,6 +75,15 @@ internal fun WalletScreen(
         }
     }
     val showingFlow = state.selectedTab != WalletDemoTab.Credentials && presentationContent == null
+    val openingStatusNotice = state.statusNotificationOpened && state.externalFlow == null &&
+        state.presentationReview == null && state.offerPreview == null && presentationContent == null && !state.isBusy
+    LaunchedEffect(openingStatusNotice) {
+        if (openingStatusNotice) {
+            showingSettings = false
+            showingScanner = false
+            controller.selectTab(WalletDemoTab.Credentials)
+        }
+    }
     LaunchedEffect(state.externalFlow) {
         if (state.externalFlow != null) showingSettings = false
     }
@@ -116,6 +123,7 @@ internal fun WalletScreen(
             serverSettingsContent = serverSettingsContent,
             walletAccessContent = { WalletAccessSettingsScreen(controller, state.access) },
             onCancelPinChange = controller::cancelPinChange,
+            onDismissStatusMessage = controller::dismissCredentialStatusNotice,
         )
         return
     }
@@ -146,13 +154,6 @@ internal fun WalletScreen(
                 }
             }
         },
-        bottomBar = {
-            if (!showingScanner && !showingFlow && presentationContent == null && detailsChrome == null && state.isStatusVisible) {
-                WalletFooter(feedback = {
-                    StatusCard(state, controller::dismissStatus, controller::toggleStatusExpanded)
-                })
-            }
-        },
     ) { contentPadding ->
         val modifier = Modifier
             .fillMaxSize()
@@ -166,9 +167,17 @@ internal fun WalletScreen(
                     icon = { WalletIcon(WalletSymbol.Receive, null) })
             }
             CredentialsTab(
-                session = state.session,
+                state = collectionState,
                 onDeleteCredential = if (allowCredentialDelete) controller::deleteCredential else null,
                 onDetailsChromeChange = { detailsChrome = it },
+                onDetailsVisible = controller::checkCredentialStatusWhileViewingDetails,
+                isVisible = !openingStatusNotice && !showingScanner && !showingFlow && presentationContent == null,
+                onDismissStatus = controller::dismissStatus,
+                onToggleStatusExpanded = controller::toggleStatusExpanded,
+                onDismissStatusMessage = controller::dismissCredentialStatusNotice,
+                onAcknowledgeStatusNotice = controller::acknowledgeCredentialStatusNotice,
+                openStatusNoticeOnHome = openingStatusNotice && !showingFlow,
+                onStatusNoticeOpenedOnHome = controller::credentialStatusNotificationOpenedOnHome,
                 modifier = Modifier.weight(1f),
             )
         }

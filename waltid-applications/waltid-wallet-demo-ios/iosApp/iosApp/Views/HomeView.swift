@@ -1,5 +1,6 @@
 import SwiftUI
 import WalletDemoSharingUI
+import WalletSDK
 
 struct HomeView: View {
     @ObservedObject var viewModel: WalletViewModel
@@ -17,6 +18,8 @@ struct HomeView: View {
     }
 
     var body: some View {
+        let detailsToCheck = credentialContentVisible && viewModel.automaticStatusChecksAllowed
+            ? selectedCredentialDetailsID : nil
         Group {
             if !viewModel.isReady {
                 if let model = viewModel.identityScreen {
@@ -90,21 +93,38 @@ struct HomeView: View {
         }
         .environment(\.credentialStatusUI, viewModel.credentialStatusUIContext)
         .onReceive(viewModel.proximityPresentation.$active) { active in
-            if !active { Task { @MainActor in viewModel.presentDeferredCredentialStatusNotice() } }
+            if !active { Task { @MainActor in viewModel.scheduleCredentialStatusCheck() } }
         }
-        .overlay(alignment: .bottom) {
-            if let notice = viewModel.credentialStatusNotice, viewModel.presentationReview == nil {
-                HStack {
-                    Text(notice).font(.footnote)
-                    Button(String(localized: "Dismiss")) { viewModel.credentialStatusNotice = nil }
-                }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding()
-                    .accessibilityIdentifier("credential-status-notice")
-                    .task(id: notice) {
-                        do { try await Task.sleep(nanoseconds: 6_000_000_000) } catch { return }
-                        if viewModel.credentialStatusNotice == notice { viewModel.credentialStatusNotice = nil }
-                    }
+        .task(id: detailsToCheck) {
+            if let detailsToCheck { await viewModel.checkCredentialStatusOnDetails(detailsToCheck) }
+        }
+        .task(id: canOpenStatusNotification) {
+            if canOpenStatusNotification {
+                viewModel.statusNotificationOpened = false
+                selectedCredentialDetailsID = nil
+                showingSettings = false
+                showingScanner = false
+                viewModel.selectedTab = .credentials
             }
         }
+    }
+
+    private var canOpenStatusNotification: Bool {
+        viewModel.statusNotificationOpened && viewModel.isReady && viewModel.auth == .unlocked &&
+            !viewModel.isLoading && viewModel.externalFlow == nil && viewModel.presentationReview == nil &&
+            viewModel.offerPreview == nil && !proximity.active && !nearbySheet.keepsHomeVisible
+    }
+
+    private var canShowStatusNotice: Bool {
+        viewModel.isReady && viewModel.auth == .unlocked && !viewModel.isLoading &&
+            viewModel.selectedTab == .credentials && viewModel.presentationReview == nil &&
+            viewModel.externalFlow == nil && viewModel.offerPreview == nil && credentialContentVisible &&
+            selectedCredentialDetailsID == nil
+    }
+
+    private var credentialContentVisible: Bool {
+        !showingSettings && !dismissingSettings && !showingTaskSheet && !nearbySheet.keepsHomeVisible &&
+            !viewModel.statusNotificationOpened
     }
 
     private func openSettings() {
@@ -122,7 +142,8 @@ struct HomeView: View {
     private var credentialsContent: some View {
         CredentialsTabView(viewModel: viewModel, selectedDetailsID: $selectedCredentialDetailsID, cards: credentialCards,
             onOpenSettings: openSettings, onScan: { showingScanner = true }, onShareNearby: startNearbySharing,
-            nearbyPreparing: nearbySheet.isPreparing, nearbyEnabled: !proximity.closing)
+            nearbyPreparing: nearbySheet.isPreparing, nearbyEnabled: !proximity.closing,
+            statusNotices: canShowStatusNotice ? viewModel.walletStatusNotices : [])
             .accessibilityHidden(showingTaskSheet || nearbySheet.keepsHomeVisible)
     }
 

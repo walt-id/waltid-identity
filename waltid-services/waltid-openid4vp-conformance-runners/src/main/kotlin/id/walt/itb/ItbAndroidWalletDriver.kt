@@ -9,16 +9,33 @@ import java.net.Socket
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** Opt-in operator fixture. The forwarded device executes whole wallet operations with a native key. */
+/** Carries wallet operations to the Android device used by the live runner. */
 internal class ItbAndroidWalletDriver private constructor(
     private val socket: Socket,
     private val ioDispatcher: CoroutineDispatcher,
+    private val operationTimeoutMillis: Long,
 ) : AutoCloseable by socket {
     private var sequence = 0
 
-    suspend fun execute(interaction: ItbWalletInteraction) {
+    /** Probe the peer while the channel is idle, before creating the next portal session. */
+    suspend fun isConnected(): Boolean {
+        if (socket.isClosed) return false
+        return try {
+            withSocketDeadline(socket, 5_000, ioDispatcher) {
+                ItbDeviceWire.write(socket, ItbDeviceWire.ping)
+                check(ItbDeviceWire.read(socket) == ItbDeviceWire.pong) { "Invalid device liveness response" }
+            }
+            true
+        } catch (error: Exception) {
+            close()
+            currentCoroutineContext().ensureActive()
+            false
+        }
+    }
+
+    suspend fun execute(interaction: ItbWalletInteraction): ItbWalletResult {
         val result = try {
-            withSocketDeadline(socket, 110_000, ioDispatcher) {
+            withSocketDeadline(socket, operationTimeoutMillis, ioDispatcher) {
                 ItbDeviceWire.write(socket, buildJsonObject {
                     put("sequence", ++sequence); put("interaction", ItbDeviceWire.encode(interaction))
                 })
@@ -35,11 +52,12 @@ internal class ItbAndroidWalletDriver private constructor(
             val trace = result["trace"]?.jsonArray.orEmpty().mapNotNull {
                 it.jsonPrimitive.content.takeIf { value -> value.matches(Regex("[A-Za-z0-9_.$:<>-]{1,240}")) }
             }.take(20)
-            System.err.println("Native wallet failure locations: ${trace.joinToString()}")
+            System.err.println("Android wallet failure locations: ${trace.joinToString()}")
             val code = result["code"]?.jsonPrimitive?.content
             if (code != null && code.matches(Regex("[a-z0-9_]{1,80}"))) throw ItbWalletRejection(code)
-            error("The native wallet operation failed")
+            error("The Android wallet operation failed")
         }
+        return Json.decodeFromJsonElement(ItbWalletResult.serializer(), result.getValue("observation"))
     }
 
     companion object {
@@ -67,7 +85,8 @@ internal class ItbAndroidWalletDriver private constructor(
             }
 
         suspend fun connect(
-            port: Int, token: String, origin: Url, trustPem: String, connectDispatcher: CoroutineDispatcher,
+            port: Int, token: String, origin: Url, trustPem: String?, connectDispatcher: CoroutineDispatcher,
+            provider: String = "android-native-biometric", operationTimeoutMillis: Long = 110_000,
         ): ItbAndroidWalletDriver {
             require(port in 1024..65535 && token.matches(Regex("[0-9a-f]{64}")))
             val socket = Socket()
@@ -75,18 +94,18 @@ internal class ItbAndroidWalletDriver private constructor(
                 withContext(connectDispatcher) {
                     socket.connect(InetSocketAddress(InetAddress.getByName("127.0.0.1"), port), 5_000)
                 }
-                withSocketDeadline(socket, 30_000, connectDispatcher) {
+                withSocketDeadline(socket, 180_000, connectDispatcher) {
                     ItbDeviceWire.write(socket, buildJsonObject {
-                        put("version", 1); put("token", token); put("origin", origin.toString())
-                        put("trustPem", trustPem)
+                        put("version", ItbDeviceWire.VERSION); put("token", token); put("origin", origin.toString())
+                        trustPem?.let { put("trustPem", it) }
                     })
                     val response = ItbDeviceWire.read(socket)
                     check(response["ready"]?.jsonPrimitive?.booleanOrNull == true &&
-                        response["provider"]?.jsonPrimitive?.content == "android-native-biometric") {
-                        "Native device fixture is not ready"
+                        response["provider"]?.jsonPrimitive?.content == provider) {
+                        "Expected Android wallet driver is not ready"
                     }
                 }
-                return ItbAndroidWalletDriver(socket, connectDispatcher)
+                return ItbAndroidWalletDriver(socket, connectDispatcher, operationTimeoutMillis)
             } catch (error: Exception) { socket.close(); throw error }
         }
     }

@@ -20,6 +20,8 @@ import platform.Foundation.CFBridgingRelease
 import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSData
 import platform.Foundation.create
+import platform.LocalAuthentication.LAContext
+import platform.Security.kSecUseAuthenticationContext
 import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
@@ -62,6 +64,12 @@ public class IosDatabaseEncryptionKeyProvider(
         return DatabaseEncryptionKey(keyId = keyId, material = storeKeyMaterial(walletId, keyId, material))
     }
 
+    /** Reads the existing Keychain item with user interaction disabled. */
+    public fun readExistingKey(walletId: String, databaseName: String): DatabaseEncryptionKey? {
+        val keyId = keyId(walletId, databaseName)
+        return readKeyMaterial(walletId, keyId, withoutInteraction = true)?.let { DatabaseEncryptionKey(keyId, it) }
+    }
+
     /**
      * Removes the database key stored in iOS Keychain.
      */
@@ -81,10 +89,13 @@ public class IosDatabaseEncryptionKeyProvider(
         }
     }
 
-    private fun readKeyMaterial(walletId: String, keyId: String): ByteArray? = memScoped {
+    private fun readKeyMaterial(walletId: String, keyId: String, withoutInteraction: Boolean = false): ByteArray? = memScoped {
         val result = alloc<CFTypeRefVar>()
         val query = keychainQuery(keyId, returnData = true)
         try {
+            if (withoutInteraction) {
+                query.addRetained(kSecUseAuthenticationContext, LAContext().apply { interactionNotAllowed = true })
+            }
             when (val status = SecItemCopyMatching(query.dictionary, result.ptr)) {
                 errSecSuccess -> (CFBridgingRelease(result.value) as NSData).toByteArray()
                 errSecItemNotFound -> null

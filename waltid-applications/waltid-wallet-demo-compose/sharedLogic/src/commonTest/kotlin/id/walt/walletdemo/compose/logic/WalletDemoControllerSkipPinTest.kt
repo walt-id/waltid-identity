@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.StandardTestDispatcher
 
@@ -104,8 +105,11 @@ class WalletDemoControllerSkipPinTest {
         runCurrent()
         assertEquals(null, controller.state.value.credentialStatusNotice)
         controller.setExternalCredentialStatusReviewActive(false); runCurrent()
-        assertTrue(controller.state.value.credentialStatusNotice!!.contains("Identity card"))
-        controller.dismissCredentialStatusNotice()
+        val message = assertNotNull(controller.state.value.credentialStatusNotice)
+        assertTrue(message.contains("Identity card"))
+        controller.dismissCredentialStatusNotice("Previous message")
+        assertEquals(message, controller.state.value.credentialStatusNotice)
+        controller.dismissCredentialStatusNotice(message)
         wallet.statuses.value = wallet.statuses.value.copy(credentials = wallet.statuses.value.credentials.mapValues {
             it.value.copy(lastCheckedAt = "2026-11-12T12:00:00Z")
         })

@@ -354,6 +354,7 @@ class ScaPresentationInteropTest {
         val token = Json.parseToJsonElement(vp).jsonObject.values.single().jsonArray.single().jsonPrimitive.content
         val issuerJwt = JWSObject.parse(token.substringBefore('~'))
         assertTrue(issuerJwt.verify(ECDSAVerifier(f.issuer.toPublicJWK())))
+        assertFalse(issuerJwt.payload.toJSONObject().containsKey("aud"), "The fixture omits issuer-signed aud")
         val kb = JWSObject.parse(token.substringAfterLast('~'))
         assertTrue(kb.verify(ECDSAVerifier(f.holderPublic)))
         assertEquals("kb+jwt", kb.header.type.toString())
@@ -382,7 +383,6 @@ class ScaPresentationInteropTest {
                 put("jwk", if (holderBinding == "different")
                     Json.parseToJsonElement(issuer.toPublicJWK().toJSONString()) else publicKey)
             })
-            if (type == "sca-user") put("aud", "x509_san_dns:rp.example")
             put("_sd", JsonArray(disclosures.map { JsonPrimitive(hash(it.encoded)) }))
         }
         val issuerJwt = JWSObject(JWSHeader.Builder(JWSAlgorithm.ES256).type(JOSEObjectType("dc+sd-jwt")).build(), Payload(claims.toString()))

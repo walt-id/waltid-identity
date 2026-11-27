@@ -134,6 +134,15 @@ class Crypto2JwtKeyResolverTest {
         assertEquals(KeyId("$DID_JWK#0"), resolved?.key?.id)
     }
 
+    @Test
+    fun `exact path and query key IDs take precedence over shared fragments`() = runTest {
+        val ids = listOf("$DID/path#shared", "$DID?version=2#shared")
+        val resolver = resolver(*ids.toTypedArray())
+        for (id in ids) assertEquals(KeyId(id), resolver.resolveFromDid(DID, id).id)
+        assertFailsWith<IllegalArgumentException> { resolver.resolveFromDid(DID, "shared") }
+        assertFailsWith<IllegalArgumentException> { resolver.resolveFromDid(DID, "$DID/other#shared") }
+    }
+
     private suspend fun resolver(vararg keyIds: String): Crypto2JwtKeyResolver {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         val keys = keyIds.map { keyId ->

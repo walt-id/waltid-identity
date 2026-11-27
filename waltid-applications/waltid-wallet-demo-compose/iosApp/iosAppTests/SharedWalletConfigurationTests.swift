@@ -1,5 +1,6 @@
 import WalletDemoIdentityDocumentSupport
 import XCTest
+import sharedUI
 
 /// Proves the Compose demo's shared wallet configuration is the one its provider extension resolves.
 ///
@@ -29,5 +30,25 @@ final class SharedWalletConfigurationTests: XCTestCase {
             namespace: .composeDemo,
             walletID: "compose-published-wallet-\(UUID().uuidString)"
         )
+    }
+}
+
+@MainActor
+final class ComposeBackgroundStatusBridgeTests: XCTestCase {
+    func testInvalidGrantReachesSwiftAsIneligible() async throws {
+        let namespace = IdentityDocumentNamespace.composeDemo
+        let keychain = try XCTUnwrap(namespace.keychainAccessGroup)
+        let completed = expectation(description: "Bridge delivered the result once")
+        completed.assertForOverFulfill = true
+        let run = WalletDemoIosKt.startWalletDemoBackgroundStatus(
+            binding: "invalid-binding", appGroupIdentifier: namespace.appGroupIdentifier,
+            keychainAccessGroup: keychain, onFinished: { outcome in
+                XCTAssertEqual(outcome, .ineligible)
+                completed.fulfill()
+            }
+        )
+        defer { run.cancel() }
+        let result = await XCTWaiter.fulfillment(of: [completed], timeout: 5)
+        XCTAssertEqual(result, .completed)
     }
 }

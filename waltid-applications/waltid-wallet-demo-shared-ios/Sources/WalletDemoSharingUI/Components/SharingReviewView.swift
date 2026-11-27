@@ -21,6 +21,7 @@ public struct SharingReviewView: View {
     private let onReject: (() -> Void)?
     private let onCancel: () -> Void
     private let compact: Bool
+    private let showsCredentialStatus: Bool
     private let showActions: Bool
     private let paymentReview: PaymentReviewState
     private let claimReview: ClaimReviewState
@@ -63,6 +64,7 @@ public struct SharingReviewView: View {
         onCancel: @escaping () -> Void,
         compact: Bool = false,
         showActions: Bool = true,
+        showsCredentialStatus: Bool = true,
         paymentReview: PaymentReviewState = .notRequired,
         claimReview: ClaimReviewState = .legacy,
         onRetryClaimReview: @escaping () -> Void = {},
@@ -79,6 +81,7 @@ public struct SharingReviewView: View {
         self.onReject = onReject
         self.onCancel = onCancel
         self.compact = compact
+        self.showsCredentialStatus = showsCredentialStatus
         self.showActions = showActions
         self.paymentReview = paymentReview
         self.claimReview = claimReview
@@ -108,6 +111,7 @@ public struct SharingReviewView: View {
                                 isLoading: isLoading, isReadOnly: isReadOnly || !review.allowsCredentialSelection(option),
                                 onToggleCredential: onToggleCredential,
                                 hasAlternatives: review.credentialOptions.filter { $0.queryID == option.queryID }.count > 1,
+                                showsCredentialStatus: showsCredentialStatus,
                                 showAdditionalInformationHint: usesLegacyClaimReview)
                         }
                     }

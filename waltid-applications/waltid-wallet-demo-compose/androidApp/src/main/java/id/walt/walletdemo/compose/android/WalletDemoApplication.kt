@@ -7,5 +7,6 @@ class WalletDemoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         installWalletImageLoader()
+        registerActivityLifecycleCallbacks(AndroidCredentialStatusNotifications)
     }
 }
