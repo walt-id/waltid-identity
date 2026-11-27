@@ -8,14 +8,12 @@ import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
-import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
-import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
@@ -42,15 +40,10 @@ import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
 import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
-import id.waltid.openid4vci.wallet.metadata.LocalizedMetadata
-import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
-import id.waltid.openid4vci.wallet.metadata.ResolvedCredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.nonce.NonceRequestError
 import id.waltid.openid4vci.wallet.nonce.NonceRequestException
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.oauth.PKCEManager
-import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
-import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.token.DPoPProofFactory
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import id.waltid.openid4vci.wallet.token.TokenRequestException
@@ -154,7 +147,7 @@ class WalletIssuanceSessionService(
     suspend fun startOffer(
         request: WalletIssuanceOfferRequest,
         preferredLocales: List<String> = emptyList(),
-    ): WalletIssuanceOfferReview = startSession(request, preferredLocales, null, null).toOfferReview()
+    ): WalletIssuanceOfferReview = startSession(request, preferredLocales, null, null).toOfferReview(attestationAssembler != null)
 
     /** Returns the retained offer while it still awaits the holder's acceptance. */
     suspend fun reviewBatch(sessionId: String): WalletIssuanceBatchSession? = reviewOffer(sessionId)?.session
@@ -162,29 +155,8 @@ class WalletIssuanceSessionService(
     /** Reopens the offer and evaluates client identification using this wallet's configured authentication. */
     suspend fun reviewOffer(sessionId: String): WalletIssuanceOfferReview? {
         val active = loadActive(sessionId) ?: return null
-        return mutex.withLock { active.takeIf { sessions[sessionId] === it && it.state == SessionState.AWAITING_ACCEPTANCE }?.toOfferReview() }
+        return mutex.withLock { active.takeIf { sessions[sessionId] === it && it.state == SessionState.AWAITING_ACCEPTANCE }?.toOfferReview(attestationAssembler != null) }
     }
-
-    private fun ActiveSession.toOfferReview() = WalletIssuanceOfferReview(
-        toBatchSession(), resolved.authorizationServerMetadata.issuer, clientIdentification(),
-    )
-
-    private fun ActiveSession.clientIdentification(): IssuanceClientIdentification {
-        val metadata = resolved.authorizationServerMetadata
-        val identified = resolved.grant == WalletIssuanceGrant.AUTHORIZATION_CODE ||
-            metadata.preAuthorizedGrantAnonymousAccessSupported != true || request.tokenRequestHeaders.isNotEmpty() ||
-            (attestationAssembler != null && metadata.tokenEndpointAuthMethodsSupported
-                ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true)
-        return if (identified) IssuanceClientIdentification.CLIENT_ID_REQUIRED else IssuanceClientIdentification.ANONYMOUS_ALLOWED
-    }
-
-    private fun ActiveSession.toBatchSession(): WalletIssuanceBatchSession = WalletIssuanceBatchSession(
-        public.id, public.offer, resolved.issuerMetadata.metadata.batchCredentialIssuance?.batchSize,
-        credentialDisplayMetadata = resolved.offeredCredentials.mapNotNull { credential ->
-            storedCredentialDisplayMetadata(resolved.issuerMetadata.metadata, credential.credentialConfigurationId)
-                ?.let { credential.credentialConfigurationId to it.toString() }
-        }.toMap(),
-    )
 
     private suspend fun startSession(
         request: WalletIssuanceOfferRequest,
@@ -195,7 +167,7 @@ class WalletIssuanceSessionService(
         parseManualClientAttestationHeaders(request.tokenRequestHeaders)
         ensureOpen()
         val keyMaterial = resolveIssuanceKeyMaterial(request.key, request.keyId)
-        val resolved = resolve(request, preferredLocales, keyMaterial)
+        val resolved = request.resolveSessionOffer(httpClient, metadataTrustResolver, preferredLocales)
         val sessionId = Uuid.random().toString()
         val publicSession = WalletIssuanceSession(
             id = sessionId,
@@ -366,7 +338,7 @@ class WalletIssuanceSessionService(
             return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.INVALID_INPUT)
         }
         val effectiveClientId = clientId ?: active.clientId
-        if (active.clientIdentification() == IssuanceClientIdentification.CLIENT_ID_REQUIRED && effectiveClientId == null) {
+        if (active.clientIdentification(attestationAssembler != null) == IssuanceClientIdentification.CLIENT_ID_REQUIRED && effectiveClientId == null) {
             return restoreOfferAfterFailure(active, WalletIssuanceErrorCode.INVALID_INPUT)
         }
         active.clientId = effectiveClientId
@@ -1172,88 +1144,6 @@ class WalletIssuanceSessionService(
         return algorithms
     }
 
-    private suspend fun resolve(
-        request: WalletIssuanceOfferRequest,
-        preferredLocales: List<String>,
-        keyMaterial: WalletKeyStoreEntry,
-    ): ResolvedOffer {
-        val offer = if (request.credentialIssuer != null) null else if (request.offerJson != null) {
-            val inline = json.decodeFromString<CredentialOffer>(request.offerJson.toString())
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(inline, null)
-        } else {
-            val parsed = CredentialOfferParser.parseCredentialOfferUrl(request.getEffectiveOfferString())
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(parsed.credentialOffer, parsed.credentialOfferUri)
-        }
-        val resolver = IssuerMetadataResolver(httpClient, metadataTrustResolver)
-        // Operational metadata is always resolved from issuer-derived well-known endpoints.
-        // Unrecognized offer parameters are caller-controlled and must not select network
-        // endpoints for issuance.
-        val issuerMetadata = resolver.resolveCredentialIssuerMetadata(
-            credentialIssuerUrl = request.credentialIssuer ?: requireNotNull(offer).credentialIssuer,
-            preferredLocales = preferredLocales,
-        )
-        require(issuerMetadata.metadata.credentialIssuer == (request.credentialIssuer ?: requireNotNull(offer).credentialIssuer)) {
-            "Credential issuer metadata identifier does not match the offer"
-        }
-        val (grant, asResolution) = resolver.resolveIssuanceGrant(offer, issuerMetadata.metadata)
-        val authorizationServerMetadata = asResolution.metadata
-
-        val offered = if (offer != null) OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
-            else requireNotNull(request.credentialConfigurationIds).map {
-                OfferedCredentialResolver.ResolvedCredentialOffer(it, issuerMetadata.metadata.credentialConfigurationsSupported.getValue(it))
-            }
-        require(offered.isNotEmpty()) { "Credential offer resolved no supported credentials" }
-        return ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offered, grant, asResolution.headers)
-    }
-
-    private fun ResolvedOffer.toPreview(preferredLocales: List<String>): WalletIssuanceOfferPreview {
-        val issuerDisplay = LocalizedMetadata.select(issuerMetadata.metadata.display, preferredLocales) { it.locale }
-        val txCode = offer?.grants?.preAuthorizedCode?.txCode?.takeIf { grant == WalletIssuanceGrant.PRE_AUTHORIZED_CODE }
-        return WalletIssuanceOfferPreview(
-            grant = grant,
-            issuer = WalletIssuanceIssuerPreview(
-                identifier = issuerMetadata.metadata.credentialIssuer,
-                name = issuerDisplay?.name,
-                locale = issuerDisplay?.locale,
-                logoUri = issuerDisplay?.logo?.uri,
-                logoAltText = issuerDisplay?.logo?.altText,
-                metadataProvenance = issuerMetadata.toPreviewProvenance(),
-            ),
-            credentials = offeredCredentials.map { offered ->
-                val display = LocalizedMetadata.select(
-                    offered.configuration.credentialMetadata?.display,
-                    preferredLocales,
-                ) { it.locale }
-                WalletIssuanceCredentialPreview(
-                    configurationId = offered.credentialConfigurationId,
-                    format = offered.configuration.format.value,
-                    name = display?.name,
-                    descriptionText = display?.description,
-                    logoUri = display?.logo?.uri,
-                    logoAltText = display?.logo?.altText,
-                    backgroundColor = display?.backgroundColor,
-                    backgroundImageUri = display?.backgroundImage?.uri,
-                    textColor = display?.textColor,
-                    vct = offered.configuration.vct,
-                    doctype = offered.configuration.doctype,
-                )
-            },
-            transactionCode = txCode?.let {
-                WalletIssuanceTransactionCode(it.inputMode, it.length, it.description)
-            },
-        )
-    }
-
-    private fun ResolvedCredentialIssuerMetadata.toPreviewProvenance(): WalletIssuanceMetadataProvenance = when (this) {
-        is ResolvedCredentialIssuerMetadata.Unsigned -> WalletIssuanceMetadataProvenance.Unsigned
-        is ResolvedCredentialIssuerMetadata.Signed -> WalletIssuanceMetadataProvenance.Signed(
-            compactJwt = compactJwt,
-            algorithm = signer.algorithm,
-            keyId = signer.keyId,
-            trustType = signer.trustType,
-        )
-    }
-
     private fun WalletIssuanceOfferPreview.credentialName(configurationId: String): String? =
         credentials.firstOrNull { it.configurationId == configurationId }?.name
 
@@ -1498,22 +1388,11 @@ class WalletIssuanceSessionService(
             return null
         }
 
-        val offer = persisted.offer?.let { json.decodeFromString<CredentialOffer>(it) }
-        // The store is an integrity-protected persistence boundary. Restore the resolution snapshot
-        // established when the session started, then revalidate its protocol bindings below.
-        val issuerMetadata = json.decodeFromString<ResolvedCredentialIssuerMetadata>(persisted.issuerMetadata)
-        val authorizationServerMetadata =
-            json.decodeFromString<AuthorizationServerMetadata>(persisted.authorizationServerMetadata)
-        val offeredCredentials = if (offer != null) OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata.metadata)
-            else persisted.public.offer.credentials.map { OfferedCredentialResolver.ResolvedCredentialOffer(it.configurationId,
-                issuerMetadata.metadata.credentialConfigurationsSupported.getValue(it.configurationId)) }
-        val resolved = ResolvedOffer(offer, issuerMetadata, authorizationServerMetadata, offeredCredentials, persisted.public.offer.grant)
-        validatePersistedResolution(persisted.public, resolved)
-
+        val resolved = persisted.restoreOffer(json)
         val request = WalletIssuanceOfferRequest(
             offerJson = persisted.offer?.let { Json.parseToJsonElement(it).jsonObject },
-            credentialIssuer = issuerMetadata.metadata.credentialIssuer.takeIf { offer == null },
-            credentialConfigurationIds = offeredCredentials.map { it.credentialConfigurationId }.takeIf { offer == null },
+            credentialIssuer = resolved.issuerMetadata.metadata.credentialIssuer.takeIf { resolved.offer == null },
+            credentialConfigurationIds = resolved.offeredCredentials.map { it.credentialConfigurationId }.takeIf { resolved.offer == null },
             keyId = persisted.request.keyId,
             did = persisted.request.did,
             tokenRequestHeaders = persisted.request.tokenRequestHeaders,
@@ -1575,35 +1454,6 @@ class WalletIssuanceSessionService(
             sessions[sessionId] ?: if (store.get(activeRecordId(sessionId)) == record) {
                 active.also { sessions[sessionId] = it }
             } else null
-        }
-    }
-
-    private fun validatePersistedResolution(
-        public: WalletIssuanceSession,
-        resolved: ResolvedOffer,
-    ) {
-        require(resolved.issuerMetadata.metadata.credentialIssuer == public.offer.issuer.identifier) {
-            "Stored issuance session issuer binding is invalid"
-        }
-        require(resolved.offer == null || resolved.issuerMetadata.metadata.credentialIssuer == resolved.offer.credentialIssuer) {
-            "Stored credential issuer metadata binding is invalid"
-        }
-        require(resolved.authorizationServerMetadata.issuer in resolved.issuerMetadata.metadata.authorizationServerIssuers()) {
-            "Stored authorization server binding is invalid"
-        }
-        require(
-            resolved.offeredCredentials.map { it.credentialConfigurationId } ==
-                    public.offer.credentials.map { it.configurationId }
-        ) { "Stored offered credential binding is invalid" }
-        // The released record already stores the selected grant and its resolved server.
-        val offered = resolved.offer?.getGrantTypes().orEmpty()
-        val grant = resolved.grant
-        val supported = if (grant == WalletIssuanceGrant.AUTHORIZATION_CODE) GrantType.AuthorizationCode else GrantType.PreAuthorizedCode
-        require(if (offered.isEmpty()) grant == WalletIssuanceGrant.AUTHORIZATION_CODE else supported in offered) {
-            "Stored issuance grant binding is invalid"
-        }
-        require(resolved.authorizationServerMetadata.issuer in grantServers(resolved.offer, grant, resolved.issuerMetadata.metadata)) {
-            "Stored grant authorization server binding is invalid"
         }
     }
 
@@ -2118,15 +1968,6 @@ class WalletIssuanceSessionService(
 
     private fun nowEpochMilliseconds(): Long = now().toEpochMilliseconds()
 
-    internal data class ResolvedOffer(
-        val offer: CredentialOffer?,
-        val issuerMetadata: ResolvedCredentialIssuerMetadata,
-        val authorizationServerMetadata: AuthorizationServerMetadata,
-        val offeredCredentials: List<OfferedCredentialResolver.ResolvedCredentialOffer>,
-        val grant: WalletIssuanceGrant,
-        val discoveryHeaders: io.ktor.http.Headers = io.ktor.http.Headers.Empty,
-    )
-
     internal data class AuthorizationState(
         val public: WalletIssuanceAuthorization,
         val pkce: PKCEManager.PKCEData,
@@ -2137,7 +1978,7 @@ class WalletIssuanceSessionService(
         val request: WalletIssuanceOfferRequest,
         var clientId: String?,
         var redirectUri: String?,
-        val resolved: ResolvedOffer,
+        val resolved: ResolvedSessionOffer,
         var keyMaterial: WalletKeyStoreEntry,
         val keyId: String?,
         val did: String?,
