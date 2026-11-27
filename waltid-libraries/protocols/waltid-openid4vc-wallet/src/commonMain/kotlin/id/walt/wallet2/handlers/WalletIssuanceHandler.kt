@@ -3203,10 +3203,21 @@ data class CredentialIssuanceFailure(
     val target: CredentialIssuanceTarget,
     val stage: CredentialIssuanceStage,
     val notAttempted: List<CredentialIssuanceTarget> = emptyList(),
+    /** Why the target failed, where the stage alone does not tell. Absent for every other failure. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val reason: CredentialIssuanceFailureReason? = null,
 )
 
 @Serializable
 enum class CredentialIssuanceStage { PROOF, REQUEST, RESPONSE, STORAGE, OBSERVER }
+
+@Serializable
+enum class CredentialIssuanceFailureReason {
+    /** The wallet's issuance trust rejected the issuer of a received credential, so nothing was stored. */
+    ISSUER_NOT_TRUSTED,
+
+    /** The wallet's issuance trust could not judge the issuer: its trust source failed or gave no answer. */
+    ISSUER_TRUST_UNAVAILABLE,
+}
 
 class CredentialIssuanceException(
     val failure: CredentialIssuanceFailure,

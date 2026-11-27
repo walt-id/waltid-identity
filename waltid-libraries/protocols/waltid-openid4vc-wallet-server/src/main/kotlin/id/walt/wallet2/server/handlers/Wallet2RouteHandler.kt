@@ -19,6 +19,7 @@ import id.walt.did.dids.DidService
 import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.wallet2.trust.IssuerNotTrustedException
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.WalletResolver
@@ -1059,6 +1060,14 @@ object Wallet2RouteHandler {
                     HttpStatusCode.Conflict to { body<FetchCredentialsResult>() }
                     HttpStatusCode.MultiStatus to { body<FetchCredentialsResult>() }
                     HttpStatusCode.InternalServerError to { body<FetchCredentialsResult>() }
+                    HttpStatusCode.UnprocessableEntity to {
+                        description = "Issuance trust refused the issuer (reason ISSUER_NOT_TRUSTED); nothing was stored"
+                        body<IssuerTrustErrorResponse>()
+                    }
+                    HttpStatusCode.BadGateway to {
+                        description = "Issuance trust could not judge the issuer (reason ISSUER_TRUST_UNAVAILABLE); nothing was stored"
+                        body<IssuerTrustErrorResponse>()
+                    }
                     HttpStatusCode.BadRequest to {
                         description = "The issuer rejected the credential request; preserves its error code and error_description"
                         body<CredentialError>()
@@ -1079,6 +1088,8 @@ object Wallet2RouteHandler {
                     call.respondFetchCredentialResult(WalletIssuanceHandler.fetchCredentials(wallet, req), req)
                 } catch (error: CredentialEndpointException) {
                     call.respondCredentialEndpointError(error)
+                } catch (error: IssuerNotTrustedException) {
+                    call.respondIssuerNotTrusted(error)
                 }
             }
 
@@ -1228,6 +1239,14 @@ object Wallet2RouteHandler {
                     HttpStatusCode.Conflict to { body<PollDeferredResult>() }
                     HttpStatusCode.MultiStatus to { body<PollDeferredResult>() }
                     HttpStatusCode.InternalServerError to { body<PollDeferredResult>() }
+                    HttpStatusCode.UnprocessableEntity to {
+                        description = "Issuance trust refused the issuer (reason ISSUER_NOT_TRUSTED); nothing was stored"
+                        body<IssuerTrustErrorResponse>()
+                    }
+                    HttpStatusCode.BadGateway to {
+                        description = "Issuance trust could not judge the issuer (reason ISSUER_TRUST_UNAVAILABLE); nothing was stored"
+                        body<IssuerTrustErrorResponse>()
+                    }
                     HttpStatusCode.BadRequest to {
                         description = "The issuer rejected the deferred request (for example credential_request_denied or invalid_transaction_id); preserves its error code and optional error_description"
                         body<CredentialError>()
@@ -1252,6 +1271,8 @@ object Wallet2RouteHandler {
                     call.respondPollDeferredResult(WalletIssuanceHandler.pollDeferred(wallet, req), req)
                 } catch (error: CredentialEndpointException) {
                     call.respondCredentialEndpointError(error)
+                } catch (error: IssuerNotTrustedException) {
+                    call.respondIssuerNotTrusted(error)
                 }
             }
             post("/authorized", {

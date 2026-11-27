@@ -1,5 +1,6 @@
 package id.walt.wallet2.server.handlers
 
+import id.walt.wallet2.handlers.CredentialIssuanceFailureReason
 import id.walt.wallet2.handlers.CredentialIssuanceStage
 import id.walt.wallet2.handlers.CredentialEndpointException
 import id.walt.wallet2.handlers.FetchCredentialResult
@@ -12,9 +13,14 @@ import id.walt.wallet2.handlers.WalletIssuanceOutcome
 import id.walt.wallet2.handlers.ReceiveCredentialResult
 import id.walt.wallet2.handlers.ReceiveCredentialsResult
 import id.walt.wallet2.handlers.CredentialReceiveException
+import id.walt.wallet2.trust.IssuerNotTrustedException
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
+import kotlinx.serialization.Serializable
+
+private val log = KotlinLogging.logger { }
 
 /** Preserve committed progress in the response body even when a later target fails. */
 suspend fun ApplicationCall.respondIssuanceResult(result: ReceiveCredentialResult) = respond(HttpStatusCode.OK, result)
@@ -31,6 +37,8 @@ suspend fun ApplicationCall.respondIssuanceResult(result: ReceiveCredentialsResu
         failure == null -> HttpStatusCode.OK
         (result.credentialIds.isNotEmpty() || result.deferredCredentials.isNotEmpty() ||
             result.storageOutcome?.deferredCredentials?.isNotEmpty() == true) && !legacy -> HttpStatusCode.MultiStatus
+        // The wallet refused the issuer: the request cannot succeed against it, unlike a failing issuer or trust source.
+        failure.reason == CredentialIssuanceFailureReason.ISSUER_NOT_TRUSTED -> HttpStatusCode.UnprocessableEntity
         else -> when (failure.stage) {
             CredentialIssuanceStage.PROOF -> HttpStatusCode.UnprocessableEntity
             CredentialIssuanceStage.REQUEST, CredentialIssuanceStage.RESPONSE -> HttpStatusCode.BadGateway
@@ -62,6 +70,31 @@ suspend fun ApplicationCall.respondCredentialEndpointError(
         throw error
     }
     respond(HttpStatusCode.fromValue(error.statusCode), credentialError)
+}
+
+/**
+ * Body of an isolated fetch or deferred poll that the wallet's issuance trust stopped. Nothing of the issuer
+ * response was stored, and the issuer was sent `credential_failure` where it has a notification endpoint.
+ */
+@Serializable
+data class IssuerTrustErrorResponse(
+    val reason: CredentialIssuanceFailureReason,
+    val message: String,
+)
+
+/**
+ * Wallet2 API policy: a refused issuer is unprocessable (422). A trust source that is not linked, fails or gives
+ * no answer is an upstream failure (502); its cause is logged, not returned.
+ */
+suspend fun ApplicationCall.respondIssuerNotTrusted(error: IssuerNotTrustedException) {
+    if (error.trustSourceUnavailable) {
+        log.warn(error) { "Issuance trust could not judge the credential issuer" }
+        respond(HttpStatusCode.BadGateway, IssuerTrustErrorResponse(error.reason,
+            "Issuer trust could not be established: the trust source is not configured, failed or gave no answer"))
+    } else {
+        respond(HttpStatusCode.UnprocessableEntity, IssuerTrustErrorResponse(error.reason,
+            error.message ?: "The credential issuer is not trusted"))
+    }
 }
 
 /** Preserve local recovery after an isolated deferred response was already received. */

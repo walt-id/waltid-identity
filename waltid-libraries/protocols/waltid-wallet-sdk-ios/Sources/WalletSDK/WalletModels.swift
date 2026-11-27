@@ -1273,6 +1273,9 @@ public enum IssuanceErrorCode: Equatable, Sendable {
 
     /// A protocol response was structurally invalid or inconsistent.
     case `protocol`
+
+    /// The wallet's issuance trust refused the issuer, or could not establish its trust; nothing was stored.
+    case issuerNotTrusted
 }
 
 /// Sanitized error returned by a typed issuance transition.

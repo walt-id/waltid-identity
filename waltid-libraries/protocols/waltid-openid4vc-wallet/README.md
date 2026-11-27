@@ -31,6 +31,7 @@ This library provides the core wallet functionality for building identity wallet
 - **Deferred issuance** — Poll for credentials that are issued asynchronously
 - **Proof of possession** — JWT-based key binding proofs
 - **Multiple credential formats** — W3C VC, SD-JWT, mdoc/mDL
+- **Issuer trust** — Optional trust-registry check of each received credential's X.509 issuer chain before anything is stored
 
 For isolated proof signing, `signProof(SignProofRequest)` retains the single-JWT SDK contract.
 Use `signProofs(SignProofsRequest)` for explicit holder collections; its `SignProofsResult.proofs`
@@ -195,6 +196,24 @@ When issuer metadata requires a key attestation, attach a `KeyAttestationProvide
 For issuer-specific selection, attach a `KeyAttestationProviderResolver` with `wallet.attachKeyAttestationProviderResolver(resolver)`. It resolves only when the credential requires attestation and returns a provider with a fixed verification key, or null to reject an unsupported issuer. Each proof collection retains its selected provider and verification key. The existing fixed-provider API remains available.
 
 Validation follows [OpenID4VCI 1.0 Appendix D.1](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-final.html#appendix-D.1): `typ` must be `key-attestation+jwt`, `iss` is not required, and the proof key may occur anywhere in `attested_keys`. The unhyphenated spelling in a TS3 example is an [acknowledged upstream typo](https://github.com/eu-digital-identity-wallet/eudi-doc-standards-and-technical-specifications/issues/605). This wallet-side validation does not establish full EUDI TS3 compliance, including its first-key signing rule, certificate trust, certification and status requirements.
+
+#### Issuer trust
+
+Without configuration the wallet stores what an issuer returns. To check the issuer first, attach a `WalletIssuanceTrust`:
+
+```kotlin
+wallet.attachIssuanceTrust(WalletIssuanceTrust(
+    evaluator = HttpTrustDecisionEvaluator("https://trust.example.com/resolve/certificate-chain"),
+))
+```
+
+Every credential of a response must pass before any is stored, deferred credentials included when they arrive:
+
+1. Its signature verifies with the issuer key, and an mdoc's value digests match its MSO.
+2. That key is certified by an X.509 chain (`x5c` or the mdoc x5chain). A credential signed with a DID or HTTPS key has none and is rejected; a JWT without `x5c` is rejected before its issuer key is resolved.
+3. The evaluator trusts the chain for `TrustPurpose.WALLET_ISSUANCE_ISSUER_CERT` from a fresh registry source, as one of the entity types the signed `vct` or doctype maps to. By default the EUDI PID maps to `PID_PROVIDER` and every other type to `ATTESTATION_PROVIDER`; set `credentialTypes` and `otherCredentialTypes` to change that.
+
+A refused response stores nothing and sends `credential_failure` when the issuer has a notification endpoint. The reason is `ISSUER_NOT_TRUSTED`, or `ISSUER_TRUST_UNAVAILABLE` when the trust source gave no answer (`UNKNOWN`, `PROCESSING_ERROR`) or failed: as `failure.reason` of a full receive, or on the `IssuerNotTrustedException` that isolated fetch and deferred poll throw. Issuance sessions fail with error code `ISSUER_NOT_TRUSTED` in both cases, and a refused deferred credential ends its continuation, since the issuer will not answer again. `attachIssuanceTrust { ... }` takes a resolver that runs once per response, so the configuration can change at runtime; it returns null to skip the check. Like the other attachments it is runtime only: reattach it after restoring a wallet. Credentials added with `importCredential`, and isolated fetches that do not store, are not checked.
 
 ### Presenting Credentials (OpenID4VP 1.0)
 

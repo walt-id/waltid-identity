@@ -1475,6 +1475,7 @@ private extension Waltid_openid4vc_walletWalletIssuanceErrorCode {
         case .crypto: return .crypto
         case .storage: return .storage
         case .protocol: return .protocol
+        case .issuerNotTrusted: return .issuerNotTrusted
         }
     }
 }

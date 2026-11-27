@@ -191,6 +191,27 @@ The isolated `request-token` and `exchange-code` routes retain their released th
 Swagger includes ordered single, batch, multi-configuration, and authorization
 examples. Issuance does not implicitly generate keys or increase batch size.
 
+## Issuer trust
+
+When the `WalletResolver` returns a wallet with `attachIssuanceTrust` (see the
+[wallet library](../waltid-openid4vc-wallet/README.md#issuer-trust)), every received
+credential's X.509 issuer chain must be trusted before anything is stored. A refused
+response stores nothing and the issuer is sent `credential_failure` where it has a
+notification endpoint.
+
+| Route | Issuer refused | Trust source unavailable |
+|-------|----------------|--------------------------|
+| Full receive routes | 422, `failure.reason` `ISSUER_NOT_TRUSTED` | 502, `failure.reason` `ISSUER_TRUST_UNAVAILABLE` |
+| Isolated `fetch-credential` with `storeInWallet=true`, `POST .../receive/deferred` | 422, `{"reason":"ISSUER_NOT_TRUSTED","message":...}` | 502, `{"reason":"ISSUER_TRUST_UNAVAILABLE","message":...}` |
+| `POST .../receive/deferred/{deferredCredentialId}` | 200, outcome `failed`, `error.code` `ISSUER_NOT_TRUSTED` | same |
+
+"Unavailable" means the trust source failed, answered `UNKNOWN` or `PROCESSING_ERROR`,
+or its configuration could not be resolved. The isolated routes log the cause instead
+of returning it. A full receive whose earlier configuration was already stored keeps
+returning 207 with that `failure`. A refused retained handle is removed, so resuming it
+again returns `INVALID_SESSION`. Isolated fetch with `storeInWallet=false` stores
+nothing and returns the raw credentials unchecked.
+
 ## API Endpoints
 
 ### Wallet Management

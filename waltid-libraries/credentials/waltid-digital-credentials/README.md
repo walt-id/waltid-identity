@@ -140,6 +140,7 @@ For detailed implementation examples and understanding the library internals, re
 - **`formats/mdocs/MdocsCredential.kt`**: mdoc credential implementation
 - **`signatures/`**: Signature type implementations (JWT, SD-JWT, Data Integrity Proof, COSE)
 - **`keyresolver/`**: Key resolution mechanisms for credential verification
+- **`trust/IssuerTrustMaterial.kt`**: Signature-verified issuer certificate chain or key, for trust decisions
 - **`presentations/`**: Verifiable presentation format implementations
 - **Test files**: Located in `src/jvmTest`, these provide comprehensive examples of all credential types and signature combinations
 
@@ -278,6 +279,19 @@ suspend fun verifyCredential(credential: DigitalCredential) {
     }
 }
 ```
+
+### Issuer Trust Material
+
+To ask a trust source about an issuer, take the material from the key that actually signed:
+
+```kotlin
+when (val material = credential.verifiedIssuerTrustMaterial()) {
+    is IssuerTrustMaterial.CertificateChain -> material.pemChain // PEM, leaf first
+    is IssuerTrustMaterial.PublicKey -> material.jwk             // DID or HTTPS issuer key without a matching x5c
+}
+```
+
+It verifies the signature with that key before returning, so trust is never decided for a key that did not sign: an mdoc's IssuerAuth with its x5chain leaf, a JWT with the key resolved from its DID `iss`, `x5c` or HTTPS issuer metadata. An inline `jwk` header is not accepted. It checks possession only: mdoc value digests, MSO validity and the certificate profile are left to the caller. It throws `IssuerTrustMaterialException` if the format is unsupported, the key cannot be resolved or the signature does not verify.
 
 ### Working with Presentations
 

@@ -65,6 +65,18 @@ final class IssuanceBridgeContractTests: XCTestCase {
         }
     }
 
+    func testIssuerTrustRefusalKeepsItsOwnCode() throws {
+        let core = Waltid_openid4vc_walletWalletIssuanceOutcomeFailed(sessionId: "session",
+            error: .init(code: .issuerNotTrusted, message: "Nothing was stored"), storedCredentialIds: [],
+            deferredCredentials: [], failure: nil)
+        guard case let .failed(_, error, stored, deferred) = try core.toSwiftIssuanceOutcome() else {
+            return XCTFail("Expected an explicit failure outcome")
+        }
+        XCTAssertEqual(error.code, .issuerNotTrusted)
+        XCTAssertTrue(stored.isEmpty)
+        XCTAssertTrue(deferred.isEmpty)
+    }
+
     func testConfiguredDeferredOutcomePreservesTheReleasedReference() throws {
         let pending = Waltid_openid4vc_walletWalletDeferredCredential(id: "pending",
             credentialConfigurationId: "identity", intervalSeconds: .init(longLong: 7), credentialIdentifier: "dataset-a")

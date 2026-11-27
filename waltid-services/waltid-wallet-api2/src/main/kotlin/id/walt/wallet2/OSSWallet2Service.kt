@@ -9,6 +9,8 @@ import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
 import id.walt.openid4vp.clientidprefix.ClientIdX509TrustRegistry
 import id.walt.trust.decision.HttpTrustDecisionEvaluator
+import id.walt.wallet2.trust.IssuerEntityTypeRule
+import id.walt.wallet2.trust.WalletIssuanceTrust
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.auth.ExposedWallet2AccountStore
 import id.walt.wallet2.auth.InMemoryWallet2AccountStore
@@ -100,8 +102,10 @@ object OSSWallet2Service {
             get() = OSSWallet2Service.didStoreFactory
 
         override suspend fun resolveWallet(walletId: String): Wallet? {
-            val registry = persistentStoreRegistry ?: return super.resolveWallet(walletId)
-            return registry.withWalletLock(walletId) { super.resolveWallet(walletId) }
+            val registry = persistentStoreRegistry
+            val wallet = if (registry == null) super.resolveWallet(walletId)
+            else registry.withWalletLock(walletId) { super.resolveWallet(walletId) }
+            return wallet?.attachIssuanceTrust { configuredIssuanceTrust }
         }
 
         override suspend fun resolveIssuanceSessionState(walletId: String): WalletIssuanceSessionState {
@@ -231,6 +235,7 @@ object OSSWallet2Service {
     fun Route.registerRoutes() {
         val attestationAssembler = createAttestationAssembler()
         val clientIdTrustConfiguration = configuredClientIdTrustConfiguration()
+        configuredIssuanceTrust = configuredIssuanceTrust()
         val transactionDataTypeRegistry = configuredTransactionDataTypeRegistry()
         val authEnabled = runCatching {
             FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
@@ -273,6 +278,23 @@ object OSSWallet2Service {
             )
         },
     )
+
+    internal fun IssuanceTrustConfig.toDomain(): WalletIssuanceTrust? = trustRegistry?.let { registry ->
+        WalletIssuanceTrust(
+            evaluator = HttpTrustDecisionEvaluator(registry.resolveCertificateChainUrl) { registry.headers },
+            credentialTypes = credentialTypes.map { IssuerEntityTypeRule(it.vcts, it.doctypes, it.entityTypes) },
+            otherCredentialTypes = otherCredentialTypes,
+            requireAuthenticatedSource = registry.requireAuthenticatedSource,
+        )
+    }
+
+    /** Read from the service configuration when routes are registered; null leaves issuance trust off. */
+    @Volatile
+    internal var configuredIssuanceTrust: WalletIssuanceTrust? = null
+        private set
+
+    internal fun configuredIssuanceTrust(): WalletIssuanceTrust? =
+        ConfigManager.getConfig<OSSWallet2ServiceConfig>().issuanceTrust.toDomain()
 
     internal fun configuredClientIdTrustConfiguration(): ClientIdTrustConfiguration =
         ConfigManager.getConfig<OSSWallet2ServiceConfig>().clientIdTrust.toDomain()

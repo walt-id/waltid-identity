@@ -374,7 +374,7 @@ Validates credential issuer certificates against an ETSI Trust List (TSL/LoTE).
 3. **Enterprise Service**: When neither is provided and running in enterprise stack, uses the linked TrustRegistryEnterpriseService
 
 **How it works:**
-1. Extracts the full certificate chain from the credential's x5c header (COSE for mDoc, JWT header for SD-JWT/W3C VC)
+1. Extracts the full certificate chain from the credential's x5c header (COSE for mDoc, JWT header for SD-JWT/W3C VC) and verifies the credential signature with the leaf key first (the mDoc IssuerAuth with its x5chain leaf, the JWS with the resolved issuer key), so an mDoc whose IssuerAuth does not verify fails before any lookup
 2. Iterates through the chain (leaf → root) and resolves trust for each certificate
 3. If any certificate in the chain is found trusted, the credential passes
 

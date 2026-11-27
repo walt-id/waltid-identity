@@ -184,8 +184,9 @@ internal fun grantedCredentialSelections(
 }
 
 /**
- * Validate the entire response before the first write. Issuers may return fewer instances or reorder
- * them. Match by cryptographic holder binding, not by array position, then persist each independently.
+ * Validate the entire response before the first write. With [Wallet.attachIssuanceTrust], every
+ * credential's issuer must be trusted first, so one untrusted credential rejects the whole response.
+ * Issuers may return fewer instances or reorder them. Match by cryptographic holder binding, not by array position, then persist each independently.
  * Only proof-bound requests impose one credential per supplied key; proofless response arrays
  * do not acquire a count limit or holder binding from the wallet's default key.
  */
@@ -210,6 +211,9 @@ internal suspend fun Wallet.prepareIssuedCredentials(
     expectedConfiguration?.let { configuration ->
         parsedCredentials.forEach { it.requireRequestedConfiguration(configuration) }
     }
+    // Before holder binding and type metadata, so no type metadata an untrusted issuer names is fetched. Resolving
+    // the issuer key can still fetch a DID document for a JWT that carries x5c with a DID iss; without x5c it is not tried.
+    issuanceTrust()?.let { trust -> parsedCredentials.forEach { trust.requireTrustedIssuer(it) } }
     return parsedCredentials.map { parsed ->
         require(holderBindingKnown || parsed !is MdocsCredential) {
             "Exact issuance holder-key material is required when storing an mdoc"

@@ -6,6 +6,7 @@ import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletKeyStoreEntry
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.trust.IssuerNotTrustedException
 import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import kotlinx.coroutines.CancellationException
@@ -152,7 +153,8 @@ internal suspend fun executeCredentialTargets(
             throw error
         } catch (error: Exception) {
             throw CredentialIssuanceException(
-                CredentialIssuanceFailure(target, stage, targets.drop(index + 1).map { it.target }), error,
+                CredentialIssuanceFailure(target, stage, targets.drop(index + 1).map { it.target },
+                    reason = (error as? IssuerNotTrustedException)?.reason), error,
                 storageOutcome = (error as? CredentialStorageException)?.outcome,
             )
         }
