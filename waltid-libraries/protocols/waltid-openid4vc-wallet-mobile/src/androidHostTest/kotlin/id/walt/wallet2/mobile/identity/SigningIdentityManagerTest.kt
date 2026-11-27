@@ -109,7 +109,7 @@ class SigningIdentityManagerTest {
             val identity = assertIs<SigningIdentityOperationResult.Active>(fixture.wallet.signingIdentity.initialize()).identity
             assertEquals(identity, assertIs<SigningIdentityState.Active>(fixture.wallet.signingIdentity.state()).identity)
             assertEquals(false, fixture.wallet.digitalCredentialRegistration.value?.available)
-            assertEquals("Registry unavailable", fixture.wallet.digitalCredentialRegistration.value?.reason)
+            assertEquals("The platform could not register the stored credentials.", fixture.wallet.digitalCredentialRegistration.value?.reason)
         }
     }
 

@@ -1727,7 +1727,7 @@ class WalletDemoControllerTest {
 
         val firstBanner = checkNotNull(controller.state.value.statusBanner())
         assertEquals(WalletStatusKind.Error, firstBanner.kind)
-        assertTrue(firstBanner.message.contains("issuer unavailable"))
+        assertFalse(firstBanner.message.contains("issuer unavailable"))
         assertTrue(controller.state.value.isStatusVisible)
         controller.dismissStatus()
         assertFalse(controller.state.value.isStatusVisible)
@@ -1864,7 +1864,7 @@ class WalletDemoControllerTest {
         assertTrue(pinStore.hasPin())
         val setup = controller.state.value.auth as WalletAuthState.Setup
         assertEquals(
-            WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, "PIN verifier could not be cleared"),
+            WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, WalletDisplayText.UnexpectedError),
             setup.error,
         )
         assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
@@ -1893,7 +1893,7 @@ class WalletDemoControllerTest {
         assertTrue(controller.state.value.session is WalletSessionState.Failed)
         assertEquals(
             WalletOperationState.Failed(
-                WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, "HTTP 500"),
+                WalletDisplayText.failure(WalletDisplayText.ResetWalletFailed, WalletDisplayText.UnexpectedError),
                 WalletDemoTab.Credentials,
             ),
             controller.state.value.operation,
@@ -2121,6 +2121,33 @@ class WalletDemoControllerTest {
         assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
         assertNull(controller.state.value.offerPreview)
         assertFalse(controller.state.value.acceptOfferEnabled)
+    }
+
+    @Test
+    fun unreadableOfferCanBeCheckedAgainButUnavailableOfferClosesTheReview() = runTest {
+        for (grant in WalletDemoIssuanceGrant.entries) {
+            val wallet = FakeDemoWallet(issuanceGrant = grant)
+            val controller = unlockedControllerWith(wallet, this)
+            controller.updateOfferUrl("openid-credential-offer://issuer.example")
+            controller.previewOffer()
+            runCurrent()
+
+            wallet.offerLookupError = IllegalStateException("private store diagnostic")
+            controller.acceptOffer()
+            runCurrent()
+            assertTrue(controller.state.value.acceptOfferEnabled)
+            assertFalse(controller.state.value.statusText.contains("private store diagnostic"))
+
+            wallet.offerLookupError = ReviewedOfferUnavailable()
+            controller.acceptOffer()
+            runCurrent()
+            assertFalse(controller.state.value.acceptOfferEnabled)
+            assertNull(controller.state.value.offerPreview)
+            assertNull(controller.state.value.authorizationRequestUrl)
+            controller.acceptOffer()
+            runCurrent()
+            assertEquals(2, wallet.receivedIssuanceSelections.size)
+        }
     }
 
     @Test
@@ -4500,8 +4527,11 @@ private class FakeDemoWallet(
         )
     }
 
+    var offerLookupError: Exception? = null
+
     override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization {
         receivedIssuanceSelections += credentials
+        offerLookupError?.let { throw it }
         return WalletDemoIssuanceAuthorization("browser-authorization", "openid://authorization")
     }
 
@@ -4512,6 +4542,7 @@ private class FakeDemoWallet(
     ): WalletDemoIssuanceOutcome {
         receiveCalls += 1
         receivedIssuanceSelections += credentials
+        offerLookupError?.let { throw it }
         receivedTxCodes += transactionCode
         if (ignoreReceiveCancellation) {
             withContext(NonCancellable) { receiveGate?.await() }

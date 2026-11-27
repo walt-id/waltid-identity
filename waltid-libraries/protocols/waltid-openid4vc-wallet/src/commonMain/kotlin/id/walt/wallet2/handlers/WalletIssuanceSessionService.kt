@@ -148,8 +148,17 @@ class WalletIssuanceSessionService(
 
     /** Reopens the offer and evaluates client identification using this wallet's configured authentication. */
     suspend fun reviewOffer(sessionId: String): WalletIssuanceOfferReview? {
-        val active = loadActive(sessionId) ?: return null
-        return mutex.withLock { active.takeIf { sessions[sessionId] === it && it.state == SessionState.AWAITING_ACCEPTANCE }?.toOfferReview(attestationAssembler != null) }
+        val active = try {
+            loadActive(sessionId)
+        } catch (error: IssuanceStageException) {
+            if (error.code == WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN) throw IssuanceOutcomeUncertainException()
+            throw error
+        } ?: return null
+        return mutex.withLock {
+            if (sessions[sessionId] !== active) return@withLock null
+            if (active.state == SessionState.PROCESSING) throw IssuanceOutcomeUncertainException()
+            active.takeIf { it.state == SessionState.AWAITING_ACCEPTANCE }?.toOfferReview(attestationAssembler != null)
+        }
     }
 
     private suspend fun startSession(
@@ -322,9 +331,8 @@ class WalletIssuanceSessionService(
         } catch (error: IssuanceStageException) {
             return failed(sessionId, error.code)
         } catch (error: Exception) {
-            log.error(error) { "Could not load issuance session '$sessionId' for pre-authorized issuance" }
-            // The store failed before this attempt could claim the offer or submit its grant.
-            return failed(sessionId, WalletIssuanceErrorCode.STORAGE, canRetryOffer = true)
+            log.error { "Could not load issuance session for pre-authorized issuance" }
+            return failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(sessionId)
         val grant = active.resolved.offer?.grants?.preAuthorizedCode
             ?: return failAndRemove(active, WalletIssuanceErrorCode.INVALID_SESSION)
@@ -360,7 +368,7 @@ class WalletIssuanceSessionService(
             withContext(NonCancellable) { restoreOffer(active) }
             throw error
         } catch (error: Exception) {
-            log.error(error) { "Could not persist accepted issuance session '$sessionId'" }
+            log.error { "Could not persist accepted issuance session" }
             return failAndRemove(active, WalletIssuanceErrorCode.STORAGE)
         }
         return complete(active, retryTokenRejection = requirement != null) {
@@ -377,7 +385,7 @@ class WalletIssuanceSessionService(
         } catch (error: IssuanceStageException) {
             return failed(callback.sessionId, error.code)
         } catch (error: Exception) {
-            log.error(error) { "Could not load issuance session '${callback.sessionId}' for authorization callback" }
+            log.error { "Could not load issuance session for authorization callback" }
             return failed(callback.sessionId, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(callback.sessionId)
         val authorization = active.authorization
@@ -414,7 +422,7 @@ class WalletIssuanceSessionService(
         } catch (error: IssuanceStageException) {
             return failed(sessionId, error.code)
         } catch (error: Exception) {
-            log.error(error) { "Could not load issuance session '$sessionId' for cancellation" }
+            log.error { "Could not load issuance session for cancellation" }
             return failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         }
         return try {
@@ -441,7 +449,7 @@ class WalletIssuanceSessionService(
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            log.error(error) { "Could not cancel issuance session '$sessionId'" }
+            log.error { "Could not cancel issuance session" }
             failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         }
     }
@@ -609,7 +617,7 @@ class WalletIssuanceSessionService(
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
-            log.error(error) { "Could not load issuance continuation '$id'" }
+            log.error { "Could not load issuance continuation" }
             return failed(id, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(id)
         // Observing another writer must never enter cleanup that can release its claim.
@@ -624,7 +632,7 @@ class WalletIssuanceSessionService(
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {
-                    log.error(error) { "Could not check stored credentials for issuance session '${record.sessionId}'" }
+                    log.error { "Could not check stored credentials" }
                     return failed(record.sessionId, WalletIssuanceErrorCode.STORAGE,
                         deferredCredentials = listOf(record.public))
                 }
@@ -770,9 +778,13 @@ class WalletIssuanceSessionService(
             retainInterruptedDeferred(record)
             throw error
         } catch (error: Exception) {
-            val errorCode = (error as? IssuanceStageException)?.code ?: stage
+            val errorCode = when (error) {
+                is CredentialDeliveryUncertainException -> WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN
+                is IssuanceStageException -> error.code
+                else -> stage
+            }
             if (errorCode == WalletIssuanceErrorCode.STORAGE) {
-                log.error(error) { "Could not store issued credentials for issuance session '${record.sessionId}'" }
+                log.error { "Could not store issued credentials" }
             }
             retainInterruptedDeferred(record)
             val code = if (errorCode == WalletIssuanceErrorCode.NETWORK && record.claimed && record.content is DeferredContent.Remote)
@@ -829,13 +841,15 @@ class WalletIssuanceSessionService(
     ): WalletIssuanceOutcome {
         val storedIds = mutableListOf<String>()
         val deferredResults = mutableListOf<WalletIssuanceContinuation>()
+        var remoteOutcomePending = true
         return try {
             val advertisedDpop = active.dpopAlgorithms()
             val token = obtainToken()
+            remoteOutcomePending = false
             val dpop = dpopAlgorithmsForToken(token.token_type, advertisedDpop)
             emitEvent(WalletSessionEvent.issuance_token_obtained)
 
-            issueCredentials(active, token, dpop, storedIds, deferredResults)
+            issueCredentials(active, token, dpop, storedIds, deferredResults) { remoteOutcomePending = it }
             removeSession(active.public.id)
             if (deferredResults.isNotEmpty()) {
                 WalletIssuanceOutcome.Deferred(active.public.id, storedIds, deferredResults.map(::WalletDeferredCredential))
@@ -844,24 +858,26 @@ class WalletIssuanceSessionService(
                 WalletIssuanceOutcome.Stored(active.public.id, storedIds)
             }
         } catch (error: CancellationException) {
-            withContext(NonCancellable) {
-                removeSession(active.public.id)
-            }
+            if (!remoteOutcomePending) invalidateActiveSessionBestEffort(active.public.id, active)
             throw error
         } catch (error: TokenRequestException) {
             log.warn {
-                "Issuance token request failed: status=${error.statusCode}, " +
-                        "oauthError=${error.oauthError}, grant=${active.public.offer.grant}, " +
-                        "clientId=${active.clientId}, dpopAdvertised=${active.dpopAlgorithms() != null}"
+                "Issuance token request failed (HTTP ${error.statusCode})"
             }
-            val code = if (error.statusCode == 0) WalletIssuanceErrorCode.NETWORK else WalletIssuanceErrorCode.ISSUER_RESPONSE
+            // An unreadable success or a lost POST response can already have consumed the code.
+            if (error.statusCode == 0 || error.statusCode in 200..299) {
+                return failed(active.public.id, WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN, storedIds, deferredResults)
+            }
+            val code = WalletIssuanceErrorCode.ISSUER_RESPONSE
             if (retryTokenRejection && storedIds.isEmpty() && error.oauthError == "invalid_grant") {
                 restoreOfferAfterFailure(active, code)
             } else {
                 failAndRemove(active, code, storedIds)
             }
         } catch (error: IssuanceStageException) {
-            failAndRemove(active, error.code, storedIds, deferredResults, error.failure, error.receiptFailure)
+            if (error.code == WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN)
+                failed(active.public.id, error.code, storedIds, deferredResults, error.failure)
+            else failAndRemove(active, error.code, storedIds, deferredResults, error.failure, error.receiptFailure)
         } catch (_: IllegalArgumentException) {
             failAndRemove(active, WalletIssuanceErrorCode.PROTOCOL, storedIds, deferredResults)
         } catch (_: Exception) {
@@ -875,6 +891,7 @@ class WalletIssuanceSessionService(
         dpopAlgorithms: Set<String>?,
         storedIds: MutableList<String>,
         deferredResults: MutableList<WalletIssuanceContinuation>,
+        onRemoteOutcomePending: (Boolean) -> Unit,
     ) {
         val metadata = active.resolved.issuerMetadata.metadata
         try {
@@ -888,6 +905,7 @@ class WalletIssuanceSessionService(
                 labelFor = { active.public.offer.credentialName(it) },
                 ensureOwned = { ensureContinuationOwned(active.persistedSnapshot) },
                 onEvent = ::emitEvent,
+                onRemoteOutcomePending = onRemoteOutcomePending,
                 onCredentialStored = { storedIds += it.id },
                 onDeferredCredential = { deferredResults += WalletIssuanceContinuation(
                     requireNotNull(it.deferredCredentialId), it.credentialConfigurationId, it.intervalSeconds, it.credentialIdentifier) },
@@ -896,6 +914,7 @@ class WalletIssuanceSessionService(
             error.storageOutcome?.let { deferredResults += it.deferredCredentials }
             val cause = error.cause
             val code = error.storageOutcome?.error?.code ?: (cause as? IssuanceStageException)?.code ?: when {
+                cause is CredentialDeliveryUncertainException -> WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN
                 cause is NonceRequestException -> when (cause.error) {
                     NonceRequestError.INVALID_ENDPOINT -> WalletIssuanceErrorCode.ISSUER_METADATA
                     NonceRequestError.NETWORK -> WalletIssuanceErrorCode.NETWORK
@@ -910,7 +929,7 @@ class WalletIssuanceSessionService(
             }
             // Credential storage failures are already logged when converted to an outcome.
             if (code == WalletIssuanceErrorCode.STORAGE && error.storageOutcome == null) {
-                log.error(error) { "Could not store issuance progress for session '${active.public.id}'" }
+                log.error { "Could not store issuance progress" }
             }
             throw IssuanceStageException(code, error, error.failure, cause as? CredentialReceiptTrustException)
         }
@@ -1241,7 +1260,9 @@ class WalletIssuanceSessionService(
     ): ActiveSession? {
         val active = loadActive(sessionId) ?: return null
         val marked = mutex.withLock {
-            if (sessions[sessionId] !== active || active.state != expected || (grant != null && active.resolved.grant != grant)) return@withLock false
+            if (sessions[sessionId] !== active) return@withLock false
+            if (active.state == SessionState.PROCESSING) throw IssuanceStageException(WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN)
+            if (active.state != expected || (grant != null && active.resolved.grant != grant)) return@withLock false
             active.state = SessionState.PROCESSING
             active.expiresAtEpochMilliseconds = PROCESSING_EXPIRY
             true
@@ -1255,7 +1276,7 @@ class WalletIssuanceSessionService(
             throw error
         } catch (error: Exception) {
             if (error !is IssuanceStageException) {
-                log.error(error) { "Could not claim issuance session '$sessionId'" }
+                log.error { "Could not claim issuance session" }
             }
             invalidateActiveSessionBestEffort(sessionId)
             if (error is IssuanceStageException) throw error
@@ -1282,7 +1303,13 @@ class WalletIssuanceSessionService(
         if (mutex.withLock { runtime.closed }) return null
         val cached = mutex.withLock { sessions[sessionId] }
         val store = sessionStore
-        val record = store?.get(activeRecordId(sessionId))
+        val record = try {
+            store?.get(activeRecordId(sessionId))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            throw IssuanceSessionStorageException(failure)
+        }
         if (cached != null && (!cached.persistable || store == null || record == cached.persistedSnapshot)) {
             if (cached.expiresAtEpochMilliseconds <= nowEpochMilliseconds()) {
                 invalidateActiveSessionBestEffort(sessionId)
@@ -1597,7 +1624,7 @@ class WalletIssuanceSessionService(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                log.error(error) { "Could not checkpoint received credentials for issuance session '${record.sessionId}'" }
+                log.error { "Could not checkpoint received credentials" }
                 deliverCredentialNotification(
                     httpClient = httpClient,
                     target = record.notificationTarget(),
@@ -1878,7 +1905,7 @@ class WalletIssuanceSessionService(
         WalletIssuanceErrorCode.ISSUER_METADATA -> "The issuer metadata is incomplete or inconsistent."
         WalletIssuanceErrorCode.ISSUER_RESPONSE -> "The issuer returned an invalid or unsuccessful response."
         WalletIssuanceErrorCode.NETWORK -> "The issuer could not be reached."
-        WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN -> "A deferred request is still in progress or its response was lost. The wallet will not automatically repeat it."
+        WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN -> "The issuer request is in progress or its response could not be confirmed. Check with the issuer before trying again."
         WalletIssuanceErrorCode.STORAGE_OUTCOME_UNCERTAIN -> "Saving this credential batch is still in progress or was interrupted. Another writer cannot safely take over automatically."
         WalletIssuanceErrorCode.CRYPTO -> "The selected holder key could not create the required proof."
         WalletIssuanceErrorCode.STORAGE -> "The issued credential could not be stored."

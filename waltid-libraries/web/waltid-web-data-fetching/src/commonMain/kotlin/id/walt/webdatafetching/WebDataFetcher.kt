@@ -6,7 +6,9 @@ import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.contentnegotiation.*
+import kotlinx.coroutines.CancellationException
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -100,13 +102,13 @@ class WebDataFetcher private constructor(
         }
 
         val httpResponse = httpResponseResult.getOrElse { ex ->
+            if (ex is CancellationException) throw ex
             throw DataFetchingException("Could not send request to: $url (${ex.message ?: "unknown error"})", ex)
         }
 
         if (dataFetcherConfiguration.request?.expectSuccess == true) {
             if (!httpResponse.status.isSuccess()) {
-                // TODO: More detailed error message
-                throw DataFetchingException("Response to http request was not successful, but success was expected", null)
+                throw DataFetchingException("The server returned HTTP ${httpResponse.status.value}", ResponseException(httpResponse, ""))
             }
         }
 
@@ -130,7 +132,10 @@ class WebDataFetcher private constructor(
         } else {
             runCatching {
                 httpResponse.body<Res>()
-            }.getOrElse { ex -> throw DataFetchingException("Failed to deserialize response from: $url", ex) }
+            }.getOrElse { ex ->
+                if (ex is CancellationException) throw ex
+                throw DataFetchingException("Failed to deserialize response from: $url", ex)
+            }
         }
 
         val result = WebDataFetchingResult(
@@ -163,8 +168,7 @@ class WebDataFetcher private constructor(
 
         if (dataFetcherConfiguration.request?.expectSuccess == true) {
             if (!httpResponse.status.isSuccess()) {
-                // TODO: More detailed error message
-                throw DataFetchingException("Response to http request was not successful, but success was expected", null)
+                throw DataFetchingException("The server returned HTTP ${httpResponse.status.value}", ResponseException(httpResponse, ""))
             }
         }
 
@@ -196,7 +200,11 @@ class WebDataFetcher private constructor(
     suspend inline fun <reified Req : Any, reified Res : Any> send(urlString: String, req: Req, customRequestConfig: RequestConfiguration? = null) =
         send<Req, Res>(UrlUtils.parseUrl(urlString), req, customRequestConfig)
 
-    suspend fun sendForm(url: String, parameters: Parameters, customRequest: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
+    suspend fun sendForm(url: String, parameters: Parameters, customRequest: HttpRequestBuilder.() -> Unit = {}): HttpResponse =
+        sendForm(url, parameters, dataFetcherConfiguration.request?.expectSuccess == true, customRequest)
+
+    /** Allows a protocol caller to handle the peer's HTTP status itself. URL and request policies still apply. */
+    suspend fun sendForm(url: String, parameters: Parameters, expectSuccess: Boolean, customRequest: HttpRequestBuilder.() -> Unit): HttpResponse {
         dataFetcherConfiguration.url?.requireUrlAllowed(url)
         val requestConfig = dataFetcherConfiguration.request
 
@@ -205,10 +213,9 @@ class WebDataFetcher private constructor(
             customRequest(this)
         }
 
-        if (dataFetcherConfiguration.request?.expectSuccess == true) {
+        if (expectSuccess) {
             if (!httpResponse.status.isSuccess()) {
-                // TODO: More detailed error message
-                throw DataFetchingException("Response to http request was not successful, but success was expected", null)
+                throw DataFetchingException("The server returned HTTP ${httpResponse.status.value}", ResponseException(httpResponse, ""))
             }
         }
 

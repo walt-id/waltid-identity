@@ -530,7 +530,7 @@ class WalletBatchIssuanceTest {
         assertTrue(fixture.store.listCredentials().toList().isEmpty())
     }
 
-    @Test fun invalidCredentialResponsesAreProtocolFailuresAcrossFullFlowEntryPoints() = runTest {
+    @Test fun unreadableAndInvalidCredentialResponsesDoNotWriteOrRepeatDelivery() = runTest {
         for (body in listOf("not-json", """{"credentials":[]}""")) {
             for (entryPoint in listOf("pre-authorized", "authorized", "retained")) {
                 val fixture = batchTestFixture(true)
@@ -543,7 +543,8 @@ class WalletBatchIssuanceTest {
                         val session = service.start(WalletIssuanceSessionRequest(offerJson = batchTestOffer()))
                         val result = assertIs<WalletIssuanceOutcome.Failed>(
                             service.continuePreAuthorized(session.id, credentials = selection))
-                        assertEquals(WalletIssuanceErrorCode.PROTOCOL, result.error.code)
+                        val expected = if (body == "not-json") WalletIssuanceErrorCode.REMOTE_OUTCOME_UNCERTAIN else WalletIssuanceErrorCode.PROTOCOL
+                        assertEquals(expected, result.error.code)
                         assertTrue(result.storedCredentialIds.isEmpty())
                         result.failure
                     }

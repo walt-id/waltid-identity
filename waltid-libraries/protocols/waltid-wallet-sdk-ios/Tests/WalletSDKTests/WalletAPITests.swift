@@ -81,7 +81,7 @@ final class WalletAPITests: XCTestCase {
             XCTFail("Expected typed refusal")
         } catch let error as WalletError {
             XCTAssertEqual(error, .paymentConsent(.missingTranslation, message: "Payment instructions unavailable"))
-            XCTAssertEqual(error.localizedDescription, "Payment instructions unavailable")
+            XCTAssertEqual(error.localizedDescription, "Payment authorization could not be completed.")
         }
     }
 
@@ -132,6 +132,20 @@ final class WalletAPITests: XCTestCase {
                 walletProvider: provider
             )
         )).contains("sentinel"))
+    }
+
+    func testThrownTransportFailuresRemainDistinctAtTheWalletFacade() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+        for expected in [WalletError.network, .timeout, .remoteResponse, .deliveryUncertain, .issuanceOutcomeUncertain] {
+            bridge.error = expected
+            do {
+                _ = try await wallet.credentials()
+                XCTFail("Expected a wallet error")
+            } catch let error as WalletError {
+                XCTAssertEqual(error, expected)
+            }
+        }
     }
 
     func testParsesKotlinInstantTimestampsWithOptionalFractionalSeconds() throws {
@@ -1475,6 +1489,10 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         if let error { throw error }
         authorizationIssuanceCalls.append((authorizationID, callback))
         return issuanceOutcomeResult
+    }
+
+    func retrySigning(sessionID: String) async throws -> IssuanceOutcome {
+        .stored(sessionID: sessionID, credentialIDs: ["signed"])
     }
 
     func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {

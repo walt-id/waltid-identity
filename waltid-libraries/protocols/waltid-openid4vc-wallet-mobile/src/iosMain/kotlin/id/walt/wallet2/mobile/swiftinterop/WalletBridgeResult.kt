@@ -6,50 +6,15 @@ import id.walt.crypto2.keys.KeyUseAuthorizationException
 import id.walt.crypto2.keys.KeyUseAuthorizationFailure
 import id.walt.wallet2.consent.PaymentConsentException
 import id.walt.wallet2.consent.PaymentConsentFailure
-import id.walt.wallet2.handlers.PresentationReviewChangedException
-import id.walt.wallet2.handlers.PreviewSessionException
 import id.walt.wallet2.mobile.presentation.PresentationErrorCode
 import id.walt.wallet2.mobile.presentation.toPresentationErrorCode
-import id.walt.wallet2.mobile.WalletStorageInUseException
-import id.walt.wallet2.persistence.encryption.WalletPersistenceException
-import id.walt.wallet2.status.CredentialStatusReviewChangedException
+import id.walt.wallet2.mobile.WalletFailure
 import id.waltid.openid4vp.wallet.UnsafePresentationErrorResponseException
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
-/**
- * Coarse error category for Swift bridge failures.
- */
-@Serializable
-public enum class WalletBridgeErrorCategory {
-    /** Input supplied by the caller is invalid. */
-    invalidInput,
-
-    /** Request validation failed and its error response could not be sent safely. */
-    presentationValidation,
-
-    /** Wallet storage access failed. */
-    storage,
-
-    /** The operation was cancelled. */
-    cancelled,
-
-    /** Key-use authorization was unavailable or was not completed. */
-    authorization,
-
-    /** A payment could not be reviewed or authorized. */
-    paymentConsent,
-
-    /** Unexpected wallet failure that does not fit a narrower category. */
-    internalFailure,
-
-    /** The local semantic status warning changed after host review. */
-    credentialStatusReviewChanged,
-
-    /** A previously reviewed request, credential or holder has changed. */
-    presentationReviewChanged,
-}
+/** Kotlin source alias for the shared mobile failure classification. */
+public typealias WalletBridgeErrorCategory = WalletFailure
 
 /**
  * An OpenID4VP validation error retained locally because remote reporting was unsafe.
@@ -99,19 +64,7 @@ public class WalletBridgeError internal constructor(
             val authorizationFailure = (throwable as? KeyUseAuthorizationException)?.failure
             val paymentFailure = (throwable as? PaymentConsentException)?.reason
             val presentationFailure = throwable as? UnsafePresentationErrorResponseException
-            val category = when {
-                presentationFailure != null -> WalletBridgeErrorCategory.presentationValidation
-                throwable is PresentationReviewChangedException -> WalletBridgeErrorCategory.presentationReviewChanged
-                throwable is CredentialStatusReviewChangedException -> WalletBridgeErrorCategory.credentialStatusReviewChanged
-                paymentFailure != null -> WalletBridgeErrorCategory.paymentConsent
-                authorizationFailure != null -> WalletBridgeErrorCategory.authorization
-                throwable is CancellationException -> WalletBridgeErrorCategory.cancelled
-                throwable is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
-                throwable is PreviewSessionException -> WalletBridgeErrorCategory.invalidInput
-                throwable is WalletPersistenceException || throwable is WalletStorageInUseException -> WalletBridgeErrorCategory.storage
-                else -> WalletBridgeErrorCategory.internalFailure
-            }
-
+            val category = WalletFailure.classify(throwable)
             return WalletBridgeError(
                 category = category,
                 message = throwable.message ?: throwable::class.simpleName ?: "Unknown wallet error",

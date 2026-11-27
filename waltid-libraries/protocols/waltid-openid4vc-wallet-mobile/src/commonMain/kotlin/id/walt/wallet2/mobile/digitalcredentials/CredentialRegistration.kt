@@ -28,7 +28,7 @@ internal class CredentialRegistration(
             else wallet.registryRecords(preferredLocales, registrationProjection)
         } catch (failure: Exception) {
             if (failure is CancellationException) throw failure
-            lastRegistrationResult.value = CredentialRegistrationResult.Unavailable(failure.message ?: failure::class.simpleName ?: "Credential registration failed")
+            lastRegistrationResult.value = CredentialRegistrationResult.Unavailable("Could not read credentials for registration.")
             throw failure
         }
         currentCoroutineContext().ensureActive()
@@ -36,7 +36,7 @@ internal class CredentialRegistration(
             credentialRegistry.replace(registryId = digitalCredentialRegistryId(), records = records)
         }.getOrElse { failure ->
             if (failure is CancellationException) throw failure
-            CredentialRegistrationResult.Unavailable(failure.message ?: failure::class.simpleName ?: "Credential registration failed")
+            CredentialRegistrationResult.Unavailable("The platform could not register the stored credentials.")
         }
         // A completed presentation replacement remains observable if creation is cancelled.
         lastRegistrationResult.value = presentationResult

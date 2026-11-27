@@ -28,6 +28,19 @@ public enum WalletError: Error, Equatable, Sendable {
     /// The operation was cancelled.
     case cancelled
 
+    /// A transport deadline expired before a result was available.
+    case timeout
+    /// A remote service could not be reached.
+    case network
+    /// A remote service returned an HTTP error response.
+    case remoteResponse
+    /// The requested cryptographic operation failed.
+    case crypto
+    /// Another owner holds this issuance claim or the issuer outcome is unknown.
+    case issuanceOutcomeUncertain
+    /// A sent protocol response may have reached the verifier.
+    case deliveryUncertain
+
     /// The SDK encountered an unexpected internal failure.
     case internalFailure(String)
 }
@@ -60,14 +73,17 @@ extension WalletError: LocalizedError {
     /// A localized, user-readable description of the wallet error.
     public var errorDescription: String? {
         switch self {
-        case .invalidInput(let message),
-             .storage(let message),
-             .internalFailure(let message):
-            return message
-        case .presentationValidation(let code, let message, let responseSafetyFailure):
-            return "\(code.errorCode): \(message). Error response was not sent: \(responseSafetyFailure)"
-        case .paymentConsent(_, let message):
-            return message
+        case .invalidInput: return "The wallet request is invalid or has expired."
+        case .storage: return "Wallet storage is unavailable."
+        case .internalFailure: return "The wallet operation could not be completed."
+        case .presentationValidation: return "The request is invalid and the wallet cannot safely report it to the verifier."
+        case .paymentConsent: return "Payment authorization could not be completed."
+        case .timeout: return "The wallet service did not respond in time."
+        case .network: return "The wallet service could not be reached."
+        case .remoteResponse: return "The remote service returned an error."
+        case .crypto: return "The requested cryptographic operation failed."
+        case .issuanceOutcomeUncertain: return "Issuance is already in progress or its outcome is unknown. Check its status."
+        case .deliveryUncertain: return "Delivery could not be confirmed. Check the verifier transaction before sharing again."
         case .keyUseAuthorization(let failure):
             return "Wallet key authorization failed: \(failure)"
         case .presentationReviewChanged:

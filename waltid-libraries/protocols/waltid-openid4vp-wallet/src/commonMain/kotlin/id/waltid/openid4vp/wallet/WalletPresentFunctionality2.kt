@@ -38,6 +38,7 @@ import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.ssrf.BlockedAddressException
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.isLegacyPresentationDefinitionRequest
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.legacyFallbackResult
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.resolveAndValidateAuthorizationRequest
@@ -48,6 +49,8 @@ import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.statement.*
+import io.ktor.client.plugins.expectSuccess
+import io.ktor.client.plugins.retry
 import io.ktor.http.*
 import io.ktor.util.*
 import kotlinx.coroutines.CancellationException
@@ -177,7 +180,6 @@ object WalletPresentFunctionality2 {
         val holderBindingAudience = dcApiOrigin?.let { "origin:$it" }
 
         for ((queryId, matchedCredsWithClaimsList) in matchedData) {
-            log.trace { "Query ID: $queryId, matched credentials: $matchedCredsWithClaimsList" }
             val presentationsForThisQueryId = buildJsonArray {
                 for (matchResult in matchedCredsWithClaimsList) {
                     val digitalCredential = matchResult.originalDigitalCredential()
@@ -261,7 +263,6 @@ object WalletPresentFunctionality2 {
             log.warn { "No presentations generated for any query ID. Returning empty vp_token object." }
         }
 
-        log.trace { "Generated VP Token Map Contents: $vpTokenMapContents" }
         requireCurrentPayment()
         return Json.encodeToString(JsonObject(vpTokenMapContents))
     }
@@ -430,12 +431,34 @@ object WalletPresentFunctionality2 {
                 character.code in 0x23..0x5B ||
                 character.code in 0x5D..0x7E
 
-    private suspend fun postFormResponse(
+    internal suspend fun postFormResponse(
         responseUri: String,
         parameters: Parameters,
+        transport: WebDataFetcher = webPostToken,
     ): WalletPresentResult {
-        val response = webPostToken.sendForm(responseUri, parameters)
-        return directPostResult(response.status.isSuccess(), response.bodyAsText())
+        var requestConfigured = false
+        val response = try {
+            transport.sendForm(responseUri, parameters, expectSuccess = false) {
+                expectSuccess = false
+                retry { noRetry() }
+                requestConfigured = true
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            if (!requestConfigured || error is BlockedAddressException) throw error
+            throw PresentationDeliveryUncertainException(error)
+        }
+        val accepted = response.status.isSuccess()
+        val body = try {
+            response.bodyAsText()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            if (accepted) throw PresentationDeliveryUncertainException(error)
+            ""
+        }
+        return directPostResult(accepted, body)
     }
 
     internal fun directPostResult(success: Boolean, responseBody: String): WalletPresentResult {
@@ -1384,7 +1407,6 @@ object WalletPresentFunctionality2 {
         credentialHolderKeyResolver: CredentialPresentationKeyResolver?,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
-        log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
 
         // Step 1: Resolve AuthorizationRequest. The strict resolver is always the primary path; the
         // legacy fallback is only reached from inside it, after resolution has failed.
@@ -1412,7 +1434,6 @@ object WalletPresentFunctionality2 {
         }
         val authorizationRequest = resolvedRequest.authorizationRequest.also(::validateAuthorizationRequest)
 
-        log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
 
         val validation = PresentationRequestValidator.validate(
             resolvedRequest = resolvedRequest,
@@ -1446,7 +1467,7 @@ object WalletPresentFunctionality2 {
         val query = requireNotNull(authorizationRequest.dcqlQuery)
         val credentials = selectCredentialsForQuery(query)
         val afterSelection = walletPhaseStart.elapsedNow()
-        log.trace { "Auto-selected credential count: ${credentials.mapValues { it.value.count() }}" }
+        log.trace { "Auto-selected credential count: ${credentials.values.sumOf { it.size }}" }
         val availabilityError = PresentationRequestValidator.validateTransactionDataCredentialAvailability(
             transactionData = validatedTransactionData,
             availableCredentialQueryIds = credentials.filterValues { it.isNotEmpty() }.keys,
@@ -1584,7 +1605,6 @@ object WalletPresentFunctionality2 {
         scaContext: ScaKeyBindingContext?,
     ): String {
         selectedDisclosures.map { it.asEncoded() }
-        log.trace { "Creating KB+JWT for disclosures: $selectedDisclosures" }
         // Per RFC 9901 §4.3.1, sd_hash is computed over:
         // <Issuer-signed JWT>~<Disclosure 1>~...~<Disclosure N>~
         // The trailing ~ is always required, even when there are no disclosures.
@@ -1596,7 +1616,6 @@ object WalletPresentFunctionality2 {
             disclosed // disclose() already produces "issuer_jwt~" for zero disclosures
         }
 
-        log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
         val issuerClaims = SDJwt.parse(disclosed).undisclosedPayload
         val sdAlgorithm = issuerClaims["_sd_alg"]?.jsonPrimitive?.contentOrNull
             ?: "sha-256"
