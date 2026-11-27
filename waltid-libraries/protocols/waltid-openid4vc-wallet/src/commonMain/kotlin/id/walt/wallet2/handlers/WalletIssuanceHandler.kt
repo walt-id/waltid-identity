@@ -11,7 +11,6 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.did.dids.DidService
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders.CLIENT_ATTESTATION_CHALLENGE
-import id.walt.openid4vci.errors.CredentialError
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.KeyAttestationsRequired
@@ -20,7 +19,6 @@ import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.proofs.Proofs
 import id.walt.openid4vci.requests.notification.NotificationEvent
-import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.WalletIssuanceHandler.exchangeCode
 import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
@@ -34,21 +32,12 @@ import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
 import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
 import id.waltid.openid4vci.wallet.clientauth.ClientAssertionBuilder
 import id.waltid.openid4vci.wallet.credential.CredentialEncryption
-import id.waltid.openid4vci.wallet.credential.CredentialIssuanceTarget
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
-import id.waltid.openid4vci.wallet.credential.PreparedCredentialRequest
-import id.waltid.openid4vci.wallet.credential.acceptCredentialResponse
-import id.waltid.openid4vci.wallet.credential.isApplicationJwt
-import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
-import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
-import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
-import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.metadata.ResolvedAuthorizationServerMetadata
-import id.waltid.openid4vci.wallet.nonce.NonceRequestBuilder
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
@@ -85,32 +74,6 @@ fun CredentialOfferSource.checkOfferSource() {
     check(offerUrl == null || offerJson == null) { "Only one of offerUrl or offerJson may be provided, not both" }
 }
 
-// ---------------------------------------------------------------------------
-// Request / response types
-// ---------------------------------------------------------------------------
-
-// Isolated step types
-
-// Deferred issuance types
-
-// Draft-15 §9.3: preserve the released polling contract, including its default interval.
-internal fun CredentialResponse.validateLegacyDeferredPendingResponse(transactionId: String): CredentialResponse =
-    copy(transactionId = this.transactionId ?: transactionId, interval = interval ?: 5)
-        .validateCredentialResponse(HttpStatusCode.Accepted.value, transactionId)
-
-// Auth-code grant isolated steps
-
-// ---------------------------------------------------------------------------
-// Handler
-// ---------------------------------------------------------------------------
-
-/**
- * OpenID4VCI 1.0 credential issuance logic.
- *
- * Orchestrates the wallet-side steps using waltid-openid4vci-wallet primitives.
- * Returns a [Flow] of [StoredCredential] for the full flow so callers can
- * react to each credential as it arrives (useful for streaming UIs).
- */
 internal fun attestationAssemblerForTokenMethods(
     methods: Set<String>?,
     attestationAssembler: ClientAttestationAssembler?,
@@ -127,13 +90,17 @@ internal fun attestationAssemblerForTokenMethods(
     return null
 }
 
+/**
+ * OpenID4VCI 1.0 credential issuance logic.
+ *
+ * Orchestrates the wallet-side steps using waltid-openid4vci-wallet primitives.
+ * Returns a [Flow] of [StoredCredential] for the full flow so callers can
+ * react to each credential as it arrives (useful for streaming UIs).
+ */
 object WalletIssuanceHandler {
     private val crypto2Runtime = CryptoRuntime(defaultSoftwareKeyProviders())
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
     private val previewedOffers = PreviewSessionStore<ResolvedIssuanceOffer>(sessionName = "Issuance")
-
-    /** Existing redirect handling for credential endpoint POSTs; nonce requests never use this path. */
-    private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
 
     /**
      * Shared [HttpClient] for all issuance step functions. Lazily initialized on first use.
@@ -871,165 +838,6 @@ object WalletIssuanceHandler {
         )
     }
 
-    internal data class CredentialEndpointExchange(
-        val response: CredentialResponse,
-        val responseDecryptionKey: Crypto2Key? = null,
-    )
-
-    private suspend fun requestCredential(
-        request: FetchCredentialRequest,
-        httpClient: HttpClient,
-        dpop: DpopRequestContext? = null,
-        issuerMetadata: CredentialIssuerMetadata? = null,
-        onStage: (CredentialIssuanceStage) -> Unit = {},
-    ): CredentialEndpointExchange {
-        val credentialRequestJson = CredentialRequestBuilder.build(
-            CredentialIssuanceTarget(request.credentialConfigurationId, request.credentialIdentifier), request.effectiveProofs?.jwt)
-        val prepared = CredentialEncryption.prepare(credentialRequestJson, issuerMetadata)
-        val response = requestCredentialResponse(request.credentialEndpoint.toString(), request.accessToken,
-            credentialRequestJson, httpClient, dpop, prepared = prepared, onStage = onStage)
-        return CredentialEndpointExchange(response, prepared.responseDecryptionKey)
-    }
-
-    private suspend fun requestCredentialResponse(
-        endpoint: String,
-        accessToken: String,
-        body: JsonObject,
-        httpClient: HttpClient,
-        dpop: DpopRequestContext?,
-        expectedTransactionId: String? = null,
-        prepared: PreparedCredentialRequest? = null,
-        responseDecryptionKey: Crypto2Key? = prepared?.responseDecryptionKey,
-        onStage: (CredentialIssuanceStage) -> Unit = {},
-    ): CredentialResponse {
-        val scheme = if (dpop != null) "DPoP" else "Bearer"
-        var dpopNonce: String? = dpop?.nonce
-        val outboundBody = prepared?.body ?: body.toString()
-        val outboundType = prepared?.contentType ?: ContentType.Application.Json
-
-        repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
-            val proof = dpop?.let {
-                onStage(CredentialIssuanceStage.PROOF)
-                buildDpopProof(
-                    keyMaterial = it.keyMaterial,
-                    algorithms = it.algorithms,
-                    endpoint = endpoint,
-                    accessToken = accessToken,
-                    nonce = dpopNonce,
-                )
-            }
-            onStage(CredentialIssuanceStage.REQUEST)
-            val response = postFollowingRedirects(httpClient, endpoint) {
-                header(HttpHeaders.Authorization, "$scheme ${accessToken}")
-                proof?.let { header(DPOP_HEADER, it) }
-                contentType(outboundType)
-                if (outboundType.isApplicationJwt()) acceptCredentialResponse()
-                setBody(outboundBody)
-            }
-            dpop?.nonce = response.headers[DPOP_NONCE_HEADER] ?: dpopNonce
-            if (response.status.isSuccess()) {
-                onStage(CredentialIssuanceStage.RESPONSE)
-                val credentialResponse = responseDecryptionKey?.let { responseKey ->
-                    require(response.contentType().isApplicationJwt()) {
-                        "Encrypted credential response must use application/jwt"
-                    }
-                    lenientJson.decodeFromString<CredentialResponse>(
-                        CredentialEncryption.decryptResponse(response.bodyAsText(), responseKey),
-                    )
-                } ?: response.body<CredentialResponse>()
-                return credentialResponse.validateCredentialResponse(response.status.value, expectedTransactionId)
-            }
-
-            // Read the DPoP signals before the body: oauthErrorCode() consumes it.
-            val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
-            val oauthError = response.oauthErrorCode()
-            if (
-                attempt == 0 &&
-                proof != null &&
-                oauthError == USE_DPOP_NONCE &&
-                !suppliedNonce.isNullOrBlank()
-            ) {
-                log.debug { "Credential endpoint demanded a DPoP nonce; retrying once with it" }
-                dpopNonce = suppliedNonce
-                return@repeat
-            }
-
-            // Retain draft-15 §9.3 pending responses accepted by the released polling API.
-            if (expectedTransactionId != null && response.status == HttpStatusCode.BadRequest && oauthError == "issuance_pending") {
-                onStage(CredentialIssuanceStage.RESPONSE)
-                return lenientJson.decodeFromString<CredentialResponse>(response.bodyAsText())
-                    .validateLegacyDeferredPendingResponse(expectedTransactionId)
-            }
-
-            // try-catch rather than runCatching: the body read suspends, and runCatching would
-            // swallow CancellationException.
-            val credentialError = try {
-                lenientJson.decodeFromString<CredentialError>(response.bodyAsText())
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Exception) {
-                null
-            }
-            throw CredentialEndpointException(
-                statusCode = response.status.value,
-                credentialError = credentialError,
-            )
-        }
-        error("DPoP nonce retry exhausted for the credential endpoint")
-    }
-
-    /**
-     * Fetches a credential with a freshly generated proof, retrying once only when the issuer
-     * explicitly rejects that proof with the OID4VCI `invalid_nonce` error.
-     *
-     * Isolated fetch callers deliberately do not use this helper: they own the separate
-     * request-nonce and sign-proof steps and therefore must handle [CredentialEndpointException]
-     * themselves.
-     */
-    internal suspend fun requestCredentialWithNonceRetry(
-        request: FetchCredentialRequest,
-        nonceEndpoint: String?,
-        httpClient: HttpClient,
-        buildProof: (suspend (String?) -> Proofs?)?,
-        onProofGenerated: suspend () -> Unit = {},
-        dpop: DpopRequestContext? = null,
-        issuerMetadata: CredentialIssuerMetadata? = null,
-        onStage: (CredentialIssuanceStage) -> Unit = {},
-    ): CredentialResponse = exchangeCredentialWithNonceRetry(
-        request, nonceEndpoint, httpClient, buildProof, onProofGenerated, dpop, issuerMetadata, onStage,
-    ).response
-
-    internal suspend fun exchangeCredentialWithNonceRetry(
-        request: FetchCredentialRequest,
-        nonceEndpoint: String?,
-        httpClient: HttpClient,
-        buildProof: (suspend (String?) -> Proofs?)?,
-        onProofGenerated: suspend () -> Unit = {},
-        dpop: DpopRequestContext? = null,
-        issuerMetadata: CredentialIssuerMetadata? = null,
-        onStage: (CredentialIssuanceStage) -> Unit = {},
-    ): CredentialEndpointExchange {
-        suspend fun fetchWithFreshProof(): CredentialEndpointExchange {
-            val proofs = buildProof?.let {
-                val nonce = requestProofNonce(httpClient, nonceEndpoint)
-                onStage(CredentialIssuanceStage.PROOF)
-                it(nonce)
-            }
-            onProofGenerated()
-            return requestCredential(request.copy(proofs = proofs), httpClient, dpop, issuerMetadata, onStage)
-        }
-
-        return try {
-            fetchWithFreshProof()
-        } catch (error: CredentialEndpointException) {
-            if (!error.isInvalidNonce || buildProof == null || nonceEndpoint == null) {
-                throw error
-            }
-            log.info { "Credential issuer rejected the proof nonce; obtaining a fresh nonce and retrying once" }
-            fetchWithFreshProof()
-        }
-    }
-
     /**
      * Fetches credentials and applies [FetchCredentialRequest.storeInWallet] consistently for
      * every server adapter. Use the stateless overload when no wallet is available.
@@ -1406,40 +1214,6 @@ object WalletIssuanceHandler {
         val metadataResolver = IssuerMetadataResolver(httpClient)
         val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(credentialIssuerBaseUrl).metadata
         return metadataResolver.resolveIssuanceGrant(null, issuerMetadata).server
-    }
-
-    private suspend fun postFollowingRedirects(
-        httpClient: HttpClient,
-        url: String,
-        block: HttpRequestBuilder.() -> Unit
-    ): HttpResponse {
-        var response = httpClient.post(url, block)
-        if (response.status.value in REDIRECT_STATUS_CODES) {
-            val location = response.headers[HttpHeaders.Location]
-            if (location != null) {
-                log.debug { "Following redirect to: $location" }
-                check(isSameOrigin(url, location)) {
-                    "Cross-origin redirect from $url to $location is not supported for wallet POST requests"
-                }
-                response = httpClient.post(location, block)
-            }
-        }
-        return response
-    }
-
-    private suspend fun requestProofNonce(
-        httpClient: HttpClient,
-        nonceEndpoint: String?,
-    ): String? = nonceEndpoint?.let {
-        NonceRequestBuilder(httpClient).requestNonce(it).cNonce
-    }
-
-    private fun isSameOrigin(source: String, target: String): Boolean {
-        val sourceUrl = Url(source)
-        val targetUrl = Url(target)
-        return sourceUrl.protocol == targetUrl.protocol &&
-                sourceUrl.host == targetUrl.host &&
-                sourceUrl.port == targetUrl.port
     }
 
     // ---------------------------------------------------------------------------
@@ -1823,10 +1597,13 @@ object WalletIssuanceHandler {
             IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(it).metadata
         }
         val preparedRequest = CredentialEncryption.prepare(deferredRequest, issuerMetadata)
-        val credentialResponse = requestCredentialResponse(
-            request.deferredCredentialEndpoint.toString(), request.accessToken,
-            deferredRequest, httpClient, dpop, request.transactionId,
-            prepared = preparedRequest)
+        val credentialResponse = httpClient.requestCredentialResponse(
+            endpoint = request.deferredCredentialEndpoint.toString(),
+            accessToken = request.accessToken,
+            prepared = preparedRequest,
+            dpop = dpop,
+            expectedTransactionId = request.transactionId,
+        )
         if (credentialResponse.transactionId != null) {
             onPending(DeferredCredentialPending(request.transactionId, requireNotNull(credentialResponse.interval)))
             onEvent.emitSafely(WalletSessionEvent.issuance_deferred)
