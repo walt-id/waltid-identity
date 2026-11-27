@@ -16,6 +16,7 @@ import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
@@ -461,11 +462,23 @@ public class SigningIdentityManager internal constructor(
         }
     }
 
-    private fun requirements(storage: SigningIdentityKeyStorage, authorization: KeyUseAuthorizationPolicy = this.authorization,
-        attestation: SigningIdentityAttestationRequest = SigningIdentityAttestationRequest.None): WalletKeyRequirements = WalletKeyRequirements(
-        spec = identitySpec, usages = identityUsages, authorizationPolicy = authorization,
-        protection = if (storage == SigningIdentityKeyStorage.HardwareBacked) WalletKeyProtection.HardwareRequired else WalletKeyProtection.NativeStorage,
-        platform = configuration.platform,
+    private fun requirements(
+        storage: SigningIdentityKeyStorage,
+        authorization: KeyUseAuthorizationPolicy = this.authorization,
+        attestation: SigningIdentityAttestationRequest = SigningIdentityAttestationRequest.None,
+    ): WalletKeyRequirements = WalletKeyRequirements(
+        spec = identitySpec,
+        usages = identityUsages,
+        authorizationPolicy = authorization,
+        protection = when (storage) {
+            SigningIdentityKeyStorage.HardwareBacked -> WalletKeyProtection.HardwareRequired
+            SigningIdentityKeyStorage.NativeStorage -> WalletKeyProtection.NativeStorage
+            SigningIdentityKeyStorage.EncryptedDatabase -> WalletKeyProtection.PlatformDefault
+        },
+        platform = when (storage) {
+            SigningIdentityKeyStorage.EncryptedDatabase -> PlatformKeyConfiguration.Default
+            else -> configuration.platform
+        },
         attestationChallenge = (attestation as? SigningIdentityAttestationRequest.Native)?.challenge,
     )
 

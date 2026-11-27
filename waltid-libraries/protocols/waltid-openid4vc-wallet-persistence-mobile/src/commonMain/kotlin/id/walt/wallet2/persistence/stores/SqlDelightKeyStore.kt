@@ -1,15 +1,21 @@
 package id.walt.wallet2.persistence.stores
 
-import id.walt.crypto2.keys.Key as StoredKeyMaterial
 import id.walt.crypto.keys.Key
 import id.walt.crypto2.CryptoRuntime
+import id.walt.crypto2.keys.KeyEncodingFormat
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.crypto2.keys.ManagedKey
+import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.keys.toAuthorizationFailure
 import id.walt.crypto2.keys.toPublicJwk
-import id.walt.crypto2.keys.KeyEncodingFormat
 import id.walt.crypto2.providers.CryptoOperation
 import id.walt.crypto2.providers.CryptoRequirement
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
@@ -18,25 +24,21 @@ import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletKeyStoreEntry
-import id.walt.wallet2.data.WalletPublicKeyMaterial
 import id.walt.wallet2.data.WalletKeyUsageUnsupportedException
+import id.walt.wallet2.data.WalletPublicKeyMaterial
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
-import id.walt.wallet2.persistence.keys.PolicyAwareWalletKeyStore
-import id.walt.crypto2.keys.KeyUseAuthorizationException
-import id.walt.crypto2.keys.KeyUseAuthorizationFailure
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
-import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
-import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
-import id.walt.wallet2.persistence.keys.WalletKeyRequirements
-import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
-import id.walt.crypto2.keys.toAuthorizationFailure
+import id.walt.wallet2.persistence.keys.PolicyAwareWalletKeyStore
+import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
+import id.walt.wallet2.persistence.keys.WalletKeyProtection
+import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlin.time.Clock
+import id.walt.crypto2.keys.Key as StoredKeyMaterial
 
 /**
  * Wallet key store backed by SQLDelight.
@@ -50,8 +52,6 @@ public class SqlDelightKeyStore(
     private val queries: WalletPersistenceQueries,
     private val identityWalletId: String = "default",
 ) : PolicyAwareWalletKeyStore {
-    private val softwareRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
-
     /** Legacy key material is not supported by the mobile store. */
     override suspend fun getKey(keyId: String): Key? = null
 
@@ -105,7 +105,7 @@ public class SqlDelightKeyStore(
         managedKeyProvider.preflight(requirements).let { managedSupport ->
             if (managedSupport is KeyUseAuthorizationSupport.Supported) {
                 managedSupport
-            } else if (!requirements.permitsSoftwareFallback()) {
+            } else if (!requirements.permitsSoftwareStorage()) {
                 managedSupport
             } else if (supportsSoftware(requirements)) {
                 KeyUseAuthorizationSupport.Supported(requirements.authorizationPolicy)
@@ -127,10 +127,10 @@ public class SqlDelightKeyStore(
                 managedKeyProvider.generateManagedKey(request)
 
             is KeyUseAuthorizationSupport.Unsupported -> {
-                if (!request.requirements.permitsSoftwareFallback()) {
+                if (!request.requirements.permitsSoftwareStorage()) {
                     throw KeyUseAuthorizationException(
                         failure = managedSupport.reason.toAuthorizationFailure(),
-                        message = "The platform cannot enforce ${request.requirements.authorizationPolicy} for ${request.requirements.spec}",
+                        message = "The platform cannot satisfy the signing-key requirements for ${request.requirements.spec}",
                     )
                 }
                 if (!supportsSoftware(request.requirements)) {
@@ -163,10 +163,10 @@ public class SqlDelightKeyStore(
         return key
     }
 
-    /** Creates software material only when no native authorization requirement is selected. */
+    /** Creates a software key only when the request can be fulfilled without native protection or attestation. */
     public suspend fun generateSoftwareKey(request: WalletKeyCreationRequest): StoredKeyMaterial {
-        require(request.requirements.authorizationPolicy == KeyUseAuthorizationPolicy.None) {
-            "Software storage cannot enforce native key-use authorization"
+        require(request.requirements.permitsSoftwareStorage()) {
+            "Software storage cannot satisfy the requested native key requirements"
         }
         return softwareRuntime.generateSoftwareKey(GenerateSoftwareKeyRequest(
             request.id, request.requirements.spec, request.requirements.usages,
@@ -191,22 +191,6 @@ public class SqlDelightKeyStore(
     /** Keeps issuance/presentation key resolution on the same active identity as default-key lookup. */
     override suspend fun getDefaultKeyMaterial(usages: Set<KeyUsage>): WalletKeyStoreEntry? =
         getDefaultCrypto2Key(usages)?.let { WalletKeyStoreEntry(it.id.value, null, it) }
-
-    private fun WalletKeyRequirements.permitsSoftwareFallback(): Boolean =
-        authorizationPolicy == KeyUseAuthorizationPolicy.None &&
-            protection == id.walt.wallet2.persistence.keys.WalletKeyProtection.PlatformDefault &&
-            platform == id.walt.crypto2.keys.PlatformKeyConfiguration.Default
-
-    private fun supportsSoftware(requirements: WalletKeyRequirements): Boolean = runCatching {
-        softwareRuntime.resolveSoftwareProvider(
-            CryptoRequirement(
-                operation = CryptoOperation.GENERATE_KEY,
-                spec = requirements.spec,
-                usages = requirements.usages,
-                keyEncoding = KeyEncodingFormat.JWK,
-            )
-        )
-    }.isSuccess
 
     /** Persists a versioned descriptor without exporting it through the legacy key API. */
     override suspend fun addCrypto2Key(key: StoredKeyMaterial): String {
@@ -235,6 +219,25 @@ public class SqlDelightKeyStore(
         queries.deleteByKeyId(keyId)
         return true
     }
+
+    private val softwareRuntime = CryptoRuntime(defaultSoftwareKeyProviders())
+
+    private fun WalletKeyRequirements.permitsSoftwareStorage(): Boolean =
+        authorizationPolicy == KeyUseAuthorizationPolicy.None &&
+            protection == WalletKeyProtection.PlatformDefault &&
+            platform == PlatformKeyConfiguration.Default &&
+            attestationChallenge == null
+
+    private fun supportsSoftware(requirements: WalletKeyRequirements): Boolean = runCatching {
+        softwareRuntime.resolveSoftwareProvider(
+            CryptoRequirement(
+                operation = CryptoOperation.GENERATE_KEY,
+                spec = requirements.spec,
+                usages = requirements.usages,
+                keyEncoding = KeyEncodingFormat.JWK,
+            )
+        )
+    }.isSuccess
 
     private fun decodeStoredKey(keyId: String, serialized: String): StoredKey = try {
         StoredKeyCodec.decodeFromString(serialized).also { stored ->

@@ -9,7 +9,15 @@ import id.walt.crypto2.keys.KeyCapabilities
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
+import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.crypto2.keys.ManagedKey
+import id.walt.crypto2.keys.PlatformKeyConfiguration
 import id.walt.crypto2.keys.ProviderId
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
@@ -17,17 +25,11 @@ import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
-import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
-import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
-import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
-import id.walt.crypto2.keys.KeyUseAuthorizationException
-import id.walt.crypto2.keys.KeyUseAuthorizationFailure
-import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
-import id.walt.wallet2.persistence.keys.WalletKeyRequirements
-import id.walt.crypto2.keys.KeyUseAuthorizationSupport
-import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
+import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
+import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
+import id.walt.wallet2.persistence.keys.WalletKeyProtection
+import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -167,6 +169,30 @@ class SqlDelightKeyStoreRestartTest {
             val signature = assertNotNull(restored.capabilities.signer).sign(message, algorithm)
             assertTrue(assertNotNull(restored.capabilities.verifier).verify(message, signature, algorithm))
             assertEquals(key.id, restored.id)
+        }
+    }
+
+    @Test
+    fun `software keys cannot fulfill native key requirements`() = runTest {
+        database().use { database ->
+            val unavailable = KeyUseAuthorizationSupport.Unsupported(KeyUseAuthorizationUnsupportedReason.UnsupportedCombination)
+            val store = SqlDelightKeyStore(FakePlatformManagedKeyProvider(preflightResult = unavailable), database.queries)
+            val base = WalletKeyRequirements(KeySpec.Ec(EcCurve.P256), KEY_USAGES)
+            val nativeRequirements = listOf(
+                base.copy(attestationChallenge = BinaryData(byteArrayOf(1))),
+                base.copy(protection = WalletKeyProtection.HardwareRequired),
+                base.copy(protection = WalletKeyProtection.NativeStorage),
+                base.copy(protection = WalletKeyProtection.HardwarePreferred),
+                base.copy(authorizationPolicy = KeyUseAuthorizationPolicy.BiometricCurrentSet),
+                base.copy(platform = PlatformKeyConfiguration.AndroidKeystore(unlockedDeviceRequired = true)),
+            )
+            for (requirements in nativeRequirements) {
+                val request = WalletKeyCreationRequest(KeyId("native-only"), requirements)
+                assertEquals(unavailable, store.preflight(requirements))
+                assertFailsWith<KeyUseAuthorizationException> { store.generateKey(request) }
+                assertFailsWith<IllegalArgumentException> { store.generateSoftwareKey(request) }
+                assertNull(database.queries.selectByKeyId(request.id.value).executeAsOneOrNull())
+            }
         }
     }
 
