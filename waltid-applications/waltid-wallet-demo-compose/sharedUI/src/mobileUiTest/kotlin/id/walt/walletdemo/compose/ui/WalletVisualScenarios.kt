@@ -16,6 +16,7 @@ import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import id.walt.walletdemo.compose.ui.components.WalletControlsPreview
 import id.walt.walletdemo.compose.ui.components.WalletHeaderButton
 import id.walt.walletdemo.compose.ui.components.title
+import id.walt.walletdemo.compose.logic.CredentialContent
 import id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.DemoBiometricKind
 import id.walt.walletdemo.compose.logic.DemoBiometricResult
@@ -666,8 +667,13 @@ internal class WalletVisualScenarios(
         val ready = WalletVisualFixtures.partialResult.session as WalletSessionState.Ready
         val operationMessage = "Wallet operation completed"
         val other = notice?.let {
-            ready.credentials.single().copy(id = "queued-credential", format = "jwt_vc_json", label = "Access card",
-                metadataJson = null, credentialDataJson = """{"given_name":"Ada"}""")
+            ready.credentials.single().copy(
+                id = "queued-credential",
+                format = "jwt_vc_json",
+                label = "Access card",
+                content = CredentialContent.Full("""{"given_name":"Ada"}"""),
+                metadataJson = null,
+            )
         }
         val pending = listOfNotNull(notice, other?.let {
             WalletDemoCredentialStatusNotice(it.id, "suspended-v1", "SUSPENDED", "2026-11-20T12:01:00Z", false)
