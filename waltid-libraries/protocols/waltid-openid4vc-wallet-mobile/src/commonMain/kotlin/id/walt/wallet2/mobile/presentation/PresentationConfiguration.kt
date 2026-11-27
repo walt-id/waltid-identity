@@ -10,7 +10,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * Rules for authenticating OpenID4VP verifiers and interpreting transaction data during consent.
- * Collection inputs are captured on construction. The supplied X.509 trust store remains host-owned.
+ * Collection inputs are captured on construction. The host supplies the X.509 trust store and optional registry evaluator.
  * To replace a transaction profile, supply a new section with one entry for its type.
  */
 public class PresentationConfiguration(
@@ -18,16 +18,16 @@ public class PresentationConfiguration(
     transactionDataProfiles: List<TransactionDataProfile> = emptyList(),
     paymentCredentialIssuers: List<PaymentCredentialIssuer> = emptyList(),
 ) {
-    /** Wallet-owned client metadata and the host's verifier trust anchors. */
+    /** Wallet-owned client metadata and the host's verifier trust sources. */
     public val verifierTrust: ClientIdTrustConfiguration
-        get() = ClientIdTrustConfiguration(
-            x509TrustAnchors = anchors,
-            trustedVerifierAttestationIssuers = attestationIssuers,
+        get() = capturedTrust.copy(
             preRegisteredClients = registeredMetadata.mapValues { (_, metadata) -> Json.decodeFromString(metadata) },
         )
 
-    private val anchors = verifierTrust.x509TrustAnchors
-    private val attestationIssuers = buildSet { addAll(verifierTrust.trustedVerifierAttestationIssuers) }
+    private val capturedTrust = verifierTrust.copy(
+        trustedVerifierAttestationIssuers = buildSet { addAll(verifierTrust.trustedVerifierAttestationIssuers) },
+        preRegisteredClients = emptyMap(),
+    )
     // Pre-registered metadata contains nested caller-owned lists and JSON objects.
     private val registeredMetadata = verifierTrust.preRegisteredClients.mapValues { (_, metadata) ->
         Json.encodeToString(metadata)

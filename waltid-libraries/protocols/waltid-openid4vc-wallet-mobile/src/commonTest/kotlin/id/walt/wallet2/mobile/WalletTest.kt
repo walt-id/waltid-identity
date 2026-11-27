@@ -64,6 +64,7 @@ import id.walt.mdoc.readertrust.ReaderTrustState
 import id.walt.openid4vci.offers.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
+import id.walt.openid4vp.clientidprefix.ClientIdX509TrustRegistry
 import id.walt.openid4vp.clientidprefix.prefixes.Unsupported
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -577,12 +578,16 @@ class WalletTest {
         val profiles = mutableListOf(profile)
         val redirects = mutableListOf("https://verifier.example/response")
         val clients = mutableMapOf("registered" to ClientMetadata(redirectUris = redirects))
+        val registry = ClientIdX509TrustRegistry(
+            evaluator = { error("Reading configuration must not evaluate verifier trust") },
+            requireAuthenticatedSource = true,
+        )
         val locales = mutableListOf("de-AT")
         val original = WalletConfiguration(
             presentation = PresentationConfiguration(
-            verifierTrust = ClientIdTrustConfiguration(preRegisteredClients = clients),
-            transactionDataProfiles = profiles,
-        ),
+                verifierTrust = ClientIdTrustConfiguration(preRegisteredClients = clients, x509TrustRegistry = registry),
+                transactionDataProfiles = profiles,
+            ),
             preferredLocales = locales,
         )
         val derived = original.copy(walletId = "second")
@@ -592,6 +597,7 @@ class WalletTest {
         clients.clear()
         locales.clear()
 
+        assertSame(registry, derived.presentation.verifierTrust.x509TrustRegistry)
         assertEquals(listOf("de-AT"), derived.preferredLocales)
         assertEquals(listOf("amount"), original.presentation.transactionDataProfiles.single().fields)
         assertEquals(setOf("example.transaction"), derived.presentation.transactionDataProfiles.toTransactionDataTypeRegistry().types)
