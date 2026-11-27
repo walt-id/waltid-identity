@@ -1,24 +1,47 @@
 package id.walt.walletdemo.compose.ui
 
-import kotlinx.io.bytestring.ByteString
 import android.R as AndroidR
 import android.graphics.Bitmap
-import android.view.View
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.CompositionLocalProvider
-import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
-import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
-import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import android.graphics.Canvas
+import android.view.View
 import androidx.compose.material3.Surface
-import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
-import androidx.test.runner.lifecycle.Stage
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.v2.runComposeUiTest
-import id.walt.wallet2.mobile.*
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
+import id.walt.wallet2.mobile.proximity.ProximityApprovalTiming
+import id.walt.wallet2.mobile.proximity.ProximityCredentialOption
+import id.walt.wallet2.mobile.proximity.ProximityDeviceAuthenticationMethod
+import id.walt.wallet2.mobile.proximity.ProximityDocumentReview
+import id.walt.wallet2.mobile.proximity.ProximityDocumentSubmission
+import id.walt.wallet2.mobile.proximity.ProximityElementReference
+import id.walt.wallet2.mobile.proximity.ProximityEngagement
+import id.walt.wallet2.mobile.proximity.ProximityEngagementMethod
+import id.walt.wallet2.mobile.proximity.ProximityHostActionResult
+import id.walt.wallet2.mobile.proximity.ProximityPreparationResult
+import id.walt.wallet2.mobile.proximity.ProximityProfile
+import id.walt.wallet2.mobile.proximity.ProximityReaderAuthentication
+import id.walt.wallet2.mobile.proximity.ProximityReaderAuthenticationOutcome
+import id.walt.wallet2.mobile.proximity.ProximityReaderAuthenticationScope
+import id.walt.wallet2.mobile.proximity.ProximityReaderCertificatePathState
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustDecision
+import id.walt.wallet2.mobile.proximity.ProximityReaderTrustState
+import id.walt.wallet2.mobile.proximity.ProximityRequestedElement
+import id.walt.wallet2.mobile.proximity.ProximityReview
+import id.walt.wallet2.mobile.proximity.ProximityReviewId
+import id.walt.wallet2.mobile.proximity.ProximityReviewReason
+import id.walt.wallet2.mobile.proximity.ProximitySharingPlan
+import id.walt.wallet2.mobile.proximity.ProximitySharingReceipt
+import id.walt.wallet2.mobile.proximity.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximitySubmission
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import id.walt.walletdemo.compose.logic.WalletDemoProximityDocumentSelection
 import id.walt.walletdemo.compose.logic.WalletDemoProximityHostActionExecutor
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
+import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
+import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -26,6 +49,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
+import kotlinx.io.bytestring.ByteString
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -138,7 +162,7 @@ class PreparedProximitySharingAndroidTest {
     /** Only creates display fixtures. Signed-request SDK tests prove authorization and matching. */
     private fun fixturePlan(review: ProximityReview): ProximitySharingPlan {
         val digest = ByteString(ByteArray(32))
-        val scope = Class.forName("id.walt.wallet2.mobile.ProximityApprovalScope")
+        val scope = Class.forName("id.walt.wallet2.mobile.proximity.ProximityApprovalScope")
             .declaredConstructors.single().apply { isAccessible = true }.newInstance(
                 ProximityProfile.Iso180135Edition2Dis2026, "fixture-certificate", digest,
                 mapOf("credential" to digest), emptyList<Any>())

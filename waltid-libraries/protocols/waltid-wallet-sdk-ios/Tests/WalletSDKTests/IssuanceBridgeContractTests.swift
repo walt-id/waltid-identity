@@ -4,20 +4,28 @@ import XCTest
 @testable import WalletSDK
 
 final class IssuanceBridgeContractTests: XCTestCase {
+    func testRequiredBridgeCollectionsRejectAnyIncompatibleElement() throws {
+        XCTAssertEqual(try requiredBridgeArray(["one", "two"], of: String.self), ["one", "two"])
+        XCTAssertThrowsError(try requiredBridgeArray(["one", 2] as [Any], of: String.self))
+    }
+
     func testExplicitSelectionPreservesDatasetAndEveryHolderBinding() throws {
-        let selection = try IssuanceCredentialSelection(configurationID: "identity", credentialIdentifier: "dataset-a",
-            holders: .existing([.init(keyID: "first", did: "did:key:first"), .init(keyID: "second")]))
+        let selection = try IssuanceCredentialSelection(
+            configurationID: "identity",
+            holders: .existing([.init(keyID: "first", did: "did:key:first"), .init(keyID: "second")]),
+            credentialIdentifier: "dataset-a"
+        )
         let core = try selection.toKMPSelection()
         XCTAssertEqual(core.credentialConfigurationId, "identity")
         XCTAssertEqual(core.credentialIdentifier, "dataset-a")
-        XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersExisting).bindings.map(\.keyId), ["first", "second"])
-        XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersExisting).bindings.map(\.did), ["did:key:first", nil])
+        XCTAssertEqual((core.holders as! WalletCore.IssuanceHoldersExisting).bindings.map(\.keyId), ["first", "second"])
+        XCTAssertEqual((core.holders as! WalletCore.IssuanceHoldersExisting).bindings.map(\.did), ["did:key:first", nil])
     }
 
     func testGeneratedSelectionPreservesCountAndRejectsInvalidNativeCounts() throws {
         let selection = try IssuanceCredentialSelection(configurationID: "identity", holders: .newKeys(count: 2))
         let core = try selection.toKMPSelection()
-        XCTAssertEqual((core.holders as! MobileWalletCredentialHoldersNewKeys).count, 2)
+        XCTAssertEqual((core.holders as! WalletCore.IssuanceHoldersNewKeys).count, 2)
         for count in [0, -1, Int.max] {
             XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", holders: .newKeys(count: count)).toKMPSelection())
         }
@@ -29,7 +37,11 @@ final class IssuanceBridgeContractTests: XCTestCase {
             XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", holders: holders))
         }
         XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: " ", holders: .newKeys(count: 1)))
-        XCTAssertThrowsError(try IssuanceCredentialSelection(configurationID: "identity", credentialIdentifier: " ", holders: .newKeys(count: 1)))
+        XCTAssertThrowsError(try IssuanceCredentialSelection(
+            configurationID: "identity",
+            holders: .newKeys(count: 1),
+            credentialIdentifier: " "
+        ))
     }
 
     func testIssuerRejectionPreservesTheCoreOfferRetryDecision() throws {
@@ -41,6 +53,18 @@ final class IssuanceBridgeContractTests: XCTestCase {
                 return XCTFail("Expected an issuer rejection")
             }
             XCTAssertEqual(error.canRetryOffer, canRetry)
+        }
+    }
+
+    func testReceiptTrustDenialIsDistinctFromAnOrdinaryIssuerRejection() throws {
+        for denied in [false, true] {
+            let core = Waltid_openid4vc_walletWalletIssuanceOutcomeFailed(sessionId: "session",
+                error: .init(code: .issuerResponse, message: "Rejected", canRetryOffer: false, issuerTrustFailed: denied),
+                storedCredentialIds: [], deferredCredentials: [], failure: nil)
+            guard case let .failed(_, error, _, _) = try core.toSwiftIssuanceOutcome() else {
+                return XCTFail("Expected an issuer rejection")
+            }
+            XCTAssertEqual(error.code, denied ? .issuerTrust : .issuerResponse)
         }
     }
 
@@ -61,7 +85,7 @@ final class IssuanceBridgeContractTests: XCTestCase {
             }
             XCTAssertEqual(error.code, swiftCode)
             XCTAssertEqual(stored, ["stored"])
-            XCTAssertEqual(deferred.map(\.id), ["handle"])
+            XCTAssertEqual(deferred.map(\.id.rawValue), ["handle"])
         }
     }
 
@@ -75,7 +99,7 @@ final class IssuanceBridgeContractTests: XCTestCase {
         }
         XCTAssertEqual(session, "session")
         XCTAssertEqual(stored, ["stored"])
-        XCTAssertEqual(handles, [.init(id: "pending", credentialConfigurationID: "identity", intervalSeconds: 7,
+        XCTAssertEqual(handles, [.init(id: .init(rawValue: "pending")!, credentialConfigurationID: "identity", intervalSeconds: 7,
             credentialIdentifier: "dataset-a")])
     }
 
@@ -89,7 +113,7 @@ final class IssuanceBridgeContractTests: XCTestCase {
         guard case let .failed(_, _, _, handles) = try core.toSwiftIssuanceOutcome() else {
             return XCTFail("Expected local save recovery")
         }
-        XCTAssertEqual(handles.map(\.id), ["local-save"])
+        XCTAssertEqual(handles.map(\.id.rawValue), ["local-save"])
         XCTAssertNil(handles.first?.credentialConfigurationID)
         XCTAssertNil(handles.first?.credentialIdentifier)
     }
@@ -112,7 +136,7 @@ final class IssuanceBridgeContractTests: XCTestCase {
             }
             XCTAssertEqual(session, "session")
             XCTAssertEqual(stored, ["stored"])
-            XCTAssertEqual(deferred, [.init(id: "handle", credentialConfigurationID: "identity", intervalSeconds: 7,
+            XCTAssertEqual(deferred, [.init(id: .init(rawValue: "handle")!, credentialConfigurationID: "identity", intervalSeconds: 7,
                 credentialIdentifier: "dataset-a")])
             XCTAssertEqual(error.targetFailure?.stage, swiftStage)
             XCTAssertEqual(error.targetFailure?.target.credentialIdentifier, "dataset-b")

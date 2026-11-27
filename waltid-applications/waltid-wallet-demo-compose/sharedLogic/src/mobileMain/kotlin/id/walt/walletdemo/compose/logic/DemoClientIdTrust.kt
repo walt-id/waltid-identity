@@ -335,7 +335,7 @@ object DemoClientIdTrust {
     """.trimIndent()
 
     /**
-     * PEM trust anchors passed into [id.walt.wallet2.mobile.MobileWalletFactory.create].
+     * PEM trust anchors passed into [id.walt.wallet2.mobile.WalletFactory.create].
      *
      * Append more PEM strings to allow additional `x509_san_dns` / `x509_hash` verifiers:
      *

@@ -3,9 +3,10 @@ package id.walt.wallet2.mobile
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import kotlinx.coroutines.test.runTest
+import id.walt.wallet2.mobile.digitalcredentials.encryptAnnexCHpke
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlinx.coroutines.test.runTest
 
 class AnnexCHpkeAndroidTest {
     @Test

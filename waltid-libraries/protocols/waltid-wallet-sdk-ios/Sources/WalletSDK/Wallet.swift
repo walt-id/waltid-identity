@@ -5,32 +5,22 @@ import IdentityDocumentServices
 
 /// Actor-isolated entry point for the walt.id wallet SDK on iOS.
 ///
-/// Create one wallet actor per app-level wallet identity. The actor serializes
-/// calls into the Kotlin Multiplatform wallet core and exposes native Swift
-/// models and errors to app code.
+/// Create one wallet actor per app-level wallet identity. Its methods can interleave at suspension points.
+/// The host owns its UI tasks and consent state.
 @available(macOS 10.15, *)
 public actor Wallet {
     /// Configuration used to create this wallet.
     public let configuration: WalletConfiguration
-    private let bridge: any WalletCoreBridge
-
     /// Creates a wallet with the provided configuration.
     ///
     /// - Parameter configuration: Wallet identity, default key type, and
     ///   optional attestation settings used by the underlying wallet core.
-    /// - Throws: ``WalletError/internalFailure(_:)`` when the wallet core
-    ///   bridge cannot be created.
+    /// - Throws: ``WalletError/invalidInput(_:)`` for invalid configuration. Storage and key-provider
+    ///   failures can also prevent opening. Caller cancellation propagates through the async bridge.
     public init(configuration: WalletConfiguration = .init()) async throws {
+        try Task.checkCancellation()
         self.configuration = configuration
         self.bridge = try await DefaultWalletCoreBridgeFactory.makeBridge(configuration: configuration)
-    }
-
-    init(
-        configuration: WalletConfiguration = .init(),
-        bridge: any WalletCoreBridge
-    ) {
-        self.configuration = configuration
-        self.bridge = bridge
     }
 
     /// Signing identity creation and recovery. Options are issued and validated by the shared core.
@@ -38,8 +28,9 @@ public actor Wallet {
 
     /// Emits wallet issuance and presentation progress events.
     ///
-    /// The stream is backed by the wallet core event flow. Iteration ends when
-    /// the underlying flow completes or when the consuming task is cancelled.
+    /// Each observer receives up to ten recent events from the core. A slow Swift observer
+    /// retains the newest 42 queued events. Use operation results for decisions. Cancel the
+    /// observing task when the screen or wallet closes.
     public var events: AsyncStream<WalletEvent> {
         bridge.events
     }
@@ -139,7 +130,7 @@ public actor Wallet {
     ) async throws -> WalletKeyUseAuthorizationPreflight {
         try await bridge.keyUseAuthorizationPreflight(
             keyType: keyType,
-            policy: policy ?? configuration.defaultKeyUseAuthorizationPolicy
+            policy: policy ?? configuration.keyAuthorization.policy
         )
     }
 
@@ -159,74 +150,39 @@ public actor Wallet {
         policy: WalletKeyUseAuthorizationPolicy? = nil
     ) async throws -> [IssuanceHolderBinding] {
         try await bridge.createIssuanceHolderKeys(count: count, keyType: keyType, didMethod: didMethod,
-            policy: policy ?? configuration.defaultKeyUseAuthorizationPolicy)
+            policy: policy ?? configuration.keyAuthorization.policy)
     }
 
     /// Starts a typed pre-authorized or authorization-code issuance session.
     ///
-    /// - Parameter request: Offer, callback, client, and holder-binding configuration.
+    /// - Parameter request: Credential offer and optional holder-binding configuration.
     /// - Returns: A validated session with a typed offer preview.
     /// - Throws: ``WalletError`` when offer resolution, metadata validation, or key selection fails.
     public func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
-        try await bridge.startIssuance(request: request)
+        guard !request.offer.absoluteString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw WalletError.invalidInput("Credential offer URI must not be blank")
+        }
+        return try await IssuanceSession(bridge.startIssuance(request: request), wallet: self)
     }
 
-    /// Starts the authorization-code browser request for an accepted issuance session.
-    ///
-    /// Offer resolution and local review do not create authorization-server state. Call this
-    /// method only after the user accepts an authorization-code offer, then open the returned URL
-    /// in the browser and deliver the callback to ``continueAuthorizationIssuance(sessionID:callbackURI:)``.
-    ///
+    /// Reopens an offer in the same wallet, returning nil when the offer is no longer available.
+    /// - Parameter id: Session reference saved while reviewing the offer.
+    public func resumeIssuance(_ id: IssuanceSessionID) async throws -> IssuanceSession? {
+        try await bridge.resumeIssuance(id: id).map { try IssuanceSession($0, wallet: self) }
+    }
+
+    /// Delivers a callback with its saved browser reference after reopening the wallet.
     /// - Parameters:
-    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
-    ///   - credentials: Explicit selections and holder keys; omission requests one instance per offered configuration.
-    /// - Returns: Browser authorization data, including the callback binding and PKCE state.
-    /// - Throws: ``WalletError`` when authorization initiation cannot be completed.
-    public func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]? = nil) async throws -> IssuanceAuthorization {
-        try await bridge.beginAuthorizationIssuance(sessionID: sessionID, credentials: credentials)
+    ///   - id: Browser continuation saved before leaving the wallet.
+    ///   - callback: Exact URI returned to the application.
+    public func completeAuthorization(_ id: IssuanceAuthorizationID, callback: URL) async throws -> IssuanceOutcome {
+        try await bridge.completeAuthorization(id.rawValue, callback: callback)
     }
 
-    /// Continues a reviewed pre-authorized issuance session.
-    ///
-    /// - Parameters:
-    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
-    ///   - transactionCode: Separately delivered transaction code when required by the offer.
-    ///   - credentials: Explicit selections and holder keys; omission requests one instance per offered configuration.
-    /// - Returns: A typed stored, deferred, cancelled, or failed outcome.
-    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
-    public func continuePreAuthorizedIssuance(
-        sessionID: String,
-        transactionCode: String? = nil,
-        credentials: [IssuanceCredentialSelection]? = nil
-    ) async throws -> IssuanceOutcome {
-        try await bridge.continuePreAuthorizedIssuance(
-            sessionID: sessionID,
-            transactionCode: transactionCode,
-            credentials: credentials
-        )
-    }
-
-    /// Strictly validates and consumes a browser authorization callback.
-    ///
-    /// - Parameters:
-    ///   - sessionID: Opaque identifier returned by ``startIssuance(_:)``.
-    ///   - callbackURI: Complete callback URI received from the browser session.
-    /// - Returns: A typed stored, deferred, cancelled, or failed outcome.
-    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
-    public func continueAuthorizationIssuance(
-        sessionID: String,
-        callbackURI: URL
-    ) async throws -> IssuanceOutcome {
-        try await bridge.continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI)
-    }
-
-    /// Cancels an active issuance session and removes its deferred continuations.
-    ///
-    /// - Parameter sessionID: Opaque identifier of the session to cancel.
-    /// - Returns: A cancelled outcome, or a typed failure for an invalid session.
-    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
-    public func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
-        try await bridge.cancelIssuance(sessionID: sessionID)
+    /// Cancels the retained offer and discards its authorization material.
+    /// - Parameter sessionID: Reference for the offer to cancel.
+    public func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome {
+        try await bridge.cancelIssuance(sessionID: sessionID.rawValue)
     }
 
     /// Lists retained deferred operations after an interrupted flow or wallet recreation.
@@ -237,42 +193,13 @@ public actor Wallet {
         try await bridge.listDeferredIssuance()
     }
 
-    /// Reports OpenID4VCI `credential_deleted` for a credential the holder rejected instead of storing.
-    ///
-    /// Isolated fetch (`storeInWallet=false`) returns the notification identifier to pass here with
-    /// the same access token. Delivery is Bearer-only and best-effort.
-    ///
-    /// - Parameters:
-    ///   - notificationID: OpenID4VCI `notification_id` from the credential response.
-    ///   - accessToken: Access token used to obtain the credential.
-    ///   - credentialIssuerBaseURL: Issuer identifier used to resolve `notification_endpoint` when
-    ///     `notificationEndpoint` is omitted.
-    ///   - notificationEndpoint: Explicit OpenID4VCI notification endpoint, when already known.
-    ///   - eventDescription: Optional issuer-facing description.
-    /// - Throws: ``WalletError`` when the SDK bridge cannot deliver the notification request.
-    public func rejectIssuedCredential(
-        notificationID: String,
-        accessToken: String,
-        credentialIssuerBaseURL: URL? = nil,
-        notificationEndpoint: URL? = nil,
-        eventDescription: String? = nil
-    ) async throws {
-        try await bridge.rejectIssuedCredential(
-            notificationID: notificationID,
-            accessToken: accessToken,
-            credentialIssuerBaseURL: credentialIssuerBaseURL,
-            notificationEndpoint: notificationEndpoint,
-            eventDescription: eventDescription
-        )
-    }
-
     /// Polls a deferred credential operation without exposing its access material.
     ///
-    /// - Parameter deferredCredentialID: Opaque identifier returned in a deferred outcome.
+    /// - Parameter id: Deferred reference from an issuance outcome or the retained listing.
     /// - Returns: A stored, still-deferred, or failed outcome.
     /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
-    public func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
-        try await bridge.resumeDeferredIssuance(deferredCredentialID: deferredCredentialID)
+    public func resumeDeferredIssuance(_ id: DeferredIssuanceID) async throws -> IssuanceOutcome {
+        try await bridge.resumeDeferredIssuance(deferredCredentialID: id.rawValue)
     }
 
     /// Lists credentials currently known to the wallet.
@@ -299,30 +226,6 @@ public actor Wallet {
         try await bridge.deleteLocalData()
     }
 
-    /// Presents credentials for an OpenID4VP request URL.
-    ///
-    /// This immediate submission API is intended for callers that already handled
-    /// request review and user consent. Apps that need to display verifier
-    /// details, credential choices, selective disclosures, or transaction data
-    /// should use ``previewPresentation(request:)`` followed by an action with its preview handle.
-    ///
-    /// - Parameters:
-    ///   - request: OpenID4VP authorization request URL received by the app.
-    ///   - did: Optional wallet DID to use for presentation. When omitted,
-    ///     wallet core selects an available DID.
-    ///   - runPolicies: Optional policy execution override for presentation.
-    /// - Returns: Presentation outcome, including verifier redirect and raw
-    ///   verifier response details when available.
-    /// - Throws: ``WalletError`` when the request is invalid, credential
-    ///   selection fails, signing fails, or verifier communication fails.
-    public func present(
-        request: URL,
-        did: String? = nil,
-        runPolicies: Bool? = nil
-    ) async throws -> PresentationResult {
-        try await bridge.present(request: request, did: did, runPolicies: runPolicies)
-    }
-
     /// Resolves and previews an OpenID4VP presentation request without submitting credentials.
     ///
     /// - Parameter request: OpenID4VP authorization request URL received by the app.
@@ -333,110 +236,26 @@ public actor Wallet {
     }
 
     /// Prepares the effective claims for this selection without signing or sending credentials.
-    /// Recompute after selection changes and submit the same selection snapshot that was displayed.
+    /// Recompute after a selection change and submit the returned review after holder confirmation.
     /// - Parameters:
     ///   - previewHandle: Handle identifying the retained, wallet-bound presentation request.
-    ///   - selectedCredentialOptions: Credentials selected for the requested queries.
-    ///   - selectedDisclosureOptions: Selected optional disclosures, or nil for request-matched defaults.
+    ///   - selection: The credentials and disclosures captured for this review.
     ///   - did: Optional holder DID to use consistently with the subsequent submission.
     /// - Returns: Effective credential claims and source/received path mappings for this selection.
     /// - Throws: A wallet error when the request, selection or credential format cannot be reviewed.
     public func reviewPresentation(
         previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
+        selection: PresentationSelection,
         did: String? = nil
-    ) async throws -> PreparedPresentationReview {
-        try await bridge.reviewPresentation(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions, did: did)
+    ) async throws -> PresentationReview {
+        try await bridge.retainPresentation(previewHandle: previewHandle, selection: selection, did: did, owner: self)
     }
 
-    /// Resolves authenticated payment instructions for this selection without signing.
-    /// Display the returned review before passing its revision to submission. Nil means no payment review is required.
-    /// - Parameters:
-    ///   - previewHandle: Handle returned by presentation preview.
-    ///   - selectedCredentialOptions: Credentials selected for this presentation.
-    ///   - selectedDisclosureOptions: Selected disclosures, or nil for the request-matched defaults.
-    ///   - did: Optional holder DID, which must also be used for submission.
-    /// - Returns: Validated payment instructions, or nil when the selection contains no SD-JWT payment.
-    /// - Throws: A typed payment-consent error when review cannot be prepared safely.
-    public func preparePaymentConsent(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
-        did: String? = nil
-    ) async throws -> PaymentConsent? {
-        try await bridge.preparePaymentConsent(previewHandle: previewHandle, selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions, did: did)
-    }
-
-    /// Submits a presentation with user-selected credential options.
-    ///
-    /// - Parameters:
-    ///   - reviewedStatus: Selected credential IDs mapped to the semantic revisions actually shown during consent.
-    ///   - previewHandle: Handle returned by ``previewPresentation(request:)``.
-    ///   - selectedCredentialOptions: Credential options selected from
-    ///     ``previewPresentation(request:)``.
-    ///   - selectedDisclosureOptions: Optional selectively disclosable claims
-    ///     selected from ``previewPresentation(request:)``. Passing `nil`
-    ///     preserves the wallet core's default request-matched disclosure set.
-    ///   - did: Optional wallet DID to use for presentation.
-    ///   - runPolicies: Optional policy execution override for presentation.
-    ///   - paymentConsentRevision: Revision returned by payment preparation and explicitly reviewed by the user.
-    /// - Returns: Presentation outcome.
-    /// - Throws: ``WalletError`` when selection, signing, or verifier communication fails.
-    /// Submits the selected credentials using the exact semantic status warnings rendered by the host.
-    /// Throws `WalletError.credentialStatusReviewChanged` if those warnings change during authorization.
-    public func submitStatusReviewedPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
-        reviewedStatus: [String: String],
-        did: String? = nil,
-        runPolicies: Bool? = nil,
-        paymentConsentRevision: String? = nil
-    ) async throws -> PresentationResult {
-        try await bridge.submitStatusReviewedPresentation(
-            previewHandle: previewHandle,
-            selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions,
-            reviewedStatus: reviewedStatus,
-            did: did,
-            runPolicies: runPolicies,
-            paymentConsentRevision: paymentConsentRevision
-        )
-    }
-
-    /// Submits a presentation with user-selected credential options.
-    ///
-    /// - Parameters:
-    ///   - previewHandle: Handle returned by ``previewPresentation(request:)``.
-    ///   - selectedCredentialOptions: Credential options selected from
-    ///     ``previewPresentation(request:)``.
-    ///   - selectedDisclosureOptions: Optional selectively disclosable claims
-    ///     selected from ``previewPresentation(request:)``. Passing `nil`
-    ///     preserves the wallet core's default request-matched disclosure set.
-    ///   - did: Optional wallet DID to use for presentation.
-    ///   - runPolicies: Optional policy execution override for presentation.
-    ///   - paymentConsentRevision: Revision returned by payment preparation and explicitly reviewed by the user.
-    /// - Returns: Presentation outcome.
-    /// - Throws: ``WalletError`` when selection, signing, or verifier communication fails.
-    public func submitPresentation(
-        previewHandle: PresentationPreviewHandle,
-        selectedCredentialOptions: [PresentationCredentialSelection],
-        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
-        did: String? = nil,
-        runPolicies: Bool? = nil,
-        paymentConsentRevision: String? = nil
-    ) async throws -> PresentationResult {
-        try await bridge.submitPresentation(
-            previewHandle: previewHandle,
-            selectedCredentialOptions: selectedCredentialOptions,
-            selectedDisclosureOptions: selectedDisclosureOptions,
-            did: did,
-            runPolicies: runPolicies,
-            paymentConsentRevision: paymentConsentRevision
-        )
+    /// Submits only the selection and advisories captured before the holder confirmed.
+    /// - Parameter review: Wallet-issued review that the holder just confirmed.
+    public func submitPresentation(_ review: PresentationReview) async throws -> PresentationResult {
+        guard review.owner === self else { throw WalletError.invalidInput("Review belongs to another wallet") }
+        return try await review.submit()
     }
 
     /// Rejects a reviewed presentation request and consumes its preview handle.
@@ -487,6 +306,7 @@ public actor Wallet {
             bridge: try await bridge.startProximityPresentation(configuration: configuration)
         )
     }
+
     /// Returns the current IdentityDocumentServices capability snapshot.
     public func digitalCredentialCapabilities() async -> DigitalCredentialCapabilities {
         #if canImport(WalletCore) && os(iOS)
@@ -519,57 +339,71 @@ public actor Wallet {
             selectedRegistryEntryIDs: selectedRegistryEntryIDs
         )
     }
-
-    /// Verifies the raw request against the retained preview and returns the HPKE response JSON.
+    /// Verifies the raw request and returns an encrypted response while the reviewed status remains current.
     ///
     /// - Parameters:
-    ///   - reviewedStatus: Selected credential IDs mapped to the semantic revisions actually shown during consent.
-    ///   - requestID: Handle returned by ``previewAnnexCPresentation(parsedRequest:verifiedOrigin:selectedRegistryEntryIDs:)``.
-    ///   - verifiedOrigin: Platform-verified origin bound to the preview.
-    ///   - deviceRequestBase64URL: Raw post-consent device request.
-    ///   - encryptionInfoBase64URL: Raw post-consent encryption information.
-    ///   - selectedCredentialOptions: User-approved credentials, one per requested document.
-    /// Submits an Annex C response only while the selected cached status warnings remain as reviewed.
-    public func submitStatusReviewedAnnexCPresentation(
-        reviewedStatus: [String: String],
-        requestID: String,
-        verifiedOrigin: String,
-        deviceRequestBase64URL: String,
-        encryptionInfoBase64URL: String,
-        selectedCredentialOptions: [PresentationCredentialSelection]
-    ) async throws -> DigitalCredentialResponse {
-        try await bridge.submitStatusReviewedAnnexCPresentation(
-            reviewedStatus: reviewedStatus,
-            requestID: requestID,
-            verifiedOrigin: verifiedOrigin,
-            deviceRequestBase64URL: deviceRequestBase64URL,
-            encryptionInfoBase64URL: encryptionInfoBase64URL,
-            selectedCredentialOptions: selectedCredentialOptions
-        )
+    ///   - submission: Holder-approved selections and the platform request bound to the preview.
+    ///   - reviewedStatus: Selected credential IDs mapped to the semantic revisions shown during consent.
+    public func submitStatusReviewedAnnexCPresentation(_ submission: AnnexCSubmission, reviewedStatus: [String: String]) async throws -> DigitalCredentialResponse {
+        try await bridge.submitStatusReviewedAnnexCPresentation(submission, reviewedStatus: reviewedStatus)
     }
 
     /// Verifies the raw request against the retained preview and returns the HPKE response JSON.
     ///
     /// - Parameters:
-    ///   - requestID: Handle returned by ``previewAnnexCPresentation(parsedRequest:verifiedOrigin:selectedRegistryEntryIDs:)``.
-    ///   - verifiedOrigin: Platform-verified origin bound to the preview.
-    ///   - deviceRequestBase64URL: Raw post-consent device request.
-    ///   - encryptionInfoBase64URL: Raw post-consent encryption information.
-    ///   - selectedCredentialOptions: User-approved credentials, one per requested document.
-    public func submitAnnexCPresentation(
-        requestID: String,
-        verifiedOrigin: String,
-        deviceRequestBase64URL: String,
-        encryptionInfoBase64URL: String,
-        selectedCredentialOptions: [PresentationCredentialSelection]
-    ) async throws -> DigitalCredentialResponse {
-        try await bridge.submitAnnexCPresentation(
-            requestID: requestID,
-            verifiedOrigin: verifiedOrigin,
-            deviceRequestBase64URL: deviceRequestBase64URL,
-            encryptionInfoBase64URL: encryptionInfoBase64URL,
-            selectedCredentialOptions: selectedCredentialOptions
-        )
+    ///   - submission: Holder-approved selections and the platform request bound to the preview.
+    public func submitAnnexCPresentation(_ submission: AnnexCSubmission) async throws -> DigitalCredentialResponse {
+        try await bridge.submitAnnexCPresentation(submission)
     }
 
+    init(
+        configuration: WalletConfiguration = .init(),
+        bridge: any WalletCoreBridge
+    ) {
+        self.configuration = configuration
+        self.bridge = bridge
+    }
+
+    private let bridge: any WalletCoreBridge
+
+}
+
+extension Wallet {
+    /// Accepts a browser grant and builds its request using the app's registered client and exact redirect.
+    /// - Parameters:
+    ///   - session: Browser grant returned by the wallet.
+    ///   - registration: Client identifier and exact registered callback URI.
+    ///   - credentials: Selected configurations and copy counts. Omit to use the offered defaults.
+    func beginAuthorization(
+        _ session: IssuanceSessionID,
+        registration: IssuanceClientRegistration,
+        credentials: [IssuanceCredentialSelection]? = nil
+    ) async throws -> PendingIssuanceAuthorization {
+        let redirect = registration.redirectURI.absoluteString
+        guard !registration.clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !redirect.isEmpty, redirect == redirect.trimmingCharacters(in: .whitespacesAndNewlines) else {
+            throw WalletError.invalidInput("A registered client ID and callback URI are required")
+        }
+        let request = try await bridge.beginAuthorizationIssuance(
+            sessionID: session.rawValue, registration: registration, credentials: credentials
+        )
+        return PendingIssuanceAuthorization(id: .init(session: session), request: request, wallet: self)
+    }
+
+    /// Accepts the pre-authorized grant. Supply a client identity when the authorization server requires one.
+    /// - Parameters:
+    ///   - session: Pre-authorized grant returned by the wallet.
+    ///   - transactionCode: Code entered by the holder when the offer requires one.
+    ///   - credentials: Selected configurations and copy counts.
+    ///   - clientID: Client identifier when required by the authorization server.
+    func accept(
+        _ session: IssuanceSessionID,
+        transactionCode: String? = nil,
+        credentials: [IssuanceCredentialSelection]? = nil,
+        clientID: String? = nil
+    ) async throws -> IssuanceOutcome {
+        try await bridge.continuePreAuthorizedIssuance(
+            sessionID: session.rawValue, clientID: clientID, transactionCode: transactionCode, credentials: credentials
+        )
+    }
 }

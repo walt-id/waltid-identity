@@ -17,9 +17,9 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.x509.MdocReaderAuthenticationEkuOid
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.time.Instant
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /** Runtime-generated reader CA and re-signed certificate mutations; no retained private-key material. */
 internal class ReaderCertificateProfileFixture private constructor(

@@ -68,7 +68,7 @@ changes="$TMP_DIR/changes.txt"
 expect_pass "empty change list" "$changes"
 
 write_changes "$changes" \
-  "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonMain/kotlin/id/walt/wallet2/mobile/MobileWallet.kt"
+  "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonMain/kotlin/id/walt/wallet2/mobile/Wallet.kt"
 expect_pass "private/source-only mobile change" "$changes"
 
 write_changes "$changes" \

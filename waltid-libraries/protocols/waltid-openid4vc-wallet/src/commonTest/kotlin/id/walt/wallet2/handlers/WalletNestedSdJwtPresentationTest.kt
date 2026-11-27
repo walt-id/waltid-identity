@@ -756,10 +756,8 @@ class WalletNestedSdJwtPresentationTest {
         assertEquals(json("""[{"kind": "residency", "country": "DE"}]"""), verifierView("A")["nationalities"])
         assertFalse("nationalities" in verifierView("B"))
 
-        val selected = WalletPresentationHandler.run {
-            selectFromStores(wallet, requireNotNull(request.dcqlQuery), useWalletCredentialIds = true)
-                .selectCredentialOptions(listOf("A", "B").map { PresentationCredentialSelection(it, CREDENTIAL_ID) }, emptyList())
-        }
+        val selected = selectFromStores(wallet, requireNotNull(request.dcqlQuery), useWalletCredentialIds = true)
+            .selectCredentialOptions(listOf("A", "B").map { PresentationCredentialSelection(it, CREDENTIAL_ID) }, emptyList())
         selected.forEach { (queryId, matches) ->
             val match = matches.single()
             val credential = (match.credential as RawDcqlCredential).originalCredential as DigitalCredential

@@ -24,18 +24,25 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
                     _ = try await initializeSigningIdentity(wallet)
                     let redirect = URL(string: "walbatchtest://callback")!
                     let session = try await wallet.startIssuance(IssuanceRequest(
-                        offer: try XCTUnwrap(URL(string: offer.offerUrl)), clientID: "wallet-client", redirectURI: redirect))
+                        offer: try XCTUnwrap(URL(string: offer.offerUrl))
+                    ))
                     let outcome: IssuanceOutcome
                     if authorized {
-                        let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id)
-                        XCTAssertTrue(authorization.pushedAuthorizationRequestUsed)
+                        guard case .authorizationCode(let grant) = session.grant else {
+                            throw WalletError.invalidInput("Unexpected grant for this test offer")
+                        }
+                        let authorization = try await grant.beginAuthorization(using: .init(clientID: "wallet-client", redirectURI: redirect))
+                        XCTAssertTrue(authorization.request.pushedAuthorizationRequestUsed)
                         // Recreate the Swift facade and real KMP wallet before code exchange.
                         let reopened = try await makeWallet(walletId: walletID, attestation: offer.attestation)
                         _ = try await initializeSigningIdentity(reopened)
-                        let callback = try await followChallengeAuthorization(authorization.url, redirect: redirect)
-                        outcome = try await reopened.continueAuthorizationIssuance(sessionID: session.id, callbackURI: callback)
+                        let callback = try await followChallengeAuthorization(authorization.request.url, redirect: redirect)
+                        outcome = try await reopened.completeAuthorization(authorization.id, callback: callback)
                     } else {
-                        outcome = try await wallet.continuePreAuthorizedIssuance(sessionID: session.id, transactionCode: offer.txCode)
+                        guard case .preAuthorized(let grant) = session.grant else {
+                            throw WalletError.invalidInput("Unexpected grant for this test offer")
+                        }
+                        outcome = try await grant.accept(transactionCode: offer.txCode, clientID: "wallet-client")
                     }
                     guard case let .stored(_, credentialIDs) = outcome else {
                         return XCTFail("Challenge issuance failed for \(scenarioID): \(outcome)")
@@ -103,7 +110,16 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
 
         let session = try await fixture.createVerifierSession(scenario: selectedScenario, platform: .ios)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-        let presentResult = try await wallet2.present(request: presentationURL, did: bootstrapResult.did)
+        guard case let .ready(preview) = try await wallet2.previewPresentation(request: presentationURL) else {
+            return XCTFail("Expected a presentation preview for the issued credential")
+        }
+        let selection = try XCTUnwrap(preview.credentialOptions.first { credentialIDs.contains($0.credentialID) }).selection
+        let review = try await wallet2.reviewPresentation(
+            previewHandle: preview.previewHandle,
+            selection: .init(credentials: [selection]),
+            did: bootstrapResult.did
+        )
+        let presentResult = try await wallet2.submitPresentation(review)
         assertTransmittedSuccess(
             presentResult,
             "Should present persisted Enterprise credential for \(selectedScenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
@@ -119,14 +135,16 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         let wallet = try await makeWallet(walletId: walletID, attestation: nil)
         _ = try await initializeSigningIdentity(wallet)
         let session = try await wallet.startIssuance(
-            IssuanceRequest(offer: try XCTUnwrap(URL(string: offer.offerUrl)), redirectURI: URL(string: "openid://")!)
+            IssuanceRequest(
+                offer: try XCTUnwrap(URL(string: offer.offerUrl))
+            )
         )
         XCTAssertGreaterThanOrEqual(try XCTUnwrap(session.offer.batchSize), 2)
-        let outcome = try await wallet.continuePreAuthorizedIssuance(
-            sessionID: session.id,
-            credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
-                                holders: .newKeys(count: 2))]
-        )
+        guard case .preAuthorized(let grant) = session.grant else {
+            throw WalletError.invalidInput("Unexpected grant for this test offer")
+        }
+        let outcome = try await grant.accept(credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
+                                holders: .newKeys(count: 2))], clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             return XCTFail("Expected two stored credentials, got \(outcome)")
         }
@@ -146,9 +164,11 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
             }
             let option = try XCTUnwrap(preview.credentialOptions.first { $0.credentialID == credentialID })
             // No holder-key override: the reopened wallet must use each credential's persisted binding.
-            let result = try await reopened.submitPresentation(
-                previewHandle: preview.previewHandle, selectedCredentialOptions: [option.selection]
+            let review = try await reopened.reviewPresentation(
+                previewHandle: preview.previewHandle,
+                selection: .init(credentials: [option.selection])
             )
+            let result = try await reopened.submitPresentation(review)
             assertTransmittedSuccess(result, "Presentation failed for a stored batch copy")
             try await fixture.waitForVerifierSuccess(sessionID: verification.sessionID, timeoutSeconds: verifierPollingTimeout)
         }
@@ -169,15 +189,17 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         let wallet = try await makeWallet(walletId: walletID, attestation: nil)
         _ = try await initializeSigningIdentity(wallet)
         let session = try await wallet.startIssuance(
-            IssuanceRequest(offer: try XCTUnwrap(URL(string: offer.offerUrl)), redirectURI: URL(string: "openid://")!)
+            IssuanceRequest(
+                offer: try XCTUnwrap(URL(string: offer.offerUrl))
+            )
         )
         let first = try await wallet.createIssuanceHolderKeys(count: 1, policy: WalletKeyUseAuthorizationPolicy.none)
         let second = try await wallet.createIssuanceHolderKeys(count: 1, policy: .deviceCredential(timeoutSeconds: 0))
-        let outcome = try await wallet.continuePreAuthorizedIssuance(
-            sessionID: session.id,
-            credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
-                                holders: .existing(first + second))]
-        )
+        guard case .preAuthorized(let grant) = session.grant else {
+            throw WalletError.invalidInput("Unexpected grant for this test offer")
+        }
+        let outcome = try await grant.accept(credentials: [.init(configurationID: try XCTUnwrap(session.offer.credentials.first).configurationID,
+                                holders: .existing(first + second))], clientID: "eudiw-abca")
         guard case let .failed(_, failure, storedIDs, deferred) = outcome else {
             return XCTFail("Expected a signing failure after operator cancellation, got \(outcome)")
         }
@@ -195,12 +217,14 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         transactionCode: String?
     ) async throws -> [String] {
         let session = try await wallet.startIssuance(
-            IssuanceRequest(offer: offerURL, redirectURI: URL(string: "openid://")!)
+            IssuanceRequest(
+                offer: offerURL
+            )
         )
-        let outcome = try await wallet.continuePreAuthorizedIssuance(
-            sessionID: session.id,
-            transactionCode: transactionCode
-        )
+        guard case .preAuthorized(let grant) = session.grant else {
+            throw WalletError.invalidInput("Unexpected grant for this test offer")
+        }
+        let outcome = try await grant.accept(transactionCode: transactionCode, clientID: "eudiw-abca")
         guard case let .stored(_, credentialIDs) = outcome else {
             if case let .failed(_, failure, _, _) = outcome {
                 XCTFail("Issuance failed [\(failure.code)]: \(failure.message)")
@@ -217,15 +241,17 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: walletId,
-                attestation: attestation.map {
-                    WalletAttestationConfiguration(
-                        baseURL: $0.baseUrl,
-                        attesterPath: $0.attesterPath,
-                        bearerToken: $0.bearerToken,
-                        hostHeader: $0.hostHeader
-                    )
-                },
-                defaultKeyUseAuthorizationPolicy: .none
+                keyAuthorization: .init(policy: .none),
+                issuance: .init(
+                    attestation: attestation.map {
+                        WalletAttestationConfiguration(
+                            baseURL: $0.baseUrl,
+                            attesterPath: $0.attesterPath,
+                            bearerToken: $0.bearerToken,
+                            hostHeader: $0.hostHeader
+                        )
+                    }
+                )
             )
         )
     }
@@ -287,7 +313,16 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
 
         let session = try await fixture.createVerifierSession(scenario: scenario, platform: .ios)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-        let presentResult = try await wallet.present(request: presentationURL, did: bootstrapResult.did)
+        guard case let .ready(preview) = try await wallet.previewPresentation(request: presentationURL) else {
+            return XCTFail("Expected a presentation preview for the issued credential")
+        }
+        let selection = try XCTUnwrap(preview.credentialOptions.first { credentialIDs.contains($0.credentialID) }).selection
+        let review = try await wallet.reviewPresentation(
+            previewHandle: preview.previewHandle,
+            selection: .init(credentials: [selection]),
+            did: bootstrapResult.did
+        )
+        let presentResult = try await wallet.submitPresentation(review)
         assertTransmittedSuccess(
             presentResult,
             "Enterprise verifier2 presentation should succeed for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"

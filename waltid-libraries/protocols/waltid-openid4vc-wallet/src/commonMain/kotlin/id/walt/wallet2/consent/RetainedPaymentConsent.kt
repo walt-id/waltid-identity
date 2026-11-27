@@ -61,10 +61,11 @@ internal class RetainedPaymentConsent {
         key: WalletKeyStoreEntry,
         policy: PaymentConsentPolicy,
         holderDid: String? = null,
+        consume: Boolean = true,
     ) {
         if (selectedPayment(request, selection) == null) return
         val snapshot = prepared
-        prepared = null // Every attempt needs a fresh review after cancellation or failure.
+        if (consume) prepared = null
         if (revision == null || snapshot == null) consentFailure(PaymentConsentFailure.CONSENT_REQUIRED)
         if (revision != snapshot.second.revision || snapshot.first != binding(request, selection, credentials, disclosures, key, policy, holderDid)) {
             consentFailure(PaymentConsentFailure.STALE_CONSENT)

@@ -85,7 +85,7 @@ not bind submission to a protocol revision. Request expiry, wallet ownership, ca
 consumption follow the existing preview session. Prepare claim review and payment consent sequentially
 for the same choices; they share the preview's exclusive lease. Review never extends its lifetime.
 
-The mobile facade exposes string-based claim JSON and typed path JSON via `reviewPresentation` and
+The wallet SDK exposes string-based claim JSON and typed path JSON via `reviewPresentation` and
 `reviewDigitalCredentialPresentation`. Submit through the existing `submitPresentation` or
 `submitDigitalCredentialPresentation` methods. Payment consent retains its separate revision checks.
 The stateless HTTP preview contract is unchanged. A reliable projection must be available for the
@@ -123,10 +123,19 @@ waltid-openid4vc-wallet
 │   ├── WalletCredentialStore.kt
 │   └── WalletDidStore.kt
 ├── handlers/                # Protocol handlers
-│   ├── WalletIssuanceHandler.kt   # OpenID4VCI flows
-│   └── WalletPresentationHandler.kt # OpenID4VP flows
+│   ├── WalletIssuanceHandler.kt         # Stateless and preview-based issuance
+│   ├── WalletIssuanceSessionService.kt  # Retained grants, callbacks and deferred work
+│   └── WalletPresentationHandler.kt     # Preview, review and submission
 └── stores/inmemory/         # Default in-memory implementations
 ```
+
+| Responsibility | Shared implementation |
+| --- | --- |
+| Resolve an issuance offer and verify its issuer, grant and server when reopening it | [IssuanceSessionOffer.kt](src/commonMain/kotlin/id/walt/wallet2/handlers/IssuanceSessionOffer.kt) |
+| Exchange a credential request, retry an issuer-rejected nonce and read an encrypted response | [CredentialEndpointExchange.kt](src/commonMain/kotlin/id/walt/wallet2/handlers/CredentialEndpointExchange.kt) |
+| Poll a retained deferred request using its bound key and negotiated encryption | [DeferredCredentialEndpoint.kt](src/commonMain/kotlin/id/walt/wallet2/handlers/DeferredCredentialEndpoint.kt) |
+| Find eligible credentials and verify the holder's selection | [Credential matching](src/commonMain/kotlin/id/walt/wallet2/handlers/PresentationCredentialMatching.kt) · [Selection validation](src/commonMain/kotlin/id/walt/wallet2/handlers/PresentationSelectionValidation.kt) |
+| Determine which presentation formats the wallet and each mdoc holder key support | [PresentationFormatCapabilities.kt](src/commonMain/kotlin/id/walt/wallet2/handlers/PresentationFormatCapabilities.kt) |
 
 ## Usage
 

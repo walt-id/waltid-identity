@@ -24,23 +24,22 @@ class Snippet:
 SNIPPETS = (
     Snippet(
         "kotlin-proximity-session",
-        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletProximitySnippets.kt",
+        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/ProximitySnippets.kt",
         (
-            REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",
+            REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/docs/proximity.md",
         ),
     ),
     Snippet(
         "kotlin-proximity-preparation",
-        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletProximitySnippets.kt",
+        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/ProximitySnippets.kt",
         (
-            REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",
+            REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/docs/proximity.md",
         ),
     ),
     Snippet(
         "swift-proximity-session",
         REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/ProximityDocumentationSnippets.swift",
         (
-            REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md",
             REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/ProximityPresentation.md",
         ),
     ),
@@ -53,42 +52,42 @@ SNIPPETS = (
     ),
     Snippet(
         "kotlin-default-persistence",
-        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletPersistenceSnippetsTest.kt",
-        (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",),
+        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/WalletPersistenceSnippetsTest.kt",
+        (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/docs/persistence.md",),
     ),
     Snippet(
         "kotlin-provided-database-key",
-        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletPersistenceSnippetsTest.kt",
-        (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",),
+        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/WalletPersistenceSnippetsTest.kt",
+        (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/docs/persistence.md",),
     ),
     Snippet(
         "kotlin-custom-credential-store",
-        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletPersistenceSnippetsTest.kt",
-        (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",),
+        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/WalletPersistenceSnippetsTest.kt",
+        (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/docs/persistence.md",),
     ),
     Snippet(
         "kotlin-store-overrides",
-        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/MobileWalletPersistenceSnippetsTest.kt",
-        (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md",),
+        REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/src/commonTest/kotlin/id/walt/wallet2/mobile/WalletPersistenceSnippetsTest.kt",
+        (REPO_ROOT / "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/docs/persistence.md",),
     ),
     Snippet(
         "swift-provided-database-key",
         REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/WalletPersistenceSnippetsTests.swift",
         (
-            REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md",
+            REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/docs/persistence.md",
             REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/WalletSDK.md",
         ),
     ),
     Snippet(
         "swift-custom-credential-store",
         REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/WalletPersistenceSnippetsTests.swift",
-        (REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md",),
+        (REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/docs/persistence.md",),
     ),
     Snippet(
-        "swift-full-store-overrides",
+        "swift-credential-and-did-overrides",
         REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/WalletPersistenceSnippetsTests.swift",
         (
-            REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md",
+            REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/docs/persistence.md",
             REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/WalletSDK.md",
             REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources/WalletSDK/Documentation.docc/GettingStarted.md",
         ),
@@ -96,7 +95,7 @@ SNIPPETS = (
     Snippet(
         "swift-combined-persistence",
         REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Tests/WalletSDKTests/WalletPersistenceSnippetsTests.swift",
-        (REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md",),
+        (REPO_ROOT / "waltid-libraries/protocols/waltid-wallet-sdk-ios/docs/persistence.md",),
     ),
 )
 

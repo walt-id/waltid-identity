@@ -14,13 +14,13 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
 
     func testProvidedDatabaseKeySnippetCompiles() async throws {
         // doc-snippet:start swift-provided-database-key
-        struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
-            func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+        struct KMSDatabaseKeyProvider: DatabaseEncryptionKeyProvider {
+            func getOrCreateKey(walletID: String, databaseName: String) async throws -> DatabaseEncryptionKey {
                 let keyData = try await loadOrCreateKeyData(walletID: walletID, databaseName: databaseName)
-                return WalletDatabaseKey(keyID: "\(walletID):\(databaseName)", material: keyData)
+                return DatabaseEncryptionKey(keyID: "\(walletID):\(databaseName)", material: keyData)
             }
 
-            func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+            func deleteKey(walletID: String, databaseName: String) async throws {
                 try await deleteKeyData(walletID: walletID, databaseName: databaseName)
             }
         }
@@ -29,7 +29,7 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
             configuration: WalletConfiguration(
                 walletID: "consumer-wallet",
                 persistence: WalletPersistence(
-                    databaseKey: .provided(KMSDatabaseKeyProvider())
+                    databaseKeySource: .provided(KMSDatabaseKeyProvider())
                 )
             )
         )
@@ -37,7 +37,7 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
 
         deleteAfterTest(wallet)
         let configuration = await wallet.configuration
-        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
+        XCTAssertTrue(configuration.persistence.databaseKeySource.isProvided)
     }
 
     func testCustomCredentialStoreSnippetCompiles() async throws {
@@ -78,7 +78,7 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
     }
 
     func testCredentialAndDidStoreOverridesSnippetCompiles() async throws {
-        // doc-snippet:start swift-full-store-overrides
+        // doc-snippet:start swift-credential-and-did-overrides
         let wallet = try await Wallet(
             configuration: WalletConfiguration(
                 walletID: "consumer-wallet",
@@ -88,7 +88,7 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
                 )
             )
         )
-        // doc-snippet:end swift-full-store-overrides
+        // doc-snippet:end swift-credential-and-did-overrides
 
         deleteAfterTest(wallet)
         let configuration = await wallet.configuration
@@ -102,7 +102,7 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
             configuration: WalletConfiguration(
                 walletID: "consumer-wallet",
                 persistence: WalletPersistence(
-                    databaseKey: .provided(KMSDatabaseKeyProvider()),
+                    databaseKeySource: .provided(KMSDatabaseKeyProvider()),
                     credentialStore: AppCredentialStore(),
                     didStore: AppDidStore()
                 )
@@ -112,19 +112,19 @@ final class WalletPersistenceSnippetsTests: XCTestCase {
 
         deleteAfterTest(wallet)
         let configuration = await wallet.configuration
-        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
+        XCTAssertTrue(configuration.persistence.databaseKeySource.isProvided)
         XCTAssertNotNil(configuration.persistence.credentialStore)
         XCTAssertNotNil(configuration.persistence.didStore)
     }
 }
 
-private struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
-    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+private struct KMSDatabaseKeyProvider: DatabaseEncryptionKeyProvider {
+    func getOrCreateKey(walletID: String, databaseName: String) async throws -> DatabaseEncryptionKey {
         let keyData = try await loadOrCreateKeyData(walletID: walletID, databaseName: databaseName)
-        return WalletDatabaseKey(keyID: "\(walletID):\(databaseName)", material: keyData)
+        return DatabaseEncryptionKey(keyID: "\(walletID):\(databaseName)", material: keyData)
     }
 
-    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+    func deleteKey(walletID: String, databaseName: String) async throws {
         try await deleteKeyData(walletID: walletID, databaseName: databaseName)
     }
 }
@@ -180,7 +180,7 @@ private func deleteKeyData(walletID: String, databaseName: String) async throws 
     precondition(!databaseName.isEmpty)
 }
 
-private extension WalletDatabaseKeyConfiguration {
+private extension DatabaseKeySource {
     var isProvided: Bool {
         switch self {
         case .managed:

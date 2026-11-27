@@ -27,7 +27,7 @@ class WalletPresentationDisclosurePreviewTest {
             originalQuery = CredentialQuery(id = "pid", format = CredentialFormat.entries.first { format in it.id },
                 meta = NoMeta, claims = requested.keys.map { ClaimsQuery(pathStrings = listOf(it)) }),
         )
-        return WalletPresentationHandler.run { match.toPresentationDisclosures() }
+        return match.toPresentationDisclosures()
     }
 
     @Test fun previewIncludesClearTextDataButNotUnrequestedSelectiveValues() {
@@ -65,7 +65,7 @@ class WalletPresentationDisclosurePreviewTest {
         )
         val match = DcqlMatcher.matchCredential(query, RawDcqlCredential("one", "mso_mdoc", data)).getOrThrow()
 
-        val disclosure = WalletPresentationHandler.run { match.toPresentationDisclosures() }.single()
+        val disclosure = match.toPresentationDisclosures().single()
         assertSame(portrait, disclosure.value)
     }
 

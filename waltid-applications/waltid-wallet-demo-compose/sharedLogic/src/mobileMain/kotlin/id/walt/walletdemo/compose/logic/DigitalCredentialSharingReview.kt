@@ -1,0 +1,155 @@
+package id.walt.walletdemo.compose.logic
+
+import id.walt.mdoc.readertrust.ReaderTrustState
+import id.walt.mdoc.readertrust.ReaderTrustDecision
+import id.walt.wallet2.mobile.digitalcredentials.AnnexCPreview
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialPreview
+import id.walt.wallet2.mobile.presentation.PresentationCredentialOption
+import id.walt.wallet2.mobile.presentation.PresentationCredentialRequirement
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialReaderAuthentication
+
+/**
+ * Maps an OpenID4VP Digital Credentials API preview onto the shared sharing-review model.
+ *
+ * The preview's `requestId` and the platform request objects stay with the caller: only what the user
+ * has to decide about crosses into the review model.
+ */
+fun DigitalCredentialPreview.toSharingReview(): WalletDemoSharingReview =
+    WalletDemoSharingReview(
+        request = WalletDemoSharingRequest(
+            requester = WalletDemoSharingRequester(
+                display = request.verifierMetadata?.display?.toDemoMetadataDisplay(),
+                // Falling back to the origin keeps the requester named by something authenticated.
+                // An unsigned DC API request has no trusted `client_id`, so there is nothing else
+                // truthful to head this section with.
+                fallbackName = verifiedOrigin,
+                verifiedOrigin = verifiedOrigin,
+                details = listOfNotNull(
+                    request.verifierMetadata?.let { WalletDemoSharingDetail("Client URI", it.clientUri, it.clientUri) },
+                    request.verifierMetadata?.let { WalletDemoSharingDetail("Privacy policy", it.policyUri, it.policyUri) },
+                    request.verifierMetadata?.let {
+                        WalletDemoSharingDetail("Terms of service", it.termsOfServiceUri, it.termsOfServiceUri)
+                    },
+                ),
+            ),
+            // The OpenID4VP DC API has no reader authentication, so the review offers no reader
+            // section rather than one reporting an absent reader.
+            readerTrust = readerAuthentication.toDemoReaderTrust(readerTrust),
+            responseProtection = if (request.responseMode == DC_API_JWT_RESPONSE_MODE) {
+                WalletDemoSharingResponseProtection.Encrypted(WalletDemoSharingEncryptionMechanism.DcApiJwt)
+            } else {
+                WalletDemoSharingResponseProtection.None
+            },
+            transactionData = request.transactionData.toDemoTransactionDataGroups(),
+            technicalDetails = listOf(
+                WalletDemoSharingDetail("Protocol", protocol),
+                WalletDemoSharingDetail("Client ID", request.clientId),
+                WalletDemoSharingDetail("Response mode", request.responseMode),
+                WalletDemoSharingDetail("Nonce", request.nonce),
+            ),
+        ),
+        credentialOptions = credentialOptions.map { it.toDemoCredentialOption() },
+        credentialRequirements = credentialRequirements.map { it.toDemoCredentialRequirement() },
+    )
+
+/**
+ * Maps an ISO 18013-7 Annex C preview onto the shared sharing-review model.
+ *
+ * Annex C carries no OpenID4VP request parameters, so the review gets no client ID, state or
+ * response URI at all. The requested documents and elements are reviewed through the same credential
+ * and disclosure components every other transport uses, which is what makes them comparable.
+ */
+fun AnnexCPreview.toSharingReview(): WalletDemoSharingReview =
+    WalletDemoSharingReview(
+        request = WalletDemoSharingRequest(
+            requester = WalletDemoSharingRequester(
+                fallbackName = verifiedOrigin,
+                verifiedOrigin = verifiedOrigin,
+            ),
+            readerTrust = readerAuthentication.toDemoReaderTrust(readerTrust),
+            // Annex C always session-encrypts the device response; there is no unencrypted variant to
+            // report, so this states the mechanism rather than asking whether encryption was requested.
+            responseProtection = WalletDemoSharingResponseProtection.Encrypted(
+                mechanism = WalletDemoSharingEncryptionMechanism.AnnexCHpke,
+                keyManagementAlgorithm = "DHKEM(P-256, HKDF-SHA256)",
+                contentEncryptionAlgorithm = "AES-128-GCM",
+            ),
+            technicalDetails = listOf(
+                WalletDemoSharingDetail(
+                    label = "Requested documents",
+                    value = parsedRequest.documents.joinToString(", ") { it.docType }.takeIf { it.isNotBlank() },
+                ),
+            ),
+        ),
+        credentialOptions = credentialOptions.map { it.toDemoCredentialOption() },
+        // Annex C requests every listed document, so each requested document is its own requirement
+        // and Share stays disabled until one credential is chosen for each.
+        credentialRequirements = credentialOptions
+            .map { it.queryId }
+            .distinct()
+            .map { queryId -> WalletDemoPresentationCredentialRequirement(options = listOf(listOf(queryId))) },
+    )
+
+/**
+ * Translates SDK reader authentication and trust into review states.
+ *
+ * [DigitalCredentialReaderAuthentication.NOT_APPLICABLE] becomes null rather than a state, because "this
+ * protocol has no reader authentication" is answered by omitting the section, not by rendering one.
+ * Only a [ReaderTrustState.TRUSTED] decision names the reader; anything else, including a missing
+ * decision, is shown as untrusted.
+ */
+private fun DigitalCredentialReaderAuthentication.toDemoReaderTrust(trust: ReaderTrustDecision?): WalletDemoReaderTrust? =
+    when (this) {
+        DigitalCredentialReaderAuthentication.NOT_APPLICABLE -> null
+        DigitalCredentialReaderAuthentication.NOT_AUTHENTICATED -> WalletDemoReaderTrust.NotAuthenticated
+        DigitalCredentialReaderAuthentication.PENDING_RAW_REQUEST -> WalletDemoReaderTrust.PendingVerification
+        DigitalCredentialReaderAuthentication.VERIFIED -> {
+            val displayName = trust?.displayName
+            if (trust?.state == ReaderTrustState.TRUSTED && displayName != null) {
+                WalletDemoReaderTrust.Trusted(displayName)
+            } else {
+                WalletDemoReaderTrust.Untrusted(trust?.reason ?: "The reader is not trusted")
+            }
+        }
+    }
+
+private fun PresentationCredentialOption.toDemoCredentialOption(): WalletDemoPresentationCredentialOption =
+    WalletDemoPresentationCredentialOption(
+        queryId = queryId,
+        credentialId = credential.id,
+        multiple = multiple,
+        label = resolveCardTitle(
+            format = credential.format,
+            credentialDataJson = credential.credentialDataJson,
+            displayName = presentationDisplayName(
+                format = credential.format,
+                metadataJson = credential.metadataJson,
+                storedLabel = credential.label,
+            ),
+            fallback = credential.format,
+        ),
+        issuer = credential.issuer,
+        subject = credential.subject,
+        format = credential.format,
+        credentialDataJson = credential.credentialDataJson,
+        metadataJson = credential.metadataJson,
+        disclosures = disclosures.map { disclosure ->
+            WalletDemoPresentationDisclosure(
+                label = CredentialDisplayVocabulary.disclosureLabel(disclosure.name, disclosure.path),
+                path = disclosure.path,
+                valueJson = disclosure.valueJson,
+                displayValue = disclosure.displayValue,
+                selectivelyDisclosable = disclosure.selectivelyDisclosable,
+                required = disclosure.required,
+                selectable = disclosure.selectable,
+                requested = disclosure.requested,
+            )
+        },
+    )
+
+private fun PresentationCredentialRequirement.toDemoCredentialRequirement():
+    WalletDemoPresentationCredentialRequirement =
+    WalletDemoPresentationCredentialRequirement(options = options)
+
+/** Serialized OpenID4VP response mode that returns a JWE through the Digital Credentials API. */
+private const val DC_API_JWT_RESPONSE_MODE = "dc_api.jwt"

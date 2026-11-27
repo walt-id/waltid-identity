@@ -11,15 +11,19 @@ import XCTest
 final class SharingReviewModelTests: XCTestCase {
     func testEffectiveConsentUsesDetailsLocaleForTreeChoicesAndInclusionReasons() throws {
         let city = #""home_address"."city""#
-        let option = PresentationCredentialOption(queryID: "employee", credentialID: "one", format: "dc+sd-jwt",
-            issuer: nil, subject: nil, label: "Identity",
-            credentialDataJSON: #"{"home_address":{"city":"Vienna","country":"AT","postal_code":"1010"}}"#,
+        let option = try PresentationCredentialOption(
+            queryID: "employee", credential: .init(id: "one", format: "dc+sd-jwt", credentialDataJSON: #"{"home_address":{"city":"Vienna","country":"AT","postal_code":"1010"}}"#, issuer: nil, subject: nil, label: "Identity", metadataJSON: #"{"credentialClaims":[{"path":["home_address"],"display":[{"locale":"en","name":"Address"},{"locale":"de","name":"Anschrift"}]},{"path":["home_address","city"],"display":[{"locale":"en","name":"City"},{"locale":"de","name":"Wohnort"}]},{"path":["home_address","country"],"display":[{"locale":"en","name":"Country"},{"locale":"de","name":"Land"}]},{"path":["home_address","postal_code"],"display":[{"locale":"en","name":"Postal code"},{"locale":"de","name":"Postleitzahl"}]}]}"#),
             disclosures: [
-                .init(path: city, name: "City", valueJSON: #""Vienna""#, displayValue: nil, selectivelyDisclosable: true, required: true),
-                .init(path: #""home_address"."country""#, name: "Country", valueJSON: #""AT""#, displayValue: nil, selectivelyDisclosable: true),
-                .init(path: #""home_address"."postal_code""#, name: "Postal code", valueJSON: #""1010""#, displayValue: nil, selectivelyDisclosable: true),
-            ],
-            metadataJSON: #"{"credentialClaims":[{"path":["home_address"],"display":[{"locale":"en","name":"Address"},{"locale":"de","name":"Anschrift"}]},{"path":["home_address","city"],"display":[{"locale":"en","name":"City"},{"locale":"de","name":"Wohnort"}]},{"path":["home_address","country"],"display":[{"locale":"en","name":"Country"},{"locale":"de","name":"Land"}]},{"path":["home_address","postal_code"],"display":[{"locale":"en","name":"Postal code"},{"locale":"de","name":"Postleitzahl"}]}]}"#)
+                .init(path: city, valueJSON: #""Vienna""#, disposition: .requiredSelective, name: "City"),
+                .init(path: #""home_address"."country""#, valueJSON: #""AT""#, disposition: .selectable, name: "Country"),
+                .init(
+                    path: #""home_address"."postal_code""#,
+                    valueJSON: #""1010""#,
+                    disposition: .selectable,
+                    name: "Postal code"
+                ),
+            ]
+        )
         let prepared = effectivePrepared(#"{"home_address":{"city":"Vienna","country":"AT"}}"#)
         // English is first in the issuer metadata; a regional German preference must override it.
         for (locale, labels) in [
@@ -73,7 +77,7 @@ final class SharingReviewModelTests: XCTestCase {
         let off = effectivePrepared(#"{"employment":{"job_title":"Engineer"}}"#)
         let on = effectivePrepared(#"{"employment":{"job_title":"Engineer","salary":{"amount":0,"eligible":false,"until":null}}}"#)
         let key = PresentationDisclosureSelection(queryID: "employee", credentialID: "one", path: #""employment"."salary""#)
-        func salary(_ prepared: PreparedPresentationReview, selected: Bool) throws -> EffectiveClaimNode {
+        func salary(_ prepared: ReviewedPresentationClaims, selected: Bool) throws -> EffectiveClaimNode {
             let tree = try effectiveReview(prepared, option, disclosures: selected ? [key] : []).contributions[0].nodes.sharingSection(always: false)
             return try XCTUnwrap(tree.first { $0.label == "Employment" }?.children.first { $0.label == "Salary" })
         }
@@ -101,7 +105,7 @@ final class SharingReviewModelTests: XCTestCase {
         let option = effectiveOption()
         for locations in [[], [.init(sourcePathJSON: "[null]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true)],
                           [.init(sourcePathJSON: "[]", receivedPathJSON: "[]", sharedBy: [], alwaysCarried: true)]] as [[PresentationClaimLocation]] {
-            let prepared = PreparedPresentationReview(credentials: [.init(queryID: "employee", credentialID: "one",
+            let prepared = ReviewedPresentationClaims(credentials: [.init(queryID: "employee", credentialID: "one",
                 format: option.format, claimsJSON: #"{"name":"Maya"}"#, wholeCredential: false, locations: locations)])
             XCTAssertThrowsError(try effectiveReview(prepared, option))
         }
@@ -123,10 +127,15 @@ final class SharingReviewModelTests: XCTestCase {
 
     func testOptionalArrayControlUsesIssuerMetadataAtItsOriginalIndex() throws {
         let base = effectiveOption()
-        let option = PresentationCredentialOption(queryID: base.queryID, credentialID: base.credentialID, format: base.format,
-            issuer: nil, subject: nil, label: base.label, credentialDataJSON: base.credentialDataJSON,
-            disclosures: [.init(path: #""certifications".1"#, name: "SDK fallback", valueJSON: #"{"name":"Cloud security"}"#,
-                displayValue: nil, selectivelyDisclosable: true)], metadataJSON: base.metadataJSON)
+        let option = try PresentationCredentialOption(
+            queryID: base.queryID, credential: .init(id: base.credentialID, format: base.format, credentialDataJSON: base.credentialDataJSON, issuer: nil, subject: nil, label: base.label, metadataJSON: base.metadataJSON),
+            disclosures: [.init(
+                path: #""certifications".1"#,
+                valueJSON: #"{"name":"Cloud security"}"#,
+                disposition: .selectable,
+                name: "SDK fallback"
+            )]
+        )
         let nodes = try effectiveReview(effectivePrepared("{}"), option).contributions[0].nodes.sharingSection(always: false)
         let candidate = try XCTUnwrap(nodes.first?.children.first)
         XCTAssertEqual(candidate.path, [.key("certifications"), .index(1)])
@@ -138,10 +147,15 @@ final class SharingReviewModelTests: XCTestCase {
     func testEqualContributionsMergeOnlyWhenOriginalArrayIdentitiesAlsoMatch() throws {
         let base = effectiveOption()
         func option(_ query: String, index: Int) -> PresentationCredentialOption {
-            .init(queryID: query, credentialID: base.credentialID, format: base.format, issuer: nil, subject: nil,
-                label: base.label, credentialDataJSON: base.credentialDataJSON,
-                disclosures: [.init(path: "\"certifications\".\(index)", name: "Certification", valueJSON: #"{"name":"Cloud security"}"#,
-                    displayValue: nil, selectivelyDisclosable: true, required: true)], metadataJSON: base.metadataJSON)
+            try! PresentationCredentialOption(
+                queryID: query, credential: .init(id: base.credentialID, format: base.format, credentialDataJSON: base.credentialDataJSON, issuer: nil, subject: nil, label: base.label, metadataJSON: base.metadataJSON),
+                disclosures: [.init(
+                    path: "\"certifications\".\(index)",
+                    valueJSON: #"{"name":"Cloud security"}"#,
+                    disposition: .requiredSelective,
+                    name: "Certification"
+                )]
+            )
         }
         let raw = effectivePrepared(#"{"certifications":[{"name":"Cloud security"}]}"#).credentials[0]
         func contribution(_ query: String, index: Int) -> PresentationCredentialClaims {
@@ -169,24 +183,39 @@ final class SharingReviewModelTests: XCTestCase {
 
     private func effectiveOption() -> PresentationCredentialOption {
         let disclosures: [PresentationDisclosure] = [
-            .init(path: #""employment"."job_title""#, name: "Job title", valueJSON: #""Engineer""#, displayValue: nil, selectivelyDisclosable: true, required: true),
-            .init(path: #""certifications".1"#, name: "Cloud security", valueJSON: #"{"name":"Cloud security"}"#, displayValue: nil, selectivelyDisclosable: true, required: true),
-            .init(path: #""employment"."salary""#, name: "salary", valueJSON: #"{"amount":0,"eligible":false,"until":null}"#, displayValue: nil, selectivelyDisclosable: true),
-            .init(path: #""home_address"."city""#, name: "City", valueJSON: #""Bengaluru""#, displayValue: nil, selectivelyDisclosable: true),
+            .init(
+                path: #""employment"."job_title""#,
+                valueJSON: #""Engineer""#,
+                disposition: .requiredSelective,
+                name: "Job title"
+            ),
+            .init(
+                path: #""certifications".1"#,
+                valueJSON: #"{"name":"Cloud security"}"#,
+                disposition: .requiredSelective,
+                name: "Cloud security"
+            ),
+            .init(
+                path: #""employment"."salary""#,
+                valueJSON: #"{"amount":0,"eligible":false,"until":null}"#,
+                disposition: .selectable,
+                name: "salary"
+            ),
+            .init(path: #""home_address"."city""#, valueJSON: #""Bengaluru""#, disposition: .selectable, name: "City"),
         ]
-        return .init(queryID: "employee", credentialID: "one", format: "dc+sd-jwt", issuer: nil, subject: nil, label: "Employee",
-            credentialDataJSON: #"{"employment":{"job_title":"Engineer","manager_name":"Withheld"},"certifications":[{}, {"name":"Cloud security"}]}"#,
-            disclosures: disclosures,
-            metadataJSON: #"{"credentialClaims":[{"path":["certifications",1],"display":[{"name":"Cloud security"}]}]}"#)
+        return try! PresentationCredentialOption(
+            queryID: "employee", credential: .init(id: "one", format: "dc+sd-jwt", credentialDataJSON: #"{"employment":{"job_title":"Engineer","manager_name":"Withheld"},"certifications":[{}, {"name":"Cloud security"}]}"#, issuer: nil, subject: nil, label: "Employee", metadataJSON: #"{"credentialClaims":[{"path":["certifications",1],"display":[{"name":"Cloud security"}]}]}"#),
+            disclosures: disclosures
+        )
     }
 
-    private func effectiveReview(_ prepared: PreparedPresentationReview, _ option: PresentationCredentialOption,
+    private func effectiveReview(_ prepared: ReviewedPresentationClaims, _ option: PresentationCredentialOption,
                                  disclosures: Set<PresentationDisclosureSelection> = []) throws -> EffectivePresentationReview {
         try .init(prepared: prepared, model: .init(request: .init(requester: nil), credentialOptions: [option]),
             selection: .init(credentials: [option.selection], disclosures: disclosures))
     }
 
-    private func effectivePrepared(_ claims: String) -> PreparedPresentationReview {
+    private func effectivePrepared(_ claims: String) -> ReviewedPresentationClaims {
         var locations: [PresentationClaimLocation] = []
         func encoded(_ path: [ClaimPathExpression.Segment]) -> String {
             let values: [Any] = path.map { switch $0 { case .key(let key): return key; case .index(let index): return index; case .wildcard: return NSNull() } }
@@ -231,17 +260,17 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(scheduled.fields.filter { $0.group == .timing }.map(\.paymentPath), [["execution_date"]])
     }
 
-    func testSoleRequiredMatchesHaveNoSelectionControlButAlternativesRemainSelectable() {
+    func testSoleRequiredMatchesHaveNoSelectionControlButAlternativesRemainSelectable() throws {
         let identity = option(queryID: "pid", credentialID: "one")
         let address = option(queryID: "address", credentialID: "two")
         let request = SharingRequest(requester: nil)
         XCTAssertFalse(SharingReviewModel(request: request, credentialOptions: [identity]).allowsCredentialSelection(identity))
         let both = SharingReviewModel(request: request, credentialOptions: [identity, address],
-            credentialRequirements: [.init(options: [["pid", "address"]])])
+            credentialRequirements: [try .init(options: [["pid", "address"]])])
         XCTAssertFalse(both.allowsCredentialSelection(identity))
         XCTAssertFalse(both.allowsCredentialSelection(address))
         let either = SharingReviewModel(request: request, credentialOptions: [identity, address],
-            credentialRequirements: [.init(options: [["pid"], ["address"]])])
+            credentialRequirements: [try .init(options: [["pid"], ["address"]])])
         XCTAssertTrue(either.allowsCredentialSelection(identity))
         XCTAssertTrue(either.allowsCredentialSelection(address))
         let alternatives = SharingReviewModel(request: request,
@@ -251,8 +280,8 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Requester identity
 
-    func testNormalOpenIDReviewIsHeadedByVerifierMetadataAndNotByAVerifiedOrigin() {
-        let review = openIDPreview(
+    func testNormalOpenIDReviewIsHeadedByVerifierMetadataAndNotByAVerifiedOrigin() throws {
+        let review = try openIDPreview(
             verifierMetadata: VerifierMetadata(
                 display: MetadataDisplay(name: "Example Verifier", locale: "en", logoURI: nil, logoAltText: nil),
                 clientURI: "https://verifier.example",
@@ -275,8 +304,8 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(requester?.details.first { $0.label == "Privacy policy" }?.linkURI, "https://verifier.example/privacy")
     }
 
-    func testARequestWithoutVerifierMetadataGetsNoRequesterSection() {
-        let review = openIDPreview(verifierMetadata: nil).sharingReview()
+    func testARequestWithoutVerifierMetadataGetsNoRequesterSection() throws {
+        let review = try openIDPreview(verifierMetadata: nil).sharingReview()
 
         XCTAssertNil(
             review.request.requester,
@@ -284,8 +313,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testVerifierMetadataCarryingNothingUsableIsTreatedAsAbsent() {
-        let review = openIDPreview(
+    func testVerifierMetadataCarryingNothingUsableIsTreatedAsAbsent() throws {
+        let review = try openIDPreview(
             verifierMetadata: VerifierMetadata(
                 display: MetadataDisplay(name: "   ", locale: nil, logoURI: nil, logoAltText: nil),
                 clientURI: nil,
@@ -297,8 +326,8 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertNil(review.request.requester)
     }
 
-    func testAnnexCReviewIsHeadedByTheVerifiedOriginTheWalletWillBindTheResponseTo() {
-        let review = annexCPreview(verifiedOrigin: "https://reader.example").sharingReview()
+    func testAnnexCReviewIsHeadedByTheVerifiedOriginTheWalletWillBindTheResponseTo() throws {
+        let review = try annexCPreview(verifiedOrigin: "https://reader.example").sharingReview()
         let requester = try? XCTUnwrap(review.request.requester)
 
         XCTAssertEqual(requester?.fallbackName, "https://reader.example")
@@ -313,8 +342,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testTheReviewDoesNotReinterpretTheOriginTheKMPCanonicalizerReturned() {
-        let review = annexCPreview(verifiedOrigin: "https://Reader.Example:443/").sharingReview()
+    func testTheReviewDoesNotReinterpretTheOriginTheKMPCanonicalizerReturned() throws {
+        let review = try annexCPreview(verifiedOrigin: "https://Reader.Example:443/").sharingReview()
 
         XCTAssertEqual(
             review.request.requester?.verifiedOrigin,
@@ -323,8 +352,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testAnOriginThatHeadsTheRequesterSectionIsCaptionedAsVerifiedAndNotRepeated() {
-        let requester = annexCPreview(verifiedOrigin: "https://reader.example").sharingReview().request.requester
+    func testAnOriginThatHeadsTheRequesterSectionIsCaptionedAsVerifiedAndNotRepeated() throws {
+        let requester = try annexCPreview(verifiedOrigin: "https://reader.example").sharingReview().request.requester
 
         XCTAssertEqual(requester?.identityName, "https://reader.example")
         XCTAssertEqual(
@@ -364,9 +393,9 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Reader trust
 
-    func testAProtocolWithoutReaderAuthenticationGetsNoReaderTrustState() {
+    func testAProtocolWithoutReaderAuthenticationGetsNoReaderTrustState() throws {
         XCTAssertNil(
-            openIDPreview().sharingReview().request.readerTrust,
+            try openIDPreview().sharingReview().request.readerTrust,
             "OpenID4VP has no reader to be trusted or untrusted, so any state here would describe something the request does not contain"
         )
         XCTAssertNil(
@@ -375,10 +404,10 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testAnUnauthenticatedReaderIsReportedAsAnonymousRatherThanAsAFailure() {
+    func testAnUnauthenticatedReaderIsReportedAsAnonymousRatherThanAsAFailure() throws {
         XCTAssertEqual(ReaderTrust.notAuthenticated.sharingReaderTrust(), .notAuthenticated)
         XCTAssertEqual(
-            annexCPreview(readerTrust: .notAuthenticated).sharingReview().request.readerTrust,
+            try annexCPreview(readerTrust: .notAuthenticated).sharingReview().request.readerTrust,
             .notAuthenticated
         )
     }
@@ -392,25 +421,25 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertNotEqual(ReaderTrust.pendingRawRequest.sharingReaderTrust(), .notAuthenticated)
     }
 
-    func testAnUntrustedReaderCarriesTheTrustPolicyReasonRatherThanASignatureVerdict() {
+    func testAnUntrustedReaderCarriesTheTrustPolicyReasonRatherThanASignatureVerdict() throws {
         XCTAssertEqual(
             ReaderTrust.untrusted(reason: "No configured trust anchor").sharingReaderTrust(),
             .untrusted(reason: "No configured trust anchor")
         )
         XCTAssertEqual(
-            annexCPreview(readerTrust: .untrusted(reason: "No configured trust anchor"))
+            try annexCPreview(readerTrust: .untrusted(reason: "No configured trust anchor"))
                 .sharingReview().request.readerTrust,
             .untrusted(reason: "No configured trust anchor")
         )
     }
 
-    func testATrustedReaderCarriesTheIdentityTheWalletCanVouchFor() {
+    func testATrustedReaderCarriesTheIdentityTheWalletCanVouchFor() throws {
         XCTAssertEqual(
             ReaderTrust.trusted(certificateSubject: "CN=Reader").sharingReaderTrust(),
             .trusted(readerIdentity: "CN=Reader")
         )
         XCTAssertEqual(
-            annexCPreview(readerTrust: .trusted(certificateSubject: "CN=Reader"))
+            try annexCPreview(readerTrust: .trusted(certificateSubject: "CN=Reader"))
                 .sharingReview().request.readerTrust,
             .trusted(readerIdentity: "CN=Reader")
         )
@@ -430,12 +459,12 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Response protection
 
-    func testAnUnencryptedOpenIDResponseIsReportedAsUnencryptedRatherThanAsUnknown() {
-        XCTAssertEqual(openIDPreview().sharingReview().request.responseProtection, SharingResponseProtection.none)
+    func testAnUnencryptedOpenIDResponseIsReportedAsUnencryptedRatherThanAsUnknown() throws {
+        XCTAssertEqual(try openIDPreview().sharingReview().request.responseProtection, SharingResponseProtection.none)
     }
 
-    func testAnEncryptedOpenIDResponseReportsTheJWEAlgorithmsAndVerifierKey() {
-        let review = openIDPreview(
+    func testAnEncryptedOpenIDResponseReportsTheJWEAlgorithmsAndVerifierKey() throws {
+        let review = try openIDPreview(
             responseEncryption: .required(
                 ResponseEncryptionDetails(
                     keyManagementAlgorithm: "ECDH-ES",
@@ -459,8 +488,8 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(SharingEncryptionMechanism.jwe.displayName, "JWE encrypted response")
     }
 
-    func testAnnexCReportsTheHPKESuiteISO180137MandatesRatherThanAskingWhetherEncryptionWasRequested() {
-        let review = annexCPreview().sharingReview()
+    func testAnnexCReportsTheHPKESuiteISO180137MandatesRatherThanAskingWhetherEncryptionWasRequested() throws {
+        let review = try annexCPreview().sharingReview()
 
         XCTAssertEqual(
             review.request.responseProtection,
@@ -476,8 +505,8 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Transaction data and technical details
 
-    func testTransactionDataIsGroupedForReviewOnTheNormalOpenIDPath() {
-        let review = openIDPreview(transactionData: [
+    func testTransactionDataIsGroupedForReviewOnTheNormalOpenIDPath() throws {
+        let review = try openIDPreview(transactionData: [
             PresentationTransactionData(
                 type: "urn:test:payment",
                 displayName: "Payment authorization",
@@ -507,7 +536,7 @@ final class SharingReviewModelTests: XCTestCase {
 
     func testPaymentDisplayUsesKnownTypesAndNeverSubstitutesForRequiredConsent() throws {
         for type in ["urn:eudi:sca:payment:1", "org.waltid.transaction-data.payment-authorization"] {
-            let review = openIDPreview(transactionData: [PresentationTransactionData(
+            let review = try openIDPreview(transactionData: [PresentationTransactionData(
                 type: type, displayName: "Localized profile title", credentialQueryIDs: ["pid"], supportedFields: [],
                 rawJSON: #"{"amount":"42.00","currency":"EUR","payee":{"name":"Store"}}"#,
                 detailsJSON: #"{"amount":"42.00","currency":"EUR","payee":{"name":"Store"}}"#
@@ -568,8 +597,8 @@ final class SharingReviewModelTests: XCTestCase {
         return try XCTUnwrap(PaymentReviewState.ready(consent).displays(transactions: []).first)
     }
 
-    func testAnnexCHasNoTransactionDataAndNoOpenIDRequestParametersToShow() {
-        let review = annexCPreview().sharingReview()
+    func testAnnexCHasNoTransactionDataAndNoOpenIDRequestParametersToShow() throws {
+        let review = try annexCPreview().sharingReview()
 
         XCTAssertTrue(review.request.transactionData.isEmpty)
         XCTAssertEqual(
@@ -584,8 +613,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testNormalOpenIDExposesTheProtocolParametersBehindTechnicalDetails() {
-        let review = openIDPreview().sharingReview()
+    func testNormalOpenIDExposesTheProtocolParametersBehindTechnicalDetails() throws {
+        let review = try openIDPreview().sharingReview()
 
         XCTAssertEqual(
             review.request.technicalDetails.map(\.label),
@@ -595,17 +624,17 @@ final class SharingReviewModelTests: XCTestCase {
         XCTAssertEqual(review.request.technicalDetails.first { $0.label == "Nonce" }?.value, "nonce-456")
     }
 
-    func testARejectedRequestStillDescribesWhoAskedSoTheUserCanDecideWhetherToNotifyThem() {
-        let request = PresentationRequestContext(
+    func testARejectedRequestStillDescribesWhoAskedSoTheUserCanDecideWhetherToNotifyThem() throws {
+        let request = try PartialPresentationRequest(
             clientID: "https://verifier.example",
+            requestAuthentication: .unauthenticated,
+            responseEncryption: .notRequired,
             verifierMetadata: VerifierMetadata(
                 display: MetadataDisplay(name: "Example Verifier", locale: "en", logoURI: nil, logoAltText: nil),
                 clientURI: nil,
                 policyURI: nil,
                 termsOfServiceURI: nil
-            ),
-            requestAuthentication: .unauthenticated,
-            responseEncryption: .notRequired
+            )
         ).sharingRequest()
 
         XCTAssertEqual(request.requester?.display?.name, "Example Verifier")
@@ -616,8 +645,8 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Credential requirements and disclosures
 
-    func testAnnexCRequestsEveryListedDocumentSoEachOneIsItsOwnRequirement() {
-        let review = annexCPreview(
+    func testAnnexCRequestsEveryListedDocumentSoEachOneIsItsOwnRequirement() throws {
+        let review = try annexCPreview(
             documentTypes: ["org.iso.18013.5.1.mDL", "eu.europa.ec.eudi.pid.1"],
             credentialOptions: [
                 option(queryID: "annexC.0", credentialID: "cred-mdl"),
@@ -641,20 +670,18 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testAnnexCDisclosuresAreReviewedThroughTheNormalRequestedDisclosureVocabulary() {
-        let review = annexCPreview(credentialOptions: [
+    func testAnnexCDisclosuresAreReviewedThroughTheNormalRequestedDisclosureVocabulary() throws {
+        let review = try annexCPreview(credentialOptions: [
             option(
                 queryID: "annexC.0",
                 credentialID: "cred-mdl",
                 disclosures: [
                     PresentationDisclosure(
                         path: "org.iso.18013.5.1.family_name",
-                        name: "family_name",
                         valueJSON: "\"Doe\"",
-                        displayValue: "Doe",
-                        selectivelyDisclosable: true,
-                        required: true,
-                        selectable: false
+                        disposition: .requiredSelective,
+                        name: "family_name",
+                        displayValue: "Doe"
                     ),
                 ]
             ),
@@ -674,8 +701,8 @@ final class SharingReviewModelTests: XCTestCase {
         )
     }
 
-    func testDeselectingACredentialDropsTheDisclosuresApprovedForIt() {
-        let review = openIDPreview().sharingReview()
+    func testDeselectingACredentialDropsTheDisclosuresApprovedForIt() throws {
+        let review = try openIDPreview().sharingReview()
         let credential = review.credentialOptions[0].selection
         let disclosure = PresentationDisclosureSelection(
             queryID: credential.queryID,
@@ -700,8 +727,8 @@ final class SharingReviewModelTests: XCTestCase {
 
     // MARK: - Action availability
 
-    func testShareStaysUnavailableUntilTheRequestIsSatisfied() {
-        let review = openIDPreview().sharingReview()
+    func testShareStaysUnavailableUntilTheRequestIsSatisfied() throws {
+        let review = try openIDPreview().sharingReview()
 
         XCTAssertFalse(
             review.hasCompleteCredentialSelection([]),
@@ -726,10 +753,20 @@ final class SharingReviewModelTests: XCTestCase {
     func testRepeatedCredentialCombinesQueriesAndRequiredFieldsStayFixed() {
         let required = informationOption(query: "name", name: "Ada")
         let optional = informationOption(query: "optional", name: "Ada", replacing: [
-            .init(path: "birth_date", name: "birth_date", valueJSON: #""1815-12-10""#, displayValue: "1815-12-10",
-                selectivelyDisclosable: true, required: true, selectable: false),
-            .init(path: "$.given_name", name: "given_name", valueJSON: #""Ada""#, displayValue: "Ada",
-                selectivelyDisclosable: true, required: false, selectable: true),
+            .init(
+                path: "birth_date",
+                valueJSON: #""1815-12-10""#,
+                disposition: .requiredSelective,
+                name: "birth_date",
+                displayValue: "1815-12-10"
+            ),
+            .init(
+                path: "$.given_name",
+                valueJSON: #""Ada""#,
+                disposition: .selectable,
+                name: "given_name",
+                displayValue: "Ada"
+            ),
         ])
         let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: [required, optional])
         let groups = review.informationToShare(selection: .init(credentials: [required.selection, optional.selection]),
@@ -743,10 +780,20 @@ final class SharingReviewModelTests: XCTestCase {
     }
 
     func testAdditionalInformationIsVisibleWithoutUnrequestedProtocolMetadata() {
-        let extra = PresentationDisclosure(path: "family_name", name: "family_name", valueJSON: #""Lovelace""#,
-            displayValue: "Lovelace", selectivelyDisclosable: false, required: false, selectable: false, requested: false)
-        let technical = PresentationDisclosure(path: "iss", name: "iss", valueJSON: #""Issuer""#,
-            displayValue: "Issuer", selectivelyDisclosable: false, required: false, selectable: false, requested: false)
+        let extra = PresentationDisclosure(
+            path: "family_name",
+            valueJSON: #""Lovelace""#,
+            disposition: .additionalCleartext,
+            name: "family_name",
+            displayValue: "Lovelace"
+        )
+        let technical = PresentationDisclosure(
+            path: "iss",
+            valueJSON: #""Issuer""#,
+            disposition: .additionalCleartext,
+            name: "iss",
+            displayValue: "Issuer"
+        )
         let option = informationOption(name: "Ada", extra: [extra, technical])
         let details = CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true)
         let fields = informationFields(option: option, details: details, disclosures: [])
@@ -760,8 +807,13 @@ final class SharingReviewModelTests: XCTestCase {
         let options = [("nested", #"["address","name"]"#, "Vienna"), ("name", "name", "Ada"),
                        ("literal", #"["address.name"]"#, "Literal")].map { query, path, value in
             informationOption(query: query, name: value, replacing: [
-                .init(path: path, name: "name", valueJSON: "\"\(value)\"", displayValue: value,
-                    selectivelyDisclosable: true, required: true, selectable: false)
+                .init(
+                    path: path,
+                    valueJSON: "\"\(value)\"",
+                    disposition: .requiredSelective,
+                    name: "name",
+                    displayValue: value
+                )
             ])
         }
         let review = SharingReviewModel(request: SharingRequest(requester: nil), credentialOptions: options)
@@ -787,8 +839,13 @@ final class SharingReviewModelTests: XCTestCase {
     }
 
     func testOptionalClearTextRequestedFieldIsNotPresentedAsAdditional() {
-        let disclosure = PresentationDisclosure(path: "given_name", name: "given_name", valueJSON: #""Ada""#,
-            displayValue: "Ada", selectivelyDisclosable: false, required: false, selectable: false)
+        let disclosure = PresentationDisclosure(
+            path: "given_name",
+            valueJSON: #""Ada""#,
+            disposition: .optionalCleartext,
+            name: "given_name",
+            displayValue: "Ada"
+        )
         let option = informationOption(name: "Ada", replacing: [disclosure])
         let field = informationFields(option: option, details: CredentialDisplayNormalizer.sharingDetails(for: option, includeDisclosures: true), disclosures: [])[0]
         XCTAssertTrue(field.included)
@@ -797,10 +854,16 @@ final class SharingReviewModelTests: XCTestCase {
 
     private func informationOption(id: String = "one", query: String = "pid", name: String, required: Bool = true,
         extra: [PresentationDisclosure] = [], replacing: [PresentationDisclosure]? = nil) -> PresentationCredentialOption {
-        .init(queryID: query, credentialID: id, format: "dc+sd-jwt", issuer: "Issuer", subject: nil, label: "Identity",
-            credentialDataJSON: #"{"given_name":"Ada","family_name":"Lovelace","birth_date":"1815-12-10"}"#,
-            disclosures: replacing ?? [.init(path: "given_name", name: "given_name", valueJSON: "\"\(name)\"",
-                displayValue: name, selectivelyDisclosable: true, required: required, selectable: !required)] + extra)
+        try! PresentationCredentialOption(
+            queryID: query, credential: .init(id: id, format: "dc+sd-jwt", credentialDataJSON: #"{"given_name":"Ada","family_name":"Lovelace","birth_date":"1815-12-10"}"#, issuer: "Issuer", subject: nil, label: "Identity"),
+            disclosures: replacing ?? [.init(
+                path: "given_name",
+                valueJSON: "\"\(name)\"",
+                disposition: required ? .requiredSelective : .selectable,
+                name: "given_name",
+                displayValue: name
+            )] + extra
+        )
     }
 
     // MARK: - Fixtures
@@ -814,17 +877,17 @@ final class SharingReviewModelTests: XCTestCase {
         ),
         responseEncryption: PresentationResponseEncryption = .notRequired,
         transactionData: [PresentationTransactionData] = []
-    ) -> PresentationPreview {
-        PresentationPreview(
+    ) throws -> PresentationPreview {
+        try PresentationPreview(
             previewHandle: PresentationPreviewHandle(value: "preview"),
-            request: PresentationRequestInfo(
+            request: PresentationRequest(
                 clientID: "https://verifier.example",
-                verifierMetadata: verifierMetadata,
                 requestAuthentication: .unauthenticated,
-                responseURI: URL(string: "https://verifier.example/response"),
-                state: "state-123",
                 nonce: "nonce-456",
                 responseEncryption: responseEncryption,
+                verifierMetadata: verifierMetadata,
+                responseURI: URL(string: "https://verifier.example/response"),
+                state: "state-123",
                 transactionData: transactionData
             ),
             credentialOptions: [option(queryID: "pid", credentialID: "cred-1")],
@@ -860,21 +923,15 @@ final class SharingReviewModelTests: XCTestCase {
         disclosures: [PresentationDisclosure] = [
             PresentationDisclosure(
                 path: "$.given_name",
-                name: "given_name",
                 valueJSON: "\"Ada\"",
-                displayValue: "Ada",
-                selectivelyDisclosable: true
+                disposition: .selectable,
+                name: "given_name",
+                displayValue: "Ada"
             ),
         ]
     ) -> PresentationCredentialOption {
-        PresentationCredentialOption(
-            queryID: queryID,
-            credentialID: credentialID,
-            format: "mso_mdoc",
-            issuer: "https://issuer.example",
-            subject: "did:example:holder",
-            label: "Mobile Driving Licence",
-            credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe","given_name":"Ada"}}"#,
+        try! PresentationCredentialOption(
+            queryID: queryID, credential: .init(id: credentialID, format: "mso_mdoc", credentialDataJSON: #"{"org.iso.18013.5.1":{"family_name":"Doe","given_name":"Ada"}}"#, issuer: "https://issuer.example", subject: "did:example:holder", label: "Mobile Driving Licence"),
             disclosures: disclosures
         )
     }

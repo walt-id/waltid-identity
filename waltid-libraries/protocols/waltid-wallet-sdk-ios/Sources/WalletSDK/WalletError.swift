@@ -4,6 +4,8 @@ import Foundation
 public enum WalletError: Error, Equatable, Sendable {
     /// The selected credential status warning changed after it was rendered.
     case credentialStatusReviewChanged
+    /// The wallet's retained selection or holder has changed since review.
+    case presentationReviewChanged
     /// The SDK input could not be parsed or validated.
     case invalidInput(String)
 
@@ -14,20 +16,8 @@ public enum WalletError: Error, Equatable, Sendable {
     ///   - responseSafetyFailure: The reason the error response was not sent.
     case presentationValidation(code: PresentationErrorCode, message: String, responseSafetyFailure: String)
 
-    /// Network communication with an issuer, verifier, or wallet backend failed.
-    case network(String)
-
-    /// Issuer-side credential issuance failed.
-    case issuer(String)
-
-    /// Verifier-side presentation handling failed.
-    case verifier(String)
-
     /// Local wallet storage failed.
     case storage(String)
-
-    /// Key management, signing, or cryptographic processing failed.
-    case crypto(String)
 
     /// A protected wallet-key request failed for a stable, actionable reason.
     case keyUseAuthorization(WalletKeyUseAuthorizationFailure)
@@ -35,56 +25,11 @@ public enum WalletError: Error, Equatable, Sendable {
     /// Payment review or authorization failed for a stable reason.
     case paymentConsent(PaymentConsentFailure, message: String)
 
-    /// The requested credential was not found in the wallet.
-    case credentialNotFound(String)
-
     /// The operation was cancelled.
     case cancelled
 
     /// The SDK encountered an unexpected internal failure.
     case internalFailure(String)
-}
-
-extension WalletError: LocalizedError {
-    /// A localized, user-readable description of the wallet error.
-    public var errorDescription: String? {
-        switch self {
-        case .invalidInput(let message),
-             .network(let message),
-             .issuer(let message),
-             .verifier(let message),
-             .storage(let message),
-             .crypto(let message),
-             .credentialNotFound(let message),
-             .internalFailure(let message):
-            return message
-        case .presentationValidation(let code, let message, let responseSafetyFailure):
-            return "\(code.errorCode): \(message). Error response was not sent: \(responseSafetyFailure)"
-        case .paymentConsent(_, let message):
-            return message
-        case .keyUseAuthorization(let failure):
-            return "Wallet key authorization failed: \(failure)"
-        case .credentialStatusReviewChanged:
-            return "Credential status changed. Review the updated information before sharing."
-        case .cancelled:
-            return "The wallet operation was cancelled."
-        }
-    }
-
-    /// A localized explanation of why the wallet error occurred.
-    public var failureReason: String? {
-        nil
-    }
-
-    /// A localized recovery suggestion for the wallet error.
-    public var recoverySuggestion: String? {
-        nil
-    }
-
-    /// A localized help anchor for documentation related to the wallet error.
-    public var helpAnchor: String? {
-        nil
-    }
 }
 
 /// Stable reasons for refusing payment consent, resolved by the shared wallet core.
@@ -109,4 +54,43 @@ public enum PaymentConsentFailure: Equatable, Sendable {
     case consentRequired
     /// The selection or another bound input changed after review.
     case staleConsent
+}
+
+extension WalletError: LocalizedError {
+    /// A localized, user-readable description of the wallet error.
+    public var errorDescription: String? {
+        switch self {
+        case .invalidInput(let message),
+             .storage(let message),
+             .internalFailure(let message):
+            return message
+        case .presentationValidation(let code, let message, let responseSafetyFailure):
+            return "\(code.errorCode): \(message). Error response was not sent: \(responseSafetyFailure)"
+        case .paymentConsent(_, let message):
+            return message
+        case .keyUseAuthorization(let failure):
+            return "Wallet key authorization failed: \(failure)"
+        case .presentationReviewChanged:
+            return "Presentation changed. Review the updated selection before sharing."
+        case .credentialStatusReviewChanged:
+            return "Credential status changed. Review the updated information before sharing."
+        case .cancelled:
+            return "The wallet operation was cancelled."
+        }
+    }
+
+    /// A localized explanation of why the wallet error occurred.
+    public var failureReason: String? {
+        nil
+    }
+
+    /// A localized recovery suggestion for the wallet error.
+    public var recoverySuggestion: String? {
+        nil
+    }
+
+    /// A localized help anchor for documentation related to the wallet error.
+    public var helpAnchor: String? {
+        nil
+    }
 }

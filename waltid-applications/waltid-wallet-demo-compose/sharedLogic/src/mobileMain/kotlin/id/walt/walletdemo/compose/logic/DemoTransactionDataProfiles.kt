@@ -1,6 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
+import id.walt.wallet2.mobile.presentation.TransactionDataProfile
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
@@ -12,12 +12,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 internal data class DemoTransactionDataProfilesResult(
-    val profiles: List<MobileWalletTransactionDataProfile>,
+    val profiles: List<TransactionDataProfile>,
     val warning: String? = null,
 )
 
 internal suspend fun DemoWalletConfig.resolveDemoTransactionDataProfiles(
-    loadProfiles: suspend (String) -> List<MobileWalletTransactionDataProfile> = ::fetchTransactionDataProfiles,
+    loadProfiles: suspend (String) -> List<TransactionDataProfile> = ::fetchTransactionDataProfiles,
 ): DemoTransactionDataProfilesResult {
     val url = transactionDataProfilesUrl.trim()
     if (url.isEmpty()) {
@@ -36,7 +36,7 @@ internal suspend fun DemoWalletConfig.resolveDemoTransactionDataProfiles(
 private suspend fun fetchTransactionDataProfiles(url: String) =
     transactionDataProfilesClient.use { client ->
         client.get(url).body<List<TransactionDataProfileDto>>().map {
-            MobileWalletTransactionDataProfile(
+            TransactionDataProfile(
                 type = it.type,
                 displayName = it.displayName,
                 fields = it.fields,

@@ -27,6 +27,7 @@ data class WalletDemoIssuanceSession(
 )
 
 data class WalletDemoIssuanceAuthorization(
+    val id: String,
     val url: String,
 )
 

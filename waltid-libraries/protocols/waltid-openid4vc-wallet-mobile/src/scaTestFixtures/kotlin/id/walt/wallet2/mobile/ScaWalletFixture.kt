@@ -1,7 +1,5 @@
 package id.walt.wallet2.mobile
 
-import id.walt.sdjwt.metadata.type.MetadataIntegrity
-import id.walt.sdjwt.metadata.type.TypeMetadataResolver
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
@@ -10,35 +8,52 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.sdjwt.*
+import id.walt.sdjwt.metadata.type.MetadataIntegrity
+import id.walt.sdjwt.metadata.type.TypeMetadataResolver
 import id.walt.wallet2.consent.PaymentCredentialIssuer
+import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialPreview
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialRequest
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialResponse
+import id.walt.wallet2.mobile.presentation.PresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.PresentationSelection
+import id.walt.wallet2.mobile.presentation.TransactionDataProfile
+import id.walt.wallet2.mobile.presentation.NativeScaPresentationAuthorizer
+import id.walt.wallet2.mobile.proximity.snapshot
+import id.walt.wallet2.persistence.keys.*
+import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.headersOf
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
-import id.walt.wallet2.data.WalletKeyStore
-import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.persistence.keys.*
-import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
-import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import kotlinx.serialization.json.*
 
 /** Synthetic issuer and payment data, shared by host and opt-in native tests. */
-internal data class ScaWalletFixture(val wallet: MobileWallet, val request: JsonObject) {
-    suspend fun preview(): MobileWalletDigitalCredentialPreview = wallet.previewDigitalCredentialPresentation(
-        MobileWalletDigitalCredentialRequest(
-            protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+internal data class ScaWalletFixture(val wallet: Wallet, val request: JsonObject) {
+    suspend fun preview(): DigitalCredentialPreview = wallet.previewDigitalCredentialPresentation(
+        DigitalCredentialRequest(
+            protocol = DigitalCredentialProtocols.OPENID4VP_UNSIGNED,
             dataJson = request.toString(), verifiedOrigin = "https://verifier.example",
         ),
     )
-    suspend fun submit(preview: MobileWalletDigitalCredentialPreview): MobileWalletDigitalCredentialResponse {
+    suspend fun submit(preview: DigitalCredentialPreview): DigitalCredentialResponse {
         val selections = preview.credentialOptions.map {
-            MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+            PresentationCredentialSelection(it.queryId, it.credential.id)
         }
-        val consent = requireNotNull(wallet.prepareDigitalCredentialPaymentConsent(preview.requestId, selections))
-        return wallet.submitDigitalCredentialPresentation(preview.requestId, selections,
-            paymentConsentRevision = consent.revision)
+        val consent = requireNotNull(wallet.prepareDigitalCredentialPaymentConsent(
+            preview.requestId,
+            PresentationSelection(credentials = selections),
+        ))
+        return wallet.submitDigitalCredentialPresentation(
+            preview.requestId,
+            PresentationSelection(credentials = selections),
+            paymentConsentRevision = consent.revision,
+        )
     }
 }
 
@@ -112,7 +127,7 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
         }) })
     }
     val backingStore = InMemoryKeyStore().also { it.addCrypto2Key(key) }
-    val keys = object : MobileWalletKeyStore, WalletKeyStore by backingStore {
+    val keys = object : PolicyAwareWalletKeyStore, WalletKeyStore by backingStore {
         override suspend fun keyUseAuthorizationPolicy(keyId: String): KeyUseAuthorizationPolicy? =
             (backingStore.getKeyMaterial(keyId)?.crypto2Key as? ManagedKey)?.let {
                 provider.keyUseAuthorizationPolicy(it.storedKey)
@@ -122,9 +137,9 @@ internal suspend fun scaWalletFixture(key: Key, provider: PlatformManagedKeyProv
         it.addCredential(StoredCredential("synthetic-sca", CredentialParser.detectAndParse(credential.toString()).second,
             metadata = buildJsonObject { put("sdJwtVcTypeMetadata", metadataSnapshot) }))
     }
-    val wallet = MobileWallet(
+    val wallet = Wallet(
         walletId = "synthetic-sca-wallet", keyStore = keys, didStore = InMemoryDidStore(), credentialStore = credentials,
-        transactionDataProfiles = listOf(MobileWalletTransactionDataProfile("urn:eudi:sca:payment:1")),
+        transactionDataProfiles = listOf(TransactionDataProfile("urn:eudi:sca:payment:1")),
         scaAuthorizer = NativeScaPresentationAuthorizer(provider),
         preferredLocales = listOf("en"),
         paymentCredentialIssuers = listOf(PaymentCredentialIssuer("https://issuer.example",

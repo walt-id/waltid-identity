@@ -1,5 +1,8 @@
 package id.walt.wallet2.handlers
 
+import id.walt.wallet2.consent.PaymentConsentPolicy
+import id.walt.wallet2.consent.PaymentConsentResolver
+import kotlin.test.assertFailsWith
 import com.sun.net.httpserver.HttpServer
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.status.CredentialStatusKind
@@ -49,7 +52,13 @@ import kotlin.time.Instant
 class WalletStatusReviewedPresentationTest {
     @Test
     @Timeout(30)
-    fun callerCannotAdoptANewStatusWhileTheHolderSignatureIsPending() = runBlocking {
+    fun callerCannotAdoptANewStatusWhileTheHolderSignatureIsPending() = runBlocking { exercisePendingSignature(false) }
+
+    @Test
+    @Timeout(30)
+    fun retainedReviewRejectsForeignAndSupersededDecisionsAndRechecksAfterSigning() = runBlocking { exercisePendingSignature(true) }
+
+    private suspend fun exercisePendingSignature(retain: Boolean) = kotlinx.coroutines.coroutineScope {
         val fixture = batchTestFixture(true)
         val holder = fixture.keys.first().requireCrypto2Key()
         val signing = CompletableDeferred<Unit>()
@@ -92,7 +101,8 @@ class WalletStatusReviewedPresentationTest {
         try {
             service.refresh(mode = CredentialStatusRefreshMode.FORCE)
             val initial = service.snapshot().credentials.single().presentation
-            assertEquals(CredentialStatusKind.CHECKED, initial.kind)
+            assertEquals(CredentialStatusKind.CHECKED, initial.kind,
+                "Initial status issue: ${initial.issue}, discovery: ${initial.discoveryProblem}, failure: ${initial.failure}")
             val reviewed = mutableMapOf("resident" to initial.advisoryRevision)
             val request = AuthorizationRequest(
                 clientId = "redirect_uri:https://verifier.example/callback",
@@ -107,11 +117,29 @@ class WalletStatusReviewedPresentationTest {
                 executionKey = { fixture.keys.first() }, onEvent = {}, transactionDataTypeRegistry = registry,
                 resolveAuthorizationRequest = { ResolvedAuthorizationRequest.Plain(request) },
             ))
+            val selection = SubmitPresentationRequest(preview.handle, listOf(PresentationCredentialSelection("identity", "resident")))
+            val policy = PaymentConsentPolicy(PaymentConsentResolver(emptyList()), emptyList())
+            val receipt = if (retain) {
+                val first = WalletPresentationHandler.retainPresentationReview(fixture.wallet, selection, policy)
+                val latest = WalletPresentationHandler.retainPresentationReview(fixture.wallet, selection, policy)
+                assertEquals("resident", latest.claims.credentials.single().credentialId)
+                assertEquals(initial.advisoryRevision, latest.status.credentials.single().presentation.advisoryRevision)
+                assertFailsWith<PresentationReviewChangedException> {
+                    WalletPresentationHandler.submitReviewedPresentation(fixture.wallet, first, registry, null)
+                }
+                assertFailsWith<IllegalArgumentException> {
+                    WalletPresentationHandler.submitReviewedPresentation(fixture.wallet.copy(), latest, registry, null)
+                }
+                val other = fixture.wallet.copy()
+                assertFailsWith<IllegalArgumentException> { WalletPresentationHandler.discardInstancePreview(other, preview.handle) }
+                assertFailsWith<IllegalArgumentException> { WalletPresentationHandler.rejectInstancePresentation(other, RejectPresentationRequest(preview.handle)) }
+                WalletPresentationHandler.closeInstancePreviews(other)
+                latest
+            } else null
             val result = async {
                 runCatching {
-                    WalletPresentationHandler.submitStatusReviewedPresentation(fixture.wallet,
-                        SubmitPresentationRequest(preview.handle, listOf(PresentationCredentialSelection("identity", "resident"))),
-                        reviewed, registry)
+                    if (receipt == null) WalletPresentationHandler.submitStatusReviewedPresentation(fixture.wallet, selection, reviewed, registry)
+                    else WalletPresentationHandler.submitReviewedPresentation(fixture.wallet, receipt, registry, null)
                 }
             }
             select<Unit> {

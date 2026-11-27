@@ -11,17 +11,17 @@ final class IdentityDocumentProviderMappingTests: XCTestCase {
     private let pid = "eu.europa.ec.eudi.pid.1"
 
     func testEveryPresentmentContributesItsRequestedElements() throws {
-        let snapshot = MobileDocumentRequestSnapshot(presentments: [
-            MobileDocumentPresentmentSnapshot(documentRequestSets: [
-                MobileDocumentRequestSetSnapshot(requests: [
+        let snapshot = MdocRequestSnapshot(presentments: [
+            MdocPresentmentSnapshot(documentRequestSets: [
+                MdocRequestSetSnapshot(requests: [
                     AnnexCDocumentRequest(
                         documentType: mdl,
                         namespaces: ["org.iso.18013.5.1": ["family_name", "portrait"]]
                     ),
                 ]),
             ]),
-            MobileDocumentPresentmentSnapshot(documentRequestSets: [
-                MobileDocumentRequestSetSnapshot(requests: [
+            MdocPresentmentSnapshot(documentRequestSets: [
+                MdocRequestSetSnapshot(requests: [
                     AnnexCDocumentRequest(
                         documentType: pid,
                         namespaces: ["eu.europa.ec.eudi.pid.1": ["birth_date"]]
@@ -37,12 +37,12 @@ final class IdentityDocumentProviderMappingTests: XCTestCase {
     }
 
     func testAlternativeRequestSetsAreRejectedRatherThanSilentlyNarrowed() {
-        let snapshot = MobileDocumentRequestSnapshot(presentments: [
-            MobileDocumentPresentmentSnapshot(documentRequestSets: [
-                MobileDocumentRequestSetSnapshot(requests: [
+        let snapshot = MdocRequestSnapshot(presentments: [
+            MdocPresentmentSnapshot(documentRequestSets: [
+                MdocRequestSetSnapshot(requests: [
                     AnnexCDocumentRequest(documentType: mdl, namespaces: [:]),
                 ]),
-                MobileDocumentRequestSetSnapshot(requests: [
+                MdocRequestSetSnapshot(requests: [
                     AnnexCDocumentRequest(documentType: pid, namespaces: [:]),
                 ]),
             ]),
@@ -59,7 +59,7 @@ final class IdentityDocumentProviderMappingTests: XCTestCase {
 
     func testEmptyRequestIsRejected() {
         XCTAssertThrowsError(
-            try parsedRequest(from: MobileDocumentRequestSnapshot(presentments: []))
+            try parsedRequest(from: MdocRequestSnapshot(presentments: []))
         ) { error in
             XCTAssertEqual(error as? IdentityDocumentSupportFailure, .emptyRequest)
         }

@@ -15,12 +15,12 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.fragment.app.FragmentActivity
 import id.walt.walletdemo.compose.logic.DemoWalletConfig
+import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoProximityController
 import id.walt.walletdemo.compose.logic.DemoReaderTrustSettingsController
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.logic.WalletAuthState
-import id.walt.walletdemo.compose.ui.MobileWalletDemoApp
+import id.walt.walletdemo.compose.ui.WalletDemoHost
 import kotlinx.coroutines.launch
 
 const val WALLET_SIGNING_PROTECTION_MODE_EXTRA =
@@ -77,7 +77,7 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
+            WalletDemoHost(controller, proximityController, readerTrustSettingsController)
         }
     }
 

@@ -14,9 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import id.walt.wallet2.mobile.ProximityCredentialOption
-import id.walt.wallet2.mobile.ProximityElementReference
-import id.walt.wallet2.mobile.ProximityReview
+import id.walt.wallet2.mobile.proximity.ProximityCredentialOption
+import id.walt.wallet2.mobile.proximity.ProximityElementReference
+import id.walt.wallet2.mobile.proximity.ProximityReview
 import id.walt.walletdemo.compose.logic.ClaimItem
 import id.walt.walletdemo.compose.logic.CredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoProximityDocumentSelection

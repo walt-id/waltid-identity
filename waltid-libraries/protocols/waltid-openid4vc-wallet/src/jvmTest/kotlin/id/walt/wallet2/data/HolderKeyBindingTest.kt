@@ -48,11 +48,15 @@ import id.walt.wallet2.handlers.WalletCredentialHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.walt.wallet2.handlers.BuildVpTokenRequest
 import id.walt.wallet2.handlers.requireCrypto2SigningKey
+import id.walt.wallet2.handlers.selectPresentableFromStores
+import id.walt.wallet2.handlers.withBoundMdocDeviceAuthentication
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.http.Url
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
@@ -193,6 +197,18 @@ class HolderKeyBindingTest {
     }
 
     @Test
+    fun `mdoc format discovery propagates holder key cancellation`() = runTest {
+        val credential = mdocCredential(signingKey("cancelled-lookup"))
+        val cancellation = CancellationException("Holder key lookup cancelled")
+
+        val failure = assertFailsWith<CancellationException> {
+            WalletPresentationFormatRegistry.defaultCapabilities()
+                .withBoundMdocDeviceAuthentication(listOf(credential)) { _, _ -> throw cancellation }
+        }
+        assertSame(cancellation, failure)
+    }
+
+    @Test
     fun `store matching does not offer an unbound mdoc for presentation`() = runTest {
         val holderKey = signingKey("holder")
         val unbound = mdocCredential(holderKey)
@@ -276,7 +292,7 @@ class HolderKeyBindingTest {
         ).also { credentialStore.addCredential(it) }
         val query = DcqlQuery(credentials = listOf(mdocQuery("mdl", MDOC_DOCTYPE)))
 
-        val selected = WalletPresentationHandler.selectPresentableFromStores(
+        val selected = selectPresentableFromStores(
             wallet = wallet,
             query = query,
         )

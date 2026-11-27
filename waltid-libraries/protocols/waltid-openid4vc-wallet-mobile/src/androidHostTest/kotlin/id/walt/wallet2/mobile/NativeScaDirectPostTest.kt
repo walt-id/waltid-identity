@@ -8,16 +8,19 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
+import id.walt.wallet2.mobile.presentation.PresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.PresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.PresentationSelection
 import id.walt.wallet2.persistence.keys.*
 import io.ktor.http.URLBuilder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.*
 import java.net.InetSocketAddress
 import java.net.URLDecoder
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.*
 
 /** Real reviewed wallet submission and HTTP delivery; native authentication is simulated here. */
 class NativeScaDirectPostTest {
@@ -70,12 +73,16 @@ class NativeScaDirectPostTest {
                 parameters["response_uri"] = endpoint
                 parameters["client_id"] = "redirect_uri:$endpoint"
             }.buildString()
-            val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(fixture.wallet.previewPresentation(request)).preview
+            val preview = assertIs<PresentationPreviewResult.Ready>(fixture.wallet.previewPresentation(request)).preview
             val selections = preview.credentialOptions.map {
-                MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+                PresentationCredentialSelection(it.queryId, it.credential.id)
             }
-            val consent = assertNotNull(fixture.wallet.preparePaymentConsent(preview.previewHandle, selections))
-            fixture.wallet.submitPresentation(preview.previewHandle, selections, paymentConsentRevision = consent.revision)
+            val review = fixture.wallet.reviewPresentation(
+                preview.previewHandle,
+                PresentationSelection(credentials = selections),
+            )
+            assertNotNull(review.payment)
+            fixture.wallet.submitPresentation(review)
             val vp = Json.parseToJsonElement(assertNotNull(received.get())["vp_token"]!!)
                 .jsonObject.getValue("payment").jsonArray.single().jsonPrimitive.content
             val proof = CompactJws.verify(vp.substringAfterLast('~'), key, JwsAlgorithm.ES256)

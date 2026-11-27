@@ -1,17 +1,12 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.digitalcredentials.MaxRegistryIconBytes
+import id.walt.wallet2.mobile.digitalcredentials.createRegistryImageHttpClient
+import id.walt.wallet2.mobile.digitalcredentials.fetchRegistryIconBytes
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.api.createClientPlugin
 import io.ktor.http.URLProtocol
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
-import org.junit.Test
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -24,6 +19,14 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import org.junit.Test
 
 /** Real Android HTTP transport: MockEngine and host URLConnection cannot reproduce the platform race. */
 class RegistryImageFetchTest {

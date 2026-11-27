@@ -66,17 +66,17 @@ internal class WalletDemoActivityModel(
     /** A browser callback after process loss continues once, even if MainActivity then rotates. */
     fun drainOrphanCreateAuthorization() {
         while (true) {
-            val (sessionId, callbackUri) = OrphanAuthorizationCallback.take() ?: return
+            val (authorizationId, callbackUri) = OrphanAuthorizationCallback.take() ?: return
             viewModelScope.launch {
                 try {
                     wallet.bootstrap(config.selectedSigningProtection(applicationContext))
-                    val outcome = wallet.continueAuthorizationIssuance(sessionId, callbackUri)
+                    val outcome = wallet.completeAuthorization(authorizationId, callbackUri)
                     WalletDemoCredentialStoreNotifier.notifyChanged()
                     Log.i("WaltDigitalCredentials", "Recovered provider authorization: ${outcome::class.simpleName}")
                 } catch (cause: CancellationException) { throw cause
                 } catch (cause: Exception) {
                     Log.e("WaltDigitalCredentials", "Could not recover provider authorization", cause)
-                } finally { DigitalCredentialCreateAuthHandoff.clear(applicationContext, sessionId) }
+                } finally { DigitalCredentialCreateAuthHandoff.clear(applicationContext, authorizationId) }
             }
         }
     }

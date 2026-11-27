@@ -4,14 +4,21 @@ import XCTest
 @testable import WalletSDK
 
 final class ProximityBridgeContractTests: XCTestCase {
+    func testRequiredProximityCollectionsPreserveEveryEntryOrFail() throws {
+        XCTAssertEqual(try requiredBridgeArray(NSArray(), of: String.self), [])
+        XCTAssertEqual(try requiredBridgeSet(NSSet(), of: String.self), [])
+        XCTAssertThrowsError(try requiredBridgeArray(NSArray(objects: "retained" as NSString, NSNumber(value: 1)), of: String.self))
+        XCTAssertThrowsError(try requiredBridgeSet(NSSet(objects: "retained" as NSString, NSNumber(value: 1)), of: String.self))
+    }
+
     func testAggregateRoutesAndRemediationOrderMatchKMP() throws {
         let ble = WalletSDK.ProximityRetrievalOptions()
-        let wifi = WalletSDK.ProximityRetrievalOptions(bluetoothLowEnergy: nil, wifiAware: true)
+        let wifi = try WalletSDK.ProximityRetrievalOptions(bluetoothLowEnergy: nil, wifiAware: true)
         let cases: [(WalletSDK.ProximitySessionConfiguration, [Bool])] = [
             (.qr(ble), [true, false, true, false, false, false]),
-            (.nfc(.init(handover: .negotiatedHandover, retrieval: ble, qrFallback: wifi)),
+            (.nfc(try .init(handover: .negotiatedHandover, retrieval: ble, qrFallback: wifi)),
                 [true, true, true, false, false, true]),
-            (.provisionalNFCV2(.init(qrFallback: wifi, wifiAware: true)),
+            (.provisionalNFCV2(try .init(qrFallback: wifi, wifiAware: true)),
                 [true, true, false, false, true, true]),
         ]
         for (session, selected) in cases {
@@ -35,7 +42,7 @@ final class ProximityBridgeContractTests: XCTestCase {
                     qrEngagement: observations[0], nfcEngagement: observations[1],
                     bluetoothLowEnergy: observations[2], nfcRetrieval: observations[3],
                     nfcV2Retrieval: observations[4], wifiAwareRetrieval: observations[5])
-                let swift = core.toSwiftCapabilities()
+                let swift = try core.toSwiftCapabilities()
                 XCTAssertEqual(swift.mayStart, core.mayStart)
                 XCTAssertEqual(swift.qrMayStart, core.qrMayStart)
                 XCTAssertEqual(swift.nfcMayStart, core.nfcMayStart)

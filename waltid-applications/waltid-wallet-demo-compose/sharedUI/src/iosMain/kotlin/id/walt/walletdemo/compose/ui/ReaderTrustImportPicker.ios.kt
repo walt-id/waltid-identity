@@ -5,7 +5,7 @@ package id.walt.walletdemo.compose.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
-import id.walt.wallet2.mobile.ProximityReaderTrustSettingsCodec
+import id.walt.wallet2.mobile.proximity.trust.ProximityReaderTrustSettingsCodec
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned

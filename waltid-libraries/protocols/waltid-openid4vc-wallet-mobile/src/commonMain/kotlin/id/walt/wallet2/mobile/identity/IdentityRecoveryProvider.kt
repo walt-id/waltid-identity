@@ -34,12 +34,16 @@ public data class IdentityRecoveryProviderStatus(
 
 /** Secret bytes crossing the trusted provider boundary. Never log or include them in UI/analytics. */
 public class IdentityRecoveryData(bytes: ByteArray) {
-    private val bytes: ByteArray = bytes.copyOf()
-    init { require(bytes.size in 1..MAX_BYTES) { "Recovery record exceeds the supported size" } }
     /** Returns a defensive copy for a trusted storage/encryption adapter. */
     public fun copyBytes(): ByteArray = bytes.copyOf()
+
     /** Redacted representation safe for diagnostic output. */
     override fun toString(): String = "IdentityRecoveryData(redacted)"
+
+    private val bytes: ByteArray = bytes.copyOf()
+
+    init { require(bytes.size in 1..MAX_BYTES) { "Recovery record exceeds the supported size" } }
+
     /** Recovery record bounds. */
     public companion object {
         /** Upper bound for a single identity record, compatible with Block Store's per-entry limit. */

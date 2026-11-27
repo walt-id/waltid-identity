@@ -68,8 +68,8 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     override suspend fun startIssuance(offerUrl: String, redirectUri: String, did: String?) =
         wallet().startIssuance(offerUrl, redirectUri, did)
 
-    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>) =
-        wallet().beginAuthorizationIssuance(sessionId, credentials)
+    override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>) =
+        wallet().beginAuthorizationIssuance(sessionId, redirectUri, credentials)
 
 
     override suspend fun listDeferredIssuance() = wallet().listDeferredIssuance()
@@ -77,24 +77,10 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
     override suspend fun continuePreAuthorizedIssuance(sessionId: String, transactionCode: String?, credentials: List<WalletDemoCredentialSelection>) =
         wallet().continuePreAuthorizedIssuance(sessionId, transactionCode, credentials)
 
-    override suspend fun continueAuthorizationIssuance(sessionId: String, callbackUri: String) =
-        wallet().continueAuthorizationIssuance(sessionId, callbackUri)
+    override suspend fun completeAuthorization(authorizationId: String, callbackUri: String) =
+        wallet().completeAuthorization(authorizationId, callbackUri)
 
     override suspend fun cancelIssuance(sessionId: String) = wallet().cancelIssuance(sessionId)
-
-    override suspend fun rejectIssuedCredential(
-        notificationId: String,
-        accessToken: String,
-        credentialIssuerBaseUrl: String?,
-        notificationEndpoint: String?,
-        eventDescription: String?,
-    ) = wallet().rejectIssuedCredential(
-        notificationId = notificationId,
-        accessToken = accessToken,
-        credentialIssuerBaseUrl = credentialIssuerBaseUrl,
-        notificationEndpoint = notificationEndpoint,
-        eventDescription = eventDescription,
-    )
 
     override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
         wallet().resumeDeferredIssuance(deferredCredentialId)

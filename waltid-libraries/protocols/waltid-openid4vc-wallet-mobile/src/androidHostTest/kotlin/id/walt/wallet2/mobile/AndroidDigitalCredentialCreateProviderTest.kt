@@ -6,6 +6,15 @@ import androidx.credentials.ExperimentalDigitalCredentialApi
 import androidx.credentials.exceptions.CreateCredentialCancellationException
 import androidx.credentials.exceptions.CreateCredentialUnknownException
 import androidx.credentials.provider.PendingIntentHandler
+import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialCreateProvider
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.OPENID4VCI_CREATE_PROTOCOLS
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -13,12 +22,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -38,7 +41,7 @@ class AndroidDigitalCredentialCreateProviderTest {
             verifiedOrigin = "https://issuer.example",
         )
 
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1, request.protocol)
+        assertEquals(DigitalCredentialProtocols.OPENID4VCI_V1, request.protocol)
         assertEquals("https://issuer.example", request.verifiedOrigin)
         val offer = Json.parseToJsonElement(request.offerJson).jsonObject
         assertEquals("https://issuer.example", offer["credential_issuer"]?.jsonPrimitive?.content)
@@ -51,7 +54,7 @@ class AndroidDigitalCredentialCreateProviderTest {
     @Test
     fun acceptsHistoricalOpenId4VciProtocolAliasesAndEchoesThem() {
         val expectedCreateProtocols = listOf(
-            MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+            DigitalCredentialProtocols.OPENID4VCI_V1,
             "openid4vci1.0",
             "openid4vci-1.0",
             "openid4vci1.1",
@@ -59,7 +62,7 @@ class AndroidDigitalCredentialCreateProviderTest {
         )
         assertEquals(expectedCreateProtocols, OPENID4VCI_CREATE_PROTOCOLS)
         val aliases = expectedCreateProtocols.filter {
-            it != MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1
+            it != DigitalCredentialProtocols.OPENID4VCI_V1
         }
         for (protocol in aliases) {
             val request = AndroidDigitalCredentialCreateProvider.resolveCreateRequest(
@@ -91,7 +94,7 @@ class AndroidDigitalCredentialCreateProviderTest {
             """.trimIndent(),
             verifiedOrigin = "https://issuer.example",
         )
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1, request.protocol)
+        assertEquals(DigitalCredentialProtocols.OPENID4VCI_V1, request.protocol)
         val offer = Json.parseToJsonElement(request.offerJson).jsonObject
         assertEquals("https://v1.example", offer["credential_issuer"]?.jsonPrimitive?.content)
     }
@@ -122,7 +125,7 @@ class AndroidDigitalCredentialCreateProviderTest {
             """.trimIndent(),
             verifiedOrigin = "https://issuer.example",
         )
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1, request.protocol)
+        assertEquals(DigitalCredentialProtocols.OPENID4VCI_V1, request.protocol)
     }
 
     @Test
@@ -148,7 +151,7 @@ class AndroidDigitalCredentialCreateProviderTest {
         )
         assertIs<CreateDigitalCredentialResponse>(response)
         val body = Json.parseToJsonElement(response.responseJson).jsonObject
-        assertEquals(MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1, body["protocol"]?.jsonPrimitive?.content)
+        assertEquals(DigitalCredentialProtocols.OPENID4VCI_V1, body["protocol"]?.jsonPrimitive?.content)
         assertEquals("{}", body["data"]?.toString())
 
         val cancellationIntent = Intent()

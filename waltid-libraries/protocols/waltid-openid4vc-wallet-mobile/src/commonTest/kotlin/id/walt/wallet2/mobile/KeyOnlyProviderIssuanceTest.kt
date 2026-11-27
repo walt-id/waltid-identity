@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.issuance.IssuanceSession
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
@@ -16,6 +17,9 @@ import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.openid4vci.proofs.ProofType
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.mobile.issuance.CredentialOfferInput
+import id.walt.wallet2.mobile.issuance.IssuanceRequest
+import id.walt.wallet2.mobile.issuance.WalletProviderConfig
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import io.ktor.client.HttpClient
@@ -30,22 +34,22 @@ import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlin.io.encoding.Base64
-import kotlin.time.Clock
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 class KeyOnlyProviderIssuanceTest {
     private val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
@@ -55,12 +59,11 @@ class KeyOnlyProviderIssuanceTest {
         val holder = key("holder")
         val trace = Trace()
         val wallet = wallet(holder, trace, anonymous = true, keyAttestation = true)
-        val session = wallet.startIssuance(MobileWalletIssuanceRequest(
-            offer = MobileWalletCredentialOffer.InlineJson(OFFER),
-            clientId = "wallet-client",
+        val session = wallet.startIssuance(IssuanceRequest(
+            offer = CredentialOfferInput.InlineJson(OFFER),
             keyId = holder.id.value,
         ))
-        val outcome = wallet.continuePreAuthorizedIssuance(session.id)
+        val outcome = (session as IssuanceSession.PreAuthorized).accept(clientId = "wallet-client")
         assertIs<WalletIssuanceOutcome.Stored>(outcome, outcome.toString())
         assertEquals(1, wallet.credentials().size)
         assertTrue(trace.providerBodies.none { "\"wia\"" in it || "\"need\":\"wia\"" in it || "\"mint\":\"wia\"" in it }, trace.providerBodies.toString())
@@ -75,12 +78,11 @@ class KeyOnlyProviderIssuanceTest {
         val holder = key("holder")
         val trace = Trace()
         val wallet = wallet(holder, trace, anonymous = false, keyAttestation = false)
-        val session = wallet.startIssuance(MobileWalletIssuanceRequest(
-            offer = MobileWalletCredentialOffer.InlineJson(OFFER),
-            clientId = "wallet-client",
+        val session = wallet.startIssuance(IssuanceRequest(
+            offer = CredentialOfferInput.InlineJson(OFFER),
             keyId = holder.id.value,
         ))
-        val outcome = wallet.continuePreAuthorizedIssuance(session.id)
+        val outcome = (session as IssuanceSession.PreAuthorized).accept(clientId = "wallet-client")
         assertIs<WalletIssuanceOutcome.Failed>(outcome, outcome.toString())
         assertTrue(outcome.storedCredentialIds.isEmpty())
         assertTrue(wallet.credentials().isEmpty())
@@ -94,8 +96,8 @@ class KeyOnlyProviderIssuanceTest {
         trace: Trace,
         anonymous: Boolean,
         keyAttestation: Boolean,
-    ): MobileWallet {
-        val keys = InMemoryMobileWalletKeyStore().apply { addCrypto2Key(holder) }
+    ): Wallet {
+        val keys = InMemoryPolicyAwareWalletKeyStore().apply { addCrypto2Key(holder) }
         val attester = key("attester")
         val certificate = X509CertificateUtil.createSelfSignedCertificate(
             attester,
@@ -105,7 +107,7 @@ class KeyOnlyProviderIssuanceTest {
         val attesterJwk = Json.parseToJsonElement(
             attester.capabilities.publicKeyExporter!!.exportPublicKey().toPublicJwk(attester.spec).data.toByteArray().decodeToString()
         )
-        return MobileWallet(
+        return Wallet(
             walletId = "key-only",
             keyStore = keys,
             didStore = InMemoryDidStore(),
@@ -114,7 +116,7 @@ class KeyOnlyProviderIssuanceTest {
                 baseUrl = PROVIDER,
                 servicePath = "org.demo.wallet-provider",
                 bearerToken = "provider-token",
-                composition = "ka",
+                composition = WalletProviderConfig.Composition.Key,
             ),
             issuanceHttpClient = client(trace, anonymous, keyAttestation, attester, attesterJwk, x5c, holder),
         )

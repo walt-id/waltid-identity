@@ -1,9 +1,9 @@
 package id.walt.wallet2.mobile.swiftinterop
 
-import id.walt.wallet2.mobile.CredentialStatusMaintenanceEnrollment
-import id.walt.wallet2.mobile.CredentialStatusMaintenanceResult
-import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
-import id.walt.wallet2.mobile.refreshDueStatusesForExistingWallet
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceEnrollment
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceResult
+import id.walt.wallet2.mobile.credentials.refreshDueStatusesForExistingWallet
+import id.walt.wallet2.mobile.digitalcredentials.WalletAppGroupAccess
 import kotlinx.coroutines.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -17,9 +17,6 @@ public data class WalletBridgeStatusMaintenanceEnrollment(
     public val preference: String?,
     public val binding: String?,
 )
-
-internal fun CredentialStatusMaintenanceEnrollment?.toMaintenanceBridgeEnrollment() =
-    WalletBridgeStatusMaintenanceEnrollment(this?.preference?.name, this?.binding)
 
 /**
  * Redacted result of a single maintenance pass.
@@ -44,14 +41,11 @@ public object WalletStatusMaintenanceBridge {
     @Throws(CancellationException::class)
     public suspend fun refresh(
         binding: String,
-        appGroupIdentifier: String?,
-        keychainAccessGroup: String?,
+        crossProcessAccess: WalletAppGroupAccess?,
         maxItems: Int,
         timeoutMilliseconds: Long,
     ): WalletBridgeResult<WalletBridgeStatusMaintenanceResult> = walletBridgeCall {
-        val access = if (appGroupIdentifier == null && keychainAccessGroup == null) null else
-            MobileWalletCrossProcessAccess(requireNotNull(appGroupIdentifier), requireNotNull(keychainAccessGroup))
-        when (val result = refreshDueStatusesForExistingWallet(binding, access, maxItems, timeoutMilliseconds.milliseconds)) {
+        when (val result = refreshDueStatusesForExistingWallet(binding, crossProcessAccess, maxItems, timeoutMilliseconds.milliseconds)) {
             is CredentialStatusMaintenanceResult.Finished ->
                 WalletBridgeStatusMaintenanceResult("FINISHED", result.checked, result.unchanged, result.remaining, result.hasNewNotice)
             CredentialStatusMaintenanceResult.Deferred -> WalletBridgeStatusMaintenanceResult("DEFERRED")
@@ -59,3 +53,6 @@ public object WalletStatusMaintenanceBridge {
         }
     }
 }
+
+internal fun CredentialStatusMaintenanceEnrollment?.toMaintenanceBridgeEnrollment() =
+    WalletBridgeStatusMaintenanceEnrollment(this?.preference?.name, this?.binding)

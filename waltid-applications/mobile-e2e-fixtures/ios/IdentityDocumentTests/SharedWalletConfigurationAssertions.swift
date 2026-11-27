@@ -98,7 +98,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
     var hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
     // Simulators cannot create Secure Enclave keys protected by biometryCurrentSet. These
     // assertions cover shared-storage wiring; protected extension signing remains device coverage.
-    hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
+    hostConfiguration.keyAuthorization.policy = .none
     let hostWallet = try await Wallet(configuration: hostConfiguration)
     let hostBootstrap = try await initializeSigningIdentity(hostWallet)
     let hostCredentials = try await hostWallet.credentials()
@@ -128,6 +128,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
     // stay un-bootstrapped for the assertions above to mean anything.
     let bootstrapProbeWallet = try await Wallet(configuration: hostConfiguration)
     let probedResolution = try await initializeSigningIdentity(bootstrapProbeWallet)
+    try await bootstrapProbeWallet.close()
     XCTAssertEqual(
         probedResolution.keyID,
         hostBootstrap.keyID,
@@ -143,6 +144,7 @@ public func assertWalletReopensSharedStateAndSigningKey(
         line: line
     )
 
+    try await hostWallet.close()
     try await providerWallet.deleteLocalData()
 }
 
@@ -169,7 +171,7 @@ public func assertProviderResolvesThePublishedWalletID(
     // and the iOS registry writes the wallet id it was built with into the App Group.
     var hostConfiguration = try namespace.walletConfiguration(walletID: walletID)
     // This assertion covers publishing the selected wallet identifier, not biometric enforcement.
-    hostConfiguration.defaultKeyUseAuthorizationPolicy = .none
+    hostConfiguration.keyAuthorization.policy = .none
     let hostWallet = try await Wallet(configuration: hostConfiguration)
     _ = try await initializeSigningIdentity(hostWallet)
 
@@ -192,6 +194,7 @@ public func assertProviderResolvesThePublishedWalletID(
         line: line
     )
 
+    try await hostWallet.close()
     try await providerWallet.deleteLocalData()
 }
 

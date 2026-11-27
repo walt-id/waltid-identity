@@ -18,13 +18,12 @@ import platform.Foundation.NSUserDomainMask
  * iOS SQLDelight driver factory for native SQLite wallet databases.
  */
 public actual class DriverFactory {
-    private var appGroupIdentifier: String? = null
-
     /** Uses the shared App Group container for the database and all SQLite sidecars. */
     public fun useAppGroup(identifier: String): DriverFactory = apply {
         require(identifier.isNotBlank()) { "App Group identifier must not be blank" }
         appGroupIdentifier = identifier
     }
+
     /**
      * Creates a SQLCipher-backed native driver for [databaseName].
      *
@@ -101,11 +100,6 @@ public actual class DriverFactory {
         }
     }
 
-    private fun ByteArray.toSqlCipherPassphrase(): String =
-        joinToString(separator = "") { byte ->
-            (byte.toInt() and 0xff).toString(16).padStart(2, '0')
-        }
-
     /** Identifies the container used by the foreground wallet. */
     public fun existingLocation(): String = appGroupIdentifier ?: "sandbox"
 
@@ -130,6 +124,13 @@ public actual class DriverFactory {
     public actual fun deleteDatabase(databaseName: String) {
         DatabaseFileContext.deleteDatabase("$databaseName.db", appGroupContainerPath())
     }
+
+    private var appGroupIdentifier: String? = null
+
+    private fun ByteArray.toSqlCipherPassphrase(): String =
+        joinToString(separator = "") { byte ->
+            (byte.toInt() and 0xff).toString(16).padStart(2, '0')
+        }
 
     private fun sharedDatabasePath(walletId: String): String? = runCatching { appGroupContainerPath() }
         .getOrElse { cause -> throw WalletPersistenceException.EncryptionConfigurationFailed(walletId, cause) }

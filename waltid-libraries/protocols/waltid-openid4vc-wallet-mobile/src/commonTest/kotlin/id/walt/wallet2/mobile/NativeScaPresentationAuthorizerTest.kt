@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile
 
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
@@ -7,16 +8,22 @@ import id.walt.crypto2.keys.*
 import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.wallet2.persistence.keys.*
 import id.walt.wallet2.consent.PaymentConsentException
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialPreview
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialRequest
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialResponse
+import id.walt.wallet2.mobile.presentation.PresentationCredentialSelection
+import id.walt.wallet2.mobile.presentation.PresentationPreviewResult
+import id.walt.wallet2.mobile.presentation.PresentationSelection
+import id.walt.wallet2.persistence.keys.*
 import io.ktor.http.URLBuilder
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.*
 import kotlin.test.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.*
 
 /** Fake native facts exercise the adapter and mobile pipeline, not physical authentication. */
 class NativeScaPresentationAuthorizerTest {
@@ -53,9 +60,12 @@ class NativeScaPresentationAuthorizerTest {
             fixture.provider.policy = policy
             val preview = fixture.preview()
             val selections = preview.credentialOptions.map {
-                MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+                PresentationCredentialSelection(it.queryId, it.credential.id)
             }
-            suspend fun submit() = fixture.wallet.submitDigitalCredentialPresentation(preview.requestId, selections)
+            suspend fun submit() = fixture.wallet.submitDigitalCredentialPresentation(
+                preview.requestId,
+                PresentationSelection(credentials = selections),
+            )
             if (policy == KeyUseAuthorizationPolicy.None) {
                 assertFailsWith<KeyUseAuthorizationException> { submit() }
                 assertEquals(0, fixture.provider.inspections)
@@ -85,8 +95,8 @@ class NativeScaPresentationAuthorizerTest {
         val request = JsonObject(fixture.request + ("transaction_data" to buildJsonArray { add(entry) }))
         // Preview admission must reject this even when the caller never requests additional app consent.
         assertFails {
-            fixture.wallet.previewDigitalCredentialPresentation(MobileWalletDigitalCredentialRequest(
-                protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+            fixture.wallet.previewDigitalCredentialPresentation(DigitalCredentialRequest(
+                protocol = DigitalCredentialProtocols.OPENID4VP_UNSIGNED,
                 dataJson = request.toString(), verifiedOrigin = "https://verifier.example",
             ))
         }
@@ -98,7 +108,7 @@ class NativeScaPresentationAuthorizerTest {
             parameters["client_id"] = "redirect_uri:https://verifier.example/response"
             parameters["response_uri"] = "https://verifier.example/response"
         }.buildString()
-        assertIs<MobileWalletPresentationPreviewResult.Invalid>(fixture.wallet.previewPresentation(url))
+        assertIs<PresentationPreviewResult.Invalid>(fixture.wallet.previewPresentation(url))
         assertEquals(0, fixture.provider.inspections)
         assertEquals(0, fixture.signatures)
     }
@@ -108,11 +118,18 @@ class NativeScaPresentationAuthorizerTest {
         val fixture = fixture()
         val preview = fixture.preview()
         val selections = preview.credentialOptions.map {
-            MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+            PresentationCredentialSelection(it.queryId, it.credential.id)
         }
-        assertNotNull(fixture.wallet.prepareDigitalCredentialPaymentConsent(preview.requestId, selections))
+        assertNotNull(fixture.wallet.prepareDigitalCredentialPaymentConsent(
+            preview.requestId,
+            PresentationSelection(credentials = selections),
+        ))
         assertFailsWith<PaymentConsentException> {
-            fixture.wallet.submitDigitalCredentialPresentation(preview.requestId, selections, paymentConsentRevision = "wrong")
+            fixture.wallet.submitDigitalCredentialPresentation(
+                preview.requestId,
+                PresentationSelection(credentials = selections),
+                paymentConsentRevision = "wrong",
+            )
         }
         assertEquals(0, fixture.provider.inspections)
         assertEquals(0, fixture.signatures)
@@ -216,34 +233,44 @@ class NativeScaPresentationAuthorizerTest {
             parameters["client_id"] = "redirect_uri:https://verifier.example/response"
             parameters["response_uri"] = "https://verifier.example/response"
         }.buildString()
-        val preview = assertIs<MobileWalletPresentationPreviewResult.Ready>(fixture.wallet.previewPresentation(url)).preview
+        val preview = assertIs<PresentationPreviewResult.Ready>(fixture.wallet.previewPresentation(url)).preview
         val selections = preview.credentialOptions.map {
-            MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+            PresentationCredentialSelection(it.queryId, it.credential.id)
         }
-        val consent = assertNotNull(fixture.wallet.preparePaymentConsent(preview.previewHandle, selections))
+        val review = fixture.wallet.reviewPresentation(
+            preview.previewHandle,
+            PresentationSelection(credentials = selections),
+        )
+            assertNotNull(review.payment)
         assertFailsWith<KeyUseAuthorizationException> {
-            fixture.wallet.submitPresentation(preview.previewHandle, selections, paymentConsentRevision = consent.revision)
+            fixture.wallet.submitPresentation(review)
         }
         assertEquals(0, fixture.signatures)
     }
 
     private class Fixture(val key: Key, val provider: FakeProvider, val request: JsonObject) {
-        lateinit var wallet: MobileWallet
+        lateinit var wallet: Wallet
         var signatures = 0
         var signingFailure: Throwable? = null
-        suspend fun preview(): MobileWalletDigitalCredentialPreview = wallet.previewDigitalCredentialPresentation(
-            MobileWalletDigitalCredentialRequest(
-                protocol = MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED,
+        suspend fun preview(): DigitalCredentialPreview = wallet.previewDigitalCredentialPresentation(
+            DigitalCredentialRequest(
+                protocol = DigitalCredentialProtocols.OPENID4VP_UNSIGNED,
                 dataJson = request.toString(), verifiedOrigin = "https://verifier.example",
             ),
         )
-        suspend fun submit(preview: MobileWalletDigitalCredentialPreview): MobileWalletDigitalCredentialResponse {
+        suspend fun submit(preview: DigitalCredentialPreview): DigitalCredentialResponse {
             val selections = preview.credentialOptions.map {
-                MobileWalletPresentationCredentialSelection(it.queryId, it.credentialId)
+                PresentationCredentialSelection(it.queryId, it.credential.id)
             }
-            val consent = assertNotNull(wallet.prepareDigitalCredentialPaymentConsent(preview.requestId, selections))
-            return wallet.submitDigitalCredentialPresentation(preview.requestId, selections,
-                paymentConsentRevision = consent.revision)
+            val consent = assertNotNull(wallet.prepareDigitalCredentialPaymentConsent(
+                preview.requestId,
+                PresentationSelection(credentials = selections),
+            ))
+            return wallet.submitDigitalCredentialPresentation(
+                preview.requestId,
+                PresentationSelection(credentials = selections),
+                paymentConsentRevision = consent.revision,
+            )
         }
     }
 

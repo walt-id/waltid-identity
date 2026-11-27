@@ -164,6 +164,10 @@ struct PresentView: View {
         let navigationKey = viewModel.presentationNavigationResetKey
         let refresh = viewModel.presentationStatusRefresh
         var reviewStatusUI = context
+        let renderedReview = viewModel.retainedPresentationReview
+        if let retained = renderedReview {
+            reviewStatusUI.values = Dictionary(uniqueKeysWithValues: retained.statuses.map { ($0.credentialID, $0.value) })
+        }
         reviewStatusUI.check = handle.map { handle in { id in
             guard submission.canRefresh, viewModel.presentationReviewEnabled else { return }
             viewModel.checkPresentationCredentialStatus(id, handle: handle, navigationKey: navigationKey)
@@ -171,7 +175,8 @@ struct PresentView: View {
         reviewStatusUI.checking = context.checking || refresh != nil || !submission.canRefresh || !viewModel.presentationReviewEnabled
         if let refresh, refresh.phase == .checking { reviewStatusUI.refreshing.insert(refresh.credentialID) }
         let submit: ([String: String]) -> Void = { reviewedStatuses in
-            guard informationReady, review == viewModel.presentationSharingReview,
+            guard informationReady, renderedReview === viewModel.retainedPresentationReview,
+                  review == viewModel.presentationSharingReview,
                   reviewedSelection == viewModel.presentationSharingSelection,
                   reviewedPayment == viewModel.paymentReview,
                   reviewedClaims == viewModel.claimReview,
@@ -210,7 +215,7 @@ struct PresentView: View {
                 isLoading: !viewModel.presentationReviewEnabled,
                 reviewKey: OnlineSubmissionKey(handle: viewModel.presentationPreview?.previewHandle,
                     review: review, selection: reviewedSelection, claimReview: reviewedClaims),
-                credentialStatuses: context.selectedStatuses(review: review, selection: reviewedSelection),
+                credentialStatuses: reviewStatusUI.selectedStatuses(review: review, selection: reviewedSelection),
                 onSubmit: submit,
                 onReject: viewModel.rejectPresentation,
                 onCancel: closeReview,

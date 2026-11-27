@@ -11,8 +11,7 @@ public struct IssuanceIssuerSection: View {
         ExpandableMetadataCard(title: String(localized: "Issuer", bundle: .module),
             titleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerSection,
             toggleAccessibilityIdentifier: WalletAccessibilityID.offerIssuerDetailsToggle, isExpanded: $expanded) {
-            MetadataIdentityView(display: MetadataDisplay(name: issuer.name, locale: issuer.locale,
-                logoURI: issuer.logoURI?.absoluteString, logoAltText: issuer.logoAltText),
+            MetadataIdentityView(display: issuer.display,
                 fallbackName: issuer.identifier, supportingText: nil)
         } details: {
             MetadataDetailList(items: [MetadataDetailItem(label: String(localized: "Credential Issuer", bundle: .module),

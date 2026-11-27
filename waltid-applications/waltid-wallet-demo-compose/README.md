@@ -201,7 +201,7 @@ for the exact issuer allowlist, configuration, test reuse and assurance limits.
 
 ## Local wallet data
 
-Android and iOS demo targets use the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in platform-protected storage. During local development, reset wallet state through `MobileWallet.deleteWallet()`, by uninstalling the app, or by deleting the app's local data.
+Android and iOS demo targets use the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in platform-protected storage. During local development, reset wallet state through `Wallet.deleteLocalData()`, by uninstalling the app, or by deleting the app's local data.
 
 The demo unlock PIN is stored separately as a salted PBKDF2-SHA256 verifier in app-private preferences. The PIN itself is never persisted. Clearing app data or uninstalling the app resets the PIN setup flow together with the local wallet data.
 

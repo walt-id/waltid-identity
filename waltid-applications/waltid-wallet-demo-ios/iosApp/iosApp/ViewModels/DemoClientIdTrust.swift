@@ -302,7 +302,7 @@ enum DemoClientIdTrust {
         -----END CERTIFICATE-----
         """
 
-    /// PEM trust anchors passed into `WalletConfiguration.clientIDTrustConfiguration`.
+    /// PEM trust anchors passed into `WalletConfiguration.Presentation.verifierTrust`.
     static let x509TrustAnchorPems: [String] = [
         verifier2ExampleLeafPem,
         pidCzCaPem,

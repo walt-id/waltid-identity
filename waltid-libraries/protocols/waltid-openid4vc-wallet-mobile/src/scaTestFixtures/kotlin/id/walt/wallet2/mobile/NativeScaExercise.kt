@@ -4,10 +4,10 @@ import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.JwsAlgorithm
 import id.walt.crypto2.keys.*
 import id.walt.wallet2.persistence.keys.*
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
-import kotlin.uuid.Uuid
 
 /** Real native key, synthetic credential, and local signature verification; no issuer or verifier relaxation. */
 internal suspend fun exerciseNativeSca(provider: PlatformManagedKeyProvider, cancelFirst: Boolean): String {

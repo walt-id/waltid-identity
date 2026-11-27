@@ -12,7 +12,7 @@ func exchange(_ namespace: UnsafePointer<CChar>) -> Int32 {
     Task {
         defer { completed.signal() }
         do {
-            let provider = KeychainIdentityRecovery(namespace: namespace)
+            let provider = try KeychainIdentityRecovery(namespace: namespace)
             let kotlinBytes = Data("synthetic-parity-fixture:kotlin".utf8)
             guard try await provider.retrieve(recordID: "from-kotlin") == kotlinBytes,
                   try await provider.store(recordID: "from-kotlin", data: kotlinBytes) == .acceptedLocally else { return }

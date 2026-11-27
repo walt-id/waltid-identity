@@ -58,20 +58,20 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.v2.runComposeUiTest
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import id.walt.wallet2.mobile.ProximityAction
-import id.walt.wallet2.mobile.ProximityActionResult
-import id.walt.wallet2.mobile.ProximityCapabilities
-import id.walt.wallet2.mobile.ProximityConfiguration
-import id.walt.wallet2.mobile.ProximityEngagementMethod
-import id.walt.wallet2.mobile.ProximityHostActionResult
-import id.walt.wallet2.mobile.ProximitySessionConfiguration
-import id.walt.wallet2.mobile.ProximityEngagement
+import id.walt.wallet2.mobile.proximity.ProximityAction
+import id.walt.wallet2.mobile.proximity.ProximityActionResult
+import id.walt.wallet2.mobile.proximity.ProximityCapabilities
+import id.walt.wallet2.mobile.proximity.ProximityConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityEngagementMethod
+import id.walt.wallet2.mobile.proximity.ProximityHostActionResult
+import id.walt.wallet2.mobile.proximity.ProximitySessionConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityEngagement
 import id.walt.walletdemo.compose.logic.ProximityPresentationBackend
-import id.walt.wallet2.mobile.ProximityRuntimeObservation
-import id.walt.wallet2.mobile.ProximitySession
-import id.walt.wallet2.mobile.ProximityState
-import id.walt.wallet2.mobile.ProximityTransportCapability
-import id.walt.wallet2.mobile.ProximityReaderPolicy
+import id.walt.wallet2.mobile.proximity.ProximityRuntimeObservation
+import id.walt.wallet2.mobile.proximity.ProximitySession
+import id.walt.wallet2.mobile.proximity.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximityTransportCapability
+import id.walt.wallet2.mobile.proximity.ProximityReaderPolicy
 import id.walt.walletdemo.compose.logic.DemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.DemoBiometricResult
 import id.walt.walletdemo.compose.logic.InMemoryDemoSharingSettingsStore
@@ -1484,7 +1484,7 @@ class WalletDemoAppTestScenarios(
         val proximity = WalletDemoProximityController(backend, approvalModeProvider = settings::proximityApprovalMode,
             profileProvider = settings::proximityTransportProfile, scope = CoroutineScope(Dispatchers.Unconfined), dispatcher = Dispatchers.Unconfined)
         val trust = DemoReaderTrustSettingsController(InMemoryDemoReaderTrustSettingsStore())
-        setWalletContent { MobileWalletDemoApp(controller, proximity, trust) }
+        setWalletContent { WalletDemoHost(controller, proximity, trust) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
         onNodeWithTag(WalletUiTestTags.ProximityStartButton).assertIsDisplayed().assertIsEnabled().performClick()
@@ -2461,8 +2461,8 @@ internal class WalletUiTestWallet(
         )
     }
 
-    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
-        WalletDemoIssuanceAuthorization("https://issuer.example/authorize")
+    override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
+        WalletDemoIssuanceAuthorization(sessionId, "https://issuer.example/authorize")
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
@@ -2478,8 +2478,8 @@ internal class WalletUiTestWallet(
 
     var receivedSelections: List<WalletDemoCredentialSelection>? = null
 
-    override suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    override suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
     ): WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Failed("Authorization code is not configured")
 

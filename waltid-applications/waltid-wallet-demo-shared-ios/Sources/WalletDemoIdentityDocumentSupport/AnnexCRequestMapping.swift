@@ -5,7 +5,7 @@ import IdentityDocumentServices
 #endif
 
 /// One alternative set of documents a verifier is willing to accept.
-public struct MobileDocumentRequestSetSnapshot: Equatable, Sendable {
+public struct MdocRequestSetSnapshot: Equatable, Sendable {
     /// Documents requested by this alternative.
     public let requests: [AnnexCDocumentRequest]
 
@@ -16,12 +16,12 @@ public struct MobileDocumentRequestSetSnapshot: Equatable, Sendable {
 }
 
 /// One presentment request within an Apple ISO 18013 request.
-public struct MobileDocumentPresentmentSnapshot: Equatable, Sendable {
+public struct MdocPresentmentSnapshot: Equatable, Sendable {
     /// Alternative document sets offered for this presentment.
-    public let documentRequestSets: [MobileDocumentRequestSetSnapshot]
+    public let documentRequestSets: [MdocRequestSetSnapshot]
 
     /// Creates a presentment snapshot.
-    public init(documentRequestSets: [MobileDocumentRequestSetSnapshot]) {
+    public init(documentRequestSets: [MdocRequestSetSnapshot]) {
         self.documentRequestSets = documentRequestSets
     }
 }
@@ -32,12 +32,12 @@ public struct MobileDocumentPresentmentSnapshot: Equatable, Sendable {
 /// handling, and `ISO18013MobileDocumentRequest` cannot be constructed by a test. Snapshotting first
 /// makes the mapping exercisable on any OS version, while the Apple-typed initializer stays a
 /// mechanical field copy.
-public struct MobileDocumentRequestSnapshot: Equatable, Sendable {
+public struct MdocRequestSnapshot: Equatable, Sendable {
     /// Presentment requests carried by the request.
-    public let presentments: [MobileDocumentPresentmentSnapshot]
+    public let presentments: [MdocPresentmentSnapshot]
 
     /// Creates a request snapshot.
-    public init(presentments: [MobileDocumentPresentmentSnapshot]) {
+    public init(presentments: [MdocPresentmentSnapshot]) {
         self.presentments = presentments
     }
 }
@@ -49,7 +49,7 @@ public struct MobileDocumentRequestSnapshot: Equatable, Sendable {
 ///   and silently taking the first would disclose more than the verifier asked for in the branch the
 ///   user did not see. ``IdentityDocumentSupportFailure/emptyRequest`` when nothing is requested,
 ///   because a consent prompt over an empty request cannot be answered meaningfully.
-public func parsedRequest(from snapshot: MobileDocumentRequestSnapshot) throws -> AnnexCParsedRequest {
+public func parsedRequest(from snapshot: MdocRequestSnapshot) throws -> AnnexCParsedRequest {
     var documents: [AnnexCDocumentRequest] = []
     for presentment in snapshot.presentments {
         guard presentment.documentRequestSets.count == 1,
@@ -103,14 +103,14 @@ extension Data {
 
 #if os(iOS)
 @available(iOS 26.0, *)
-extension MobileDocumentRequestSnapshot {
+extension MdocRequestSnapshot {
     /// Snapshots Apple's parsed request without interpreting it.
     public init(_ request: ISO18013MobileDocumentRequest) {
         self.init(
             presentments: request.presentmentRequests.map { presentment in
-                MobileDocumentPresentmentSnapshot(
+                MdocPresentmentSnapshot(
                     documentRequestSets: presentment.documentRequestSets.map { requestSet in
-                        MobileDocumentRequestSetSnapshot(
+                        MdocRequestSetSnapshot(
                             requests: requestSet.requests.map { document in
                                 AnnexCDocumentRequest(
                                     documentType: document.documentType,

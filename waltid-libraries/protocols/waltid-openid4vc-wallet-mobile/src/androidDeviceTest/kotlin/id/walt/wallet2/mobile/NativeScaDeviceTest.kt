@@ -1,19 +1,19 @@
 package id.walt.wallet2.mobile
 
-import android.widget.Button
-import android.widget.TextView
-import android.widget.LinearLayout
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.fragment.app.FragmentActivity
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.mobile.test.PhysicalDeviceTest
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
-import kotlinx.coroutines.runBlocking
+import kotlin.coroutines.resume
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.resume
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 

@@ -92,14 +92,6 @@ public actual class DriverFactory(private val context: Context) {
         }
     }
 
-    private fun maintenanceLocations(databaseName: String): Map<String, File> {
-        require(databaseName.none { it == '/' || it == '\\' || it == '\u0000' })
-        return mapOf(
-            "database" to context.dataDir.resolve("databases/$databaseName.db"),
-            "no-backup" to context.dataDir.resolve("no_backup/$databaseName.db"),
-        )
-    }
-
     /**
      * Deletes the Android database file and SQLite sidecar files for [databaseName].
      */
@@ -108,6 +100,14 @@ public actual class DriverFactory(private val context: Context) {
         context.deleteDatabase(fileName)
         deleteDatabaseFiles(context.getDatabasePath(fileName))
         deleteDatabaseFiles(File(context.noBackupFilesDir, fileName))
+    }
+
+    private fun maintenanceLocations(databaseName: String): Map<String, File> {
+        require(databaseName.none { it == '/' || it == '\\' || it == '\u0000' })
+        return mapOf(
+            "database" to context.dataDir.resolve("databases/$databaseName.db"),
+            "no-backup" to context.dataDir.resolve("no_backup/$databaseName.db"),
+        )
     }
 
     private fun deleteDatabaseFiles(databaseFile: File): Boolean {

@@ -6,10 +6,15 @@ the wallet.
 
 ## Overview
 
+Use ``IssuanceIssuerPreview/display`` and ``IssuanceCredentialPreview/display`` for
+issuer-provided names, descriptions and artwork. Their ``MetadataDisplay`` fields
+are optional. Use the issuer identifier or credential format as a fallback when
+a display name is absent.
+
 ### Configure Required Key Attestations
 
 When issuer metadata advertises `key_attestations_required`, supply a
-``KeyAttestationProvider`` through ``WalletConfiguration/keyAttestationProvider``
+``KeyAttestationProvider`` through ``WalletConfiguration/Issuance/keyAttestationProvider``
 before creating the wallet. The provider receives the selected public proof key,
 current nonce and issuer constraints. Its signed response is checked against the
 provider's independently configured verification key before being added to the proof.
@@ -24,117 +29,59 @@ verification key or `nil` for an unsupported issuer. The wallet only resolves wh
 attestation is required, then retains that provider throughout the proof collection.
 Existing fixed providers use the default resolver implementation.
 
-### Start and Continue an Issuance Session
+### Accept the selected grant
 
-Pass the offer URL from a QR scan, deep link, universal link, or another app
-handoff into the wallet actor. Starting the session resolves the offer before
-issuance, so the application can show localized issuer and credential metadata
-and determine whether it must collect a separately delivered transaction code.
+Start with the offer URL. Show its issuer and credential metadata, then handle the grant the wallet returned. The host supplies the confirmation UI, a registered browser client and the callback URL. An identified pre-authorized client can pass `clientID` to acceptance.
+
+Look up your registration using the grant’s `authorizationServer`. The pre-authorized offer exposes its effective client-identification requirement and transaction-code prompt.
 
 ```swift
-let session = try await wallet.startIssuance(
-    IssuanceRequest(
-        offer: credentialOfferURL,
-        redirectURI: URL(string: "wallet.example:/callback")!
-    )
-)
-let outcome: IssuanceOutcome
-switch session.offer.grant {
-case .preAuthorizedCode:
-    let transactionCode: String?
-    if let requirement = session.offer.transactionCode {
-        transactionCode = await collectTransactionCode(
-            inputMode: requirement.inputMode,
-            expectedLength: requirement.length,
-            description: requirement.descriptionText
-        )
-    } else {
-        transactionCode = nil
-    }
-    outcome = try await wallet.continuePreAuthorizedIssuance(
-        sessionID: session.id,
-        transactionCode: transactionCode
-    )
-case .authorizationCode:
-    let authorization = try await wallet.beginAuthorizationIssuance(sessionID: session.id)
-    await openBrowser(authorization.url)
-    let callbackURI = await receiveAuthorizationCallback()
-    outcome = try await wallet.continueAuthorizationIssuance(
-        sessionID: session.id,
-        callbackURI: callbackURI
-    )
-}
-
-guard case let .stored(_, credentialIDs) = outcome else {
-    // Handle deferred, cancelled, or failed issuance as appropriate for the app.
+let session = try await wallet.startIssuance(.init(offer: offerURL))
+guard await ui.accept(session.offer) else {
+    _ = try await wallet.cancelIssuance(sessionID: session.id)
     return
 }
+let outcome: IssuanceOutcome
+switch session.grant {
+case .preAuthorized(let grant):
+    var code: String?
+    if let requirement = grant.transactionCode { code = await ui.code(requirement) }
+    let clientID = grant.clientIdentification == .clientIDRequired ? try registrationFor(grant.authorizationServer).clientID : nil
+    outcome = try await grant.accept(transactionCode: code, clientID: clientID)
+case .authorizationCode(let grant):
+    let authorization = try await grant.beginAuthorization(using: registrationFor(grant.authorizationServer))
+    try await ui.saveAuthorization(authorization.id)
+    if let callback = try await ui.browser(authorization.request.url) {
+        outcome = try await authorization.complete(callback)
+    } else {
+        outcome = try await wallet.cancelIssuance(sessionID: session.id)
+    }
+}
+ui.received(outcome)
 ```
 
-Issuance uses DPoP consistently for authorization binding, token exchange, and
-protected credential requests whenever the authorization server advertises
-supported DPoP signing algorithms.
+Save the session ID during offer review. After reopening the same wallet, call `resumeIssuance(_:)` to redisplay the offer while it is still available.
 
-The returned identifiers can be used to refresh local UI or to load credential
-metadata through ``Wallet/credentials()``.
+Persist ``IssuanceAuthorizationID/rawValue`` together with the owning wallet’s identity before opening the browser. If the callback arrives after a restart, reopen that wallet and pass the restored ID and callback URL to ``Wallet/completeAuthorization(_:callback:)``.
 
 ```swift
-let credentials = try await wallet.credentials()
-let issuedCredentials = credentials.filter { credentialIDs.contains($0.id) }
+guard let id = IssuanceAuthorizationID(rawValue: savedID) else {
+    throw WalletError.invalidInput("Invalid saved authorization ID")
+}
+let outcome = try await wallet.completeAuthorization(id, callback: callback)
 ```
 
-> Tip: Collect ``Wallet/events`` while issuance is running if the UI needs
-> progress updates for issuer communication, credential storage, or completion.
+### Select configurations and copies
 
-If the user closes the review without accepting it, call
-``Wallet/cancelIssuance(sessionID:)``. Offer-level cancel happens before the
-credential response, so there is no `notification_id` yet. Authorization-code issuance creates its
-browser URL only after ``Wallet/beginAuthorizationIssuance(sessionID:credentials:)`` is
-called following acceptance.
+Pass `credentials` to acceptance or browser authorization when the holder selects credential configurations or copies. Each selection identifies an offered configuration and its holder keys. An optional credential identifier selects a dataset granted by the issuer. The SDK checks the advertised batch limit before generating new keys. Omission uses the wallet's default selection.
 
-Continuing a session posts OpenID4VCI `credential_accepted` when the issuer
-advertised a notification endpoint. After an isolated fetch that left
-`storeInWallet` false, call
-``Wallet/rejectIssuedCredential(notificationID:accessToken:credentialIssuerBaseURL:notificationEndpoint:eventDescription:)``
-to post `credential_deleted` instead of storing the credential.
+### Configure issuer authentication
 
+The default receipt operation parses and stores credentials with the expected configuration and holder binding. To require issuer authentication before storage, configure receipt authorities supplied independently by the host. Kotlin accepts a `CredentialReceiptTrust` in the issuance configuration. Swift accepts `receiptAuthorities` in `WalletConfiguration.Issuance`.
 
-### Select Configurations and Copies
+Each authority binds an exact OpenID4VCI credential issuer identifier and format to a P-256 public JWK. The SD-JWT VC profile checks the ES256 issuer signature, signed issuer, credential type, disclosures and validity bounds. The mdoc profile checks ES256 issuer authentication, the document signer key and certificate profile, MSO validity, document type and item digests. Provision rollover keys alongside the existing key. An empty configured list accepts no credentials.
 
-Omitting selections requests one instance of each offered configuration. The issuer's
-``IssuanceOfferPreview/batchSize`` is a maximum, not a requested count. Different
-configurations or issuer-granted datasets use separate requests; explicit holder
-bindings request copies of one target. The core matches each received credential to
-its holder key, independently of response order. Each copy requires a distinct stored
-holder key; different IDs for the same public key are rejected before grant redemption.
-
-After review, request new keys inside acceptance or select existing wallet keys:
-
-```swift
-guard let configuration = session.offer.credentials.first,
-      (session.offer.batchSize ?? 1) >= 2 else { return }
-let selections = [try IssuanceCredentialSelection(
-    configurationID: configuration.configurationID,
-    holders: .newKeys(count: 2)
-)]
-let result = try await wallet.continuePreAuthorizedIssuance(
-    sessionID: session.id,
-    transactionCode: transactionCode,
-    credentials: selections
-)
-```
-
-Use `.existing(bindings)` to select existing keys. Newly prepared keys are removed
-when preparation or validation fails before acceptance. Once accepted, they remain
-wallet-owned through persistence errors and uncertain issuer outcomes. Retries reuse
-the accepted bindings, including after restart; changing holders or copy counts then
-requires a new session. Preview never generates keys.
-
-For authorization-code issuance, pass the same `credentials` argument to
-``Wallet/beginAuthorizationIssuance(sessionID:credentials:)``. The retained session
-preserves those bindings through the browser callback and deferred polling.
-``IssuanceCredentialSelection/credentialIdentifier`` may select an identifier already
-granted by the issuer. Do not invent dataset identifiers or infer them from offer order.
+A trust failure stops the affected issuance target before storage or system registration. Swift reports this rejection as `.issuerTrust`. Earlier stored targets remain visible in the result. The same policy applies to deferred receipt and local-save recovery. Existing credentials stay in the wallet. With the profile enabled, system registration requires recorded receipt origin and successful verification with a currently configured key.
 
 ### Keep Partial and Deferred Progress
 
@@ -162,8 +109,8 @@ case .cancelled:
 ```
 
 After recreating the wallet, recover pending work with ``Wallet/listDeferredIssuance()``.
-Wait at least ``DeferredCredential/intervalSeconds`` before polling with
-``Wallet/resumeDeferredIssuance(deferredCredentialID:)``. A still-pending outcome retains
+Wait at least ``DeferredCredential/intervalSeconds`` before passing its ``DeferredCredential/id`` to
+``Wallet/resumeDeferredIssuance(_:)``. A still-pending outcome retains
 the handle and updates the interval. The wallet persists the earliest permitted poll time
 across restarts. An early resume returns a deferred outcome with the rounded-up remaining
 wait, without contacting the issuer. A received batch awaiting local storage has no polling

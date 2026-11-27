@@ -20,10 +20,6 @@ import javax.crypto.spec.GCMParameterSpec
  */
 public class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEncryptionKeyProvider {
 
-    private val appContext = context.applicationContext
-    private val preferences = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-    private val secureRandom = SecureRandom()
-
     /**
      * Returns the existing Android-protected database key or creates and stores a new one.
      */
@@ -58,6 +54,10 @@ public class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEn
             keyStore().deleteEntry(keyId)
         }
     }
+
+    private val appContext = context.applicationContext
+    private val preferences = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val secureRandom = SecureRandom()
 
     private fun persistStoredKey(walletId: String, keyId: String, storedKey: String) {
         if (preferences.edit().putString(keyId, storedKey).commit()) {

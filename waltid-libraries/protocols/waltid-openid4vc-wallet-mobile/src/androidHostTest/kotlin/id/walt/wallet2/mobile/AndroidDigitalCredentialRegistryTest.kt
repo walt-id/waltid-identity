@@ -1,29 +1,39 @@
 package id.walt.wallet2.mobile
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
-
 import androidx.credentials.registry.digitalcredentials.mdoc.MdocEntry
 import androidx.credentials.registry.digitalcredentials.openid4vp.OpenId4VpRegistry
 import androidx.credentials.registry.digitalcredentials.sdjwt.SdJwtEntry
 import androidx.credentials.registry.provider.digitalcredentials.VerificationEntryDisplayProperties
 import androidx.credentials.registry.provider.digitalcredentials.VerificationFieldDisplayProperties
 import id.walt.cose.coseCompliantCbor
+import id.walt.wallet2.mobile.digitalcredentials.AndroidAnnexCCredentialDatabase
+import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.RegistryField
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntry
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntryDisplay
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialProtocols
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialRequestProtection
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialResponseProtection
+import id.walt.wallet2.mobile.digitalcredentials.OPENID4VCI_CREATE_PROTOCOLS
+import id.walt.wallet2.mobile.digitalcredentials.registrationAvailableAfterRefresh
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.robolectric.RuntimeEnvironment
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.junit.runner.RunWith
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -32,10 +42,10 @@ class AndroidDigitalCredentialRegistryTest {
 
     @Test
     fun oneCredentialCanBeIndexedUnderLeafAndAncestorWithoutRewritingItsId() {
-        val record = MobileWalletCredentialRegistryRecord(
-            registryEntryId = "one-id", credentialId = "stored-id", format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
-            type = "https://issuer.example/leaf", displayName = "Attestation",
-            fields = listOf(MobileWalletCredentialRegistryField(listOf("given_name"), "\"Ada\"", false)),
+        val record = RegistryEntry(
+            registryEntryId = "one-id", credentialId = "stored-id", format = DigitalCredentialFormat.SD_JWT_VC,
+            type = "https://issuer.example/leaf", display = RegistryEntryDisplay("Attestation"),
+            fields = listOf(RegistryField(listOf("given_name"), "\"Ada\"", false)),
         )
         val entries = with(registry) { listOf(record.toAndroidEntry(), record.copy(type = "https://types.example/parent").toAndroidEntry()) }
         val bytes = OpenId4VpRegistry(entries, "registry").credentials
@@ -53,17 +63,17 @@ class AndroidDigitalCredentialRegistryTest {
         assertTrue(capabilities.platformAvailable)
         assertFalse(capabilities.registrationAvailable)
         val unsigned = capabilities.capabilities.single {
-            it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_UNSIGNED
+            it.protocol == DigitalCredentialProtocols.OPENID4VP_UNSIGNED
         }
         assertFalse(unsigned.supported)
         assertTrue(unsigned.unsupportedReason?.contains("registration") == true)
         val openId4Vci = capabilities.capabilities.single {
-            it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1
+            it.protocol == DigitalCredentialProtocols.OPENID4VCI_V1
         }
         assertFalse(openId4Vci.supported)
         assertTrue(openId4Vci.unsupportedReason?.contains("creation registration") == true)
         val signed = capabilities.capabilities.single {
-            it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_SIGNED
+            it.protocol == DigitalCredentialProtocols.OPENID4VP_SIGNED
         }
         // Unsupported here only because registration has not run; signed itself is always implemented.
         assertFalse(signed.supported)
@@ -71,15 +81,15 @@ class AndroidDigitalCredentialRegistryTest {
         // Both DC API response modes: dc_api and dc_api.jwt.
         assertEquals(
             listOf(
-                MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
-                MobileWalletDigitalCredentialResponseProtection.JWE,
+                DigitalCredentialResponseProtection.UNENCRYPTED,
+                DigitalCredentialResponseProtection.JWE,
             ),
             signed.responseProtection,
         )
         assertEquals(
             listOf(
-                MobileWalletDigitalCredentialResponseProtection.UNENCRYPTED,
-                MobileWalletDigitalCredentialResponseProtection.JWE,
+                DigitalCredentialResponseProtection.UNENCRYPTED,
+                DigitalCredentialResponseProtection.JWE,
             ),
             unsigned.responseProtection,
         )
@@ -91,13 +101,13 @@ class AndroidDigitalCredentialRegistryTest {
             registry.advertisedOpenId4VpProtocols(),
         )
         val multisigned = capabilities.capabilities.single {
-            it.protocol == MobileWalletDigitalCredentialProtocols.OPENID4VP_MULTISIGNED
+            it.protocol == DigitalCredentialProtocols.OPENID4VP_MULTISIGNED
         }
         assertFalse(multisigned.supported)
         assertTrue(multisigned.unsupportedReason?.contains("JWS JSON Serialization") == true)
         assertTrue(
             capabilities.capabilities.filter { it.supported }.none { capability ->
-                MobileWalletDigitalCredentialRequestProtection.MULTISIGNED in capability.requestProtection
+                DigitalCredentialRequestProtection.MULTISIGNED in capability.requestProtection
             },
             "a multisigned request protection must never be advertised as supported",
         )
@@ -106,20 +116,19 @@ class AndroidDigitalCredentialRegistryTest {
     @Test
     fun mapsMdocMetadataWithoutRawCredentialsOrKeys() {
         val entry = with(registry) {
-            MobileWalletCredentialRegistryRecord(
+            RegistryEntry(
                 registryEntryId = "opaque-id",
                 credentialId = "wallet-private-id",
-                format = MobileWalletDigitalCredentialFormat.MDOC,
+                format = DigitalCredentialFormat.MDOC,
                 type = "org.iso.18013.5.1.mDL",
                 fields = listOf(
-                    MobileWalletCredentialRegistryField(
+                    RegistryField(
                         path = listOf("org.iso.18013.5.1", "given_name"),
                         valueJson = "\"Ada\"",
                         selectivelyDisclosable = true,
                     )
                 ),
-                displayName = "Driving licence",
-                subtitle = "D-123-456",
+                display = RegistryEntryDisplay("Driving licence", "D-123-456"),
             ).toAndroidEntry()
         } as MdocEntry
 
@@ -135,20 +144,19 @@ class AndroidDigitalCredentialRegistryTest {
     @Test
     fun mapsSdJwtClaimPathAndSelectiveDisclosure() {
         val entry = with(registry) {
-            MobileWalletCredentialRegistryRecord(
+            RegistryEntry(
                 registryEntryId = "opaque-id",
                 credentialId = "wallet-private-id",
-                format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
+                format = DigitalCredentialFormat.SD_JWT_VC,
                 type = "https://credentials.example/pid",
                 fields = listOf(
-                    MobileWalletCredentialRegistryField(
+                    RegistryField(
                         path = listOf("address", "locality"),
                         valueJson = "\"Vienna\"",
                         selectivelyDisclosable = true,
                     )
                 ),
-                displayName = "PID",
-                subtitle = "Personal ID",
+                display = RegistryEntryDisplay("PID", "Personal ID"),
             ).toAndroidEntry()
         } as SdJwtEntry
 
@@ -177,16 +185,16 @@ class AndroidDigitalCredentialRegistryTest {
             "eligible" to "false",
             "description" to "\"${"D".repeat(300)}\"",
         )
-        val records = MobileWalletDigitalCredentialFormat.entries.map { format ->
-            MobileWalletCredentialRegistryRecord(
+        val records = DigitalCredentialFormat.entries.map { format ->
+            RegistryEntry(
                 registryEntryId = "entry-$format",
                 credentialId = "credential-$format",
                 format = format,
                 type = "example.credential",
                 fields = (mediaValues + scalarValues).map { (name, value) ->
-                    MobileWalletCredentialRegistryField(listOf("namespace", name), value, true)
+                    RegistryField(listOf("namespace", name), value, true)
                 },
-                displayName = "Example",
+                display = RegistryEntryDisplay("Example"),
             )
         }
         val entries = records.map { record -> with(registry) { record.toAndroidEntry() } }
@@ -221,13 +229,13 @@ class AndroidDigitalCredentialRegistryTest {
     @Test
     fun annexCMediaFieldRemainsSelectableWithoutPayloadOrFakeMatchValue() {
         val bytes = registry.encodeAnnexCCredentialDatabase(listOf(
-            MobileWalletCredentialRegistryRecord(
+            RegistryEntry(
                 registryEntryId = "opaque-id", credentialId = "private-id",
-                format = MobileWalletDigitalCredentialFormat.MDOC, type = "example.credential",
-                fields = listOf(MobileWalletCredentialRegistryField(
+                format = DigitalCredentialFormat.MDOC, type = "example.credential",
+                fields = listOf(RegistryField(
                     listOf("namespace", "arbitrary_attachment"),
                     "\"data:application/pdf;base64,${"A".repeat(100_000)}\"", true,
-                )), displayName = "Example",
+                )), display = RegistryEntryDisplay("Example"),
             ),
         ))
         val database = coseCompliantCbor.decodeFromByteArray<AndroidAnnexCCredentialDatabase>(bytes)
@@ -261,7 +269,7 @@ class AndroidDigitalCredentialRegistryTest {
         )
         assertEquals(Json.parseToJsonElement("{\"Pass\":{}}"), json["filter"])
         val expectedCreateProtocols = listOf(
-            MobileWalletDigitalCredentialProtocols.OPENID4VCI_V1,
+            DigitalCredentialProtocols.OPENID4VCI_V1,
             "openid4vci1.0",
             "openid4vci-1.0",
             "openid4vci1.1",
@@ -286,20 +294,19 @@ class AndroidDigitalCredentialRegistryTest {
     fun annexCMatcherDatabaseUsesOpaqueIdsAndMdocNamespaces() {
         val bytes = registry.encodeAnnexCCredentialDatabase(
             listOf(
-                MobileWalletCredentialRegistryRecord(
+                RegistryEntry(
                     registryEntryId = "opaque-id",
                     credentialId = "wallet-private-id",
-                    format = MobileWalletDigitalCredentialFormat.MDOC,
+                    format = DigitalCredentialFormat.MDOC,
                     type = "org.iso.18013.5.1.mDL",
                     fields = listOf(
-                        MobileWalletCredentialRegistryField(
+                        RegistryField(
                             path = listOf("org.iso.18013.5.1", "given_name"),
                             valueJson = "\"Ada\"",
                             selectivelyDisclosable = true,
                         )
                     ),
-                    displayName = "Driving licence",
-                    subtitle = "D-123-456",
+                    display = RegistryEntryDisplay("Driving licence", "D-123-456"),
                 )
             )
         )
@@ -323,20 +330,19 @@ class AndroidDigitalCredentialRegistryTest {
         val customIcon = byteArrayOf(7, 8, 9, 10)
         val bytes = registry.encodeAnnexCCredentialDatabase(
             listOf(
-                MobileWalletCredentialRegistryRecord(
+                RegistryEntry(
                     registryEntryId = "opaque-id",
                     credentialId = "wallet-private-id",
-                    format = MobileWalletDigitalCredentialFormat.MDOC,
+                    format = DigitalCredentialFormat.MDOC,
                     type = "org.iso.18013.5.1.mDL",
                     fields = listOf(
-                        MobileWalletCredentialRegistryField(
+                        RegistryField(
                             path = listOf("org.iso.18013.5.1", "given_name"),
                             valueJson = "\"Ada\"",
                             selectivelyDisclosable = true,
                         )
                     ),
-                    displayName = "Driving licence",
-                    iconPng = customIcon,
+                    display = RegistryEntryDisplay("Driving licence", iconPng = customIcon),
                 )
             )
         )

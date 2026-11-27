@@ -233,7 +233,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
             let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
             model.unlockForTests()
             try await waitUntil { model.isReady }
-            let pending = DeferredCredential(id: "pending", credentialConfigurationID: nil, intervalSeconds: nil, status: status)
+            let pending = DeferredCredential(id: .init(rawValue: "pending")!, credentialConfigurationID: nil, intervalSeconds: nil, status: status)
             model.deferredCredentials = [pending]
             model.resumeDeferredCredential(pending)
             await Task.yield()
@@ -253,21 +253,21 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         model.unlockForTests()
         try await waitUntil { model.isReady }
-        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
+        let pending = DeferredCredential(id: .init(rawValue: "pending")!, credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
         model.deferredCredentials = [pending]
-        model.issuanceReceipt = IssuanceReceipt(pendingIDs: ["pending"])
+        model.issuanceReceipt = IssuanceReceipt(pendingIDs: [.init(rawValue: "pending")!])
         model.lastReceivedCredentialIDs = ["earlier-saved"]
         model.resumeDeferredCredential(pending)
         try await waitUntil { !model.isLoading }
         XCTAssertEqual(model.lastReceivedCredentialIDs, ["earlier-saved", "credential-1"])
-        XCTAssertEqual(model.issuanceReceipt?.pendingIDs, ["pending"])
+        XCTAssertEqual(model.issuanceReceipt?.pendingIDs, [.init(rawValue: "pending")!])
         model.resumeDeferredCredential(pending)
         try await waitUntil { !model.isLoading }
         XCTAssertEqual(model.lastReceivedCredentialIDs, ["earlier-saved", "credential-1"])
     }
 
     func testRetainedPresentationDoesNotEraseNewIntervalOrUncertainFailure() {
-        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "pid", intervalSeconds: 15)
+        let pending = DeferredCredential(id: .init(rawValue: "pending")!, credentialConfigurationID: "pid", intervalSeconds: 15)
         let lost = IssuanceOutcome.failed(sessionID: "session", error: .init(code: .remoteOutcomeUncertain, message: "Response lost"),
             storedCredentialIDs: ["saved"], deferredCredentials: [pending])
         guard case let .failed(_, _, saved, blocked) = lost.withContinuations([], resumingID: pending.id) else { return XCTFail() }
@@ -314,7 +314,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         try await waitUntil { !model.isLoading }
         XCTAssertEqual(model.credentials.map(\.id), ["credential-1"])
         XCTAssertEqual(model.lastReceivedCredentialIDs, ["credential-1"])
-        XCTAssertEqual(model.deferredCredentials.map(\.id), ["pending"])
+        XCTAssertEqual(model.deferredCredentials.map(\.id.rawValue), ["pending"])
         XCTAssertFalse(model.isError)
         XCTAssertEqual(model.statusMessage, "Saved credentials: 1. Pending targets: 1.")
         XCTAssertNil(model.offerPreview)
@@ -331,7 +331,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         model.acceptOffer()
         try await waitUntil { !model.isLoading }
         XCTAssertEqual(model.credentials.map(\.id), ["credential-1"])
-        XCTAssertEqual(model.deferredCredentials.map(\.id), ["pending"])
+        XCTAssertEqual(model.deferredCredentials.map(\.id.rawValue), ["pending"])
         XCTAssertNil(model.offerPreview)
         XCTAssertFalse(model.acceptOfferEnabled)
         XCTAssertTrue(model.statusMessage.contains("Saved credentials: 1. Pending targets: 1. Failed targets: 1. Not attempted: 2."))
@@ -346,7 +346,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
         model.unlockForTests()
         try await waitUntil { model.isReady }
-        let pending = DeferredCredential(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
+        let pending = DeferredCredential(id: .init(rawValue: "pending")!, credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)
         model.deferredCredentials = [pending]
         XCTAssertTrue(model.credentials.isEmpty)
         model.resumeDeferredCredential(pending)
@@ -629,7 +629,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         }
 
         let discardedHandles = await client.discardedPresentationPreviewHandles
-        XCTAssertEqual(discardedHandles, [PresentationPreviewHandle(value: "transaction-code-presentation-preview")])
+        XCTAssertEqual(discardedHandles, [try! PresentationPreviewHandle(value: "transaction-code-presentation-preview")])
         XCTAssertNil(viewModel.presentationPreview)
         XCTAssertFalse(viewModel.isLoading)
     }
@@ -1060,9 +1060,15 @@ private actor TransactionCodeWalletClient: WalletClient {
     func credentials() async throws -> [Credential] {
         if credentialReadFailure { throw WalletError.internalFailure("Storage read unavailable") }
         let available = startsWithCredential || credentialIssued ? storedCredentialIDs.map { id in
-            Credential(id: id, format: Self.credential.format, issuer: Self.credential.issuer,
-                subject: Self.credential.subject, label: Self.credential.label, addedAt: nil,
-                credentialDataJSON: Self.credential.credentialDataJSON)
+            Credential(
+                id: id,
+                format: Self.credential.format,
+                credentialDataJSON: Self.credential.credentialDataJSON,
+                issuer: Self.credential.issuer,
+                subject: Self.credential.subject,
+                label: Self.credential.label,
+                addedAt: nil
+            )
         }.filter { visibleReceivedIDs?.contains($0.id) ?? true } : []
         return available.filter { !deletedCredentialIDs.contains($0.id) }
     }
@@ -1071,78 +1077,63 @@ private actor TransactionCodeWalletClient: WalletClient {
     func setCredentialReadFailure(_ fail: Bool) { credentialReadFailure = fail }
 
     func listDeferredIssuance() async throws -> [DeferredCredential] {
-        (failWithProgress || deferWithProgress) && credentialIssued ? [.init(id: "pending", credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)] : []
+        (failWithProgress || deferWithProgress) && credentialIssued ? [.init(id: .init(rawValue: "pending")!, credentialConfigurationID: "ExampleCredential", intervalSeconds: 5)] : []
     }
 
-    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
+    func startIssuance(_ request: IssuanceRequest) async throws -> ReviewedIssuanceOffer {
         issuanceStartCalls += 1
         if issuanceStartDelayNanoseconds > 0 {
             try? await Task.sleep(nanoseconds: issuanceStartDelayNanoseconds)
         }
-        return IssuanceSession(
-            id: "transaction-code-session",
+        return ReviewedIssuanceOffer(
+            id: IssuanceSessionID(rawValue: "transaction-code-session")!,
             offer: IssuanceOfferPreview(
                 grant: issuanceGrant,
                 issuer: IssuanceIssuerPreview(
                     identifier: "https://issuer.example",
-                    name: "Example Issuer",
-                    locale: nil,
-                    logoURI: nil,
-                    logoAltText: nil,
-                    metadataProvenance: .unsigned
+                    metadataProvenance: .unsigned,
+                    display: .init(name: "Example Issuer")
                 ),
-                credentials: [IssuanceCredentialPreview(configurationID: "ExampleCredential", format: "vc+sd-jwt", name: "Example credential", descriptionText: nil, logoURI: nil)],
+                credentials: [IssuanceCredentialPreview(
+                    configurationID: "ExampleCredential",
+                    format: "vc+sd-jwt",
+                    display: .init(name: "Example credential")
+                )],
                 transactionCode: transactionCode,
                 batchSize: batchSize
             )
         )
     }
 
-    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest {
         receivedIssuanceSelections.append(credentials)
-        return IssuanceAuthorization(
+        guard let authorizationID = IssuanceAuthorizationID(rawValue: sessionID.rawValue) else {
+            throw WalletError.invalidInput("Invalid issuance authorization ID")
+        }
+        return .init(id: authorizationID, request: IssuanceAuthorization(
             url: URL(string: "https://issuer.example/authorize")!,
             state: "test-state",
             redirectURI: URL(string: "openid://")!,
             pkce: .init(codeChallenge: "test-challenge", codeChallengeMethod: "S256"),
             pushedAuthorizationRequestUsed: false
-        )
+        ))
     }
 
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
-        issuanceContinuationCalls += 1
-        receivedIssuanceSelections.append(credentials)
-        receivedTxCodes.append(transactionCode ?? "")
-        if let failure = firstAcceptanceFailure {
-            firstAcceptanceFailure = nil
-            return .failed(sessionID: sessionID, error: failure, storedCredentialIDs: [], deferredCredentials: [])
-        }
-        credentialIssued = true
-        deletedCredentialIDs.remove(Self.credential.id)
-        if deferWithProgress {
-            return .deferred(sessionID: sessionID, storedCredentialIDs: [Self.credential.id],
-                credentials: try await listDeferredIssuance())
-        }
-        if failWithProgress {
-            return .failed(sessionID: sessionID, error: .init(code: .network, message: "Later target failed",
-                targetFailure: .init(target: .init(configurationID: "ExampleCredential", credentialIdentifier: "second"),
-                    stage: .request, notAttempted: [.init(configurationID: "OtherCredential"), .init(configurationID: "AnotherCredential")])), storedCredentialIDs: [Self.credential.id],
-                deferredCredentials: try await listDeferredIssuance())
-        }
-        return .stored(sessionID: sessionID, credentialIDs: storedCredentialIDs)
+    func continuePreAuthorizedIssuance(sessionID: IssuanceSessionID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+        try await finishIssuance(sessionID.rawValue, transactionCode: transactionCode, credentials: credentials)
     }
 
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
-        try await continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: nil, credentials: nil)
+    func completeAuthorization(_ authorizationID: IssuanceAuthorizationID, callback: URL) async throws -> IssuanceOutcome {
+        try await finishIssuance(authorizationID.rawValue, transactionCode: nil, credentials: nil)
     }
 
-    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome {
-        cancelledIssuanceSessionIDs.append(sessionID)
-        return .cancelled(sessionID: sessionID)
+    func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome {
+        cancelledIssuanceSessionIDs.append(sessionID.rawValue)
+        return .cancelled(sessionID: sessionID.rawValue)
     }
 
-    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
-        resumedDeferredCredentialIDs.append(deferredCredentialID)
+    func resumeDeferredIssuance(_ id: DeferredIssuanceID) async throws -> IssuanceOutcome {
+        resumedDeferredCredentialIDs.append(id.rawValue)
         if deferWithProgress {
             credentialIssued = true
             return .deferred(sessionID: "session", storedCredentialIDs: [Self.credential.id],
@@ -1162,22 +1153,16 @@ private actor TransactionCodeWalletClient: WalletClient {
         }
         return .ready(
             PresentationPreview(
-                previewHandle: PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
-                request: PresentationRequestInfo(
+                previewHandle: try! PresentationPreviewHandle(value: "transaction-code-presentation-preview"),
+                request: try PresentationRequest(
                     clientID: "https://verifier.example",
                     requestAuthentication: .unauthenticated,
                     nonce: "nonce-1",
                     responseEncryption: .notRequired,
                 ),
                 credentialOptions: [
-                    PresentationCredentialOption(
-                        queryID: "pid",
-                        credentialID: Self.credential.id,
-                        format: Self.credential.format,
-                        issuer: Self.credential.issuer,
-                        subject: Self.credential.subject,
-                        label: Self.credential.label,
-                        credentialDataJSON: Self.credential.credentialDataJSON,
+                    try! PresentationCredentialOption(
+                        queryID: "pid", credential: .init(id: Self.credential.id, format: Self.credential.format, credentialDataJSON: Self.credential.credentialDataJSON, issuer: Self.credential.issuer, subject: Self.credential.subject, label: Self.credential.label),
                         disclosures: []
                     )
                 ]
@@ -1229,6 +1214,29 @@ private actor TransactionCodeWalletClient: WalletClient {
         deletedCredentialIDs.insert(Self.credential.id)
     }
 
+    private func finishIssuance(_ sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+        issuanceContinuationCalls += 1
+        receivedIssuanceSelections.append(credentials)
+        receivedTxCodes.append(transactionCode ?? "")
+        if let failure = firstAcceptanceFailure {
+            firstAcceptanceFailure = nil
+            return .failed(sessionID: sessionID, error: failure, storedCredentialIDs: [], deferredCredentials: [])
+        }
+        credentialIssued = true
+        deletedCredentialIDs.remove(Self.credential.id)
+        if deferWithProgress {
+            return .deferred(sessionID: sessionID, storedCredentialIDs: [Self.credential.id],
+                credentials: try await listDeferredIssuance())
+        }
+        if failWithProgress {
+            return .failed(sessionID: sessionID, error: .init(code: .network, message: "Later target failed",
+                targetFailure: .init(target: .init(configurationID: "ExampleCredential", credentialIdentifier: "second"),
+                    stage: .request, notAttempted: [.init(configurationID: "OtherCredential"), .init(configurationID: "AnotherCredential")])), storedCredentialIDs: [Self.credential.id],
+                deferredCredentials: try await listDeferredIssuance())
+        }
+        return .stored(sessionID: sessionID, credentialIDs: storedCredentialIDs)
+    }
+
     private var deletedCredentialIDs: Set<String> = []
 
     private enum TestFailure: Error {
@@ -1238,10 +1246,10 @@ private actor TransactionCodeWalletClient: WalletClient {
     private static let credential = Credential(
         id: "credential-1",
         format: "vc+sd-jwt",
+        credentialDataJSON: "{}",
         issuer: "https://issuer.example",
         subject: nil,
         label: "PID",
-        addedAt: nil,
-        credentialDataJSON: "{}"
+        addedAt: nil
     )
 }

@@ -2,10 +2,12 @@
 
 package id.walt.walletdemo.compose.android
 
-import id.walt.wallet2.mobile.AndroidDigitalCredentialRegistry
-import id.walt.wallet2.mobile.MobileWalletCredentialRegistryField
-import id.walt.wallet2.mobile.MobileWalletCredentialRegistryRecord
-import id.walt.wallet2.mobile.MobileWalletDigitalCredentialFormat
+import id.walt.wallet2.mobile.issuance.IssuanceSession
+import id.walt.wallet2.mobile.digitalcredentials.AndroidDigitalCredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.RegistryField
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntry
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialFormat
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntryDisplay
 import id.walt.mobile.test.DigitalCredentialProviderTest
 
 import android.content.Context
@@ -37,9 +39,9 @@ import id.walt.iso18013.annexc.AnnexCResponseVerifier
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.wallet2.handlers.WalletIssuanceOutcome
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.MobileWalletCredentialOffer
-import id.walt.wallet2.mobile.MobileWalletIssuanceRequest
+import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.issuance.CredentialOfferInput
+import id.walt.wallet2.mobile.issuance.IssuanceRequest
 import id.walt.wallet2.mobile.identity.SigningIdentityOperationResult
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
@@ -51,7 +53,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtection
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
-import id.walt.walletdemo.compose.logic.createAndroidDemoMobileWallet
+import id.walt.walletdemo.compose.logic.openAndroidDemoWallet
 import id.walt.walletdemo.compose.logic.createAndroidDemoSharingSettingsStore
 import id.walt.walletdemo.compose.ui.WalletDemoSharingReviewTestTags
 import java.io.ByteArrayOutputStream
@@ -86,7 +88,7 @@ import org.junit.runner.RunWith
 @DigitalCredentialProviderTest
 @OptIn(ExperimentalDigitalCredentialApi::class)
 internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
-    override val wallet: MobileWallet get() = provisionedWallet
+    override val wallet: Wallet get() = provisionedWallet
     override val issuedCredentialIds: Set<String> get() = provisionedCredentialIds
     /** Real platform matcher boundary: one entry indexed by two allowed VCTs remains one candidate. */
     @Test
@@ -97,16 +99,23 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         val leaf = "https://issuer.example/credentials/leaf"
         val parent = "https://types.example/credentials/parent"
         val title = "Inherited metadata fixture"
-        val record = MobileWalletCredentialRegistryRecord(
-            registryEntryId = "one-logical-credential", credentialId = "one-stored-credential",
-            format = MobileWalletDigitalCredentialFormat.SD_JWT_VC,
-            type = leaf, fields = listOf(MobileWalletCredentialRegistryField(
-                path = listOf("given_name"), valueJson = "\"Ada\"", selectivelyDisclosable = false,
-            )), displayName = title,
+        val record = RegistryEntry(
+            registryEntryId = "one-logical-credential",
+            credentialId = "one-stored-credential",
+            format = DigitalCredentialFormat.SD_JWT_VC,
+            type = leaf,
+            fields = listOf(
+                RegistryField(
+                    path = listOf("given_name"),
+                    valueJson = "\"Ada\"",
+                    selectivelyDisclosable = false,
+                ),
+            ),
+            display = RegistryEntryDisplay(name = title),
         )
         val registration = registry.replace(registryId, listOf(record, record.copy(type = parent)))
         assertTrue("Registry unavailable: ${registration.reason}", registration.available)
-        assertEquals(1, registration.registeredEntryCount)
+        assertEquals(1, registration.entryCount)
         val requestJson = buildJsonObject {
             put("requests", buildJsonArray { add(buildJsonObject {
                 put("protocol", "openid4vp-v1-unsigned")
@@ -152,7 +161,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         )
         assertTrue(
             "Credential Manager registered no credentials in the platform smoke",
-            registration.registeredEntryCount > 0,
+            registration.entryCount > 0,
         )
 
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
@@ -319,7 +328,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
         try {
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertTrue("Payment registration unavailable: ${registration.reason}", registration.available)
-            assertEquals(issuedCredentialIds.size + paymentIds.size, registration.registeredEntryCount)
+            assertEquals(issuedCredentialIds.size + paymentIds.size, registration.entryCount)
             for (showPreview in listOf(true, false)) {
                 createAndroidDemoSharingSettingsStore(fixture.context).setShowDcApiPresentationPreview(showPreview)
                 val session = DemoTestBackend.createDcApiVerifierSession(
@@ -375,7 +384,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             paymentIds.forEach { id -> check(wallet.deleteCredential(id)) { "Failed to delete temporary payment credential $id" } }
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertTrue("Credential registration was unavailable after payment cleanup", registration.available)
-            assertEquals(issuedCredentialIds.size, registration.registeredEntryCount)
+            assertEquals(issuedCredentialIds.size, registration.entryCount)
         }
     }
 
@@ -416,7 +425,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             val ageCredentialId = ageCredentialIds.single()
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertTrue("Temporary SCA/age registration was unavailable: ${registration.reason}", registration.available)
-            assertEquals(4, registration.registeredEntryCount)
+            assertEquals(4, registration.entryCount)
 
             val transactionData = DemoTestBackend.scaPaymentTransactionData(credentialId = SCA_CREDENTIAL_QUERY_ID)
             val session = DemoTestBackend.createDcApiVerifierSession(
@@ -514,7 +523,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
             val registration = wallet.refreshDigitalCredentialRegistration()
             assertEquals(issuedCredentialIds, wallet.credentials().map { it.id }.toSet())
             assertTrue("Baseline registration became unavailable: ${registration.reason}", registration.available)
-            assertEquals(2, registration.registeredEntryCount)
+            assertEquals(2, registration.entryCount)
         }
     }
 
@@ -929,7 +938,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
 
     companion object {
         private suspend fun issueFromDemoIssuer(
-            wallet: MobileWallet,
+            wallet: Wallet,
             scenario: DemoTestBackend.CredentialScenario,
         ): List<String> {
             val imageOverrides = buildJsonObject {
@@ -956,9 +965,11 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 runtimeOverrides = imageOverrides.takeIf { scenario.id in setOf("iso-mdl", "eudi-pid-sdjwt") },
             )
             val session = wallet.startIssuance(
-                MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offer.offerUrl))
+                IssuanceRequest(
+                    offer = CredentialOfferInput.Uri(offer.offerUrl),
+                )
             )
-            return when (val outcome = wallet.continuePreAuthorizedIssuance(session.id, offer.txCode)) {
+            return when (val outcome = (session as IssuanceSession.PreAuthorized).accept(offer.txCode, clientId = "eudiw-abca")) {
                 is WalletIssuanceOutcome.Stored -> outcome.credentialIds
                 is WalletIssuanceOutcome.Deferred -> error(
                     "Live issuer unexpectedly deferred ${scenario.id}: " +
@@ -1028,7 +1039,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
 
 
 
-        private lateinit var provisionedWallet: MobileWallet
+        private lateinit var provisionedWallet: Wallet
         private lateinit var provisionedCredentialIds: Set<String>
         @JvmStatic
         @BeforeClass
@@ -1040,7 +1051,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                 hasGooglePlayServices(context),
             )
 
-            val created = createAndroidDemoMobileWallet(
+            val created = openAndroidDemoWallet(
                 context = context,
                 // This Play Store emulator cannot enforce protected signing keys; production
                 // defaults remain covered by the app, while this fixture needs ordinary keys.
@@ -1066,7 +1077,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     emptyRegistration.reason,
                 emptyRegistration.available,
             )
-            assertEquals(0, emptyRegistration.registeredEntryCount)
+            assertEquals(0, emptyRegistration.entryCount)
 
             val mdlScenario = DemoTestBackend.presentationScenarios.first { it.id == "iso-mdl" }
             val sdJwtScenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-sdjwt" }
@@ -1100,7 +1111,7 @@ internal class DigitalCredentialSharingE2ETest : DigitalCredentialSharingE2E() {
                     registration.reason,
                 registration.available,
             )
-            assertEquals(2, registration.registeredEntryCount)
+            assertEquals(2, registration.entryCount)
         }
 
     }

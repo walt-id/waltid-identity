@@ -7,7 +7,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import id.walt.wallet2.mobile.*
+import id.walt.wallet2.mobile.proximity.ProximityCredentialOption
+import id.walt.wallet2.mobile.proximity.ProximityDocumentReview
+import id.walt.wallet2.mobile.proximity.ProximityElementReference
 import id.walt.walletdemo.compose.logic.*
 import id.walt.walletdemo.compose.ui.components.*
 import id.walt.walletdemo.compose.ui.resources.*

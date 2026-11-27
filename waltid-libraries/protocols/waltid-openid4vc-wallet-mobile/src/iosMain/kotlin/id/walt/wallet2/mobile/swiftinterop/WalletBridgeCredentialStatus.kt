@@ -1,10 +1,13 @@
 package id.walt.wallet2.mobile.swiftinterop
 
-import id.walt.wallet2.mobile.MobileWalletCredential
-import id.walt.wallet2.mobile.MobileWalletCredentialRead
-import id.walt.wallet2.mobile.MobileWalletCredentialStatusValue
+import id.walt.credentials.status.CredentialStatus
+import id.walt.credentials.status.CredentialStatusPresentationData
+import id.walt.wallet2.mobile.credentials.WalletCredential
+import id.walt.wallet2.mobile.credentials.CredentialWithStatus
 import id.walt.wallet2.status.WalletCredentialStatusSnapshot
 import id.walt.wallet2.status.toResponse
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -13,7 +16,7 @@ import kotlinx.serialization.json.jsonObject
 /** A typed credential plus the shared semantic status representation for the native facade. */
 public data class WalletBridgeCredentialRead(
     /** Existing credential/display data, independent of status updates. */
-    public val credential: MobileWalletCredential,
+    public val credential: WalletCredential,
     /** Typed shared status JSON consumed by the native facade. */
     public val statusJson: String,
 )
@@ -34,9 +37,9 @@ public sealed interface WalletBridgeCredentialStatusUpdate {
 
 internal val credentialStatusJson: Json = Json { encodeDefaults = true }
 
-internal fun MobileWalletCredentialRead.toStatusBridgeRead(): WalletBridgeCredentialRead = WalletBridgeCredentialRead(
-    credential, credentialStatusJson.encodeToString(MobileWalletCredentialStatusValue.serializer(),
-        MobileWalletCredentialStatusValue(status, presentation.toData(), evaluatedAt)),
+internal fun CredentialWithStatus.toStatusBridgeRead(): WalletBridgeCredentialRead = WalletBridgeCredentialRead(
+    credential, credentialStatusJson.encodeToString(CredentialStatusPayload.serializer(),
+        CredentialStatusPayload(status, presentation.toData(), evaluatedAt.toString())),
 )
 
 internal fun WalletCredentialStatusSnapshot.toStatusBridgeSnapshot(): String {
@@ -44,3 +47,11 @@ internal fun WalletCredentialStatusSnapshot.toStatusBridgeSnapshot(): String {
     val notices = credentialStatusJson.encodeToJsonElement(pendingNotices)
     return JsonObject(status + ("pendingNotices" to notices)).toString()
 }
+
+@Serializable
+@SerialName("id.walt.wallet2.mobile.credentials.MobileWalletCredentialStatusValue")
+private data class CredentialStatusPayload(
+    val status: CredentialStatus,
+    val presentation: CredentialStatusPresentationData,
+    val evaluatedAt: String,
+)

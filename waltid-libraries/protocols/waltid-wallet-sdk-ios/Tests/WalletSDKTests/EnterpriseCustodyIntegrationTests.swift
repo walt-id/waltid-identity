@@ -7,6 +7,16 @@ import WalletSDKEnterpriseCustody
 final class EnterpriseCustodyIntegrationTests: XCTestCase {
     enum FixtureFailure: Error { case unexpectedState(String) }
     // Matches Kotlin's synthetic private JWK, endpoint, and HTTP failure matrix.
+    func testCustodianRejectsInvalidResourceDestinationsAndNames() throws {
+        for resource in ["http://example.org/kms", "https://example.org/", "https://example.org/kms?query",
+                         "https://user@example.org/kms", "https:/kms"] {
+            let url = try XCTUnwrap(URL(string: resource))
+            XCTAssertThrowsError(try EnterpriseIdentityKeyCustodian(kmsResourceURL: url) { $0 })
+        }
+        let valid = try XCTUnwrap(URL(string: "https://example.org/kms"))
+        XCTAssertThrowsError(try EnterpriseIdentityKeyCustodian(kmsResourceURL: valid, id: " ") { $0 })
+    }
+
     func testMatchesKotlinEnterpriseFixtures() async throws {
         let jwk = #"{"kty":"EC","crv":"P-256","x":"_owZzgkFGR68KYqSRXklMfJvDOziRgY56Lw5y39waoI","y":"anebTPlpuKDlOcf2L7PTCtaqj4DjDx0Siq_WiiznLqA","d":"885_2uV-GjENh_HrvebzKL4Kmc28rfTWWJzyneS4_9I"}"#
         let identity = SigningIdentity(id: "identity", keyID: "key-1", did: "did:jwk:fixture", publicJWK: "{}",
@@ -17,7 +27,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
         for (scenario, expected) in cases {
             let configuration = URLSessionConfiguration.ephemeral
             configuration.protocolClasses = [CustodyProtocolFixture.self]
-            let adapter = EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
+            let adapter = try EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
                 configuration: configuration) { request in
                     XCTAssertNil(request.httpBody)
                     var request = request
@@ -40,7 +50,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
     func testOptionalAdapterImportsOriginalIdentityAndPreservesRecoveryState() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [CustodyProtocolFixture.self]
-        let adapter = EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
+        let adapter = try EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
             configuration: configuration) { request in
                 XCTAssertNil(request.httpBody, "Authentication callback must not receive the private key")
                 var authorized = request
@@ -48,7 +58,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
                 return authorized
             }
         let wallet = try await Wallet(configuration: .init(walletID: "custody-contract-\(UUID())",
-            persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
+            persistence: .init(databaseKeySource: .provided(CustodyDatabaseKeyFixture())),
             signingIdentity: .init(authorization: .explicit(.none), keyCustodians: [adapter])))
         do {
             let identities = await wallet.signingIdentity
@@ -73,10 +83,10 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
     func testAdapterFailuresReachTheSharedCustodyResult() async throws {
         let cases: [(String, SigningIdentityFailure)] = [("401", .providerInteractionRequired), ("409", .providerConflict),
             ("503", .providerUnavailable), ("malformed", .providerRejected), ("oversized", .providerRejected), ("mismatch", .providerConflict)]
-        let adapters = cases.map { scenario, _ in
+        let adapters = try cases.map { scenario, _ in
             let configuration = URLSessionConfiguration.ephemeral
             configuration.protocolClasses = [CustodyProtocolFixture.self]
-            return EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
+            return try EnterpriseIdentityKeyCustodian(kmsResourceURL: URL(string: "https://enterprise.example/v1/org.kms")!,
                 id: scenario, displayName: scenario,
                 configuration: configuration) { request in
                     var authorized = request
@@ -86,7 +96,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
                 }
         }
         let wallet = try await Wallet(configuration: .init(walletID: "custody-errors-\(UUID())",
-            persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
+            persistence: .init(databaseKeySource: .provided(CustodyDatabaseKeyFixture())),
             signingIdentity: .init(authorization: .explicit(.none), keyCustodians: adapters)))
         do {
             let identities = await wallet.signingIdentity
@@ -112,7 +122,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
         await healthy.allowStore()
         await broken.failListing()
         let wallet = try await Wallet(configuration: .init(walletID: "discovery-contract-\(UUID())",
-            persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
+            persistence: .init(databaseKeySource: .provided(CustodyDatabaseKeyFixture())),
             signingIdentity: .init(authorization: .explicit(.none), recoveryProviders: [healthy, broken])))
         do {
             let manager = await wallet.signingIdentity
@@ -131,7 +141,7 @@ final class EnterpriseCustodyIntegrationTests: XCTestCase {
     func testSwiftProviderFailureSurvivesKotlinBridgeAndPendingRetry() async throws {
         let provider = FailingRecoveryFixture()
         let wallet = try await Wallet(configuration: .init(walletID: "provider-error-\(UUID())",
-            persistence: .init(databaseKey: .provided(CustodyDatabaseKeyFixture())),
+            persistence: .init(databaseKeySource: .provided(CustodyDatabaseKeyFixture())),
             signingIdentity: .init(authorization: .explicit(.none), recoveryProviders: [provider])))
         do {
             let identities = await wallet.signingIdentity
@@ -211,10 +221,10 @@ private actor FailingRecoveryFixture: IdentityRecoveryProvider {
     func delete(recordID: String) async throws -> WalletRecoveryReceipt { records[recordID] = nil; return .confirmedByProvider }
 }
 /// Public, test-only encryption material. Each fixture has a unique wallet database.
-private struct CustodyDatabaseKeyFixture: WalletDatabaseKeyProvider {
-    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
-        WalletDatabaseKey(keyID: "fixture-\(walletID)", material: Data(repeating: 0x74, count: 32))
+private struct CustodyDatabaseKeyFixture: DatabaseEncryptionKeyProvider {
+    func getOrCreateKey(walletID: String, databaseName: String) async throws -> DatabaseEncryptionKey {
+        DatabaseEncryptionKey(keyID: "fixture-\(walletID)", material: Data(repeating: 0x74, count: 32))
     }
-    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {}
+    func deleteKey(walletID: String, databaseName: String) async throws {}
 }
 #endif

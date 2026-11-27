@@ -8,12 +8,26 @@ import kotlinx.serialization.json.*
 import kotlin.test.*
 
 class ReleasedAuthorizationApiTest {
-    private val offer = JsonObject(batchTestOffer() + ("credential_configuration_ids" to
+    private val offer = JsonObject(batchTestBrowserOffer() + ("credential_configuration_ids" to
             JsonArray(listOf("identity", "other").map(::JsonPrimitive))))
     private val metadata = Json.parseToJsonElement(batchTestMetadata()).jsonObject.let { metadata ->
         val configs = metadata.getValue("credential_configurations_supported").jsonObject
         JsonObject(metadata + ("credential_configurations_supported" to JsonObject(configs +
                 ("other" to JsonObject(configs.getValue("identity").jsonObject + ("scope" to JsonPrimitive("other"))))))).toString()
+    }
+
+    @Test
+    fun receiptTrustPreservesReleasedErrorCodesAndWireDefaults() {
+        val json = Json { encodeDefaults = true }
+        val ordinary = WalletIssuanceError(WalletIssuanceErrorCode.ISSUER_RESPONSE, "Rejected", false)
+        val encoded = json.encodeToJsonElement(ordinary).jsonObject
+        assertFalse("issuerTrustFailed" in encoded)
+        assertEquals(ordinary, json.decodeFromString<WalletIssuanceError>("""{"code":"ISSUER_RESPONSE","message":"Rejected"}"""))
+
+        val denied = ordinary.copy(issuerTrustFailed = true)
+        assertEquals(denied, json.decodeFromJsonElement<WalletIssuanceError>(json.encodeToJsonElement(denied)))
+        assertTrue(denied.copy(message = "Reworded").issuerTrustFailed)
+        assertFalse(denied.copy(code = WalletIssuanceErrorCode.NETWORK).issuerTrustFailed)
     }
 
     @Test
@@ -50,7 +64,7 @@ class ReleasedAuthorizationApiTest {
             credential = { error("Authorization must not issue credentials") }).use { http ->
             assertFailsWith<IllegalArgumentException> {
                 WalletIssuanceHandler.generateAuthorizationUrl(fixture.wallet,
-                    GenerateAuthorizationUrlRequest(offerJson = batchTestOffer(), useScope = true), httpClient = http)
+                    GenerateAuthorizationUrlRequest(offerJson = batchTestBrowserOffer(), useScope = true), httpClient = http)
             }
         }
     }

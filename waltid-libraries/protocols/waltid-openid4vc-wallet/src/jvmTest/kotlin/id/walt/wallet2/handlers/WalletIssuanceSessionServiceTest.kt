@@ -2,6 +2,15 @@
 
 package id.walt.wallet2.handlers
 
+import id.walt.wallet2.issuance.CredentialReceiptAuthority
+import id.walt.wallet2.issuance.CredentialReceiptTrust
+import id.walt.wallet2.issuance.CredentialReceiptTrustException
+import id.walt.wallet2.consent.PaymentConsentFixture
+import id.walt.credentials.CredentialParser
+import id.walt.crypto2.keys.toPublicJwk
+import id.walt.certificate.x509.profile.IsoDocumentSignerX509CertificateProfile.profileDocumentSignerCertificate
+import id.walt.certificate.x509.profile.IsoIaCaRootX509CertificateProfile.profileIaCaRootCertificate
+import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.walt.certificate.x509.X509CertificateUtil
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
@@ -18,6 +27,7 @@ import id.walt.crypto2.algorithms.EcdsaSignatureEncoding
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EcCurve
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.Key as Crypto2Key
 import id.walt.crypto2.keys.KeyId
 import id.walt.crypto2.keys.KeySpec
 import id.walt.crypto2.keys.KeyUsage
@@ -63,6 +73,7 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -92,6 +103,170 @@ import kotlin.time.Duration.Companion.seconds
 
 class WalletIssuanceSessionServiceTest {
     private val json = Json { ignoreUnknownKeys = true }
+
+    @Test
+    fun receiptProfileBindsTheProtocolIssuerFormatSignatureAndStoredProvenance() = runTest {
+        val fixture = PaymentConsentFixture.create()
+        try {
+            val jwk = requireNotNull(fixture.issuerKey.capabilities.publicKeyExporter).exportPublicKey()
+                .toPublicJwk(fixture.issuerKey.spec).data.toByteArray().decodeToString()
+            val profile = CredentialReceiptTrust(listOf(CredentialReceiptAuthority.SdJwtVc(ISSUER, jwk)))
+            val issued = requireNotNull(fixture.credential().signedWithDisclosures)
+            val wallet = Wallet("receipt-test").attachReceiptTrust(profile)
+            suspend fun prepare(origin: String?) = wallet.prepareIssuedCredentials(listOf(issued), emptyList(), null, null,
+                proofRequired = false, credentialIssuer = origin).single()
+            assertTrue(profile.permitsRegistration(prepare(ISSUER)))
+            assertFailsWith<CredentialReceiptTrustException> { prepare("https://other.example") }
+            assertFalse(profile.permitsRegistration(prepare(ISSUER).copy(metadata = null)))
+            assertFalse(CredentialReceiptTrust(listOf(CredentialReceiptAuthority.Mdoc(ISSUER, jwk))).permitsRegistration(prepare(ISSUER)))
+            val independent = PaymentConsentFixture.create()
+            try {
+                val other = requireNotNull(independent.credential().signedWithDisclosures)
+                assertFailsWith<CredentialReceiptTrustException> {
+                    wallet.prepareIssuedCredentials(listOf(issued, other), emptyList(), null, null, false, credentialIssuer = ISSUER)
+                }
+            } finally { independent.close() }
+        } finally { fixture.close() }
+    }
+
+    @Test
+    fun receiptProfileChecksTheMdocSignerChainMsoAndIssuerSignedItems() = runTest {
+        val holder = crypto2SigningKey("receipt-holder")
+        val issuer = crypto2SigningKey("receipt-issuer")
+        val jwk = (requireNotNull(issuer.capabilities.publicKeyExporter).exportPublicKey() as EncodedKey.Jwk).data.toByteArray().decodeToString()
+        val profile = CredentialReceiptTrust(listOf(CredentialReceiptAuthority.Mdoc(ISSUER, jwk)))
+        val raw = mdocCredential(holder, issuer, profiled = true)
+        val credential = CredentialParser.detectAndParse(raw).second
+        profile.verify(ISSUER, credential)
+        assertFailsWith<CredentialReceiptTrustException> { profile.verify("https://other.example", credential) }
+        val other = mdocCredential(holder, crypto2SigningKey("unconfigured-issuer"), profiled = true)
+        assertFailsWith<CredentialReceiptTrustException> { profile.verify(ISSUER, CredentialParser.detectAndParse(other).second) }
+    }
+
+    @Test
+    fun discoveryAndDualOffersBindTheUsableGrantBeforeAcceptance() = runTest {
+        val template = authRequest()
+        val base = requireNotNull(template.offerJson)
+        val both = json.parseToJsonElement(
+            """{"authorization_code":{},"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"code","tx_code":{}}}"""
+        )
+        for (browser in listOf(true, false)) {
+            val service = service { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                    AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = browser))
+                    else -> error("Offer discovery and wrong-grant calls must not exchange credentials")
+                }
+            }
+            val dual = service.start(template.copy(offerJson = JsonObject(base + ("grants" to both))))
+            if (browser) {
+                assertEquals(WalletIssuanceGrant.AUTHORIZATION_CODE, dual.offer.grant)
+                assertNull(dual.offer.transactionCode)
+                assertIs<WalletIssuanceOutcome.Failed>(service.continuePreAuthorized(dual.id, "1234"))
+                assertTrue(service.beginAuthorization(dual.id).state.isNotBlank())
+                val unregistered = service.startBatch(WalletIssuanceOfferRequest(offerJson = JsonObject(base + ("grants" to both))))
+                val callback = "wallet.example:/callback"
+                val authorization = service.beginAuthorization(
+                    unregistered.id, ClientConfiguration("wallet.example", listOf(callback)), { _, _ -> null }, {},
+                )
+                assertEquals(callback, authorization.redirectUri)
+                assertEquals(callback, Url(authorization.url).parameters["redirect_uri"])
+            } else {
+                assertEquals(WalletIssuanceGrant.PRE_AUTHORIZED_CODE, dual.offer.grant)
+                assertNotNull(dual.offer.transactionCode)
+            }
+            for (offer in listOf(JsonObject(base - "grants"), JsonObject(base + ("grants" to JsonObject(emptyMap()))))) {
+                if (browser) assertEquals(WalletIssuanceGrant.AUTHORIZATION_CODE, service.start(template.copy(offerJson = offer)).offer.grant)
+                else assertFailsWith<IllegalStateException> { service.start(template.copy(offerJson = offer)) }
+            }
+        }
+    }
+
+    @Test
+    fun retainedAndStatelessOffersReviewTheirSelectedServerAndTransactionCode() = runTest {
+        val browser = "https://browser.example"
+        val preAuthorized = "https://pre-authorized.example"
+        val offer = JsonObject(requireNotNull(authRequest().offerJson) + ("grants" to json.parseToJsonElement(
+            """{"authorization_code":{"authorization_server":"$browser"},"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"offered","authorization_server":"$preAuthorized","tx_code":{"length":6}}}"""
+        )))
+        for (servers in listOf(listOf(browser, preAuthorized), listOf(preAuthorized, browser))) {
+            val http = client { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false).replace(
+                        "\"credential_endpoint\":", "\"authorization_servers\":[${servers.joinToString { "\"$it\"" }}],\"credential_endpoint\":"
+                    ))
+                    "$browser/.well-known/oauth-authorization-server" ->
+                        jsonResponse(authorizationServerMetadata().replace(ISSUER, browser))
+                    "$preAuthorized/.well-known/oauth-authorization-server" ->
+                        jsonResponse(authorizationServerMetadata(authorizationCode = false).replace(ISSUER, preAuthorized))
+                    else -> error("Review only requires discovery")
+                }
+            }
+            val wallet = Wallet("review", staticKey = JWKKey.generate(KeyType.secp256r1))
+            val sessions = WalletIssuanceSessionService(wallet = wallet, httpClient = http)
+            val retained = sessions.start(authRequest().copy(offerJson = offer))
+            assertEquals(WalletIssuanceGrant.AUTHORIZATION_CODE, retained.offer.grant)
+            assertNull(retained.offer.transactionCode)
+            assertEquals(browser.removePrefix("https://"), Url(sessions.beginAuthorization(retained.id).url).host)
+            val summary = WalletIssuanceHandler.resolveOfferDetailed(ResolveOfferRequest(offerJson = offer), http)
+            assertEquals("pre-authorized_code", summary.summary.grantType)
+            assertEquals("offered", summary.summary.preAuthorizedCode)
+            assertEquals(preAuthorized.removePrefix("https://"), summary.summary.tokenEndpoint?.host)
+            assertEquals(6, summary.transactionCode?.length)
+            assertTrue(summary.summary.txCodeRequired)
+            http.close()
+        }
+    }
+
+    @Test
+    fun anUnhintedBrowserOfferCanUseTheNextDeclaredServer() = runTest {
+        val next = "https://next.example"
+        val sessions = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false).replace(
+                    "\"credential_endpoint\":", "\"authorization_servers\":[\"$ISSUER\",\"$next\"],\"credential_endpoint\":"
+                ))
+                AS_METADATA, "$ISSUER/.well-known/openid-configuration" -> jsonResponse("{}")
+                "$next/.well-known/oauth-authorization-server" -> jsonResponse(authorizationServerMetadata().replace(ISSUER, next))
+                else -> error("Unexpected metadata URL")
+            }
+        }
+        val offer = sessions.start(authRequest())
+        assertEquals(Url(next).host, Url(sessions.beginAuthorization(offer.id).url).host)
+    }
+
+    @Test
+    fun aSoleOfferedGrantCannotOverrideAnExplicitlyConflictingCapability() = runTest {
+        val sessions = service { request ->
+            when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = true))
+                else -> error("Only discovery is expected")
+            }
+        }
+        assertFailsWith<IllegalStateException> { sessions.start(preAuthorizedRequest()) }
+    }
+
+    @Test
+    fun reviewedPreAuthorizedIdentificationMatchesAcceptanceAndReopen() = runTest {
+        for (anonymous in listOf(false, true)) {
+            val sessions = service { request -> when (request.url.toString()) {
+                ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false, anonymousPreAuthorized = anonymous))
+                else -> error("Review and missing input checks require discovery only")
+            } }
+            val review = sessions.startOffer(WalletIssuanceOfferRequest(offerJson = preAuthorizedRequest().offerJson))
+            val expected = if (anonymous) IssuanceClientIdentification.ANONYMOUS_ALLOWED else IssuanceClientIdentification.CLIENT_ID_REQUIRED
+            assertEquals(ISSUER, review.authorizationServer)
+            assertEquals(expected, review.clientIdentification)
+            if (!anonymous) {
+                val failure = assertIs<WalletIssuanceOutcome.Failed>(sessions.continuePreAuthorized(review.session.id))
+                assertEquals(WalletIssuanceErrorCode.INVALID_INPUT, failure.error.code)
+                assertTrue(failure.error.canRetryOffer)
+            }
+            assertEquals(expected, sessions.reviewOffer(review.session.id)?.clientIdentification)
+        }
+    }
 
     @Test
     fun malformedManualAttestationIsRejectedBeforeDiscoveryOrSessionPersistence() = runTest {
@@ -210,7 +385,7 @@ class WalletIssuanceSessionServiceTest {
             requestedUrls += request.url.toString()
             when (request.url.toString()) {
                 ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
-                AS_METADATA -> jsonResponse(authorizationServerMetadata())
+                AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
                 else -> respondError(HttpStatusCode.NotFound)
             }
         }
@@ -1286,7 +1461,10 @@ class WalletIssuanceSessionServiceTest {
     fun deferredMdocCanBeResumedStoredAndBound() = runTest {
         val holderKey = crypto2SigningKey("deferred-holder")
         val keyStore = InMemoryKeyStore().apply { addCrypto2Key(holderKey) }
-        val credential = mdocCredential(holderKey)
+        val signer = crypto2SigningKey("registered-document-signer")
+        val publicKey = requireNotNull(signer.capabilities.publicKeyExporter).exportPublicKey().toPublicJwk(signer.spec)
+        val profile = CredentialReceiptTrust(listOf(CredentialReceiptAuthority.Mdoc(ISSUER, publicKey.data.toByteArray().decodeToString())))
+        val credential = mdocCredential(holderKey, signer, profiled = true)
         val credentialStore = RecordingCredentialStore()
         var deferredRequests = 0
         val client = client { request ->
@@ -1315,7 +1493,7 @@ class WalletIssuanceSessionServiceTest {
                 "deferred",
                 keyStores = listOf(keyStore),
                 credentialStores = listOf(credentialStore),
-            ),
+            ).attachReceiptTrust(profile),
             httpClient = client,
             now = { current },
         )
@@ -1335,6 +1513,7 @@ class WalletIssuanceSessionServiceTest {
             HolderKeyBindingOrigin.ISSUANCE,
             credentialStore.credentials.single().holderKeyBinding?.origin,
         )
+        assertTrue(profile.permitsRegistration(credentialStore.credentials.single()))
         assertEquals(2, deferredRequests)
         val consumed = assertIs<WalletIssuanceOutcome.Failed>(service.resumeDeferred(continuation))
         assertEquals(WalletIssuanceErrorCode.INVALID_SESSION, consumed.error.code)
@@ -1786,6 +1965,62 @@ class WalletIssuanceSessionServiceTest {
         current += 1.seconds
         assertIs<WalletIssuanceOutcome.Stored>(service.resumeDeferred(deferred.credentials.single().id))
         assertEquals(listOf("credential_accepted"), notifications)
+    }
+
+    @Test
+    fun trustDenialStopsImmediateDeferredAndPendingLocalWrites() = runTest {
+        val holder = JWKKey.generate(KeyType.secp256r1)
+        val credential = signedTestCredential(holder)
+        for (stage in listOf("immediate", "deferred", "local-save")) {
+            val records = RecordingSessionStore()
+            val store = FailingThenRecordingCredentialStore()
+            val wallet = Wallet("receipt-$stage", staticKey = holder, credentialStores = listOf(store))
+            val strict = CredentialReceiptTrust(emptyList())
+            if (stage != "local-save") wallet.attachReceiptTrust(strict)
+            var credentialRequests = 0
+            var now = Clock.System.now()
+            val transport = client { request ->
+                when (request.url.toString()) {
+                    ISSUER_METADATA -> jsonResponse(issuerMetadata(proofRequired = false))
+                    AS_METADATA -> jsonResponse(authorizationServerMetadata(authorizationCode = false))
+                    TOKEN_ENDPOINT -> jsonResponse("""{"access_token":"access","token_type":"Bearer"}""")
+                    CREDENTIAL_ENDPOINT -> {
+                        credentialRequests++
+                        if (stage == "deferred") jsonResponse("""{"transaction_id":"pending","interval":1}""", HttpStatusCode.Accepted)
+                        else jsonResponse(issuedCredentialBody(credential))
+                    }
+                    DEFERRED_ENDPOINT -> jsonResponse(issuedCredentialBody(credential))
+                    else -> respondError(HttpStatusCode.NotFound)
+                }
+            }
+            try {
+                fun open() = WalletIssuanceSessionService(wallet, sessionStore = records, httpClient = transport, now = { now })
+                val service = open()
+                val result = service.continuePreAuthorized(service.start(preAuthorizedRequest()).id)
+                val denied = when (stage) {
+                    "immediate" -> result
+                    "deferred" -> {
+                        now += 1.seconds
+                        open().resumeDeferred(assertIs<WalletIssuanceOutcome.Deferred>(result).credentials.single().id)
+                    }
+                    else -> {
+                        val failed = assertIs<WalletIssuanceOutcome.Failed>(result)
+                        assertEquals(WalletIssuanceErrorCode.STORAGE, failed.error.code)
+                        wallet.attachReceiptTrust(strict)
+                        open().resumeDeferred(failed.deferredCredentials.single().id)
+                    }
+                }
+                val failure = assertIs<WalletIssuanceOutcome.Failed>(denied)
+                assertEquals(WalletIssuanceErrorCode.ISSUER_RESPONSE, failure.error.code, stage)
+                assertTrue(failure.error.issuerTrustFailed, stage)
+                assertTrue(failure.storedCredentialIds.isEmpty())
+                assertTrue(open().listIssuanceContinuations().isEmpty())
+                assertEquals(1, credentialRequests)
+                assertTrue(wallet.streamAllCredentials().toList().isEmpty())
+            } finally {
+                transport.close()
+            }
+        }
     }
 
     @Test
@@ -2930,8 +3165,8 @@ class WalletIssuanceSessionServiceTest {
           ${if (authorizationCode || !advertiseSelectedGrant) "\"authorization_endpoint\":\"$AUTHORIZATION_ENDPOINT\"," else ""}
           "token_endpoint":"$TOKEN_ENDPOINT",
           "authorization_details_types_supported":["openid_credential"],
-          "response_types_supported":["code"],
-          "grant_types_supported":["${if (authorizationCode || !advertiseSelectedGrant) "authorization_code" else "urn:ietf:params:oauth:grant-type:pre-authorized_code"}"]
+          "response_types_supported":["code"]
+          ${if (advertiseSelectedGrant) ""","grant_types_supported":["${if (authorizationCode) "authorization_code" else "urn:ietf:params:oauth:grant-type:pre-authorized_code"}"]""" else ""}
           ${if (dpop) ",\"dpop_signing_alg_values_supported\":[${(dpopAlgorithms ?: listOf("ES256")).joinToString(",") { "\"$it\"" }}]" else ""}
           ${if (responseIssuer) ",\"authorization_response_iss_parameter_supported\":true" else ""}
           ${if (anonymousPreAuthorized) ",\"pre-authorized_grant_anonymous_access_supported\":true" else ""}
@@ -2965,19 +3200,38 @@ class WalletIssuanceSessionServiceTest {
             )
         )
 
-    private suspend fun mdocCredential(holderKey: id.walt.crypto2.keys.Key): String {
-        val issuerKey = crypto2SigningKey("issuer-${holderKey.id.value}")
-        val certificate = X509CertificateUtil.createSelfSignedCertificate(
-            issuerKey,
-            SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
-        ) {
-            subjectDn = "CN=Wallet issuance session test issuer"
+    private suspend fun mdocCredential(
+        holderKey: Crypto2Key,
+        signer: Crypto2Key? = null,
+        profiled: Boolean = false,
+    ): String {
+        val issuerKey = signer ?: crypto2SigningKey("issuer-" + holderKey.id.value)
+        val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER)
+        val certificates = if (profiled) {
+            val authority = crypto2SigningKey("test-iaca")
+            val root = X509CertificateUtil.createSelfSignedCertificate(authority, algorithm) {
+                profileIaCaRootCertificate(issuerDnCountryCode = "AT", issuerDnCommonName = "Test IACA", issuerUri = ISSUER)
+            }
+            val signerCertificate = X509CertificateUtil.createCertificate(authority, root, algorithm) {
+                profileDocumentSignerCertificate(
+                    crlDistributionPointUri = "$ISSUER/crl",
+                    issuerUri = ISSUER,
+                    subjectKey = issuerKey,
+                    subjectDnCountryCode = "AT",
+                    subjectDnCommonName = "Test signer",
+                )
+            }
+            listOf(signerCertificate, root)
+        } else {
+            listOf(X509CertificateUtil.createSelfSignedCertificate(issuerKey, algorithm) {
+                subjectDn = "CN=Wallet issuance session test issuer"
+            })
         }
         val holderPublicJwk = holderKey.capabilities.publicKeyExporter!!.exportPublicKey() as EncodedKey.Jwk
         val issuerSigned = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
             signatureAlgorithm = Cose.Algorithm.ES256,
-            issuerCertificate = listOf(CoseCertificate(certificate.encodedDer.toByteArray())),
+            issuerCertificate = certificates.map { CoseCertificate(it.encodedDer.toByteArray()) },
             holderKey = holderPublicJwk.toCoseKey(),
             docType = MDOC_DOCTYPE,
             data = MdocIssuer.MdocUniversalIssuanceData(

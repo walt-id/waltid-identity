@@ -1,7 +1,7 @@
 <div align="center">
 <h1>walt.id OpenID4VC Wallet Mobile</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Mobile facade for Android and iOS wallet SDK integrations.</p>
+ <p>Kotlin wallet SDK for Android and iOS.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -20,11 +20,39 @@
 
 ## Overview
 
-Mobile facade for the walt.id wallet SDK. This module exposes the Android/iOS-facing wallet API used by the native demo apps while delegating protocol behavior to [waltid-openid4vc-wallet](../waltid-openid4vc-wallet/README.md) and persistence to [waltid-openid4vc-wallet-persistence-mobile](../waltid-openid4vc-wallet-persistence-mobile/README.md).
+Android and iOS apps use this Kotlin API to open a wallet, receive credentials and share them with a verifier. The SDK delegates protocol behavior to [waltid-openid4vc-wallet](../waltid-openid4vc-wallet/README.md) and persistence to [waltid-openid4vc-wallet-persistence-mobile](../waltid-openid4vc-wallet-persistence-mobile/README.md).
 
 Native iOS apps should consume the Swift [WalletSDK](../waltid-wallet-sdk-ios/README.md) package, which wraps this KMP module behind Swift-owned types, `async`/`await`, and DocC documentation.
 
 For local setup and platform build flags, see the [Mobile Wallet Development Guide](../../../docs/mobile-wallet-development.md).
+
+## Package map
+
+Call `open()` on [WalletFactory](src/commonMain/kotlin/id/walt/wallet2/mobile/WalletFactory.kt).
+Pass a [WalletConfiguration](src/commonMain/kotlin/id/walt/wallet2/mobile/WalletConfiguration.kt) to customize it.
+The returned [Wallet](src/commonMain/kotlin/id/walt/wallet2/mobile/Wallet.kt) owns the
+session and its lifecycle. Import feature types from these packages under `id.walt.wallet2.mobile`.
+
+| Package | Public responsibilities |
+| --- | --- |
+| [identity](src/commonMain/kotlin/id/walt/wallet2/mobile/identity) | Signing identities, key authorization, custody and recovery |
+| [credentials](src/commonMain/kotlin/id/walt/wallet2/mobile/credentials) | Stored credentials, status reads and background checks |
+| [persistence](src/commonMain/kotlin/id/walt/wallet2/mobile/persistence) | Database key ownership and credential and DID store overrides |
+| [issuance](src/commonMain/kotlin/id/walt/wallet2/mobile/issuance) | Offers, holder bindings, accepted credentials and attestation settings |
+| [presentation](src/commonMain/kotlin/id/walt/wallet2/mobile/presentation) | Verifier requests, disclosure choices, consent and response delivery |
+| [proximity](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity) | Nearby transport, approval and session state |
+| [proximity.trust](src/commonMain/kotlin/id/walt/wallet2/mobile/proximity/trust) | Reader trust, revocation policies and saved trust settings |
+| [digitalcredentials](src/commonMain/kotlin/id/walt/wallet2/mobile/digitalcredentials) | OS registration, digital credential requests and Annex C responses |
+
+For example, import `id.walt.wallet2.mobile.issuance.IssuanceRequest` to start issuance
+and `id.walt.wallet2.mobile.presentation.PresentationSelection` to review a holder’s choices.
+Some results expose shared Wallet2 types directly. The grant’s client-identification policy
+uses `id.walt.wallet2.handlers.IssuanceClientIdentification`.
+
+Configuration captures device language preferences by default on Android and iOS. Pass
+an explicit empty list to skip preferred-language lookup. Key protection, issuer integrations,
+verifier trust and OS credential registration each have their own settings. Opening a default
+wallet requires no configuration arguments.
 
 ## Capabilities
 
@@ -84,37 +112,7 @@ policy that ignores cached responses does not prevent storing new response bodie
 
 ## Credential status
 
-Status reads are local. Use `credentialReads()` for composed credential/status data or
-`credentialStatuses` for status-only updates. Observe without rebuilding credential artwork:
-
-```kotlin
-val observation = scope.launch {
-    wallet.credentialStatuses.collect { snapshot -> renderStatus(snapshot) }
-}
-// App-owned foreground check: reuse authenticated evidence while it is fresh.
-val foreground = wallet.refreshCredentialStatuses()
-// A user-requested check requires revalidation.
-val manual = wallet.refreshCredentialStatuses(
-    credentialIds = listOf(credentialId),
-    mode = CredentialStatusRefreshMode.FORCE,
-)
-observation.cancel()
-wallet.close() // Cancels owned work; does not delete wallet data.
-```
-
-`scope`, `renderStatus` and `credentialId` belong to your app. Import
-`id.walt.wallet2.status.CredentialStatusRefreshMode`. Inspect per-credential outcomes and use the
-snapshot's shared `presentation` for wording, coverage, freshness and consent revisions.
-A previous result after a failed check, no status, unchecked and unsupported are not all-clear.
-Reads, matching, opening review facts and submitting never trigger issuer status checks. An app can
-offer explicit refresh inside an online review: keep its selection and prior evidence, wait only for
-that review's requested operation, render the result/error, then require a new deliberate submit
-with the displayed revisions. Cancel the old UI interest on lock, disposal or request/wallet replacement;
-do not apply its late result to a successor review. Provider/nearby hosts need no additional networking.
-The app owns preferences and
-foreground/manual scheduling; the SDK installs no background worker. The snapshot
-`nextRefreshAt` supports an app-owned timer while active. Cancel it during lock, background and consent,
-and use bounded retry spacing for a past due time.
+Read the wallet's local status snapshot, observe updates, and explicitly refresh when the user or app requests a check. The presentation review includes the advisories for its selected credentials. See the [credential status guide](https://docs.walt.id/community-stack/mobile-wallet/security#credential-status).
 
 Managed persistence retains minimal last-known metadata. A matching built-in trust configuration
 can restore an unexpired observation as fresh after reopen. If equivalence is unavailable, it
@@ -147,192 +145,23 @@ The app owns OS permission, local alert delivery and navigation after unlock.
 An issuer can restrict caching. A foreground session can show the restricted result. A cold pass
 cannot keep a pending notice from that result after it closes.
 
-## Receiving credentials
+## Receiving and presenting credentials
 
-When an issuer advertises `key_attestations_required`, attach an application-supplied
-`KeyAttestationProvider` using `wallet.attachKeyAttestationProvider(provider)` before
-continuing issuance. The provider receives the actual proof key, issuer nonce and
-advertised constraints. The wallet validates its signed answer before sending the proof.
-Reattach this runtime dependency after recreating a wallet; it is not persisted.
-Native Swift consumers configure `WalletConfiguration.keyAttestationProvider`.
-For multiple providers, attach a `KeyAttestationProviderResolver` with
-`wallet.attachKeyAttestationProviderResolver(resolver)`. Native Swift accepts a
-`KeyAttestationProviderResolver` in the same configuration property; existing fixed
-providers continue to work. Resolution receives the credential issuer from metadata,
-only runs when attestation is required, and retains the selected provider and its
-verification key throughout a proof collection. Returning null rejects that issuer.
-Issuer trust and evidence supporting the provider's claims remain separate requirements.
+Open a wallet with `factory.open()`. Initialize the signing identity, preview an offer, then accept its grant. Supply the registered client when starting browser authorization. An optional issuer receipt profile belongs in the issuance configuration.
 
-Start an issuance session to resolve the offer and retain the exact reviewed
-session state while the application collects a separately delivered transaction
-code when the issuer requires one:
+Preview a presentation URL, choose credentials and disclosures, and show the review returned by the wallet. After confirmation, submit that review. A prepared redirect or form requires host delivery.
 
-```kotlin
-val session = wallet.startIssuance(
-    MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.Uri(offerUrl))
-)
-// Or, for Digital Credentials API CREATE_CREDENTIAL handoffs:
-// val session = wallet.startIssuance(
-//     MobileWalletIssuanceRequest(offer = MobileWalletCredentialOffer.InlineJson(offerJson))
-// )
-val transactionCode = session.offer.transactionCode?.let { requirement ->
-    collectTransactionCode(
-        inputMode = requirement.inputMode ?: "numeric",
-        expectedLength = requirement.length,
-        description = requirement.descriptionText,
-    )
-}
-val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode)
-val credentialIds = (outcome as? WalletIssuanceOutcome.Stored)?.credentialIds
-    ?: error("Issuance did not store credentials: $outcome")
-```
+The [compiled Kotlin journey](src/commonTest/kotlin/examples/WalletJourney.kt) covers setup, both issuance grants, reviewed sharing and closing the wallet. The [receiving](https://docs.walt.id/community-stack/mobile-wallet/receive-credentials) and [presenting](https://docs.walt.id/community-stack/mobile-wallet/present-credentials) guides explain each step.
 
-Continuing a session posts OpenID4VCI `credential_accepted` when the issuer
-advertised a notification endpoint. After an isolated fetch that left
-`storeInWallet` false, call `wallet.rejectIssuedCredential(...)` to post
-`credential_deleted` instead of storing the credential. Offer-level
-`cancelIssuance` has no `notification_id` yet.
+## In-person proximity presentation
 
-`MobileWalletCredentialOffer.Uri` is used for deep-link / QR offers.
-`MobileWalletCredentialOffer.InlineJson` is the Credential Offer object from an
-OpenID4VCI Digital Credentials create request (`openid4vci-v1`, plus historical
-aliases). On Android, use
-`AndroidDigitalCredentialCreateProvider` to extract that request from Credential
-Manager and `AndroidDigitalCredentialRegistry.registerCreationOptions` to
-advertise issuance capability separately from presentation registry replacement.
+The [proximity guide](docs/proximity.md) covers platform transports, reader trust, approval, cancellation and prepared sharing.
 
-The session contains typed issuer, credential-configuration, and transaction-code
-metadata for review UI. After a failed acceptance, keep Accept available for the
-same offer only if `outcome.error.canRetryOffer` is true. The user can correct a
-rejected transaction code. A lost token response closes the offer.
+## Persistence and encryption
 
-For an authorization-code offer, call
-`beginAuthorizationIssuance(session.id)` after the user accepts the reviewed
-offer, open the returned browser URL, and then continue with
-`continueAuthorizationIssuance`. Set `MobileWalletConfig.preferredLocales` to
-the app's ordered BCP 47 language preferences; platform demos pass their
-platform locale preferences.
+The [persistence guide](docs/persistence.md) covers encrypted storage, database key ownership, custom stores and deletion.
 
-### Explicit batches and multiple configurations
-
-Issuance requests one instance of each selected configuration by default. A batch
-is opt-in: after reviewing `session.offer.batchSize`, choose existing holders or explicitly request new keys
-at acceptance. A missing batch size means single issuance only;
-an oversized batch fails before the token is redeemed.
-
-```kotlin
-// Preparation happens inside acceptance, using the platform key-use policy.
-val accepted = listOf(
-    MobileWalletCredentialSelection(
-        credentialConfigurationId = session.offer.credentials.first().configurationId,
-        holders = MobileWalletCredentialHolders.NewKeys(count = 2),
-    )
-)
-val outcome = wallet.continuePreAuthorizedIssuance(session.id, transactionCode, accepted)
-// For authorization-code issuance instead:
-// val authorization = wallet.beginAuthorizationIssuance(session.id, accepted)
-```
-
-`Existing` selects wallet-owned keys; `NewKeys` prepares keys only during acceptance.
-Use `createIssuanceHolderKeys` when copies need different platform authorization policies,
-then pass the resulting bindings through `Existing`. Validation failures remove unaccepted
-SDK-generated keys; accepted keys remain wallet-owned and retries reuse them after restart.
-Swift exposes the same choices. See the [Wallet2 batch guide](https://docs.walt.id/community-stack/wallet2/credential-receiving/batch-issuance)
-for target selection, issuer limits, partial results and polling. Mobile consumers use
-`listDeferredIssuance()` and `resumeDeferredIssuance(id)` for retained progress.
-
-Wallet deletion rejects an active wallet or signing-identity operation before any
-cleanup starts. Once admitted, deletion permanently closes that instance to wallet
-and identity operations and continues despite caller cancellation. Platform key
-and database deletion cannot roll back: after a failure, retry `deleteWallet()` on
-the same instance to finish cleanup. It skips stores already cleared before the
-database driver closed, and repeated successful deletion is a no-op. Use a newly
-opened wallet only after cleanup succeeds. This coordinates one writable mobile
-instance; it does not add cross-process write coordination.
-
-Retained records distinguish remote requests from received batches awaiting local save.
-`REMOTE_OUTCOME_UNCERTAIN` and `STORAGE_OUTCOME_UNCERTAIN` preserve an active/interrupted
-claim; they do not authorize another runtime to replay or take over. Resume a recoverable
-local-save handle to save the remaining credentials without contacting the issuer again.
-
-After changing the Swift-facing API, regenerate and check its native ABI on macOS:
-
-```shell
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:updateKotlinAbi -PenableIosBuild=true
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:iosSimulatorArm64Test -PenableIosBuild=true
-```
-
-## Presenting credentials
-
-Preview a presentation request before submission. The request information includes
-typed verifier metadata and the response-encryption state selected by the protocol
-implementation:
-
-An invalid request with an unsafe response channel throws
-`UnsafePresentationErrorResponseException`. Its `error` preserves the OpenID4VP
-code and request-validation message; `responseSafetyFailure` explains why remote
-reporting was blocked. The exception message includes both for demo diagnostics.
-Requests with a safe response channel return `Invalid` for review and explicit
-rejection. No protocol error is sent by preview.
-
-```kotlin
-val preview = wallet.previewPresentation(requestUrl)
-preview.request.verifierMetadata?.display?.name?.let(::showVerifierName)
-when (val encryption = preview.request.responseEncryption) {
-    MobileWalletResponseEncryption.NotRequired -> showPlainResponseNotice()
-    is MobileWalletResponseEncryption.Required -> showEncryptedResponseNotice(
-        algorithm = encryption.keyManagementAlgorithm,
-        contentEncryption = encryption.contentEncryptionAlgorithm,
-        verifierKeyId = encryption.verifierKeyId,
-        verifierKeyThumbprint = encryption.verifierKeyThumbprint,
-    )
-}
-```
-
-Response-encryption metadata describes protection of the authorization response. It
-does not establish verifier trust and does not expose verifier key material.
-
-In the effective review returned by `reviewPresentation` or `reviewDigitalCredentialPresentation`,
-a location with `isBinary` identifies an mdoc byte string. Its value in `claimsJson` is an
-unpadded base64url string and has one claim location. Use the flag to display it as binary data
-and use the source path for its label and selection information.
-Effective mdoc review paths follow the signed CBOR structure. Display serializers can still
-format the stored credential view.
-
-### TS-12 payment consent
-
-Configure `MobileWalletConfig.paymentCredentialIssuers` with independently trusted
-issuer URLs and public JWKs, and set `preferredLocales`. An empty trust list blocks
-authoritative payment review. Disclosure previews also expose additional clear-text values that the credential must transmit: `requested=false` distinguishes those immutable values from required or optional requested claims. The flag defaults to true for existing callers. SD-JWT extras come from the original signed payload, and mdoc previews retain only requested document elements. UI consumers must show extra personal information without making it selectable; credential/disclosure selection and payload generation remain SDK-owned.
-
-After preview and selection, prepare the payment review:
-
-```kotlin
-val consent = wallet.preparePaymentConsent(
-    previewHandle = handle,
-    selectedCredentialOptions = selectedCredentials,
-    selectedDisclosureOptions = selectedDisclosures,
-)
-// Render consent.payment and its unsigned-request warning; await explicit confirmation.
-wallet.submitPresentation(
-    previewHandle = handle,
-    selectedCredentialOptions = selectedCredentials,
-    selectedDisclosureOptions = selectedDisclosures,
-    paymentConsentRevision = consent?.revision,
-)
-```
-
-A null result means no SD-JWT TS-12 payment requires review. A
-`PaymentConsentException` blocks submission; do not fall back to generic labels.
-For app-reviewed Android DC API payments, use `prepareDigitalCredentialPaymentConsent`
-and pass its revision to `submitDigitalCredentialPresentation`. Hosts relying on platform
-confirmation instead omit the revision; this does not qualify the platform's display as
-TS-12 conformant. Native SCA authorization is enforced on both paths. Discard abandoned previews.
-After changing selections, prepare/display a new review. Reusing an acknowledgment
-after failure or cancellation is rejected. The immediate `present` API cannot
-satisfy payment consent. See [supported scope and rollout](../../../docs/ts12-sca-payment-demo.md).
-
-### Android credential registry
+## Android credential registry
 
 Android registers claim paths and scalar matching values with Credential Manager.
 Compound values, JSON null, data URIs and recognized base64 image payloads retain
@@ -352,437 +181,6 @@ orders platform writes across process-local adapters: a submitted write retains 
 provider callback finishes, even if the caller cancels, because Play services may ignore cancellation.
 A provider that never completes a callback blocks subsequent registry writes in that process; local
 wallet reads remain independent.
-
-## In-person proximity presentation
-
-Proximity presentation is a distinct session API rather than an OpenID4VP URL
-flow. Query capabilities without creating ephemeral keys or radio resources,
-then create one single-use session and render its authoritative state:
-
-<!-- doc-snippet:start kotlin-proximity-session -->
-```kotlin
-val configuration = ProximityConfiguration()
-val capabilities = wallet.proximityPresentationCapabilities(configuration)
-showUnavailableMethods(capabilities)
-val session = wallet.startProximityPresentation(configuration)
-
-try {
-    session.state.collect { state ->
-        when (state) {
-            is ProximityState.CheckingPrerequisites -> showUnavailableMethods(state.capabilities)
-            is ProximityState.EngagementReady -> showEngagements(state.engagements)
-            is ProximityState.ReviewRequired -> showProximityReview(state.review)
-            is ProximityState.PreparationRequired -> showPreparationReview(state.plan, state.reason)
-            is ProximityState.AuthorizingHolderKey -> showHolderAuthorization(state.authorization)
-            is ProximityState.Completed -> showCompletion(state.exchanges, state.declined)
-            is ProximityState.NoData -> showNoData(state.exchange, state.unsatisfiedRequest)
-            is ProximityState.Failed -> showProximityError(state.error)
-            ProximityState.Cancelled -> showCancelled()
-            is ProximityState.Preparing,
-            is ProximityState.Connecting,
-            is ProximityState.AwaitingRequest,
-            is ProximityState.SendingResponse,
-            is ProximityState.AwaitingNextRequest,
-            is ProximityState.Terminating -> showProximityProgress(state)
-        }
-    }
-} finally {
-    withContext(NonCancellable) { session.close() }
-}
-```
-<!-- doc-snippet:end kotlin-proximity-session -->
-
-The `show*` functions are application UI callbacks. Collect in a screen-owned
-coroutine and cancel it on leaving the screen; the `finally` block releases the
-session even during cancellation. Import `NonCancellable` and `withContext` from
-`kotlinx.coroutines`. Handle the capability snapshot before starting; remediations
-and protected-key authorization remain explicit host actions. A `StateFlow` does
-not complete automatically on a terminal state.
-
-### Approving before connection
-
-`ProximityConfiguration.approval` defaults to `AskEachTime`. `PrepareBeforeSharing`
-authenticates the reader and collects a request, declines that connection without
-credential disclosure, then emits terminal `PreparationRequired` after transport
-cleanup. Close that session and show the plan's reader, credential choices, exact
-fields, declared retention, purpose and application authorizations. Require a
-credential choice when several match; honour `requiredElements` (including a
-requested mDL portrait). The existing wire-level portrait-denial rule remains in force.
-
-Only after the holder deliberately approves that review, call `plan.approve(submission)`.
-A `Prepared` result supplies an opaque `sharing` for a **new** configuration with
-`approval = ProximityApproval.Prepared(sharing)`. Do not dispatch `Approve` to the
-old connection. `Rejected` gives a display-safe error and requires another review
-or reader connection. Plans are recent, in-memory requests that expire after ten
-minutes; they are not authorizations or persistent reader templates.
-
-An approval handler can return the new session (or no session after rejection):
-
-<!-- doc-snippet:start kotlin-proximity-preparation -->
-```kotlin
-return when (val result = plan.approve(submission)) {
-    is ProximityPreparationResult.Prepared -> wallet.startProximityPresentation(
-        configuration.copy(approval = ProximityApproval.Prepared(result.sharing))
-    )
-    is ProximityPreparationResult.Rejected -> {
-        showProximityError(result.error)
-        null
-    }
-}
-```
-<!-- doc-snippet:end kotlin-proximity-preparation -->
-
-A prepared approval lasts 60 seconds (monotonic time) and is claimed once, before
-prerequisites or radios start. It is bound to one wallet, the exact authenticated
-reader leaf certificate, request/profile, selected credential contents, fields,
-retention, purpose and application authorizations. Fresh reader, credential,
-revocation and holder-key checks still run. A changed request falls back to
-`ReviewRequired(PreparedSharingChanged)` on interactive routes, or ends with a new
-`PreparationRequired` on a noninteractive route. It never expands an earlier
-approval. Matching requests proceed through normal protected-key authorization;
-advance consent does not bypass device authentication or guarantee that an OS
-prompt can run during NFC emulation.
-
-Preparation requires one named, authenticated, trusted reader covering all
-requested documents. Unnamed, unsigned, untrusted or multiple-reader requests
-cannot produce a plan; their ordinary interactive policies remain unchanged.
-`NfcHostPlatformAdapter.isUserInteractionBlocked` reports the host's current modal
-presentation state. The bundled iOS adapters report `true` while the Core NFC
-system sheet is presenting. During that interval, even `AskEachTime` first
-collects and declines a trusted request so review can happen after the sheet
-closes, followed by a new connection. Conventional NFC-to-Bluetooth handover
-permits interactive review after NFC closes. NFC v2 may retain its system sheet
-while an alternate bearer connects or carries messages, so the SDK checks the
-current host presentation state for each request.
-
-Persist a mode preference only. Keep a plan/approval inside the active journey,
-call `sharing.revoke()` and `session.close()` on cancellation or genuine backgrounding,
-and exempt only the lifecycle transition owned by the active Core NFC sheet.
-Every retry requires a fresh deliberate approval; repeated exchanges cannot use
-one prepared approval. `remainingSeconds` is suitable for a ready-screen countdown.
-`Completed.receipt` records the most recent locally completed approved selection
-and its approval timing; it neither authorizes reuse nor confirms reader verification.
-
-Kotlin and Swift proximity types use the `Proximity` prefix.
-`ProximityRetrievalOptions` selects conventional retrieval bearers and defaults to BLE.
-
-The default configuration selects QR engagement and BLE retrieval. NFC supports
-conventional static/negotiated handover, conventional retrieval, and the explicit
-provisional NFCv2 session variant. A retrieval plan can select Wi-Fi Aware with
-`wifiAware = true`, including a Wi-Fi-only QR plan with `bluetoothLowEnergy = null`.
-Android implements the mandatory shared-key path; iOS reports it unimplemented.
-Runtime observations distinguish `NotChecked`, `Available`, and
-`Unavailable`; selection is independent. Startability follows each selected
-route's own retrieval plan, so an unavailable optional bearer cannot block a
-usable route or lend an unrelated bearer to another route.
-
-```kotlin
-val nfcConfiguration = ProximityConfiguration(
-    session = ProximitySessionConfiguration.ConventionalNfc(
-        handover = ProximityNfcHandover.Negotiated,
-        retrieval = ProximityRetrievalOptions(
-            nfc = ProximityNfcRetrievalConfiguration(),
-        ),
-        qrFallback = ProximityRetrievalOptions(),
-    ),
-)
-```
-
-The session variant owns engagement and compatible retrieval together. Optional
-QR fallback requires a nonempty conventional plan. Shared BLE role/policy and
-conventional NFC length limits must match across routes. The provisional NFCv2
-variant always includes same-channel retrieval and owns its distinct command
-limit; the ISO/IEC 18013-5:2021 profile rejects that variant. Its optional hybrid
-Wi-Fi bearer is selected with `wifiAware = true`; QR fallback remains a separate
-nonempty conventional plan. The mandatory NCS-SK-128 cipher is enforced by the
-transport and has no redundant public policy switch.
-
-When QR and NFC both select Wi-Fi Aware, the SDK generates independent ephemeral
-keys and publishers. Each service name follows the required EDeviceKeyBytes
-derivation, and the selected connection carries its own key, exact engagement,
-and handover into session crypto. Static NFC dual-role BLE uses the shared UUID
-that its carrier format can encode; QR retains distinct role UUIDs.
-
-Device signature is the default holder-authentication policy. Applications may
-require MAC or choose an explicit pre-review preference with
-`deviceAuthenticationPolicy`; the selected method is shown on each credential
-option, bound into the immutable review, and never changed after consent. The
-pinned EUDI profile currently requires device signature.
-
-`session.connectedRoute` reports the winning engagement and actual connected bearer. It remains
-available after the brief connecting state, including during review and after completion. Configured
-or advertised methods alone do not establish which route a reader used.
-
-Terminal errors expose display-safe `code`, `message`, and `remediationActions`. For example, NFC
-access not accepted maps to application settings. Perform that host action, wait for the application
-to return, close the failed session, and create a new session. `ReportRemediation` belongs only to the
-active prerequisite loop. The radio-independent engine retains unexpected exception causes on its
-failure result for diagnostics; raw exception text must never be rendered as presentation content.
-
-Host applications perform permission or settings effects named by
-`capabilities.remediationActions`, report the privacy-safe outcome with
-`ProximityAction.ReportRemediation`, and let the SDK re-check the
-platform. Approve and decline require the `reviewId` from the displayed review.
-A successful decision consumes that identity once; stale, duplicate, and
-cross-session actions are rejected. Invalid submissions leave the review open
-for correction. Acceptance records a decision; signing or transmission can still
-fail.
-
-The session owns configuration and nested review/profile/selection values.
-Changing caller collections or exported projections cannot alter accepted claims
-or continuation. The accepted choice has its own retained binding, while the
-preview digest still represents the request and fresh wallet/profile state.
-Only the ordered session owner publishes state, so delayed observations cannot
-replace a newer review or a terminal state. Error `recovery` distinguishes
-prerequisite retry in an active session from starting a new session after failure.
-
-Review approval uses only the credential and element choices in the displayed
-review. The SDK revalidates credential, holder key, reader
-trust, status, disclosure, and application-profile state before sending.
-Multiple reader-authentication statements retain their independent
-`authenticationIndex`, and holder-key authorization is reported per document
-request so mixed signature/MAC responses cannot be collapsed into one prompt.
-
-Android Wi-Fi Aware remediation distinguishes nearby-Wi-Fi permission,
-target-37 local-network permission, Wi-Fi/radio state, exhausted resources, and
-unsupported API/feature/cipher states. This draft implements only NCS-SK-128 and
-the mandatory 2.4 GHz NAN baseline. NCS-PK-2WDH-128, optional 5 GHz advertisement,
-and physical independent-reader qualification remain explicit follow-ups; this
-transport adds no server-retrieval or internet path.
-
-Reader authentication validity does not establish reader trust. To require a
-trusted reader, provision Reader CA certificates out of band and pass the shared
-evaluator explicitly:
-
-```kotlin
-val readerTrust = ProximityConfiguredReaderTrustEvaluator(
-    ProximityReaderTrustConfiguration(
-        trustAnchors = listOf(
-            ProximityReaderTrustAnchor(
-                certificateDerBase64Url = readerCaDerBase64Url,
-                displayName = "Example reader authority",
-            )
-        ),
-        revocationPolicy = ProximityReaderRevocationPolicy.Check(
-            applicationRevocationEvaluator
-        ),
-    )
-)
-val configuration = ProximityConfiguration(
-    readerPolicy = ProximityReaderPolicy.RequireTrusted,
-    readerTrustEvaluator = readerTrust,
-)
-```
-
-The SDK performs certificate profile, time, and explicit-anchor path validation,
-but performs no hidden network lookup and ships no reader trust list. A root sent
-by the reader is only path evidence; it is never trusted unless the application
-provisioned the same certificate. Optional RICAL providers use separate explicit
-provider roots, signer policy, revocation, and constraint boundaries. Demo apps
-can pass a named test anchor through the same configuration constructor, but
-test anchors must not become production defaults.
-
-For CRL checking, configure the shared verifier with public certificates from the
-reader's issuer path and application-owned transport:
-
-```kotlin
-val applicationRevocationEvaluator = ProximityCrlRevocationEvaluator(
-    issuerCertificatesDerBase64Url = listOf(readerCaDerBase64Url),
-    scope = ProximityCrlScope.ValidatedPath,
-    fetcher = ProximityCrlFetcher { url, maximumBytes ->
-        // Apply application destination, redirect, timeout, and byte-limit policy.
-        // Return Available with unpadded Base64URL DER, or Unavailable.
-        applicationCrlClient.fetch(url, maximumBytes)
-    },
-)
-```
-
-Install this evaluator as `ProximityReaderTrustConfiguration.revocationPolicy =
-ProximityReaderRevocationPolicy.Check(applicationRevocationEvaluator)`. `ValidatedPath`
-checks the reader and non-anchor intermediates on the exact validated direct or RICAL
-path, stopping at its selected configured anchor. Calling this scope with raw evidence
-alone returns `Indeterminate`. The explicit `ReaderCertificateAndIssuingAuthorities`
-policy retains additional status checking through the terminal self-signed authority;
-that authority must advertise an applicable distribution point.
-A current, authenticated complete CRL must cover every checked certificate;
-verified revocation of either the reader or an authority prevents disclosure.
-The issuer list supplies path material and does not add trust anchors.
-
-The supported CRL profile is direct X.509 v2 with authority key identifier, CRL
-number, `thisUpdate` and `nextUpdate`, and ECDSA or RSA PKCS#1 signatures using
-SHA-256/384/512. CRLs are limited to 2 MiB and 10,000 entries. Delta, indirect,
-partitioned, stale or unverifiable CRLs remain indeterminate. Missing evidence
-never becomes `Good`. The SDK performs no implicit fetch and keeps no cache
-between evaluations. The default revocation policy remains `NotChecked`; demo
-trust settings do not configure a CRL client. OCSP needs a separate request and
-signed-response verifier and is not implemented by this evaluator.
-
-Configuration snapshots detach collection data while retaining provider/evaluator service
-references. Providers and revocation sources are queried at evaluation time. Persisted
-settings decoding checks structure; import checks current CA usage and RICAL material;
-session evaluation establishes current trust. `applyTo` replaces the supplied trust evaluator,
-so applications needing CRL/IACA/custom policy must configure that evaluator after applying
-holder-managed settings. Imports do not add network services or infer issuer roles.
-
-Wallet applications that let holders manage this policy can persist a canonical
-`ProximityReaderTrustSettings` snapshot. Use
-`ProximityReaderTrustSettingsCodec.prepareImport` to validate and
-preview public trust material before saving the returned settings. The importer
-accepts DER or certificate-only PEM Reader CAs and versioned walt.id JSON trust
-bundles containing named Reader CAs and static signed RICAL configuration. It
-rejects private keys, PKCS#12/PFX files, unknown JSON fields or versions,
-duplicates, non-CA or expired anchors, invalid RICAL signatures and paths, and
-files larger than 1 MiB. The codec performs no persistence or network access.
-
-The version-1 bundle shape is deliberately narrow; every encoded value is
-unpadded Base64URL and unknown fields are rejected:
-
-```json
-{
-  "version": 1,
-  "type": "org.waltid.wallet.reader-trust",
-  "readerAuthorities": [
-    {
-      "name": "Example Reader CA",
-      "certificateDerBase64Url": "<public DER certificate>"
-    }
-  ],
-  "ricalProviders": [
-    {
-      "providerId": "<RICAL provider identifier>",
-      "acceptedTypes": ["<RICAL type>"],
-      "providerTrustAnchorsDerBase64Url": ["<public DER certificate>"],
-      "acceptedSignerCertificatePolicyOids": ["<certificate-policy OID>"],
-      "establishReaderTrust": false,
-      "signedRicalBase64Url": "<untagged COSE_Sign1>"
-    }
-  ]
-}
-```
-
-Read one immutable settings snapshot when a new session starts and apply it with
-`ProximityReaderTrustSettings.applyTo`. Settings changed during a
-session therefore affect only the next session. The demo wallets expose this as
-**Settings → Credential Sharing → Reader Authentication** and store only the
-canonical public configuration in app-private storage.
-
-Only one proximity session may be active per wallet. Always call `close()` when
-the journey leaves the screen; closing and cancellation are idempotent and every
-new session creates fresh engagement identifiers and ephemeral key material.
-
-An unmatched request ends in `ProximityState.NoData` without holder
-consent or key authorization. Its `exchange` identifies the final request;
-earlier exchanges may already have shared approved data. Its required
-`state.unsatisfiedRequest` contains the original requested documents, their zero-based indices,
-namespace/element identifiers and reader-declared retention intent. It contains all requested
-documents, including individually satisfiable ones, without wallet values or credential identifiers.
-Reader authentication was not evaluated on this path. Holder decline and sharing failures
-use their existing completion/failure states.
-The summary remains available after session cleanup; the SDK does not persist a history entry.
-
-Use
-`ProximityReview.readerAuthenticationSummary` for the collapsed reader summary.
-The shared SDK accounts for whole-request coverage while preserving malformed,
-invalid, and revoked authentication warnings. Raw authentication entries remain
-available for detailed inspection.
-
-## Persistence and encryption
-
-`MobileWalletConfig()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
-
-Managed signing keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Credential and DID store overrides are independent; signing keys always remain platform-managed. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
-
-`MobileWalletConfig()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types they understand through `transactionDataProfiles`; requests containing unknown transaction data types are rejected before the user can submit a presentation. Profile fields are preserved for app UI and display metadata.
-
-When an app enables `urn:eudi:sca:payment:1`, reviewed ordinary and Digital
-Credentials API submissions require a generated, non-exportable hardware signing
-key with `BiometricCurrentSet` or `BiometricTimedReuse`. The SDK checks the restored
-native key's protection and policy provenance before signing. Per-use keys authenticate
-during signing. Timed keys require fresh native biometrics for each payment, followed
-by a single-use signer that expires with the configured window and closes when the
-operation ends. A successful authorized signature establishes possession and inherence;
-the proof reports both methods as
-`other`, without claiming a specific biometric modality or certified WSCD category.
-Cancellation, expiry, missing native evidence, and unsupported key policies produce no
-payment proof. This does not upgrade an existing key's policy.
-
-The application remains responsible for transaction display, informed consent and
-action lifetime. The payment scope enforces fresh approval and one proof; the native
-key retains its timed policy for ordinary operations. This adapter does not supply
-transaction UI, authentication batching across payments, or full SCA assurance.
-
-The examples below build `MobileWalletConfig` values. Pass the selected config
-to `MobileWalletFactory(...).create(config)` from a coroutine to create the
-wallet.
-
-Use the encrypted default when the app does not need custom persistence:
-
-<!-- doc-snippet:start kotlin-default-persistence -->
-```kotlin
-val config = MobileWalletConfig(walletId = "consumer-wallet")
-```
-<!-- doc-snippet:end kotlin-default-persistence -->
-
-Provide database keys while keeping SDK SQLDelight stores by implementing `DatabaseEncryptionKeyProvider`:
-
-<!-- doc-snippet:start kotlin-provided-database-key -->
-```kotlin
-class KmsDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
-    override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
-        val keyBytes = loadOrCreateKeyBytes(walletId, databaseName)
-        return DatabaseEncryptionKey(keyId = "$walletId:$databaseName", material = keyBytes)
-    }
-
-    override suspend fun deleteKey(walletId: String, databaseName: String) {
-        deleteKeyBytes(walletId, databaseName)
-    }
-}
-
-val config = MobileWalletConfig(
-    walletId = "consumer-wallet",
-    persistence = MobileWalletPersistence(
-        databaseKey = MobileWalletDatabaseKey.Provided(
-            provider = KmsDatabaseKeyProvider()
-        )
-    )
-)
-```
-<!-- doc-snippet:end kotlin-provided-database-key -->
-
-This mode is covered by Android device and iOS simulator integration tests so
-provider lookup, encrypted database reopening, and provider deletion stay wired
-to the real platform drivers.
-
-Override only credential storage while retaining the default encrypted database, database-key ownership, DID store, and platform signing-key store:
-
-<!-- doc-snippet:start kotlin-custom-credential-store -->
-```kotlin
-val config = MobileWalletConfig(
-    walletId = "consumer-wallet",
-    persistence = MobileWalletPersistence(
-        credentialStore = appCredentialStore
-    )
-)
-```
-<!-- doc-snippet:end kotlin-custom-credential-store -->
-
-KMP consumers can override credential and DID storage while signing keys remain platform-managed:
-
-<!-- doc-snippet:start kotlin-store-overrides -->
-```kotlin
-val config = MobileWalletConfig(
-    walletId = "consumer-wallet",
-    persistence = MobileWalletPersistence(
-        credentialStore = appCredentialStore,
-        didStore = appDidStore,
-    )
-)
-```
-<!-- doc-snippet:end kotlin-store-overrides -->
-
-Call `MobileWallet.deleteWallet()` to delete local wallet material for a wallet: stored key descriptors, credentials, DIDs, platform signing keys, encrypted database files and sidecars, and the configured database key. Credential and DID custom stores receive the corresponding remove calls.
-
-If a local development build has an old plaintext database or a database restored without its matching key, opening the wallet can fail with a typed storage error. Reset local state by calling `deleteWallet()`, uninstalling the app, or deleting the app's local wallet data. WAL-1085 does not perform plaintext-to-encrypted migration.
 
 ## Demo apps
 
@@ -814,32 +212,3 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
-
-### Interactive batch acceptance
-
-The Android `EnterpriseMobileWalletIntegrationTest` uses the coordinated Enterprise
-mobile fixture (`enterprise_fixture_base_url` instrumentation argument). Its batch
-case creates two holder keys, recreates the wallet and presents each copy separately.
-For a physical phone, forward fixture ports 33334 and 33335 over ADB and use
-`http://127.0.0.1:33335` as the fixture URL.
-
-Two additional checks require explicit instrumentation flags:
-
-- `wallet.batch.cancel=true`: run `batchSigningCancellationStoresNoCredential` and
-  cancel the second holder's biometric prompt. The result must report a crypto
-  failure with no stored copies, including after wallet recreation.
-- `wallet.batch.browser=true`: run
-  `browserAuthorizationRetainsBatchSelectionAcrossWalletRecreation`. Allow the
-  installed browser to open the test callback app if prompted. The SDK is recreated
-  before browser return; both copies must then issue and present successfully.
-  This uses the fixture’s controlled identity provider; real issuer PAR/PKCE and token routes
-  remain in use. The test-only callback Activity is absent from production artifacts.
-
-
-## Client attestation challenge interoperability
-
-The SDK inherits [Wallet2 client attestation challenge recovery](../waltid-openid4vc-wallet/README.md#client-attestation-challenge-support) through its existing `WalletAttestationConfig`. `startIssuance`, `beginAuthorizationIssuance`, `continuePreAuthorizedIssuance` and `continueAuthorizationIssuance` require no new challenge parameters. The SDK signs the PoP with the platform instance key and restores flow-scoped freshness and preparation from the wallet's issuance store after wallet recreation. New issuance flows fetch an advertised challenge again; resuming the same flow preserves response-provided challenges. Applications should reattach the same attester configuration when reopening a wallet.
-
-`MobileWalletAttestationChallengeTest` covers the public SDK operations for both grants and both discovery modes. The Android device and Swift enterprise integration suites add native signing, persistent storage, the real KMP bridge on iOS, and ES issuer2 validation. Their four dedicated fixture scenarios are `enterprise-mdl-challenge-endpoint`, `enterprise-mdl-challenge-response`, and each name with `-authorized` appended. Authorization tests recreate the wallet between PAR and code exchange. The fixture's trace check verifies that issuer2 produced the error and the retry used its challenge, without exposing tokens in the trace API.
-
-The challenge fixture additionally uses ports 33336 and 33337. The coordinated enterprise Gradle task forwards them with ADB; manual device runs must forward all ports 33334–33337. iOS simulators use localhost; physical iOS devices need the configured fixture host reachable on all four ports. Native iOS execution requires macOS/Xcode.

@@ -81,20 +81,21 @@ final class ProximityPresentationViewModelTests: XCTestCase {
 
     func testSessionConfigurationMatrixRoundTripsThroughKotlinBridge() throws {
         let ble = WalletSDK.ProximityBLEConfiguration(roles: .centralClient, bearerPolicy: .gattOnly)
-        let plans: [WalletSDK.ProximityRetrievalOptions] = [
+        let nfc = try WalletSDK.ProximityNFCRetrievalConfiguration(maximumCommandDataLength: 255, maximumResponseDataLength: 256)
+        let plans: [WalletSDK.ProximityRetrievalOptions] = try [
             .init(bluetoothLowEnergy: ble),
-            .init(bluetoothLowEnergy: nil, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256)),
-            .init(bluetoothLowEnergy: ble, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256)),
+            .init(bluetoothLowEnergy: nil, nfc: nfc),
+            .init(bluetoothLowEnergy: ble, nfc: nfc),
             .init(bluetoothLowEnergy: nil, wifiAware: true),
             .init(bluetoothLowEnergy: ble, wifiAware: true),
-            .init(bluetoothLowEnergy: nil, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256), wifiAware: true),
-            .init(bluetoothLowEnergy: ble, nfc: .init(maximumCommandDataLength: 255, maximumResponseDataLength: 256), wifiAware: true),
+            .init(bluetoothLowEnergy: nil, nfc: nfc, wifiAware: true),
+            .init(bluetoothLowEnergy: ble, nfc: nfc, wifiAware: true),
         ]
         var sessions = plans.map(WalletSDK.ProximitySessionConfiguration.qr)
         for handover in [WalletSDK.ProximityNFCHandover.staticHandover, .negotiatedHandover] {
             for retrieval in plans {
                 for qr in [nil] + plans.map(Optional.some) {
-                    sessions.append(.nfc(.init(handover: handover, retrieval: retrieval, qrFallback: qr)))
+                    sessions.append(.nfc(try .init(handover: handover, retrieval: retrieval, qrFallback: qr)))
                 }
             }
         }
@@ -102,7 +103,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
             for qr in [nil] + plans.map(Optional.some) {
                 for wifiAware in [false, true] {
                     for bluetooth in [nil, ble] {
-                        sessions.append(.provisionalNFCV2(.init(
+                        sessions.append(.provisionalNFCV2(try .init(
                             maximumCommandDataLength: limit, bluetoothLowEnergy: bluetooth,
                             qrFallback: qr, wifiAware: wifiAware
                         )))
@@ -116,7 +117,7 @@ final class ProximityPresentationViewModelTests: XCTestCase {
                     profile: profile, session: session,
                     readerPolicy: profile == .eudiARF3FCAF202608 ? .requireTrusted : .allowAnonymousOrUntrusted
                 )
-                XCTAssertEqual(swiftSession(configuration.toKMPConfiguration().session), session)
+                XCTAssertEqual(try swiftSession(configuration.toKMPConfiguration().session), session)
             }
         }
     }
@@ -566,8 +567,9 @@ final class ProximityPresentationViewModelTests: XCTestCase {
                     validUntil: Date(timeIntervalSince1970: 1_893_456_000), deviceAuthentication: .signature,
                     requestedElements: [.init(namespace: "org.iso.18013.5.1", elementIdentifier: "given_name",
                         intentToRetain: false, satisfiesRequestedElements: [])])])],
-            readerAuthentication: [.init(scope: .wholeRequest, authenticationIndex: 0,
-                outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: "City service desk")))],
+            readerAuthentication: [.init(scope: .wholeRequest,
+                outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: "City service desk")),
+                authenticationIndex: 0)],
             readerAuthenticationSummary: .trusted, useCases: [], applicationAuthorizations: [])
         let selection = try fixtureSubmission(review)
         let sharing = WalletSDK.ProximityPreparedSharing(review: review, submission: selection,
@@ -1700,8 +1702,9 @@ func makeWalletVisualProximityState(_ kind: String) async throws -> WalletViewMo
                 validUntil: Date(timeIntervalSince1970: 1_893_456_000), deviceAuthentication: .signature,
                 requestedElements: [.init(namespace: try text("namespace"), elementIdentifier: try text("element"),
                     intentToRetain: true, satisfiesRequestedElements: [])])])],
-        readerAuthentication: [.init(scope: .wholeRequest, authenticationIndex: 0,
-            outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: text("reader"))))],
+        readerAuthentication: [.init(scope: .wholeRequest,
+            outcome: .valid(try .init(state: .trusted, certificatePath: .valid, displayName: text("reader"))),
+            authenticationIndex: 0)],
         readerAuthenticationSummary: .trusted, useCases: [], applicationAuthorizations: [])
     let session = FakeProximitySession()
     let client = FakeProximityWalletClient(session: session, capabilityResults: [kind == "permission"

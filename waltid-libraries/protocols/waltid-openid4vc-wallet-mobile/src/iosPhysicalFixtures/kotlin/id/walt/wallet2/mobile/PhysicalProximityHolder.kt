@@ -3,6 +3,9 @@ package id.walt.wallet2.mobile
 import id.walt.mdoc.proximity.mobile.IosBleProximityTransportFactory
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
 import id.walt.proximity.physical.PhysicalCredentialFixture
+import id.walt.wallet2.mobile.proximity.ProximityConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityCoordinator
+import id.walt.wallet2.mobile.proximity.ProximitySession
 
 /** Disposable native test host; compiled only into the isolated physical-fixtures framework. */
 public class PhysicalProximityHolder private constructor(

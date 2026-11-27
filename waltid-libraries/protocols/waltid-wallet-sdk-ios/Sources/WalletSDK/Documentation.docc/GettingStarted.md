@@ -17,10 +17,12 @@ import WalletSDK
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
-        defaultKeyUseAuthorizationPolicy: .biometricCurrentSet,
-        keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
-            message: "Authorize wallet signing",
-            cancelText: "Cancel"
+        keyAuthorization: .init(
+            policy: .biometricCurrentSet,
+            prompt: WalletKeyUseAuthorizationPrompt(
+                message: "Authorize wallet signing",
+                cancelText: "Cancel"
+            )
         )
     )
 )
@@ -28,16 +30,15 @@ let wallet = try await Wallet(
 
 ``WalletConfiguration`` uses managed encrypted local persistence by default.
 Apps that own database-key recovery can pass ``WalletPersistence`` with
-``WalletDatabaseKeyConfiguration/provided(_:)`` and a
-``WalletDatabaseKeyProvider`` implementation.
+``DatabaseKeySource/provided(_:)`` and a
+``DatabaseEncryptionKeyProvider`` implementation.
 
-Apps can provide ``WalletPersistence/credentialStore`` or ``WalletPersistence/didStore`` when they own credential or DID durability.
-Omitted stores use the encrypted local database. Signing keys are always
-platform-managed and remain in the iOS Keychain. Credential and DID stores can
+Apps can provide ``WalletPersistence/credentialStore`` or ``WalletPersistence/didStore`` when they own credential or DID durability. Even when an app supplies both a credential store and a DID store, opening the wallet still opens SQLCipher for signing-identity state and pending issuance.
+Omitted stores use the encrypted local database. The signing identity’s `storage` records whether its key uses hardware, native storage or the encrypted database. Credential and DID stores can
 be supplied independently. This example assumes app-defined store types that
 implement the corresponding protocols.
 
-<!-- doc-snippet:start swift-full-store-overrides -->
+<!-- doc-snippet:start swift-credential-and-did-overrides -->
 ```swift
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
@@ -49,7 +50,7 @@ let wallet = try await Wallet(
     )
 )
 ```
-<!-- doc-snippet:end swift-full-store-overrides -->
+<!-- doc-snippet:end swift-credential-and-did-overrides -->
 
 > Important: Keep Kotlin Multiplatform and generated bridge symbols behind
 > `WalletSDK`. Native iOS consumers should import this Swift package and work

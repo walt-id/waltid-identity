@@ -19,8 +19,10 @@ final class DemoClientIdTrustTests: XCTestCase {
         let wallet = try await Wallet(
             configuration: WalletConfiguration(
                 walletID: "demo-client-id-trust-\(UUID().uuidString)",
-                clientIDTrustConfiguration: DemoClientIdTrust.clientIDTrustConfiguration,
-                defaultKeyUseAuthorizationPolicy: .none
+                keyAuthorization: .init(policy: .none),
+                presentation: .init(
+                    verifierTrust: DemoClientIdTrust.clientIDTrustConfiguration
+                )
             )
         )
         try await wallet.deleteLocalData()

@@ -1,44 +1,44 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.ProximityUnsatisfiedDocument
-import id.walt.wallet2.mobile.ProximityUnsatisfiedRequest
+import id.walt.wallet2.mobile.proximity.ProximityUnsatisfiedDocument
+import id.walt.wallet2.mobile.proximity.ProximityUnsatisfiedRequest
 import kotlinx.io.bytestring.ByteString
-import id.walt.wallet2.mobile.ProximityApproval
-import id.walt.wallet2.mobile.ProximityBleConfiguration
-import id.walt.wallet2.mobile.ProximityNfcRetrievalConfiguration
-import id.walt.wallet2.mobile.ProximityRetrievalOptions
-import id.walt.wallet2.mobile.ProximitySharingPlan
-import id.walt.wallet2.mobile.ProximityConnectedRoute
-import id.walt.wallet2.mobile.ProximityEngagementMethod
-import id.walt.wallet2.mobile.ProximityTransport
-import id.walt.wallet2.mobile.ProximityReviewId
-import id.walt.wallet2.mobile.ProximityRecovery
-import id.walt.wallet2.mobile.ProximityRuntimeObservation
-import id.walt.wallet2.mobile.ProximityAction
-import id.walt.wallet2.mobile.ProximityActionResult
-import id.walt.wallet2.mobile.ProximityCapabilities
-import id.walt.wallet2.mobile.ProximityBleBearerPolicy
-import id.walt.wallet2.mobile.ProximityBleRoles
-import id.walt.wallet2.mobile.ProximityConfiguration
-import id.walt.wallet2.mobile.ProximityCredentialOption
-import id.walt.wallet2.mobile.ProximityDeviceAuthenticationMethod
-import id.walt.wallet2.mobile.ProximityDocumentReview
-import id.walt.wallet2.mobile.ProximityElementReference
-import id.walt.wallet2.mobile.ProximityError
-import id.walt.wallet2.mobile.ProximityEngagement
-import id.walt.wallet2.mobile.ProximityErrorCategory
-import id.walt.wallet2.mobile.ProximitySessionConfiguration
-import id.walt.wallet2.mobile.ProximityHostActionResult
-import id.walt.wallet2.mobile.ProximityNfcHandover
-import id.walt.wallet2.mobile.ProximityProfile
-import id.walt.wallet2.mobile.ProximityReaderPolicy
-import id.walt.wallet2.mobile.ProximityReaderTrustSettings
-import id.walt.wallet2.mobile.ProximityRemediationAction
-import id.walt.wallet2.mobile.ProximityRequestedElement
-import id.walt.wallet2.mobile.ProximityReview
-import id.walt.wallet2.mobile.ProximitySession
-import id.walt.wallet2.mobile.ProximityState
-import id.walt.wallet2.mobile.ProximityTransportCapability
+import id.walt.wallet2.mobile.proximity.ProximityApproval
+import id.walt.wallet2.mobile.proximity.ProximityBleConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityNfcRetrievalConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityRetrievalOptions
+import id.walt.wallet2.mobile.proximity.ProximitySharingPlan
+import id.walt.wallet2.mobile.proximity.ProximityConnectedRoute
+import id.walt.wallet2.mobile.proximity.ProximityEngagementMethod
+import id.walt.wallet2.mobile.proximity.ProximityTransport
+import id.walt.wallet2.mobile.proximity.ProximityReviewId
+import id.walt.wallet2.mobile.proximity.ProximityRecovery
+import id.walt.wallet2.mobile.proximity.ProximityRuntimeObservation
+import id.walt.wallet2.mobile.proximity.ProximityAction
+import id.walt.wallet2.mobile.proximity.ProximityActionResult
+import id.walt.wallet2.mobile.proximity.ProximityCapabilities
+import id.walt.wallet2.mobile.proximity.ProximityBleBearerPolicy
+import id.walt.wallet2.mobile.proximity.ProximityBleRoles
+import id.walt.wallet2.mobile.proximity.ProximityConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityCredentialOption
+import id.walt.wallet2.mobile.proximity.ProximityDeviceAuthenticationMethod
+import id.walt.wallet2.mobile.proximity.ProximityDocumentReview
+import id.walt.wallet2.mobile.proximity.ProximityElementReference
+import id.walt.wallet2.mobile.proximity.ProximityError
+import id.walt.wallet2.mobile.proximity.ProximityEngagement
+import id.walt.wallet2.mobile.proximity.ProximityErrorCategory
+import id.walt.wallet2.mobile.proximity.ProximitySessionConfiguration
+import id.walt.wallet2.mobile.proximity.ProximityHostActionResult
+import id.walt.wallet2.mobile.proximity.ProximityNfcHandover
+import id.walt.wallet2.mobile.proximity.ProximityProfile
+import id.walt.wallet2.mobile.proximity.ProximityReaderPolicy
+import id.walt.wallet2.mobile.proximity.trust.ProximityReaderTrustSettings
+import id.walt.wallet2.mobile.proximity.ProximityRemediationAction
+import id.walt.wallet2.mobile.proximity.ProximityRequestedElement
+import id.walt.wallet2.mobile.proximity.ProximityReview
+import id.walt.wallet2.mobile.proximity.ProximitySession
+import id.walt.wallet2.mobile.proximity.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximityTransportCapability
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -1465,7 +1465,7 @@ private fun wifiPermissionCapabilities(
 
 /** Host-only fixture. Permission invariants are covered by real signed-request tests in the SDK module. */
 private fun fixtureSharingPlan(review: ProximityReview): ProximitySharingPlan {
-    val scopeType = Class.forName("id.walt.wallet2.mobile.ProximityApprovalScope")
+    val scopeType = Class.forName("id.walt.wallet2.mobile.proximity.ProximityApprovalScope")
     val digest = ByteString(ByteArray(32) { 1 })
     val credentials = review.documents.flatMap { it.credentialOptions }.associate { it.credentialId to digest }
     val scope = scopeType.declaredConstructors.single().apply { isAccessible = true }.newInstance(

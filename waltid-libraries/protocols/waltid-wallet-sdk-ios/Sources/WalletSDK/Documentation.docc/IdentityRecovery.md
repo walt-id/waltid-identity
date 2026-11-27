@@ -41,9 +41,8 @@ Add the `WalletSDKKeychainRecovery` product and register its provider explicitly
 import WalletSDK
 import WalletSDKKeychainRecovery
 
-let configuration = WalletConfiguration(signingIdentity: .init(
-    recoveryProviders: [KeychainIdentityRecovery(namespace: "my-wallet")]
-))
+let recovery = try KeychainIdentityRecovery(namespace: "my-wallet")
+let configuration = WalletConfiguration(signingIdentity: .init(recoveryProviders: [recovery]))
 ```
 
 Apps can replace this integration with ``IdentityRecoveryProvider``. Providers

@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.mobile
 
@@ -10,27 +10,29 @@ import id.walt.crypto2.keys.*
 import id.walt.itb.*
 import id.walt.mobile.test.PhysicalDeviceTest
 import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.mobile.presentation.NativeScaPresentationAuthorizer
 import id.walt.wallet2.persistence.keys.*
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.walt.walletdemo.attestation.DemoKeyAttestationProviders
+import io.github.oshai.kotlinlogging.DirectLoggerFactory
+import io.github.oshai.kotlinlogging.KotlinLoggingConfiguration
+import io.github.oshai.kotlinlogging.Level
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
-import io.github.oshai.kotlinlogging.DirectLoggerFactory
-import io.github.oshai.kotlinlogging.KotlinLoggingConfiguration
-import io.github.oshai.kotlinlogging.Level
-import kotlinx.coroutines.*
-import kotlinx.serialization.json.*
-import org.junit.Assume.assumeTrue
-import org.junit.Test
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.SocketTimeoutException
 import java.util.UUID
+import kotlinx.coroutines.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.*
+import org.junit.Assume.assumeTrue
+import org.junit.Test
 
 /** Manual live ITB fixture; never opted in by ordinary device CI. All disposable keys are deleted. */
 @PhysicalDeviceTest

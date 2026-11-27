@@ -3,48 +3,49 @@ package id.walt.wallet2.mobile.identity
 import dev.whyoleg.cryptography.CryptographyProvider
 import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.random.CryptographyRandom
-import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.algorithms.DigestAlgorithm
 import id.walt.crypto2.algorithms.SignatureAlgorithm
 import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.keys.Key
 import id.walt.crypto2.keys.KeyId
+import id.walt.crypto2.keys.KeyOrigin
+import id.walt.crypto2.keys.KeyProtectionLevel
+import id.walt.crypto2.keys.KeySecurityLevel
+import id.walt.crypto2.keys.KeySpec
+import id.walt.crypto2.keys.KeyUsage
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.PlatformKeyConfiguration
+import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.crypto2.keys.StorableKey
 import id.walt.crypto2.keys.StoredKey
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.keys.toSpkiDer
+import id.walt.crypto2.providers.GenerateSoftwareKeyRequest
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.keys.KeyOrigin
-import id.walt.crypto2.keys.KeyProtectionLevel
-import id.walt.crypto2.keys.KeySecurityLevel
 import id.walt.did.dids.Crypto2DidService
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.mobile.MobileDidSupport
-import id.walt.wallet2.mobile.MobileWalletLifecycle
+import id.walt.wallet2.mobile.WalletLifecycle
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
-import id.walt.crypto2.keys.KeyUseAuthorizationFailure
-import id.walt.crypto2.keys.KeyUseAuthorizationException
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import id.walt.wallet2.persistence.keys.KeyUseAuthorizationPrompt
-import id.walt.crypto2.keys.KeyUseAuthorizationSupport
-import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformManagedKeyRestoration
 import id.walt.wallet2.persistence.keys.WalletKeyCreationRequest
 import id.walt.wallet2.persistence.keys.WalletKeyProtection
 import id.walt.wallet2.persistence.keys.WalletKeyRequirements
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.uuid.Uuid
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Owns one wallet's active signing identity. Creation and recovery use complete SDK-issued options.
@@ -65,26 +66,8 @@ public class SigningIdentityManager internal constructor(
     queries: WalletPersistenceQueries,
     private val didService: Crypto2DidService,
     private val onActive: suspend () -> Unit,
-    private val lifecycle: MobileWalletLifecycle = MobileWalletLifecycle(),
+    private val lifecycle: WalletLifecycle = WalletLifecycle(),
 ) {
-    private val journal = SigningIdentityJournal(walletId, queries)
-    private val owner = Any()
-    private val mutex = Mutex()
-    private suspend inline fun <T> withIdentity(block: () -> T): T =
-        lifecycle.use { mutex.withLock { block() } }
-    private suspend inline fun updateIdentity(block: () -> SigningIdentityOperationResult): SigningIdentityOperationResult =
-        lifecycle.use { mutex.withLock { block() }.notifyActive() }
-    private val software = CryptoRuntime(defaultSoftwareKeyProviders())
-    private val providers = configuration.recoveryProviders.associateBy { it.id }
-    private val custodians = configuration.keyCustodians.associateBy { it.id }
-    private val authorization: KeyUseAuthorizationPolicy get() = when (val value = configuration.authorization) {
-        SigningIdentityAuthorization.WalletDefault -> defaultAuthorization
-        is SigningIdentityAuthorization.Explicit -> value.policy
-    }
-
-    private val authorizations: List<KeyUseAuthorizationPolicy>
-        get() = (listOf(authorization) + configuration.alternativeAuthorizations).distinct()
-
     /** Offers only complete choices compatible with the host policy and current native/provider prerequisites. */
     public suspend fun creationOptions(intent: SigningIdentityIntent = SigningIdentityIntent.WithoutRecovery,
         attestation: SigningIdentityAttestationRequest = SigningIdentityAttestationRequest.None): SigningIdentityCreationOptions = withIdentity {
@@ -93,7 +76,6 @@ public class SigningIdentityManager internal constructor(
 
     /** Returns established identity metadata, including an explicit unavailable or interrupted state. */
     public suspend fun state(): SigningIdentityState = withIdentity { currentState() }
-
     /** Reopens the selected identity, or creates the recommended identity without recovery using configured defaults.
      * Pending and unavailable states never cause replacement key generation. Use creationOptions for an explicit choice.
      */
@@ -116,8 +98,8 @@ public class SigningIdentityManager internal constructor(
         if (option.owner !== owner) return@updateIdentity failed(SigningIdentityFailure.StaleOption)
         val valid = try { valid(option) }
         catch (cause: CancellationException) { throw cause }
-        catch (cause: IdentityProviderException) { return@updateIdentity failed(providerFailure(cause)) }
-        catch (cause: Exception) { return@updateIdentity failed(classify(cause)) }
+        catch (cause: IdentityProviderException) { return@updateIdentity failed(recoveryProviderFailure(cause)) }
+        catch (cause: Exception) { return@updateIdentity failed(signingIdentityFailure(cause)) }
         if (!valid) return@updateIdentity failed(SigningIdentityFailure.StaleOption)
         if (currentState() !is SigningIdentityState.Absent) return@updateIdentity failed(SigningIdentityFailure.ExistingIdentity)
         val id = Uuid.random().toString()
@@ -129,7 +111,7 @@ public class SigningIdentityManager internal constructor(
                 requireNotNull(generated.capabilities.privateKeyExporter).exportPrivateKey() as EncodedKey.Jwk
             } else null
         } catch (cause: CancellationException) { throw cause }
-        catch (cause: Exception) { return@updateIdentity failed(classify(cause)) }
+        catch (cause: Exception) { return@updateIdentity failed(signingIdentityFailure(cause)) }
         val preparing = IdentityRecord(
             id = id, keyId = keyId, nativeAlias = "$keyId.identity.${Uuid.random()}", phase = IdentityPhase.Preparing, storage = option.storage,
             requirements = requirements(option.storage, option.authorization, option.attestation), policy = configuration.policy,
@@ -139,13 +121,13 @@ public class SigningIdentityManager internal constructor(
         journal.reserve(preparing)
         try {
             val key = createKey(preparing, material)
-            MobileDidSupport.ensureInitialized()
+            WalletDidSupport.ensureInitialized()
             val registered = didService.registerByKey("jwk", key, DidJwkCreateOptions())
             val publicJwk = publicJwk(key)
             val recovery = material?.let { RecoveryRecord(
                 identityId = id, keyId = keyId, did = registered.did, publicJwk = publicJwk,
                 secret = RecoverySecret.Exported(it.data.toByteArray().decodeToString()),
-                constraints = recoveryConstraints(preparing),
+                constraints = configuration.recoveryConstraints(preparing),
             ) }
             val identity = describe(preparing, registered.did, publicJwk, key)
             proveOriginalKey(key, publicJwk)
@@ -157,7 +139,7 @@ public class SigningIdentityManager internal constructor(
             // Once backup submission can have happened, retain the journal for idempotent retry.
             if (journal.read()?.phase == IdentityPhase.Preparing) cleanup(journal.read() ?: preparing, material != null, cause)
             if (cause is CancellationException) throw cause
-            failed(classify(cause))
+            failed(signingIdentityFailure(cause))
         }
     }
 
@@ -174,7 +156,7 @@ public class SigningIdentityManager internal constructor(
                 val key = liveKey(record) ?: return@updateIdentity failed(SigningIdentityFailure.KeyUnavailable)
                 try { proveOriginalKey(key, requireNotNull(record.identity).publicJwk) }
                 catch (cause: CancellationException) { throw cause }
-                catch (cause: Exception) { return@updateIdentity failed(classify(cause)) }
+                catch (cause: Exception) { return@updateIdentity failed(signingIdentityFailure(cause)) }
                 finish(record)
             }
             IdentityPhase.Preparing -> {
@@ -222,52 +204,10 @@ public class SigningIdentityManager internal constructor(
             val receipt = submit(provider, reference.recordId, recovery, record)
             val updated = identity.copy(recovery = SigningIdentityRecoveryState.Submitted(reference, receipt))
             journal.write(record.copy(identity = updated, recovery = retained(recovery), backup = reference,
-                recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = requiredConfirmation(record)))
+                recoveryAvailability = option.recoveryAvailability, recoveryConfirmation = configuration.requiredConfirmation(record)))
             SigningIdentityOperationResult.Active(updated)
         } catch (cause: CancellationException) { throw cause }
-        catch (cause: Exception) { failed(providerFailure(cause)) }
-    }
-
-    /** Credential bindings inherit the identity's retained restriction. A recoverable identity cannot
-     * acquire a backup/custody restriction merely because a later issuance request asks for it. */
-    internal suspend fun requireKeyPolicy(keyId: String, policy: SigningIdentityKeyPolicy): Unit = mutex.withLock {
-        if (policy == SigningIdentityKeyPolicy.GeneralPurpose) return@withLock
-        val record = journal.read()
-        require(record != null && record.keyId == keyId && record.phase == IdentityPhase.Active && liveKey(record) != null) {
-            "The selected holder key is not an active managed identity"
-        }
-        require(record.policy == policy || record.policy == SigningIdentityKeyPolicy.HardwareGenerated) {
-            "The selected identity does not satisfy the required holder-key policy"
-        }
-        require(record.backup == null && record.recovery == null && record.identity?.custody.orEmpty().isEmpty()) {
-            "The required holder-key policy prohibits external private-key copies"
-        }
-    }
-
-    private suspend fun recoveryRecord(record: IdentityRecord): RecoveryRecord? {
-        val identity = requireNotNull(record.identity)
-        val source = record.backup?.let { providers[it.providerId] }
-        val existing = if (record.recovery == null) source?.retrieve(record.backup.recordId)?.copyBytes() else null
-        return record.recovery ?: existing?.let { bytes ->
-            try {
-                decodeRecovery(bytes, identity.id).also {
-                    require(it.keyId == identity.keyId && it.did == identity.did && it.publicJwk == identity.publicJwk) {
-                        "Recovery record belongs to another identity"
-                    }
-                }
-            } finally { bytes.fill(0) }
-        } ?: run {
-            val key = keys.getCrypto2Key(identity.keyId) ?: return null
-            val exported = key.capabilities.privateKeyExporter?.exportPrivateKey() as? EncodedKey.Jwk
-                ?: return null
-            RecoveryRecord(identityId = identity.id, keyId = identity.keyId, did = identity.did,
-                publicJwk = identity.publicJwk, secret = RecoverySecret.Exported(exported.data.toByteArray().decodeToString()),
-                constraints = recoveryConstraints(record))
-                .also {
-                    val bytes = it.encode()
-                    try { decodeRecovery(bytes, identity.id) } finally { bytes.fill(0) }
-                }
-        }
+        catch (cause: Exception) { failed(recoveryProviderFailure(cause)) }
     }
 
     /** Offers registered custody destinations only when the current policy permits private-key export. */
@@ -300,7 +240,7 @@ public class SigningIdentityManager internal constructor(
             journal.write(record.copy(identity = record.identity.copy(custody = (record.identity.custody + reference).distinct())))
             SigningIdentityCustodyResult.Imported(reference)
         } catch (cause: CancellationException) { throw cause }
-        catch (cause: Exception) { SigningIdentityCustodyResult.Failed(providerFailure(cause)) }
+        catch (cause: Exception) { SigningIdentityCustodyResult.Failed(recoveryProviderFailure(cause)) }
     }
 
     /** Discovers safe references and failures from the same attempt. No secret leaves discovery. */
@@ -319,7 +259,7 @@ public class SigningIdentityManager internal constructor(
                 }
             } catch (cause: CancellationException) { throw cause }
             catch (cause: Exception) {
-                val reason = providerFailure(cause)
+                val reason = recoveryProviderFailure(cause)
                 val message = when (reason) {
                     SigningIdentityFailure.ProviderInteractionRequired -> "Unlock or sign in to this recovery provider, then retry."
                     SigningIdentityFailure.ProviderConflict -> "The provider contains conflicting recovery records."
@@ -377,7 +317,7 @@ public class SigningIdentityManager internal constructor(
             provider.retrieve(option.reference.recordId)?.copyBytes()
                 ?: return@updateIdentity failed(SigningIdentityFailure.ProviderUnavailable)
         } catch (cause: CancellationException) { throw cause }
-        catch (cause: Exception) { return@updateIdentity failed(providerFailure(cause)) }
+        catch (cause: Exception) { return@updateIdentity failed(recoveryProviderFailure(cause)) }
         try {
             if (!fingerprint(bytes).contentEquals(option.fingerprint)) return@updateIdentity failed(SigningIdentityFailure.StaleOption)
             val recovery = decodeRecovery(bytes, option.reference.recordId)
@@ -406,11 +346,89 @@ public class SigningIdentityManager internal constructor(
             } catch (cause: Throwable) {
                 cleanup(journal.read() ?: preparing, imported = true, cause)
                 if (cause is CancellationException) throw cause
-                failed(classify(cause))
+                failed(signingIdentityFailure(cause))
             }
         } catch (cause: CancellationException) { throw cause }
         catch (_: Exception) { failed(SigningIdentityFailure.InvalidRecoveryRecord) }
         finally { bytes.fill(0) }
+    }
+
+    /** Reports each configured recovery provider, including its unmet prerequisites. */
+    public suspend fun recoveryProviderStatuses(): List<IdentityRecoveryProviderStatus> = lifecycle.use {
+        providers.values.map { provider ->
+            val availability = try { provider.availability() }
+            catch (cause: CancellationException) { throw cause }
+            catch (_: Exception) { RecoveryAvailability.Unavailable("The recovery service could not be reached. Try again.") }
+            IdentityRecoveryProviderStatus(provider.id, provider.displayName, availability)
+        }
+    }
+
+    /** Credential bindings inherit the identity's retained restriction. A recoverable identity cannot
+     * acquire a backup/custody restriction merely because a later issuance request asks for it. */
+    internal suspend fun requireKeyPolicy(keyId: String, policy: SigningIdentityKeyPolicy): Unit = mutex.withLock {
+        if (policy == SigningIdentityKeyPolicy.GeneralPurpose) return@withLock
+        val record = journal.read()
+        require(record != null && record.keyId == keyId && record.phase == IdentityPhase.Active && liveKey(record) != null) {
+            "The selected holder key is not an active managed identity"
+        }
+        require(record.policy == policy || record.policy == SigningIdentityKeyPolicy.HardwareGenerated) {
+            "The selected identity does not satisfy the required holder-key policy"
+        }
+        require(record.backup == null && record.recovery == null && record.identity?.custody.orEmpty().isEmpty()) {
+            "The required holder-key policy prohibits external private-key copies"
+        }
+    }
+
+    private val journal = SigningIdentityJournal(walletId, queries)
+
+    private val owner = Any()
+
+    private val mutex = Mutex()
+
+    private suspend inline fun <T> withIdentity(block: () -> T): T =
+        lifecycle.use { mutex.withLock { block() } }
+
+    private suspend inline fun updateIdentity(block: () -> SigningIdentityOperationResult): SigningIdentityOperationResult =
+        lifecycle.use { mutex.withLock { block() }.notifyActive() }
+
+    private val software = CryptoRuntime(defaultSoftwareKeyProviders())
+
+    private val providers = configuration.recoveryProviders.associateBy { it.id }
+
+    private val custodians = configuration.keyCustodians.associateBy { it.id }
+
+    private val authorization: KeyUseAuthorizationPolicy get() = when (val value = configuration.authorization) {
+        SigningIdentityAuthorization.WalletDefault -> defaultAuthorization
+        is SigningIdentityAuthorization.Explicit -> value.policy
+    }
+
+    private val authorizations: List<KeyUseAuthorizationPolicy>
+        get() = (listOf(authorization) + configuration.alternativeAuthorizations).distinct()
+
+    private suspend fun recoveryRecord(record: IdentityRecord): RecoveryRecord? {
+        val identity = requireNotNull(record.identity)
+        val source = record.backup?.let { providers[it.providerId] }
+        val existing = if (record.recovery == null) source?.retrieve(record.backup.recordId)?.copyBytes() else null
+        return record.recovery ?: existing?.let { bytes ->
+            try {
+                decodeRecovery(bytes, identity.id).also {
+                    require(it.keyId == identity.keyId && it.did == identity.did && it.publicJwk == identity.publicJwk) {
+                        "Recovery record belongs to another identity"
+                    }
+                }
+            } finally { bytes.fill(0) }
+        } ?: run {
+            val key = keys.getCrypto2Key(identity.keyId) ?: return null
+            val exported = key.capabilities.privateKeyExporter?.exportPrivateKey() as? EncodedKey.Jwk
+                ?: return null
+            RecoveryRecord(identityId = identity.id, keyId = identity.keyId, did = identity.did,
+                publicJwk = identity.publicJwk, secret = RecoverySecret.Exported(exported.data.toByteArray().decodeToString()),
+                constraints = configuration.recoveryConstraints(record))
+                .also {
+                    val bytes = it.encode()
+                    try { decodeRecovery(bytes, identity.id) } finally { bytes.fill(0) }
+                }
+        }
     }
 
     // Publish only committed identities, after releasing the identity mutex so host callbacks may read state.
@@ -438,28 +456,29 @@ public class SigningIdentityManager internal constructor(
         if (attestation is SigningIdentityAttestationRequest.Native && (importing || storage != SigningIdentityKeyStorage.HardwareBacked)) false
         else if (configuration.policy == SigningIdentityKeyPolicy.HardwareGenerated && (importing || storage != SigningIdentityKeyStorage.HardwareBacked)) false
         else if (storage == SigningIdentityKeyStorage.EncryptedDatabase) authorization == KeyUseAuthorizationPolicy.None
-        else if (!nativeSettingsPermitIdentitySigning()) false
+        else if (!configuration.permitsNativeSigning()) false
         else requirements(storage, authorization, attestation).let { required ->
             native.preflight(required) is KeyUseAuthorizationSupport.Supported && (!importing || native.supportsPrivateKeyImport(required))
         }
     }
 
-    private fun nativeSettingsPermitIdentitySigning(): Boolean {
-        val settings = configuration.platform as? id.walt.crypto2.keys.PlatformKeyConfiguration.AndroidKeystore ?: return true
-        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
-        // Identity signatures cover protocol bytes. Protected Confirmation requires signing its own CBOR structure.
-        if (settings.userConfirmationRequired || settings.userPresenceRequired) return false
-        // Activation consumes one signature to prove possession of the original public key.
-        if (settings.maxUsageCount == 1) return false
-        if (settings.validFromEpochMillis?.let { it > now } == true || settings.validUntilEpochMillis?.let { it <= now } == true) return false
-        return true
-    }
-
-    private fun requirements(storage: SigningIdentityKeyStorage, authorization: KeyUseAuthorizationPolicy = this.authorization,
-        attestation: SigningIdentityAttestationRequest = SigningIdentityAttestationRequest.None): WalletKeyRequirements = WalletKeyRequirements(
-        spec = identitySpec, usages = identityUsages, authorizationPolicy = authorization,
-        protection = if (storage == SigningIdentityKeyStorage.HardwareBacked) WalletKeyProtection.HardwareRequired else WalletKeyProtection.NativeStorage,
-        platform = configuration.platform,
+    private fun requirements(
+        storage: SigningIdentityKeyStorage,
+        authorization: KeyUseAuthorizationPolicy = this.authorization,
+        attestation: SigningIdentityAttestationRequest = SigningIdentityAttestationRequest.None,
+    ): WalletKeyRequirements = WalletKeyRequirements(
+        spec = identitySpec,
+        usages = identityUsages,
+        authorizationPolicy = authorization,
+        protection = when (storage) {
+            SigningIdentityKeyStorage.HardwareBacked -> WalletKeyProtection.HardwareRequired
+            SigningIdentityKeyStorage.NativeStorage -> WalletKeyProtection.NativeStorage
+            SigningIdentityKeyStorage.EncryptedDatabase -> WalletKeyProtection.PlatformDefault
+        },
+        platform = when (storage) {
+            SigningIdentityKeyStorage.EncryptedDatabase -> PlatformKeyConfiguration.Default
+            else -> configuration.platform
+        },
         attestationChallenge = (attestation as? SigningIdentityAttestationRequest.Native)?.challenge,
     )
 
@@ -467,16 +486,6 @@ public class SigningIdentityManager internal constructor(
         option.authorization in authorizations && option.storage in supportedStorage(option.recoverable, option.authorization, option.attestation) &&
             (!option.recoverable || (configuration.policy == SigningIdentityKeyPolicy.GeneralPurpose &&
                 providers[option.providerId]?.let { providerAvailability(it) } == option.recoveryAvailability))
-
-    /** Reports each configured recovery provider, including its unmet prerequisites. */
-    public suspend fun recoveryProviderStatuses(): List<IdentityRecoveryProviderStatus> = lifecycle.use {
-        providers.values.map { provider ->
-            val availability = try { provider.availability() }
-            catch (cause: CancellationException) { throw cause }
-            catch (_: Exception) { RecoveryAvailability.Unavailable("The recovery service could not be reached. Try again.") }
-            IdentityRecoveryProviderStatus(provider.id, provider.displayName, availability)
-        }
-    }
 
     private suspend fun providerAvailability(provider: IdentityRecoveryProvider): RecoveryAvailability = try {
         provider.availability()
@@ -546,7 +555,7 @@ public class SigningIdentityManager internal constructor(
                 recovery = SigningIdentityRecoveryState.Submitted(record.backup, receipt))))
         } catch (cause: CancellationException) { throw cause }
         catch (cause: Exception) {
-            val reason = providerFailure(cause)
+            val reason = recoveryProviderFailure(cause)
             journal.write(pending.copy(pendingReason = reason))
             SigningIdentityOperationResult.Pending(record.id, reason)
         }
@@ -559,23 +568,15 @@ public class SigningIdentityManager internal constructor(
             val returned = provider.retrieve(id)?.copyBytes()
             try { check(returned != null && returned.contentEquals(expected)) { "Provider did not preserve the recovery record" } }
             finally { returned?.fill(0) }
-            if (requiredConfirmation(record) == RecoveryConfirmation.ProviderConfirmation) {
+            if (configuration.requiredConfirmation(record) == RecoveryConfirmation.ProviderConfirmation) {
                 if (receipt != RecoveryReceipt.ConfirmedByProvider) throw IdentityProviderException(IdentityProviderFailure.ConfirmationPending)
             }
             return receipt
         } finally { expected.fill(0) }
     }
 
-    private fun recoveryConstraints(record: IdentityRecord) = RecoveryConstraints(
-        record.storage, record.requirements.authorizationPolicy, requiredConfirmation(record))
-
-    private fun requiredConfirmation(record: IdentityRecord): RecoveryConfirmation =
-        if (configuration.recoveryConfirmation == RecoveryConfirmation.ProviderConfirmation ||
-            record.recoveryConfirmation == RecoveryConfirmation.ProviderConfirmation) RecoveryConfirmation.ProviderConfirmation
-        else RecoveryConfirmation.LocalAcceptance
-
     private fun activate(record: IdentityRecord): SigningIdentityOperationResult.Active =
-        SigningIdentityOperationResult.Active(journal.activate(record, retained(record.recovery), requiredConfirmation(record)))
+        SigningIdentityOperationResult.Active(journal.activate(record, retained(record.recovery), configuration.requiredConfirmation(record)))
 
     private suspend fun currentState(): SigningIdentityState {
         val record = journal.read()
@@ -606,11 +607,11 @@ public class SigningIdentityManager internal constructor(
         return record
     }
 
-    private suspend fun matchesDid(did: String, publicJwk: String, spec: id.walt.crypto2.keys.KeySpec = identitySpec): Boolean {
+    private suspend fun matchesDid(did: String, publicJwk: String, spec: KeySpec = identitySpec): Boolean {
         if (!did.startsWith("did:jwk:") && !did.startsWith("did:key:")) return false
         requirePublicJwk(publicJwk)
         if (did.startsWith("did:jwk:")) requirePublicJwk(recoveryBase64.decode(did.removePrefix("did:jwk:")).decodeToString())
-        MobileDidSupport.ensureInitialized()
+        WalletDidSupport.ensureInitialized()
         val expected = EncodedKey.Jwk(BinaryData(publicJwk.encodeToByteArray()), false).toSpkiDer(spec)
         return didService.resolveToKeys(did).getOrThrow().any { key ->
             key.capabilities.publicKeyExporter?.exportPublicKey()?.toSpkiDer(key.spec) == expected
@@ -618,7 +619,7 @@ public class SigningIdentityManager internal constructor(
     }
 
     private fun requirePublicJwk(value: String) {
-        val jwk = recordJson.parseToJsonElement(value) as? kotlinx.serialization.json.JsonObject
+        val jwk = recordJson.parseToJsonElement(value) as? JsonObject
             ?: error("Expected a public JWK")
         require(jwk.keys.none { it in setOf("d", "p", "q", "dp", "dq", "qi", "oth", "k") }) {
             "Private members are forbidden in public identity metadata"
@@ -627,7 +628,7 @@ public class SigningIdentityManager internal constructor(
 
     private suspend fun proveOriginalKey(key: Key, publicJwk: String) {
         val public = software.restore(StoredKey.Software(StoredKey.CURRENT_VERSION, KeyId("identity-proof"), identitySpec,
-            setOf(id.walt.crypto2.keys.KeyUsage.VERIFY), EncodedKey.Jwk(BinaryData(publicJwk.encodeToByteArray()), false)))
+            setOf(KeyUsage.VERIFY), EncodedKey.Jwk(BinaryData(publicJwk.encodeToByteArray()), false)))
         val challenge = CryptographyRandom.nextBytes(32)
         try {
             val algorithm = SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256)
@@ -668,21 +669,5 @@ public class SigningIdentityManager internal constructor(
         .exportPublicKey().toPublicJwk(key.spec).data.toByteArray().decodeToString()
     private suspend fun fingerprint(bytes: ByteArray): ByteArray = CryptographyProvider.Default.get(SHA256).hasher().hash(bytes)
     private fun failed(reason: SigningIdentityFailure) = SigningIdentityOperationResult.Failed(reason)
-    private fun providerFailure(cause: Exception): SigningIdentityFailure = when ((cause as? IdentityProviderException)?.failure) {
-        IdentityProviderFailure.InteractionRequired -> SigningIdentityFailure.ProviderInteractionRequired
-        IdentityProviderFailure.Rejected -> SigningIdentityFailure.ProviderRejected
-        IdentityProviderFailure.Conflict -> SigningIdentityFailure.ProviderConflict
-        IdentityProviderFailure.ConfirmationPending -> SigningIdentityFailure.ProviderConfirmationPending
-        IdentityProviderFailure.TemporarilyUnavailable, null -> SigningIdentityFailure.ProviderUnavailable
-    }
-    private fun classify(cause: Throwable): SigningIdentityFailure = when ((cause as? KeyUseAuthorizationException)?.failure) {
-        KeyUseAuthorizationFailure.UnsupportedCombination -> SigningIdentityFailure.UnsupportedPolicy
-        KeyUseAuthorizationFailure.ProtectedKeyUnavailable -> SigningIdentityFailure.KeyUnavailable
-        KeyUseAuthorizationFailure.InvalidStoredKeyMetadata -> SigningIdentityFailure.InvalidRecoveryRecord
-        KeyUseAuthorizationFailure.BiometricUnavailable, KeyUseAuthorizationFailure.BiometricNotEnrolled,
-        KeyUseAuthorizationFailure.DeviceCredentialNotSet,
-        KeyUseAuthorizationFailure.InteractionContextUnavailable, KeyUseAuthorizationFailure.AuthorizationNotCompleted ->
-            SigningIdentityFailure.AuthorizationNotCompleted
-        null -> SigningIdentityFailure.NativeOperationFailed
-    }
+
 }

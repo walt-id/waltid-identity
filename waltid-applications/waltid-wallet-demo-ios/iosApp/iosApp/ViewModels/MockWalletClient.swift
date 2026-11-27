@@ -29,7 +29,7 @@ actor MockWalletClient: WalletClient {
     private let transactionCodeRequired: Bool
     private let issuanceGrant: IssuanceGrant
     private let presentationPreviewResultOverride: PresentationPreviewResult?
-    private let claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview)?
+    private let claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> ReviewedPresentationClaims)?
     nonisolated var supportsClaimReview: Bool { claimPreparation != nil }
     private(set) var submittedClaimSelections: [[PresentationDisclosureSelection]] = []
     private let paymentConsent: @Sendable () async throws -> PaymentConsent?
@@ -55,7 +55,7 @@ actor MockWalletClient: WalletClient {
         transactionCodeRequired: Bool = false,
         issuanceGrant: IssuanceGrant = .preAuthorizedCode,
         presentationPreviewResult: PresentationPreviewResult? = nil,
-        claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview)? = nil,
+        claimPreparation: (@Sendable ([PresentationCredentialSelection], [PresentationDisclosureSelection]) async throws -> ReviewedPresentationClaims)? = nil,
         paymentConsent: @escaping @Sendable () async throws -> PaymentConsent? = { nil },
         paymentTransaction: Bool = true,
         rejectionResult: PresentationResult = .transmitted(.succeeded(verifierResponseJSON: "{}")),
@@ -165,21 +165,22 @@ actor MockWalletClient: WalletClient {
 
     func listDeferredIssuance() async throws -> [DeferredCredential] { [] }
 
-    func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession {
+    func startIssuance(_ request: IssuanceRequest) async throws -> ReviewedIssuanceOffer {
         try await delayOperation()
-        return IssuanceSession(
-            id: "mock-session",
+        return ReviewedIssuanceOffer(
+            id: IssuanceSessionID(rawValue: "mock-session")!,
             offer: .init(
                 grant: issuanceGrant,
                 issuer: .init(
                     identifier: "https://issuer.example",
-                    name: "Example Issuer",
-                    locale: nil,
-                    logoURI: nil,
-                    logoAltText: nil,
-                    metadataProvenance: .unsigned
+                    metadataProvenance: .unsigned,
+                    display: .init(name: "Example Issuer")
                 ),
-                credentials: [.init(configurationID: "ExampleCredential", format: "dc+sd-jwt", name: "Example", descriptionText: nil, logoURI: nil)],
+                credentials: [.init(
+                    configurationID: "ExampleCredential",
+                    format: "dc+sd-jwt",
+                    display: .init(name: "Example")
+                )],
                 transactionCode: transactionCodeRequired
                     ? .init(inputMode: "numeric", length: 6, descriptionText: "Enter the six-digit code")
                     : nil
@@ -187,32 +188,33 @@ actor MockWalletClient: WalletClient {
         )
     }
 
-    func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization {
+    func beginAuthorizationIssuance(sessionID: IssuanceSessionID, credentials: [IssuanceCredentialSelection]?) async throws -> BrowserIssuanceRequest {
         guard issuanceGrant == .authorizationCode else {
             throw WalletError.internalFailure("Mock issuance session is not authorization-code based")
         }
-        return IssuanceAuthorization(
+        guard let authorizationID = IssuanceAuthorizationID(rawValue: sessionID.rawValue) else {
+            throw WalletError.invalidInput("Invalid issuance authorization ID")
+        }
+        return .init(id: authorizationID, request: IssuanceAuthorization(
             url: URL(string: "https://issuer.example/authorize")!,
             state: "mock-state",
             redirectURI: URL(string: "openid://")!,
             pkce: .init(codeChallenge: "mock-challenge", codeChallengeMethod: "S256"),
             pushedAuthorizationRequestUsed: false
-        )
+        ))
     }
 
-    func continuePreAuthorizedIssuance(sessionID: String, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
-        try await delayOperation()
-        storedCredentials = [mdocMetadata ? Self.photoIDCredential : sampleCredential]
-        return .stored(sessionID: sessionID, credentialIDs: storedCredentials.map(\.id))
+    func continuePreAuthorizedIssuance(sessionID: IssuanceSessionID, transactionCode: String?, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceOutcome {
+        try await finishIssuance(sessionID.rawValue)
     }
 
-    func continueAuthorizationIssuance(sessionID: String, callbackURI: URL) async throws -> IssuanceOutcome {
-        try await continuePreAuthorizedIssuance(sessionID: sessionID, transactionCode: nil, credentials: nil)
+    func completeAuthorization(_ authorizationID: IssuanceAuthorizationID, callback: URL) async throws -> IssuanceOutcome {
+        try await finishIssuance(authorizationID.rawValue)
     }
 
-    func cancelIssuance(sessionID: String) async throws -> IssuanceOutcome { .cancelled(sessionID: sessionID) }
+    func cancelIssuance(sessionID: IssuanceSessionID) async throws -> IssuanceOutcome { .cancelled(sessionID: sessionID.rawValue) }
 
-    func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome {
+    func resumeDeferredIssuance(_ id: DeferredIssuanceID) async throws -> IssuanceOutcome {
         .failed(
             sessionID: "mock-session",
             error: .init(code: .invalidSession, message: "No mock deferred credential"),
@@ -227,11 +229,11 @@ actor MockWalletClient: WalletClient {
         }
         return .ready(
             PresentationPreview(
-                previewHandle: PresentationPreviewHandle(value: "mock-presentation-preview"),
-                request: previewRequestInfo,
-                credentialOptions: emptyPresentationOptions ? [] : (duplicatePresentationOptions ? duplicateOptions : [defaultOption]),
+                previewHandle: try PresentationPreviewHandle(value: "mock-presentation-preview"),
+                request: try previewRequest(),
+                credentialOptions: emptyPresentationOptions ? [] : (duplicatePresentationOptions ? try makeDuplicateOptions() : [try makeDefaultOption()]),
                 credentialRequirements: [
-                    PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
+                    try PresentationCredentialRequirement(options: [duplicatePresentationOptions ? ["identity", "age"] : ["pid"]])
                 ]
             )
         )
@@ -239,7 +241,7 @@ actor MockWalletClient: WalletClient {
 
     func reviewPresentation(previewHandle: PresentationPreviewHandle,
                             selectedCredentialOptions: [PresentationCredentialSelection],
-                            selectedDisclosureOptions: [PresentationDisclosureSelection], did: String?) async throws -> PreparedPresentationReview {
+                            selectedDisclosureOptions: [PresentationDisclosureSelection], did: String?) async throws -> ReviewedPresentationClaims {
         guard let claimPreparation else { throw WalletError.invalidInput("Claim review unavailable") }
         return try await claimPreparation(selectedCredentialOptions, selectedDisclosureOptions)
     }
@@ -300,6 +302,12 @@ actor MockWalletClient: WalletClient {
             continuation.onTermination = { [weak self] _ in Task { await self?.removeStatusCollector(id) } }
         }
     }
+    private func finishIssuance(_ sessionID: String) async throws -> IssuanceOutcome {
+        try await delayOperation()
+        storedCredentials = [mdocMetadata ? Self.photoIDCredential : sampleCredential]
+        return .stored(sessionID: sessionID, credentialIDs: storedCredentials.map(\.id))
+    }
+
     private func removeStatusCollector(_ id: UUID) { statusCollectors.removeValue(forKey: id) }
     func setCredentialStatusSnapshot(_ snapshot: CredentialStatusSnapshot) {
         statusSnapshot = snapshot
@@ -344,9 +352,12 @@ actor MockWalletClient: WalletClient {
         try await Task.sleep(nanoseconds: operationDelayNanoseconds)
     }
 
-    private var previewRequestInfo: PresentationRequestInfo {
-        PresentationRequestInfo(
+    private func previewRequest() throws -> PresentationRequest {
+        try PresentationRequest(
             clientID: verifierClientID,
+            requestAuthentication: .unauthenticated,
+            nonce: "nonce-456",
+            responseEncryption: responseEncryption,
             verifierMetadata: verifierName.map {
                 VerifierMetadata(
                     display: MetadataDisplay(
@@ -360,11 +371,8 @@ actor MockWalletClient: WalletClient {
                     termsOfServiceURI: "https://verifier.example/terms"
                 )
             },
-            requestAuthentication: .unauthenticated,
             responseURI: URL(string: "https://verifier.example/response"),
             state: "state-123",
-            nonce: "nonce-456",
-            responseEncryption: responseEncryption,
             transactionData: paymentTransaction ? [Self.paymentAuthorizationTransactionData] : []
         )
     }
@@ -397,7 +405,7 @@ actor MockWalletClient: WalletClient {
 
     private static let didClientID = "decentralized_identifier:did:jwk:abc"
 
-    private static let paymentAuthorizationTransactionData = PresentationTransactionData(
+    private static let paymentAuthorizationTransactionData = try! PresentationTransactionData(
         type: "org.waltid.transaction-data.payment-authorization",
         displayName: "Payment Authorization",
         credentialQueryIDs: ["pid"],
@@ -421,55 +429,47 @@ actor MockWalletClient: WalletClient {
         """
     )
 
-    private var defaultOption: PresentationCredentialOption {
+    private func makeDefaultOption() throws -> PresentationCredentialOption {
         var disclosures = [
             PresentationDisclosure(
                 path: "$.given_name",
-                name: "given_name",
                 valueJSON: "\"Ada\"",
-                displayValue: "Ada",
-                selectivelyDisclosable: true, required: true, selectable: false
+                disposition: .requiredSelective,
+                name: "given_name",
+                displayValue: "Ada"
             )
         ]
         if let samplePortraitDisclosureValueJSON {
             disclosures.append(PresentationDisclosure(
                 path: "$.portrait",
-                name: nil,
                 valueJSON: samplePortraitDisclosureValueJSON,
-                displayValue: nil,
-                selectivelyDisclosable: true
+                disposition: .selectable
             ))
         }
-        return PresentationCredentialOption(
-            queryID: "pid",
-            credentialID: sampleCredential.id,
-            format: sampleCredential.format,
-            issuer: sampleCredential.issuer,
-            subject: sampleCredential.subject,
-            label: sampleCredential.label,
-            credentialDataJSON: sampleCredential.credentialDataJSON,
+        return try PresentationCredentialOption(
+            queryID: "pid", credential: sampleCredential,
             disclosures: disclosures
         )
     }
 
-    private var duplicateOptions: [PresentationCredentialOption] {
+    private func makeDuplicateOptions() throws -> [PresentationCredentialOption] {
         [
-            defaultOption.with(queryID: "identity", disclosures: [
+            try PresentationCredentialOption(queryID: "identity", credential: sampleCredential, disclosures: [
                 PresentationDisclosure(
                     path: "$.given_name",
-                    name: "Identity disclosure",
                     valueJSON: "\"Ada\"",
-                    displayValue: "Ada",
-                    selectivelyDisclosable: true, required: true, selectable: false
+                    disposition: .requiredSelective,
+                    name: "Identity disclosure",
+                    displayValue: "Ada"
                 )
             ]),
-            defaultOption.with(queryID: "age", disclosures: [
+            try PresentationCredentialOption(queryID: "age", credential: sampleCredential, disclosures: [
                 PresentationDisclosure(
                     path: "$.age_over_18",
-                    name: "Age disclosure",
                     valueJSON: "\"Over 18\"",
-                    displayValue: "Over 18",
-                    selectivelyDisclosable: true, required: true, selectable: false
+                    disposition: .requiredSelective,
+                    name: "Age disclosure",
+                    displayValue: "Over 18"
                 )
             ])
         ]
@@ -479,11 +479,11 @@ actor MockWalletClient: WalletClient {
         Credential(
             id: "cred-1",
             format: "jwt_vc_json",
+            credentialDataJSON: sampleCredentialDataJSON ?? Self.defaultSampleCredentialDataJSON,
             issuer: "Example Issuer",
             subject: nil,
             label: "Example Credential",
-            addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
-            credentialDataJSON: sampleCredentialDataJSON ?? Self.defaultSampleCredentialDataJSON
+            addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z")
         )
     }
 
@@ -504,10 +504,6 @@ actor MockWalletClient: WalletClient {
     private static let photoIDCredential = Credential(
         id: "photo-id-1",
         format: "mso_mdoc",
-        issuer: "Example Issuer",
-        subject: nil,
-        label: "Photo ID",
-        addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z"),
         credentialDataJSON: """
         {
           "org.iso.23220.1": {
@@ -524,21 +520,10 @@ actor MockWalletClient: WalletClient {
             "dtc_dg2": null
           }
         }
-        """
+        """,
+        issuer: "Example Issuer",
+        subject: nil,
+        label: "Photo ID",
+        addedAt: ISO8601DateFormatter().date(from: "2026-07-09T12:00:00Z")
     )
-}
-
-private extension PresentationCredentialOption {
-    func with(queryID: String, disclosures: [PresentationDisclosure]) -> PresentationCredentialOption {
-        PresentationCredentialOption(
-            queryID: queryID,
-            credentialID: credentialID,
-            format: format,
-            issuer: issuer,
-            subject: subject,
-            label: label,
-            credentialDataJSON: credentialDataJSON,
-            disclosures: disclosures
-        )
-    }
 }

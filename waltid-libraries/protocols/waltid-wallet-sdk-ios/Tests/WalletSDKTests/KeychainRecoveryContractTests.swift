@@ -6,11 +6,18 @@ import WalletSDKKeychainRecovery
 
 /// Mirrors the Kotlin Keychain adapter contract using the same record bytes and namespace rules.
 final class KeychainRecoveryContractTests: XCTestCase {
+    func testInvalidRecoveryNamespacesAndAccessGroupsAreRecoverable() {
+        for namespace in ["", "invalid/name", "trailing\n", String(repeating: "a", count: 65)] {
+            XCTAssertThrowsError(try KeychainIdentityRecovery(namespace: namespace))
+        }
+        XCTAssertThrowsError(try KeychainIdentityRecovery(namespace: "valid", accessGroup: " "))
+    }
+
     func testCompatibleAccessibilityClassesPreserveTheRecordContract() async throws {
         for accessibility: SynchronizableKeychainAccessibility in [.whenUnlocked, .afterFirstUnlock] {
             let namespace = "contract-\(UUID())"
-            let provider = KeychainIdentityRecovery(namespace: namespace, accessibility: accessibility)
-            let isolated = KeychainIdentityRecovery(namespace: "other-\(UUID())")
+            let provider = try KeychainIdentityRecovery(namespace: namespace, accessibility: accessibility)
+            let isolated = try KeychainIdentityRecovery(namespace: "other-\(UUID())")
             let recordID = "record-1"
             let data = Data("synthetic-parity-fixture".utf8)
             do {
@@ -23,7 +30,7 @@ final class KeychainRecoveryContractTests: XCTestCase {
                 XCTAssertEqual(ids, [recordID])
                 let unrelated = try await isolated.retrieve(recordID: recordID)
                 XCTAssertNil(unrelated)
-                let reopened = KeychainIdentityRecovery(namespace: namespace, accessibility: accessibility)
+                let reopened = try KeychainIdentityRecovery(namespace: namespace, accessibility: accessibility)
                 let restored = try await reopened.retrieve(recordID: recordID)
                 XCTAssertEqual(restored, data)
                 do {

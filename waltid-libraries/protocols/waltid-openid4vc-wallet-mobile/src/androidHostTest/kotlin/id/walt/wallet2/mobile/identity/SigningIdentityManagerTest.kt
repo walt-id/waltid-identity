@@ -1,29 +1,35 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.wallet2.mobile.identity
 
-import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
-import id.walt.crypto2.keys.KeyUseAuthorizationSupport
-import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import id.walt.crypto2.CryptoRuntime
 import id.walt.crypto2.keys.*
-import id.walt.crypto2.serialization.BinaryData
-import id.walt.crypto2.serialization.StoredKeyCodec
-import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
 import id.walt.crypto2.keys.EncodedKey
+import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
+import id.walt.crypto2.keys.KeyUseAuthorizationSupport
+import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
 import id.walt.crypto2.keys.ManagedKey
 import id.walt.crypto2.keys.StoredKey
+import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
+import id.walt.crypto2.serialization.BinaryData
+import id.walt.crypto2.serialization.StoredKeyCodec
 import id.walt.did.dids.Crypto2DidService
-import id.walt.openid4vp.clientidprefix.ClientIdTrustConfiguration
-import id.walt.wallet2.mobile.*
-import id.walt.wallet2.mobile.createSqlDelightMobileWallet
+import id.walt.wallet2.mobile.Wallet
+import id.walt.wallet2.mobile.WalletConfiguration
+import id.walt.wallet2.mobile.openSqlDelightWallet
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistrationResult
+import id.walt.wallet2.mobile.digitalcredentials.CredentialRegistry
+import id.walt.wallet2.mobile.digitalcredentials.RegistryEntry
+import id.walt.wallet2.mobile.digitalcredentials.DigitalCredentialsConfiguration
+import id.walt.wallet2.mobile.digitalcredentials.UnavailableCredentialRegistry
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.*
 import id.walt.wallet2.persistence.stores.SqlDelightKeyStore
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.CancellationException
 import kotlin.test.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 
 class SigningIdentityManagerTest {
     @Test fun `unavailable provider reason survives alongside a usable recovery route`() = runTest {
@@ -58,7 +64,7 @@ class SigningIdentityManagerTest {
     }
 
     @Test fun `activation and reopening publish the registry outside the identity lock`() = runTest {
-        lateinit var current: MobileWallet
+        lateinit var current: Wallet
         var notifications = 0
         Fixture(onRegistryChanged = {
             assertIs<SigningIdentityState.Active>(current.signingIdentity.state())
@@ -94,9 +100,9 @@ class SigningIdentityManagerTest {
     }
 
     @Test fun `registration and host notification failures do not undo an active identity`() = runTest {
-        val registry = object : MobileWalletCredentialRegistry {
-            override val capabilities = UnavailableMobileWalletCredentialRegistry.capabilities
-            override suspend fun replace(registryId: String, records: List<MobileWalletCredentialRegistryRecord>): MobileWalletCredentialRegistrationResult =
+        val registry = object : CredentialRegistry {
+            override val capabilities = UnavailableCredentialRegistry.capabilities
+            override suspend fun replace(registryId: String, records: List<RegistryEntry>): CredentialRegistrationResult =
                 error("Registry unavailable")
         }
         Fixture(registry = registry, onRegistryChanged = { error("Host notification failed") }).use { fixture ->
@@ -739,20 +745,25 @@ class SigningIdentityManagerTest {
     private class Fixture(
         configuration: SigningIdentityConfiguration? = null,
         val provider: MemoryRecovery = MemoryRecovery(),
-        registry: MobileWalletCredentialRegistry = UnavailableMobileWalletCredentialRegistry,
+        registry: CredentialRegistry = UnavailableCredentialRegistry,
         private val native: PlatformManagedKeyProvider = NoNative,
         onRegistryChanged: suspend () -> Unit = {},
     ) : AutoCloseable {
         private val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         private val db = WalletPersistenceDatabase(driver)
         val queries = db.walletPersistenceQueries
-        private val config = MobileWalletConfig(credentialRegistry = registry, onDigitalCredentialRegistryChanged = onRegistryChanged, signingIdentity = configuration ?: SigningIdentityConfiguration(
-            recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
+        private val config = WalletConfiguration(
+            signingIdentity = configuration ?: SigningIdentityConfiguration(
+            recoveryProviders = listOf(provider), authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)),
+            digitalCredentials = DigitalCredentialsConfiguration(
+                registry = registry,
+                onRegistrationChanged = onRegistryChanged,
+            ),
+        )
         init { WalletPersistenceDatabase.Schema.create(driver) }
         val wallet = reopen()
-        fun reopen(signingIdentity: SigningIdentityConfiguration = config.signingIdentity) = createSqlDelightMobileWallet(
+        fun reopen(signingIdentity: SigningIdentityConfiguration = config.signingIdentity) = openSqlDelightWallet(
             config = config.copy(signingIdentity = signingIdentity),
-            clientIdTrustConfiguration = ClientIdTrustConfiguration(),
             db = db,
             keyProvider = native,
             didService = Crypto2DidService,

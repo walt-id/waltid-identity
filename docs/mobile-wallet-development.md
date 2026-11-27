@@ -13,6 +13,16 @@ This guide is for contributors working on the native mobile wallet SDK, demo app
 | iOS demo app | [waltid-wallet-demo-ios](../waltid-applications/waltid-wallet-demo-ios/README.md) |
 | Mobile cryptography | [Crypto2](../waltid-libraries/crypto/waltid-crypto2/README.md) and [Signum](../waltid-libraries/crypto/waltid-crypto2-signum/README.md) |
 
+### SDK source layout
+
+The [Kotlin package map](../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md#package-map)
+and [Swift source map](../waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md#source-map)
+lead to the wallet entry point and each feature. Keep a feature's public contract first in
+its file or type, followed by internal integrations and private helpers. Keep related overloads
+together and retain the execution order of stored properties, initializers and enum entries.
+Put the primary input and other required arguments first, optional settings next, and a trailing
+callback last when the language supports trailing-closure syntax.
+
 ## IDE guidance
 
 Use Android Studio for Android application and Android Gradle Plugin work. IntelliJ IDEA can still be useful for common Kotlin/JVM code, but should not be treated as the supported Android import/build path while Android plugin support is incomplete for the Android Gradle Plugin used by this repository.
@@ -121,13 +131,15 @@ Point a wallet at a test environment with `baseUrl` (Enterprise API origin), `se
 Kotlin:
 
 ```kotlin
-MobileWalletConfig(
+WalletConfiguration(
     walletId = "consumer-wallet",
-    walletProvider = WalletProviderConfig(
-        baseUrl = "https://{org}.enterprise-sandbox.waltid.dev",
-        servicePath = "{org}.{tenant}.wallet-provider",
-        bearerToken = enterpriseSessionToken,
-        composition = "wia_ka",
+    issuance = IssuanceConfiguration(
+        walletProvider = WalletProviderConfig(
+            baseUrl = "https://{org}.enterprise-sandbox.waltid.dev",
+            servicePath = "{org}.{tenant}.wallet-provider",
+            bearerToken = enterpriseSessionToken,
+            composition = WalletProviderConfig.Composition.WalletInstanceAndKey,
+        ),
     ),
 )
 ```
@@ -137,11 +149,13 @@ Swift:
 ```swift
 WalletConfiguration(
     walletID: "consumer-wallet",
-    walletProvider: WalletProviderConfiguration(
-        baseURL: "https://{org}.enterprise-sandbox.waltid.dev",
-        servicePath: "{org}.{tenant}.wallet-provider",
-        bearerToken: enterpriseSessionToken,
-        composition: "wia_ka"
+    issuance: .init(
+        walletProvider: WalletProviderConfiguration(
+            baseURL: "https://{org}.enterprise-sandbox.waltid.dev",
+            servicePath: "{org}.{tenant}.wallet-provider",
+            bearerToken: enterpriseSessionToken,
+            composition: .walletInstanceAndKey
+        )
     )
 )
 ```
@@ -152,7 +166,7 @@ The Compose demo turns this on through `DemoWalletConfig`. `walletProviderEnable
 |-----|-----------------|
 | Compose Android | `demoWalletConfig()` in `waltid-applications/waltid-wallet-demo-compose/androidApp/src/main/java/id/walt/walletdemo/compose/android/DemoWalletConfiguration.kt` |
 | Compose iOS | `DemoWalletConfig(...)` in `waltid-applications/waltid-wallet-demo-compose/sharedUI/src/iosMain/kotlin/id/walt/walletdemo/compose/ui/WalletDemoIos.kt` |
-| Native iOS | `walletProvider:` on `WalletConfiguration` in `waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/ViewModels/WalletViewModel.swift` |
+| Native iOS | `WalletConfiguration.Issuance.walletProvider` in `waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/ViewModels/WalletViewModel.swift` |
 
 Do not enable the hosted demo constants. They name a provider that is not deployed.
 
@@ -255,7 +269,7 @@ iOS (Native)
 ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
 open iosApp.xcodeproj
-xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppTests/MobileWalletIntegrationTests -parallel-testing-enabled NO
+xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppTests/WalletIntegrationTests -parallel-testing-enabled NO
 xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppUITests/PublicDemoBackendE2ETests -parallel-testing-enabled NO
 ```
 
@@ -297,7 +311,7 @@ the deterministic reference gallery.
 
 For signed DID presentation after a process restart, both iOS demos' `testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2`
 terminate and relaunch the app before previewing a signed `did:key` request and sharing the saved credential.
-Android's `MobileWalletRestartTest` runs in the self-instrumenting `androidE2eTests` module,
+Android's `WalletRestartTest` runs in the self-instrumenting `androidE2eTests` module,
 separately from the wallet process. One test receives a credential, force-stops and relaunches the app,
 then presents the saved credential through a signed `did:key` request.
 From the Identity repository root, select an emulator or device:

@@ -13,20 +13,21 @@ public enum SynchronizableKeychainAccessibility: Sendable {
 public actor KeychainIdentityRecovery: IdentityRecoveryProvider {
     public nonisolated let id: String
     public nonisolated let displayName = "iCloud Keychain recovery"
-    private let service: String
-    private let accessGroup: String?
-    private let accessibility: SynchronizableKeychainAccessibility
-
     public init(namespace: String, accessGroup: String? = nil,
-                accessibility: SynchronizableKeychainAccessibility = .whenUnlocked) {
-        precondition(namespace.range(of: "^[A-Za-z0-9._-]{1,64}$", options: .regularExpression) != nil)
-        precondition(accessGroup == nil || accessGroup?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+                accessibility: SynchronizableKeychainAccessibility = .whenUnlocked) throws {
+        guard (1...64).contains(namespace.utf8.count),
+              namespace.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0)
+                  || (48...57).contains($0) || [45, 46, 95].contains($0) }) else {
+            throw WalletError.invalidInput("Use 1–64 ASCII letters, digits, dots, hyphens or underscores for the recovery namespace")
+        }
+        guard accessGroup?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != true else {
+            throw WalletError.invalidInput("A Keychain access group must contain a value")
+        }
         self.id = "keychain:\(namespace)"
         self.service = "id.walt.wallet.identity.recovery.\(namespace)"
         self.accessGroup = accessGroup
         self.accessibility = accessibility
     }
-
     public func availability() async throws -> WalletRecoveryAvailability {
         var request = query()
         request[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
@@ -37,7 +38,6 @@ public actor KeychainIdentityRecovery: IdentityRecoveryProvider {
         default: return .unavailable(reason: "Keychain recovery is unavailable")
         }
     }
-
     public func list() async throws -> [String] {
         var request = query()
         request[kSecMatchLimit as String] = kSecMatchLimitAll
@@ -72,6 +72,12 @@ public actor KeychainIdentityRecovery: IdentityRecoveryProvider {
         if status != errSecItemNotFound { try check(status) }
         return .acceptedLocally
     }
+
+    private let service: String
+
+    private let accessGroup: String?
+
+    private let accessibility: SynchronizableKeychainAccessibility
 
     private func read(recordID: String) throws -> Data? {
         var request = try query(recordID: recordID)

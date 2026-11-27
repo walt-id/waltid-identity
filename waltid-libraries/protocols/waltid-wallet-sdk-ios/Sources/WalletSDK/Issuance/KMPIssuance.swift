@@ -1,0 +1,250 @@
+import Foundation
+#if canImport(WalletCore) && os(iOS)
+@preconcurrency import WalletCore
+
+extension Waltid_openid4vc_walletWalletIssuanceOfferReview {
+    func toSwiftOfferReview() throws -> IssuanceOfferReview {
+        let identification: IssuanceClientIdentification
+        switch clientIdentification {
+        case .anonymousAllowed: identification = .anonymousAllowed
+        case .clientIdRequired: identification = .clientIDRequired
+        }
+        return IssuanceOfferReview(
+            id: session.id,
+            offer: try session.offer.toSwiftIssuanceOfferPreview(batchSize: session.batchSize?.intValue, displayMetadata: session.credentialDisplayMetadata),
+            authorizationServer: authorizationServer, clientIdentification: identification
+        )
+    }
+}
+
+extension Waltid_openid4vc_walletWalletIssuanceAuthorization {
+    func toSwiftIssuanceAuthorization() throws -> IssuanceAuthorization {
+        guard let authorizationURL = URL(string: url), let callbackURL = URL(string: redirectUri) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid issuance URL.")
+        }
+        return IssuanceAuthorization(
+            url: authorizationURL,
+            state: state,
+            redirectURI: callbackURL,
+            pkce: IssuancePKCEState(
+                codeChallenge: pkce.codeChallenge,
+                codeChallengeMethod: pkce.codeChallengeMethod
+            ),
+            pushedAuthorizationRequestUsed: pushedAuthorizationRequestUsed,
+            requestURIExpiresAt: requestUriExpiresAtEpochMilliseconds.map {
+                Date(timeIntervalSince1970: TimeInterval($0.int64Value) / 1000.0)
+            }
+        )
+    }
+}
+
+extension Waltid_openid4vc_walletWalletIssuanceOutcome {
+    func toSwiftIssuanceOutcome() throws -> IssuanceOutcome {
+        switch onEnum(of: self) {
+        case let .stored(value):
+            return .stored(
+                sessionID: value.sessionId,
+                credentialIDs: try requiredBridgeArray(value.credentialIds, of: String.self)
+            )
+        case let .deferred(value):
+            return .deferred(
+                sessionID: value.sessionId,
+                storedCredentialIDs: try requiredBridgeArray(value.storedCredentialIds, of: String.self),
+                credentials: try requiredBridgeArray(
+                    value.credentials,
+                    of: Waltid_openid4vc_walletWalletDeferredCredential.self
+                ).map { try $0.toSwiftDeferredCredential() }
+            )
+        case let .cancelled(value):
+            return .cancelled(sessionID: value.sessionId)
+        case let .failed(value):
+            return .failed(
+                sessionID: value.sessionId,
+                error: IssuanceFailure(
+                    code: value.error.issuerTrustFailed ? .issuerTrust : value.error.code.toSwiftIssuanceErrorCode(),
+                    message: value.error.message,
+                    canRetryOffer: value.error.canRetryOffer,
+                    targetFailure: try value.failure?.toSwiftTargetFailure()
+                ),
+                storedCredentialIDs: try requiredBridgeArray(value.storedCredentialIds, of: String.self),
+                deferredCredentials: try requiredBridgeArray(value.deferredCredentials, of: Waltid_openid4vc_walletWalletIssuanceContinuation.self)
+                    .map { try $0.toSwiftDeferredCredential() }
+            )
+        }
+    }
+}
+
+extension IssuanceCredentialSelection {
+    func toKMPSelection() throws -> WalletCore.IssuanceCredentialSelection {
+        let selection: any WalletCore.IssuanceHolders
+        switch holders {
+        case .existing(let bindings):
+            selection = WalletCore.IssuanceHoldersExisting(bindings: bindings.map { WalletCore.IssuanceHolderBinding(keyId: $0.keyID, did: $0.did) })
+        case .newKeys(let count):
+            selection = WalletCore.IssuanceHoldersNewKeys(count: Int32(count))
+        }
+        return WalletCore.IssuanceCredentialSelection(credentialConfigurationId: configurationID,
+            holders: selection, credentialIdentifier: credentialIdentifier)
+    }
+}
+
+extension Waltid_openid4vc_walletWalletDeferredCredential {
+    func toSwiftDeferredCredential() throws -> DeferredCredential {
+        guard let id = DeferredIssuanceID(rawValue: id) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid deferred reference")
+        }
+        return DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
+            intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier)
+    }
+}
+
+extension Waltid_openid4vc_walletWalletIssuanceContinuation {
+    func toSwiftDeferredCredential() throws -> DeferredCredential {
+        guard let id = DeferredIssuanceID(rawValue: id) else {
+            throw WalletError.internalFailure("Wallet core returned an invalid deferred reference")
+        }
+        return DeferredCredential(id: id, credentialConfigurationID: credentialConfigurationId,
+            intervalSeconds: intervalSeconds?.int64Value, credentialIdentifier: credentialIdentifier,
+            status: status.toSwift(), displayMetadataJSON: displayMetadataJson)
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceOfferPreview {
+    func toSwiftIssuanceOfferPreview(batchSize: Int?, displayMetadata: [String: String]) throws -> IssuanceOfferPreview {
+        let selected: IssuanceGrant
+        switch grant {
+        case .authorizationCode: selected = .authorizationCode
+        case .preAuthorizedCode: selected = .preAuthorizedCode
+        }
+        return IssuanceOfferPreview(
+            grant: selected,
+            issuer: try issuer.toSwiftIssuanceIssuerPreview(),
+            credentials: try requiredBridgeArray(credentials, of: Waltid_openid4vc_walletWalletIssuanceCredentialPreview.self)
+                .map { $0.toSwiftIssuanceCredentialPreview(metadataJSON: displayMetadata[$0.configurationId]) },
+            transactionCode: transactionCode?.toSwiftIssuanceTransactionCode(),
+            batchSize: batchSize
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceIssuerPreview {
+    func toSwiftIssuanceIssuerPreview() throws -> IssuanceIssuerPreview {
+        IssuanceIssuerPreview(
+            identifier: identifier,
+            metadataProvenance: try metadataProvenance.toSwiftMetadataProvenance(),
+            display: .init(
+                name: name,
+                locale: locale,
+                logoURI: logoUri.flatMap(URL.init(string:))?.absoluteString,
+                logoAltText: logoAltText
+            )
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceMetadataProvenance {
+    func toSwiftMetadataProvenance() throws -> MetadataProvenance {
+        switch self {
+        case is Waltid_openid4vc_walletWalletIssuanceMetadataProvenanceUnsigned:
+            return .unsigned
+        case let signed as Waltid_openid4vc_walletWalletIssuanceMetadataProvenanceSigned:
+            let trust: MetadataTrustType
+            switch signed.trustType {
+            case .trustedIssuer: trust = .trustedIssuer
+            case .trustedDelegate: trust = .trustedDelegate
+            }
+            return .signed(
+                SignedMetadataProvenance(
+                    compactJWT: signed.compactJwt,
+                    algorithm: signed.algorithm,
+                    keyID: signed.keyId,
+                    trustType: trust
+                )
+            )
+        default:
+            throw WalletError.internalFailure("Unsupported issuer metadata provenance: \(type(of: self))")
+        }
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceCredentialPreview {
+    func toSwiftIssuanceCredentialPreview(metadataJSON: String?) -> IssuanceCredentialPreview {
+        IssuanceCredentialPreview(
+            configurationID: configurationId,
+            format: format,
+            display: .init(
+                name: name,
+                logoURI: logoUri.flatMap(URL.init(string:))?.absoluteString,
+                logoAltText: logoAltText,
+                description: descriptionText,
+                backgroundColor: backgroundColor,
+                backgroundImageURI: backgroundImageUri.flatMap(URL.init(string:))?.absoluteString,
+                textColor: textColor
+            ),
+            vct: vct,
+            doctype: doctype,
+            metadataJSON: metadataJSON
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceTransactionCode {
+    func toSwiftIssuanceTransactionCode() -> IssuanceTransactionCode {
+        IssuanceTransactionCode(
+            inputMode: inputMode,
+            length: length.map { Int($0.int32Value) },
+            descriptionText: descriptionText
+        )
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceContinuationStatus {
+    func toSwift() -> IssuanceContinuationStatus {
+        switch self {
+        case .awaitingIssuer: return .awaitingIssuer
+        case .awaitingLocalSave: return .awaitingLocalSave
+        case .remoteOutcomeUncertain: return .remoteOutcomeUncertain
+        case .storageOutcomeUncertain: return .storageOutcomeUncertain
+        case .unresolved: return .unresolved
+        }
+    }
+}
+
+private extension Waltid_openid4vc_walletCredentialIssuanceFailure {
+    func toSwiftTargetFailure() throws -> IssuanceTargetFailure {
+        let stage: IssuanceFailureStage
+        switch self.stage {
+        case .proof: stage = .proof
+        case .request: stage = .request
+        case .response: stage = .response
+        case .storage: stage = .storage
+        case .observer: stage = .observer
+        }
+        return IssuanceTargetFailure(
+            target: IssuanceCredentialTarget(configurationID: target.credentialConfigurationId, credentialIdentifier: target.credentialIdentifier),
+            stage: stage,
+            notAttempted: try requiredBridgeArray(notAttempted, of: Waltid_openid4vci_walletCredentialIssuanceTarget.self).map {
+                IssuanceCredentialTarget(configurationID: $0.credentialConfigurationId, credentialIdentifier: $0.credentialIdentifier)
+            })
+    }
+}
+
+private extension Waltid_openid4vc_walletWalletIssuanceErrorCode {
+    func toSwiftIssuanceErrorCode() -> IssuanceErrorCode {
+        switch self {
+        case .invalidSession: return .invalidSession
+        case .invalidCallback: return .invalidCallback
+        case .invalidInput: return .invalidInput
+        case .authorizationFailed: return .authorizationFailed
+        case .issuerMetadata: return .issuerMetadata
+        case .issuerResponse: return .issuerResponse
+        case .network: return .network
+        case .remoteOutcomeUncertain: return .remoteOutcomeUncertain
+        case .storageOutcomeUncertain: return .storageOutcomeUncertain
+        case .crypto: return .crypto
+        case .storage: return .storage
+        case .protocol: return .protocol
+        }
+    }
+}
+#endif

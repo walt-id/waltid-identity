@@ -260,11 +260,15 @@ class WalletViewModel: ObservableObject {
     private var statusDismissedKey: String?
     private var statusHideTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
-    private var issuanceSession: IssuanceSession?
+    private var pendingAuthorizationID: IssuanceAuthorizationID?
+    private var issuanceSession: ReviewedIssuanceOffer? {
+        didSet { pendingAuthorizationID = nil }
+    }
     private var pendingPresentationSuccessMessage: String?
     private var presentationTask: Task<Void, Never>?
     private var paymentConsentTask: Task<Void, Never>?
     @Published var paymentReview: PaymentReviewState = .notRequired
+    @Published private(set) var retainedPresentationReview: PresentationReview?
     @Published private(set) var claimReview: ClaimReviewState = .legacy
     private var biometricSigningAvailabilityTask: Task<Void, Never>?
     private var foregroundSequence = 0
@@ -953,15 +957,8 @@ class WalletViewModel: ObservableObject {
         } else {
             transactionDataProfiles = TransactionDataProfilesConfiguration(profiles: [])
         }
-        let configuration = WalletConfiguration(
-            walletID: walletID,
-            attestation: Self.attestationConfiguration(
-                baseUrl: attestationBaseUrl,
-                attesterPath: attestationAttesterPath,
-                bearerToken: attestationBearerToken,
-                hostHeader: attestationHostHeader
-            ),
-            clientIDTrustConfiguration: DemoClientIdTrust.clientIDTrustConfiguration,
+        let presentation = WalletConfiguration.Presentation(
+            verifierTrust: DemoClientIdTrust.clientIDTrustConfiguration,
             transactionDataProfiles: transactionDataProfiles.profiles,
             paymentCredentialIssuers: [
                 WalletPaymentCredentialIssuer(
@@ -971,20 +968,37 @@ class WalletViewModel: ObservableObject {
                 WalletPaymentCredentialIssuer(
                     issuer: "https://waltid.enterprise.test.waltid.cloud/v2/waltid.bank-tenant.issuer2/issuer-service-api/openid4vci",
                     publicJWKJSON: #"{"kty":"EC","crv":"P-256","x":"dUpq6W-c6yLniF3k5Lj5j4rFysYXmnHTSK_aOb2JV_A","y":"urKlUBnHoHIeBP9YuCj9ZwVBewS4yNkaT1J64gQLnEw"}"#
-                ),
-            ],
-            crossProcessAccess: Self.crossProcessAccessConfiguration(),
-            defaultKeyUseAuthorizationPolicy: signingProtectionMode.defaultSelection.authorizationPolicy,
-            keyUseAuthorizationPrompt: WalletKeyUseAuthorizationPrompt(
-                message: "Authorize wallet signing",
-                cancelText: "Cancel"
-            ),
-            signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.alternativeAuthorizations,
-                keychain: .init(accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup),
-                recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
-                    accessGroup: Self.crossProcessAccessConfiguration().keychainAccessGroup)]),
-            keyAttestationProvider: DemoKeyAttestationProviders()
+                )
+            ]
         )
+        let configuration = Result {
+            let access = try Self.crossProcessAccessConfiguration()
+            return try WalletConfiguration(
+                walletID: walletID,
+                keyAuthorization: .init(
+                    policy: signingProtectionMode.defaultSelection.authorizationPolicy,
+                    prompt: WalletKeyUseAuthorizationPrompt(
+                        message: "Authorize wallet signing",
+                        cancelText: "Cancel"
+                    )
+                ),
+                signingIdentity: .init(alternativeAuthorizations: signingProtectionMode.alternativeAuthorizations,
+                    keychain: .init(accessGroup: access.keychainAccessGroup),
+                    recoveryProviders: [KeychainIdentityRecovery(namespace: "wallet-demo",
+                        accessGroup: access.keychainAccessGroup)]),
+                issuance: .init(
+                    attestation: Self.attestationConfiguration(
+                        baseUrl: attestationBaseUrl,
+                        attesterPath: attestationAttesterPath,
+                        bearerToken: attestationBearerToken,
+                        hostHeader: attestationHostHeader
+                    ),
+                    keyAttestationProvider: DemoKeyAttestationProviders()
+                ),
+                presentation: presentation,
+                crossProcessAccess: access
+            )
+        }
         let resolvedWalletClient = walletClient ?? SDKWalletClient(configuration: configuration)
         self.signingProtectionMode = signingProtectionMode
         selectedSigningProtection = selectedProtection
@@ -1264,12 +1278,11 @@ class WalletViewModel: ObservableObject {
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
         setLoading(WalletStatusText.resolvingCredentialOffer, tab: .receive)
         receiveTask = Task {
-            var newSession: IssuanceSession?
+            var newSession: ReviewedIssuanceOffer?
             do {
                 let session = try await walletClient.startIssuance(
                     IssuanceRequest(
                         offer: offer,
-                        redirectURI: URL(string: "openid://")!,
                         did: did.isEmpty ? nil : did
                     )
                 )
@@ -1286,7 +1299,7 @@ class WalletViewModel: ObservableObject {
                 setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
                 Task {
                     await prefetchCredentialCardArt(
-                        uris: session.offer.credentials.map { $0.backgroundImageURI?.absoluteString }
+                        uris: session.offer.credentials.map { $0.display.backgroundImageURI }
                     )
                 }
             } catch is CancellationError {
@@ -1356,7 +1369,8 @@ class WalletViewModel: ObservableObject {
                     let authorization = try await walletClient.beginAuthorizationIssuance(sessionID: session.id, credentials: selections)
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
-                    authorizationRequestURL = authorization.url
+                    pendingAuthorizationID = authorization.id
+                    authorizationRequestURL = authorization.request.url
                     setSuccess(WalletStatusText.reviewCredentialOffer, tab: .receive)
                 }
             } catch is CancellationError {
@@ -1400,9 +1414,7 @@ class WalletViewModel: ObservableObject {
             }
             return
         }
-        guard let session = issuanceSession,
-              let preview = offerPreview,
-              preview.grant == .authorizationCode else { return }
+        guard offerPreview != nil, let authorizationID = pendingAuthorizationID else { return }
         let request = ReceiveRequest(
             offerURL: offerUrl.trimmingCharacters(in: .whitespacesAndNewlines),
             navigationResetKey: receiveNavigationResetKey
@@ -1412,9 +1424,9 @@ class WalletViewModel: ObservableObject {
         receiveTask = Task {
             do {
                 try await completeIssuanceOutcome(
-                    try await walletClient.continueAuthorizationIssuance(
-                        sessionID: session.id,
-                        callbackURI: callbackURI
+                    try await walletClient.completeAuthorization(
+                        authorizationID,
+                        callback: callbackURI
                     ),
                     previousCredentials: previousCredentials,
                     request: request
@@ -1563,7 +1575,7 @@ class WalletViewModel: ObservableObject {
         setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
-                let outcome = try await refreshContinuations(walletClient.resumeDeferredIssuance(deferredCredentialID: credential.id), resumingID: credential.id)
+                let outcome = try await refreshContinuations(walletClient.resumeDeferredIssuance(credential.id), resumingID: credential.id)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
                 switch outcome {
@@ -1635,7 +1647,7 @@ class WalletViewModel: ObservableObject {
         }
     }
 
-    private func refreshContinuations(_ outcome: IssuanceOutcome, resumingID: String? = nil) async throws -> IssuanceOutcome {
+    private func refreshContinuations(_ outcome: IssuanceOutcome, resumingID: DeferredIssuanceID? = nil) async throws -> IssuanceOutcome {
         guard outcome.hasPendingCredentials else { return outcome }
         do { return outcome.withContinuations(try await walletClient.listDeferredIssuance(), resumingID: resumingID) }
         catch is CancellationError { throw CancellationError() }
@@ -1769,6 +1781,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private func prepareSelectedPaymentConsent() {
+        retainedPresentationReview = nil
         paymentConsentTask?.cancel()
         guard let preview = presentationPreview, let model = presentationSharingReview else { return }
         let credentials = selectedPresentationCredentialOptions
@@ -1781,6 +1794,18 @@ class WalletViewModel: ObservableObject {
         paymentConsentTask = Task {
             let information: ClaimReviewState
             do {
+                if let retained = try await walletClient.retainedPresentation(preview.previewHandle,
+                    selection: .init(credentials: Array(credentials), disclosures: Array(disclosures)), did: selectedDid) {
+                    let effective = try EffectivePresentationReview(prepared: retained.claims, model: model,
+                        selection: SharingSelection(credentials: credentials, disclosures: disclosures))
+                    try Task.checkCancellation()
+                    guard presentationPreview?.previewHandle == preview.previewHandle,
+                          selectedPresentationCredentialOptions == credentials, selectedPresentationDisclosureOptions == disclosures else { return }
+                    retainedPresentationReview = retained
+                    claimReview = .ready(effective)
+                    paymentReview = retained.payment.map { .ready($0) } ?? .notRequired
+                    return
+                }
                 if supportsReview {
                     let prepared = try await walletClient.reviewPresentation(previewHandle: preview.previewHandle,
                         selectedCredentialOptions: Array(credentials), selectedDisclosureOptions: Array(disclosures), did: selectedDid)
@@ -1832,11 +1857,16 @@ class WalletViewModel: ObservableObject {
         let selectedCredentialOptions = Array(selectedPresentationCredentialOptions)
         let selectedDid = did.isEmpty ? nil : did
 
+        let retained = retainedPresentationReview
         let consentRevision = paymentReview.consent?.revision
         setLoading(WalletStatusText.presentingCredential, tab: .present, committing: true)
         presentationTask = Task {
             do {
-                let result = try await walletClient.submitStatusReviewedPresentation(
+                let result: PresentationResult
+                if let retained {
+                    result = try await walletClient.submit(retained)
+                } else {
+                    result = try await walletClient.submitStatusReviewedPresentation(
                     previewHandle: previewHandle,
                     selectedCredentialOptions: selectedCredentialOptions,
                     selectedDisclosureOptions: Array(selectedDisclosureOptions),
@@ -1844,6 +1874,7 @@ class WalletViewModel: ObservableObject {
                     did: selectedDid,
                     paymentConsentRevision: consentRevision
                 )
+                }
                 try Task.checkCancellation()
                 resetPresentationToEntry()
                 handlePresentationResult(
@@ -1853,7 +1884,12 @@ class WalletViewModel: ObservableObject {
                 )
             } catch is CancellationError {
                 return
+            } catch WalletError.presentationReviewChanged {
+                isLoading = false
+                prepareSelectedPaymentConsent()
+                credentialStatusError = WalletError.presentationReviewChanged.localizedDescription
             } catch WalletError.credentialStatusReviewChanged {
+                prepareSelectedPaymentConsent()
                 guard !Task.isCancelled else { return }
                 do {
                     let snapshot = try await walletClient.credentialStatusSnapshot()
@@ -2225,14 +2261,10 @@ class WalletViewModel: ObservableObject {
     /// back to process-local storage looks healthy while being invisible to that extension. The
     /// symptom would be a failed presentation on a device, so the misconfiguration - an Info.plist key
     /// the build did not expand - has to stop the app at launch instead.
-    private static func crossProcessAccessConfiguration() -> WalletCrossProcessAccess {
+    private static func crossProcessAccessConfiguration() throws -> WalletCrossProcessAccess {
         guard let keychainAccessGroup = IdentityDocumentSharedConfiguration.keychainAccessGroup,
-              !keychainAccessGroup.isEmpty else {
-            fatalError(
-                IdentityDocumentSupportFailure
-                    .unresolvedKeychainAccessGroup(IdentityDocumentNamespace.keychainAccessGroupInfoKey)
-                    .localizedDescription
-            )
+              !keychainAccessGroup.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw IdentityDocumentSupportFailure.unresolvedKeychainAccessGroup(IdentityDocumentNamespace.keychainAccessGroupInfoKey)
         }
         return WalletCrossProcessAccess(
             appGroupIdentifier: IdentityDocumentSharedConfiguration.appGroupIdentifier,

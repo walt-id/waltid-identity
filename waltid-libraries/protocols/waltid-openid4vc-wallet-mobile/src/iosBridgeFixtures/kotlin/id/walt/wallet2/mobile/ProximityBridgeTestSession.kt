@@ -1,8 +1,21 @@
 package id.walt.wallet2.mobile
 
+import id.walt.wallet2.mobile.proximity.ProximityAction
+import id.walt.wallet2.mobile.proximity.ProximityActionResult
+import id.walt.wallet2.mobile.proximity.ProximityApprovalTiming
+import id.walt.wallet2.mobile.proximity.ProximityCredentialOption
+import id.walt.wallet2.mobile.proximity.ProximityDeviceAuthenticationMethod
+import id.walt.wallet2.mobile.proximity.ProximityDocumentReview
+import id.walt.wallet2.mobile.proximity.ProximityRequestedElement
+import id.walt.wallet2.mobile.proximity.ProximityReview
+import id.walt.wallet2.mobile.proximity.ProximityReviewId
+import id.walt.wallet2.mobile.proximity.ProximityReviewReason
+import id.walt.wallet2.mobile.proximity.ProximitySession
+import id.walt.wallet2.mobile.proximity.ProximitySharingReceipt
+import id.walt.wallet2.mobile.proximity.ProximityState
+import kotlin.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlin.time.Instant
 
 /** Native values and flow for exercising the real Swift bridge; absent from release artifacts. */
 public class ProximityBridgeTestSession {

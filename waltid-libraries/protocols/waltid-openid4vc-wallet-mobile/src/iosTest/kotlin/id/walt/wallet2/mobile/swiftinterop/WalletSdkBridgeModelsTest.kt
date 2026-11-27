@@ -1,8 +1,5 @@
 package id.walt.wallet2.mobile.swiftinterop
 
-import id.walt.wallet2.handlers.PreviewSessionException
-import id.walt.wallet2.handlers.PreviewSessionFailureReason
-import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.crypto2.keys.KeyUseAuthorizationException
 import id.walt.crypto2.keys.KeyUseAuthorizationFailure
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
@@ -10,11 +7,15 @@ import id.walt.crypto2.keys.KeyUseAuthorizationReuseEnforcement
 import id.walt.crypto2.keys.KeyUseAuthorizationReuseTimeoutValidation
 import id.walt.crypto2.keys.KeyUseAuthorizationSupport
 import id.walt.crypto2.keys.KeyUseAuthorizationUnsupportedReason
-import kotlinx.coroutines.CancellationException
+import id.walt.wallet2.handlers.PreviewSessionException
+import id.walt.wallet2.handlers.PreviewSessionFailureReason
+import id.walt.wallet2.mobile.digitalcredentials.WalletAppGroupAccess
+import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlinx.coroutines.CancellationException
 
 class WalletSdkBridgeModelsTest {
     @Test
@@ -29,7 +30,7 @@ class WalletSdkBridgeModelsTest {
         val error = WalletBridgeError.fromThrowable(failure)
         assertEquals(WalletBridgeErrorCategory.presentationValidation, error.category)
         val details = requireNotNull(error.presentationValidationFailure)
-        assertEquals(id.walt.wallet2.mobile.MobileWalletPresentationErrorCode.invalidRequest, details.errorCode)
+        assertEquals(id.walt.wallet2.mobile.presentation.PresentationErrorCode.invalidRequest, details.errorCode)
         assertEquals(requestError.message, details.message)
         assertEquals("Unbound response destination", details.responseSafetyFailure)
         assertEquals(failure.message, error.message)
@@ -193,17 +194,11 @@ class WalletSdkBridgeModelsTest {
     }
 
     @Test
-    fun bridgeRequiresCompleteCrossProcessConfiguration() {
-        assertFailsWith<IllegalArgumentException> {
-            WalletBridgeConfiguration(appGroupIdentifier = "group.example").toMobileWalletConfig()
-        }
+    fun bridgeMapsOptionalCrossProcessAccess() {
+        val access = WalletAppGroupAccess("group.example", "TEAM.example")
+        val config = WalletBridgeConfiguration(crossProcessAccess = access).toWalletConfiguration()
 
-        val config = WalletBridgeConfiguration(
-            appGroupIdentifier = "group.example",
-            keychainAccessGroup = "TEAM.example",
-        ).toMobileWalletConfig()
-
-        assertEquals("group.example", config.crossProcessAccess?.appGroupIdentifier)
-        assertEquals("TEAM.example", config.crossProcessAccess?.keychainAccessGroup)
+        assertEquals(access, config.digitalCredentials.crossProcessAccess)
+        assertEquals(null, WalletBridgeConfiguration().toWalletConfiguration().digitalCredentials.crossProcessAccess)
     }
 }

@@ -1,6 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
-import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
+import id.walt.wallet2.mobile.presentation.TransactionDataProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -12,7 +12,7 @@ import kotlin.test.assertNull
 class DemoTransactionDataProfilesTest {
     @Test
     fun deployedProfilesAreUsedWithoutLocalAdditions() = runTest {
-        val profiles = listOf(MobileWalletTransactionDataProfile("deployed-payment", "Payment", listOf("amount")))
+        val profiles = listOf(TransactionDataProfile("deployed-payment", "Payment", listOf("amount")))
         val result = DemoWalletConfig().resolveDemoTransactionDataProfiles { profiles }
         assertEquals(profiles, result.profiles)
         assertNull(result.warning)

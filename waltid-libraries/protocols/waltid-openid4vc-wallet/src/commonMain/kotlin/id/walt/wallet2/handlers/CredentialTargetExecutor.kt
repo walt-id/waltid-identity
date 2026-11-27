@@ -55,7 +55,7 @@ internal suspend fun executeCredentialTargets(
             val configuration = issuerMetadata.credentialConfigurationsSupported.getValue(target.credentialConfigurationId)
             val algorithms = supportedJwtProofAlgorithms(configuration.proofTypesSupported, wallet.hasKeyAttestationProvider())
             stage = CredentialIssuanceStage.REQUEST
-            val exchange = WalletIssuanceHandler.exchangeCredentialWithNonceRetry(
+            val exchange = exchangeCredentialWithNonceRetry(
                 FetchCredentialRequest(Url(issuerMetadata.credentialEndpoint), access.accessToken,
                     target.credentialConfigurationId, credentialIdentifier = target.credentialIdentifier),
                 issuerMetadata.nonceEndpoint, httpClient,
@@ -117,7 +117,7 @@ internal suspend fun executeCredentialTargets(
                         val value = it.credential
                         if (value is JsonPrimitive) value.content else value.toString()
                     }, selected.bindings, label, metadata, proofRequired = algorithms != null,
-                        expectedConfiguration = configuration, typeMetadataHttpClient = httpClient)
+                        expectedConfiguration = configuration, typeMetadataHttpClient = httpClient, credentialIssuer = issuerMetadata.credentialIssuer)
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {

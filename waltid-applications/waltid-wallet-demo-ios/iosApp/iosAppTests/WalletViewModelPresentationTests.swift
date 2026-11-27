@@ -9,7 +9,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
     @MainActor
     func testClaimReviewBlocksSubmissionOnFailureAndRetryUsesCurrentRevision() async throws {
         let preparation = PendingClaimPreparation()
-        let client = claimClient(preparation)
+        let client = try claimClient(preparation)
         let viewModel = try await paymentViewModel(client)
         try await waitUntilAsync { await preparation.count == 1 }
         XCTAssertFalse(viewModel.claimReview.canConfirm)
@@ -34,7 +34,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
     @MainActor
     func testSelectionChangeDiscardsLateClaimReviewAndSubmitsTheCurrentSelection() async throws {
         let preparation = PendingClaimPreparation()
-        let client = claimClient(preparation)
+        let client = try claimClient(preparation)
         let viewModel = try await paymentViewModel(client)
         try await waitUntilAsync { await preparation.count == 1 }
         let credential = try XCTUnwrap(viewModel.selectedPresentationCredentialOptions.first)
@@ -60,7 +60,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
     @MainActor
     func testLockCancelsClaimPreparationWithoutRestoringAnOldReview() async throws {
         let preparation = PendingClaimPreparation()
-        let client = claimClient(preparation)
+        let client = try claimClient(preparation)
         let viewModel = try await paymentViewModel(client)
         try await waitUntilAsync { await preparation.count == 1 }
         viewModel.lock()
@@ -144,12 +144,17 @@ final class WalletViewModelPresentationTests: XCTestCase {
         XCTAssertTrue(submitted.isEmpty)
     }
 
-    private func claimClient(_ preparation: PendingClaimPreparation) -> MockWalletClient {
-        let option = PresentationCredentialOption(queryID: "pid", credentialID: "claim-credential", format: "dc+sd-jwt",
-            issuer: nil, subject: nil, label: "Employee", credentialDataJSON: #"{"given_name":"Ada"}"#,
-            disclosures: [.init(path: "$.given_name", name: "Given name", valueJSON: #""Ada""#,
-                displayValue: nil, selectivelyDisclosable: true)])
-        let preview = PresentationPreview(previewHandle: .init(value: "claim-preview"),
+    private func claimClient(_ preparation: PendingClaimPreparation) throws -> MockWalletClient {
+        let option = try PresentationCredentialOption(
+            queryID: "pid", credential: .init(id: "claim-credential", format: "dc+sd-jwt", credentialDataJSON: #"{"given_name":"Ada"}"#, issuer: nil, subject: nil, label: "Employee"),
+            disclosures: [.init(
+                path: "$.given_name",
+                valueJSON: #""Ada""#,
+                disposition: .selectable,
+                name: "Given name"
+            )]
+        )
+        let preview = try PresentationPreview(previewHandle: .init(value: "claim-preview"),
             request: .init(clientID: "https://verifier.example", requestAuthentication: .unauthenticated,
                 nonce: "fixture", responseEncryption: .notRequired), credentialOptions: [option])
         return MockWalletClient(presentationPreviewResult: .ready(preview), claimPreparation: { credentials, disclosures in
@@ -176,11 +181,13 @@ final class WalletViewModelPresentationTests: XCTestCase {
     @MainActor
     func testInvalidRequestCanBeDismissedLocallyOrReportedToVerifier() async throws {
         let request = try XCTUnwrap(URL(string: "openid4vp://invalid-request"))
-        let previewHandle = PresentationPreviewHandle(value: "invalid-presentation-preview")
+        let previewHandle = try! PresentationPreviewHandle(value: "invalid-presentation-preview")
         let previewError = PresentationPreviewError(
             previewHandle: previewHandle,
-            request: PresentationRequestContext(
+            request: try PartialPresentationRequest(
                 clientID: "https://verifier.example",
+                requestAuthentication: .unauthenticated,
+                responseEncryption: .notRequired,
                 verifierMetadata: VerifierMetadata(
                     display: MetadataDisplay(
                         name: "Example Verifier",
@@ -191,9 +198,7 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     clientURI: nil,
                     policyURI: nil,
                     termsOfServiceURI: nil
-                ),
-                requestAuthentication: .unauthenticated,
-                responseEncryption: .notRequired
+                )
             ),
             code: .invalidTransactionData,
             message: "Unsupported transaction data type"
@@ -488,11 +493,11 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     Credential(
                         id: "cred-1",
                         format: "jwt_vc_json",
+                        credentialDataJSON: "{}",
                         issuer: "Example Issuer",
                         subject: nil,
                         label: "Example Credential",
-                        addedAt: nil,
-                        credentialDataJSON: "{}"
+                        addedAt: nil
                     )
                 ]
             )
@@ -518,11 +523,11 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     Credential(
                         id: "cred-1",
                         format: "jwt_vc_json",
+                        credentialDataJSON: "{}",
                         issuer: "Example Issuer",
                         subject: nil,
                         label: "Example Credential",
-                        addedAt: nil,
-                        credentialDataJSON: "{}"
+                        addedAt: nil
                     )
                 ]
             )
@@ -540,11 +545,11 @@ final class WalletViewModelPresentationTests: XCTestCase {
                 Credential(
                     id: "cred-1",
                     format: "jwt_vc_json",
+                    credentialDataJSON: "{}",
                     issuer: "Example Issuer",
                     subject: nil,
                     label: "Example Credential",
-                    addedAt: nil,
-                    credentialDataJSON: "{}"
+                    addedAt: nil
                 )
             ]
         )
@@ -577,11 +582,11 @@ final class WalletViewModelPresentationTests: XCTestCase {
                     Credential(
                         id: "cred-1",
                         format: "jwt_vc_json",
+                        credentialDataJSON: "{}",
                         issuer: "Example Issuer",
                         subject: nil,
                         label: "Example Credential",
-                        addedAt: nil,
-                        credentialDataJSON: "{}"
+                        addedAt: nil
                     )
                 ]
             ),
@@ -669,9 +674,9 @@ private actor PendingPaymentPreparation {
 }
 
 private actor PendingClaimPreparation {
-    private var pending: [([PresentationCredentialSelection], [PresentationDisclosureSelection], CheckedContinuation<PreparedPresentationReview, Error>)] = []
+    private var pending: [([PresentationCredentialSelection], [PresentationDisclosureSelection], CheckedContinuation<ReviewedPresentationClaims, Error>)] = []
     var count: Int { pending.count }
-    func prepare(_ credentials: [PresentationCredentialSelection], _ disclosures: [PresentationDisclosureSelection]) async throws -> PreparedPresentationReview {
+    func prepare(_ credentials: [PresentationCredentialSelection], _ disclosures: [PresentationDisclosureSelection]) async throws -> ReviewedPresentationClaims {
         try await withCheckedThrowingContinuation { pending.append((credentials, disclosures, $0)) }
     }
     func fail(_ index: Int) { pending[index].2.resume(throwing: WalletError.internalFailure("Projection unavailable")) }

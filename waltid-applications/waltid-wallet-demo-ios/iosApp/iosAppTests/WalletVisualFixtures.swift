@@ -68,9 +68,16 @@ struct WalletVisualFixtures {
         let data = try Data(contentsOf: resourceDirectory.appendingPathComponent("credential-information.json"))
         let contract = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         let stored = try credential()
-        let value = Credential(id: stored.id, format: stored.format, issuer: stored.issuer, subject: nil,
-            label: stored.label, addedAt: stored.addedAt,
-            credentialDataJSON: try json(object(contract, "credentialData")), metadataJSON: try json(object(contract, "metadata")))
+        let value = Credential(
+            id: stored.id,
+            format: stored.format,
+            credentialDataJSON: try json(object(contract, "credentialData")),
+            issuer: stored.issuer,
+            subject: nil,
+            label: stored.label,
+            addedAt: stored.addedAt,
+            metadataJSON: try json(object(contract, "metadata"))
+        )
         return CredentialDisplayNormalizer.details(for: value, preferredLocales: try XCTUnwrap(contract["preferredLocales"] as? [String]))
     }
 
@@ -82,10 +89,14 @@ struct WalletVisualFixtures {
             "credentialDisplay": [["name": try text(value, "title"), "locale": "en"]],
         ]
         return Credential(
-            id: try text(value, "id"), format: try text(value, "format"),
-            issuer: try text(issuer, "identifier"), subject: nil, label: try text(value, "title"),
+            id: try text(value, "id"),
+            format: try text(value, "format"),
+            credentialDataJSON: try json(object(value, "data")),
+            issuer: try text(issuer, "identifier"),
+            subject: nil,
+            label: try text(value, "title"),
             addedAt: ISO8601DateFormatter().date(from: try text(value, "addedAt")),
-            credentialDataJSON: try json(object(value, "data")), metadataJSON: try json(metadata)
+            metadataJSON: try json(metadata)
         )
     }
 
@@ -111,16 +122,23 @@ struct WalletVisualFixtures {
             "credentialDisplay": [["name": try field("title"), "background_color": try field("backgroundColor")]],
             "credentialClaims": [["path": [try field("namespace"), try field("element")],
                 "display": [["name": try field("label"), "locale": "en"]]]]]
-        return Credential(id: try field("credentialId"), format: "mso_mdoc", issuer: try field("issuer"), subject: nil,
-            label: try field("title"), addedAt: nil,
-            credentialDataJSON: try json([field("namespace"): [field("element"): field("value")]]), metadataJSON: try json(metadata))
+        return Credential(
+            id: try field("credentialId"),
+            format: "mso_mdoc",
+            credentialDataJSON: try json([field("namespace"): [field("element"): field("value")]]),
+            issuer: try field("issuer"),
+            subject: nil,
+            label: try field("title"),
+            addedAt: nil,
+            metadataJSON: try json(metadata)
+        )
     }
 
     func nearbyQrPayload() throws -> String { try text(object(root, "nearby"), "qrPayload") }
     func partialResultStatus() throws -> String { try text(object(root, "batchOutcome"), "status") }
     func deferredCredential() throws -> DeferredCredential {
         let value = try object(root, "batchOutcome")
-        return DeferredCredential(id: try text(value, "pendingId"),
+        return DeferredCredential(id: try XCTUnwrap(DeferredIssuanceID(rawValue: text(value, "pendingId"))),
             credentialConfigurationID: try text(value, "pendingConfigurationId"), intervalSeconds: 5,
             status: .awaitingIssuer, displayMetadataJSON: try json(object(value, "pendingMetadata")))
     }
@@ -130,8 +148,11 @@ struct WalletVisualFixtures {
         let issuer = try object(root, "issuer")
         return IssuanceOfferPreview(
             grant: .preAuthorizedCode,
-            issuer: .init(identifier: try text(issuer, "identifier"), name: try text(issuer, "name"),
-                          locale: "en", logoURI: nil, logoAltText: nil, metadataProvenance: .unsigned),
+            issuer: .init(
+                identifier: try text(issuer, "identifier"),
+                metadataProvenance: .unsigned,
+                display: .init(name: try text(issuer, "name"), locale: "en")
+            ),
             credentials: try array(value, "credentials").map { item in
                 let claims = try array(item, "claims").map { claim -> [String: Any] in
                     ["path": try XCTUnwrap(claim["path"] as? [String]),
@@ -139,10 +160,16 @@ struct WalletVisualFixtures {
                      "display": [["name": try text(claim, "label"), "locale": "en"]]]
                 }
                 let metadata = try JSONSerialization.data(withJSONObject: ["credentialClaims": claims])
-                return .init(configurationID: try text(item, "configurationId"), format: try text(item, "format"),
-                      name: try text(item, "title"), descriptionText: nil, logoURI: nil,
-                      backgroundColor: try text(item, "backgroundColor"), textColor: "#FFFFFF",
-                      metadataJSON: String(data: metadata, encoding: .utf8))
+                return .init(
+                    configurationID: try text(item, "configurationId"),
+                    format: try text(item, "format"),
+                    display: .init(
+                        name: try text(item, "title"),
+                        backgroundColor: try text(item, "backgroundColor"),
+                        textColor: "#FFFFFF"
+                    ),
+                    metadataJSON: String(data: metadata, encoding: .utf8)
+                )
             },
             transactionCode: nil, batchSize: try XCTUnwrap(value["batchSize"] as? Int)
         )
@@ -172,20 +199,32 @@ struct WalletVisualFixtures {
         let all = try array(value, "credentials")
         let candidates = includeAlternatives ? (multiple ? all : Array(all.prefix(2))) : (payment ? all : Array(all.prefix(1)))
         let options: [PresentationCredentialOption] = try candidates.map { item in
-            PresentationCredentialOption(queryID: try text(item, "queryId"), credentialID: try text(item, "credentialId"),
-                format: try text(item, "format"), issuer: try text(item, "issuer"), subject: nil, label: try text(item, "title"),
-                credentialDataJSON: try json(object(item, "data")), disclosures: try array(item, "disclosures").map { claim in
+            try PresentationCredentialOption(
+                queryID: try text(item, "queryId"), credential: .init(id: try text(item, "credentialId"), format: try text(item, "format"), credentialDataJSON: try json(object(item, "data")), issuer: try text(item, "issuer"), subject: nil, label: try text(item, "title"), metadataJSON: try (item["backgroundColor"] as? String).map {
+                    try json(["credentialDisplay": [["name": try text(item, "title"), "background_color": $0]]])
+                }),
+                disclosures: try array(item, "disclosures").map { claim in
                     let value = try XCTUnwrap(claim["value"])
                     let encoded = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])
-                    return PresentationDisclosure(path: try text(claim, "path"), name: try text(claim, "label"),
+                    let disposition: DisclosureDisposition
+                    switch (try XCTUnwrap(claim["selective"] as? Bool), try XCTUnwrap(claim["required"] as? Bool), try XCTUnwrap(claim["selectable"] as? Bool), claim["requested"] as? Bool ?? true) {
+                    case (false, false, false, false): disposition = .additionalCleartext
+                    case (false, true, false, true): disposition = .requiredCleartext
+                    case (false, false, false, true): disposition = .optionalCleartext
+                    case (true, true, false, true): disposition = .requiredSelective
+                    case (true, false, false, true): disposition = .fixedSelective
+                    case (true, false, true, true): disposition = .selectable
+                    default: throw WalletError.invalidInput("Invalid fixture disclosure")
+                    }
+                    return PresentationDisclosure(
+                        path: try text(claim, "path"),
                         valueJSON: try XCTUnwrap(String(data: encoded, encoding: .utf8)),
-                        displayValue: (value as? String) ?? String(data: encoded, encoding: .utf8),
-                        selectivelyDisclosable: try XCTUnwrap(claim["selective"] as? Bool),
-                        required: try XCTUnwrap(claim["required"] as? Bool), selectable: try XCTUnwrap(claim["selectable"] as? Bool),
-                        requested: try XCTUnwrap(claim["requested"] as? Bool))
-                }, metadataJSON: try (item["backgroundColor"] as? String).map {
-                    try json(["credentialDisplay": [["name": try text(item, "title"), "background_color": $0]]])
-                })
+                        disposition: disposition,
+                        name: try text(claim, "label"),
+                        displayValue: (value as? String) ?? String(data: encoded, encoding: .utf8)
+                    )
+                }
+            )
         }
         return SharingReviewModel(request: SharingRequest(
             requester: SharingRequester(fallbackName: origin, verifiedOrigin: origin),
@@ -193,7 +232,7 @@ struct WalletVisualFixtures {
             responseProtection: .encrypted(mechanism: payment ? .dcAPIJWT : .annexCHPKE),
             transactionData: payment ? [ClaimGroup(id: "transaction:0", title: "Payment", items: [], transactionType: "urn:eudi:sca:payment:1")] : []),
             credentialOptions: options,
-            credentialRequirements: Array(Set(options.map(\.queryID))).sorted().map { .init(options: [[$0]]) })
+            credentialRequirements: try Set(options.map(\.queryID)).sorted().map { try .init(options: [[$0]]) })
     }
 
     func payment(localized: Bool = false, recurring: Bool? = nil) throws -> PaymentConsent {

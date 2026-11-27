@@ -63,7 +63,7 @@ class WalletPresentationHandlerEligibleSelectionTest {
             )
         )
 
-        val rematched = WalletPresentationHandler.selectFromStores(
+        val rematched = selectFromStores(
             wallet = wallet,
             query = query,
             useWalletCredentialIds = true,
@@ -94,7 +94,7 @@ class WalletPresentationHandlerEligibleSelectionTest {
                 id = "payment", format = CredentialFormat.DC_SD_JWT,
                 meta = SdJwtVcMeta(vctValues = listOf("https://issuer.example/vct")),
             )))
-            val matches = WalletPresentationHandler.selectFromStores(
+            val matches = selectFromStores(
                 wallet = Wallet(id = "mixed-metadata", credentialStores = listOf(store)),
                 query = query, useWalletCredentialIds = true,
             )
@@ -123,7 +123,7 @@ class WalletPresentationHandlerEligibleSelectionTest {
                     it.addCredential(invalid)
                     it.addCredential(healthy)
                 }
-                val matches = WalletPresentationHandler.selectFromStores(
+                val matches = selectFromStores(
                     Wallet("invalid-chain", credentialStores = listOf(store)),
                     DcqlQuery(listOf(CredentialQuery("parent", CredentialFormat.DC_SD_JWT,
                         meta = SdJwtVcMeta(vctValues = listOf(parent)), multiple = true))),
@@ -151,7 +151,7 @@ class WalletPresentationHandlerEligibleSelectionTest {
                 })))
             }
             assertFailsWith<CancellationException> {
-                WalletPresentationHandler.selectFromStores(
+                selectFromStores(
                     Wallet("cancelled-metadata", credentialStores = listOf(store)),
                     DcqlQuery(listOf(CredentialQuery("parent", CredentialFormat.DC_SD_JWT,
                         meta = SdJwtVcMeta(vctValues = listOf("https://types.example/parent"))))),

@@ -75,8 +75,11 @@ def main():
              "-sdk", sdk, "-I", str(output), "-parse-as-library", "-strict-concurrency=complete"]
     sources = root / "waltid-libraries/protocols/waltid-wallet-sdk-ios/Sources"
     for module, library in (("WalletSDK", swift_sdk), ("WalletSDKKeychainRecovery", swift_adapter)):
+        module_dir = sources / module
+        source_files = sorted(path for path in module_dir.rglob("*.swift")
+                              if not any(part.endswith(".docc") for part in path.relative_to(module_dir).parts))
         subprocess.run(swift + ["-module-name", module, "-emit-module", "-emit-module-path", str(output / (module + ".swiftmodule")),
-            "-emit-library", "-static", "-o", str(library)] + [str(p) for p in sorted((sources / module).glob("*.swift"))], check=True)
+            "-emit-library", "-static", "-o", str(library)] + [str(path) for path in source_files], check=True)
     subprocess.run(swift + ["-emit-object", "-o", str(swift_exchange), str(root / "scripts/recovery-keychain-interop.swift")], check=True)
     env = dict(os.environ, RECOVERY_TEST_ENTITLEMENTS=str(entitlements),
                RECOVERY_TEST_HOST_OBJECT=str(host_object),

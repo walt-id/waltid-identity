@@ -55,15 +55,7 @@ their existing read-only capability.
 The demos add one final confirmation for known or retained revoked, invalid or suspended selections,
 combining it with any explicit unsigned-payment warning. Payment and nearby labels remain authoritative.
 
-If your UI records the presented `advisoryRevision`, use
-``Wallet/submitStatusReviewedPresentation(previewHandle:selectedCredentialOptions:selectedDisclosureOptions:reviewedStatus:did:runPolicies:paymentConsentRevision:)``
-for ordinary reviewed submission. Bind the captured request, credential/disclosure selection, payment
-revision, wallet context and selected status revisions. Dismissal grants no consent; changed inputs,
-lock or disposal invalidate the pending attempt. Confirm with those captured revisions once.
-A changed warning throws
-``WalletError/credentialStatusReviewChanged`` before delivery. Refresh the local review and ask for
-the existing consent again. A timestamp-only update does not invalidate consent. Adverse status is
-advisory; existing payment, reader-trust and protocol acceptance rules still apply.
+For an ordinary remote presentation, show the captured status records from the wallet-issued ``PresentationReview``. Pass it to ``Wallet/submitPresentation(_:)`` after the holder confirms. A changed advisory throws ``WalletError/credentialStatusReviewChanged`` before delivery. Refresh the review and ask the holder again. A timestamp-only update preserves consent. Platform-mediated presentations use the status revisions rendered for that request.
 
 Malformed advisory JSON does not hide an otherwise readable credential. Snapshot/stream decoding
 still fails explicitly. Show unavailable feedback and suppress a retained green assertion until

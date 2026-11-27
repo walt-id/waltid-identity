@@ -24,11 +24,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import id.walt.wallet2.mobile.ProximityError
-import id.walt.wallet2.mobile.ProximityRecovery
-import id.walt.wallet2.mobile.ProximityRemediationAction
-import id.walt.wallet2.mobile.ProximityUnsatisfiedRequest
-import id.walt.wallet2.mobile.ProximityState
+import id.walt.wallet2.mobile.proximity.ProximityError
+import id.walt.wallet2.mobile.proximity.ProximityRecovery
+import id.walt.wallet2.mobile.proximity.ProximityRemediationAction
+import id.walt.wallet2.mobile.proximity.ProximityUnsatisfiedRequest
+import id.walt.wallet2.mobile.proximity.ProximityState
 import id.walt.walletdemo.compose.logic.WalletDemoProximityUiState
 import id.walt.walletdemo.compose.ui.components.ReviewMetadataSection
 import id.walt.walletdemo.compose.ui.components.WalletAction

@@ -2,17 +2,15 @@ package id.walt.walletdemo.compose.ui
 
 import androidx.compose.ui.window.ComposeUIViewController
 import androidx.compose.runtime.DisposableEffect
+import id.walt.wallet2.mobile.credentials.CredentialStatusMaintenanceResult
+import id.walt.wallet2.mobile.credentials.refreshDueStatusesForExistingWallet
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import id.walt.wallet2.mobile.MobileWalletCrossProcessAccess
-import id.walt.wallet2.mobile.CredentialStatusMaintenanceResult
-import id.walt.wallet2.mobile.refreshDueStatusesForExistingWallet
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import id.walt.wallet2.mobile.digitalcredentials.WalletAppGroupAccess
 import id.walt.mdoc.proximity.mobile.NfcHostAvailability
 import id.walt.mdoc.proximity.mobile.NfcHostPreparation
 import id.walt.mdoc.proximity.mobile.NfcHostPlatformAdapter
@@ -28,6 +26,8 @@ import id.walt.walletdemo.compose.logic.createIosDemoReaderTrustSettingsStore
 import id.walt.walletdemo.compose.logic.createIosDemoBiometricAuthenticator
 import id.walt.walletdemo.compose.logic.createIosDemoSigningProtectionStore
 import id.walt.walletdemo.compose.logic.WalletDemoSigningProtectionMode
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import platform.UIKit.UIViewController
 
 private var iosControllerScope: CoroutineScope? = null
@@ -118,7 +118,7 @@ fun walletDemoViewController(
     require(keychainAccessGroup.isNotEmpty()) {
         "This demo ships a document-provider extension and requires a shared Keychain access group"
     }
-    val crossProcessAccess = MobileWalletCrossProcessAccess(
+    val crossProcessAccess = WalletAppGroupAccess(
         appGroupIdentifier = appGroupIdentifier,
         keychainAccessGroup = keychainAccessGroup,
     )
@@ -182,7 +182,7 @@ fun walletDemoViewController(
                 }
             }
         }
-        MobileWalletDemoApp(controller, proximityController, readerTrustSettingsController)
+        WalletDemoHost(controller, proximityController, readerTrustSettingsController)
     }
 }
 
@@ -235,7 +235,7 @@ fun startWalletDemoBackgroundStatus(
     var outcome = ComposeBackgroundStatusOutcome.DEFERRED
     try {
         outcome = when (val result = refreshDueStatusesForExistingWallet(
-            binding, MobileWalletCrossProcessAccess(appGroupIdentifier, keychainAccessGroup),
+            binding, WalletAppGroupAccess(appGroupIdentifier, keychainAccessGroup),
         )) {
             is CredentialStatusMaintenanceResult.Finished -> if (result.hasNewNotice) ComposeBackgroundStatusOutcome.FINISHED_WITH_NOTICE
                 else ComposeBackgroundStatusOutcome.FINISHED

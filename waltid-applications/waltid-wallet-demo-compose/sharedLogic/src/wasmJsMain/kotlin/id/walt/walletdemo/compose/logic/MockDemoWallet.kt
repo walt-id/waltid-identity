@@ -70,8 +70,8 @@ private class MockDemoWallet : DemoWallet {
         ),
     )
 
-    override suspend fun beginAuthorizationIssuance(sessionId: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
-        WalletDemoIssuanceAuthorization("https://issuer.example/authorize")
+    override suspend fun beginAuthorizationIssuance(sessionId: String, redirectUri: String, credentials: List<WalletDemoCredentialSelection>): WalletDemoIssuanceAuthorization =
+        WalletDemoIssuanceAuthorization(sessionId, "https://issuer.example/authorize")
 
     override suspend fun continuePreAuthorizedIssuance(
         sessionId: String,
@@ -126,8 +126,8 @@ private class MockDemoWallet : DemoWallet {
         return WalletDemoIssuanceOutcome.Stored(issued.map { it.id })
     }
 
-    override suspend fun continueAuthorizationIssuance(
-        sessionId: String,
+    override suspend fun completeAuthorization(
+        authorizationId: String,
         callbackUri: String,
     ): WalletDemoIssuanceOutcome = WalletDemoIssuanceOutcome.Failed("Mock issuer does not use authorization code")
 

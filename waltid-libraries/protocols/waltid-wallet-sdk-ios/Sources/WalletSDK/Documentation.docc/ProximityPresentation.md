@@ -65,7 +65,7 @@ ephemeral keys and derived service names, and the winning key stays paired with
 its exact engagement and handover:
 
 ```swift
-let nfcConfiguration = ProximityConfiguration(
+let nfcConfiguration = try ProximityConfiguration(
     session: .nfc(.init(
         handover: .negotiatedHandover,
         retrieval: .init(nfc: .init()),
@@ -226,7 +226,7 @@ requires a trusted reader:
 
 ```swift
 let readerTrust = ProximityConfiguredReaderTrustEvaluator(
-    configuration: ProximityReaderTrustConfiguration(
+    configuration: try ProximityReaderTrustConfiguration(
         trustAnchors: [
             ProximityReaderTrustAnchor(
                 certificateDER: readerCA,

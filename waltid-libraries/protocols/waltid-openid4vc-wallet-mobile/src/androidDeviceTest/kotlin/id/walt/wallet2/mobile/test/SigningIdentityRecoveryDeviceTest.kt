@@ -2,8 +2,8 @@ package id.walt.wallet2.mobile.test
 
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.crypto2.keys.KeyOrigin
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.WalletConfiguration
+import id.walt.wallet2.mobile.WalletFactory
 import id.walt.wallet2.mobile.identity.*
 import id.walt.crypto2.keys.KeyUseAuthorizationPolicy
 import kotlinx.coroutines.test.runTest
@@ -12,15 +12,15 @@ import kotlin.uuid.Uuid
 
 class SigningIdentityRecoveryDeviceTest {
     @Test fun hardwareImportAndSoftwareRecoverySurviveEncryptedDatabaseReopen() = runTest {
-        val factory = MobileWalletFactory(InstrumentationRegistry.getInstrumentation().targetContext)
+        val factory = WalletFactory(InstrumentationRegistry.getInstrumentation().targetContext)
         for (storage in listOf(SigningIdentityKeyStorage.HardwareBacked, SigningIdentityKeyStorage.EncryptedDatabase)) {
             val provider = LocalRecoveryFixture()
-            fun configuration() = MobileWalletConfig(walletId = "wal749-test-${Uuid.random()}",
+            fun configuration() = WalletConfiguration(walletId = "wal749-test-${Uuid.random()}",
                 signingIdentity = SigningIdentityConfiguration(recoveryProviders = listOf(provider),
                     authorization = SigningIdentityAuthorization.Explicit(KeyUseAuthorizationPolicy.None)))
             val originalConfiguration = configuration()
-            val original = factory.create(originalConfiguration)
-            val destination = factory.create(configuration())
+            val original = factory.open(originalConfiguration)
+            val destination = factory.open(configuration())
             var destinationDeleted = false
             try {
                 val options = assertIs<SigningIdentityCreationOptions.Available>(original.signingIdentity.creationOptions(SigningIdentityIntent.Recoverable))
@@ -33,8 +33,12 @@ class SigningIdentityRecoveryDeviceTest {
                 val created = assertIs<SigningIdentityOperationResult.Active>(original.signingIdentity.create(selected)).identity
                 println("Identity destination=$storage security=${created.keyFacts.securityLevel} origin=${created.keyFacts.origin}")
                 if (storage == SigningIdentityKeyStorage.HardwareBacked) assertEquals(KeyOrigin.IMPORTED, created.keyFacts.origin)
-                val reopened = factory.create(originalConfiguration)
-                assertEquals(created, assertIs<SigningIdentityState.Active>(reopened.signingIdentity.state()).identity)
+                val reopened = factory.open(originalConfiguration)
+                try {
+                    assertEquals(created, assertIs<SigningIdentityState.Active>(reopened.signingIdentity.state()).identity)
+                } finally {
+                    reopened.close()
+                }
                 val candidate = destination.signingIdentity.discoverRecovery().candidates.single()
                 val restore = destination.signingIdentity.restorationOptions(candidate).single { it.storage == storage }
                 val restored = assertIs<SigningIdentityOperationResult.Active>(destination.signingIdentity.restore(restore)).identity
@@ -42,12 +46,12 @@ class SigningIdentityRecoveryDeviceTest {
                 assertEquals(created.keyId, restored.keyId)
                 assertEquals(created.did, restored.did)
                 assertEquals(created.publicJwk, restored.publicJwk)
-                destination.deleteWallet()
+                destination.deleteLocalData()
                 destinationDeleted = true
                 assertIs<SigningIdentityState.Active>(original.signingIdentity.state())
             } finally {
-                if (!destinationDeleted) destination.deleteWallet()
-                original.deleteWallet()
+                if (!destinationDeleted) destination.deleteLocalData()
+                original.deleteLocalData()
             }
         }
     }
