@@ -34,6 +34,7 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-credential-key-resolver"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))//for Base64Utils
             implementation(project(":waltid-libraries:crypto:waltid-cose"))
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
 
             // Kotlinx
             implementation(identityLibs.kotlinx.datetime)

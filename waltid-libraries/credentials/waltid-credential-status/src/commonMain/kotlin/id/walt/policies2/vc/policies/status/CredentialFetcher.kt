@@ -63,10 +63,10 @@ class CredentialFetcher(
      * Fetches status list content from the given URL.
      * Returns [StatusListContent.Binary] for CWT content types and [StatusListContent.Text] for others.
      */
-    suspend fun fetch(url: String): Result<StatusListContent> = runCatching {
+    suspend fun fetch(url: String): Result<StatusListContent> = runStatusCheck {
         cached(url)?.let { cached ->
             logger.debug { "Using cached status list" }
-            return@runCatching cached
+            return@runStatusCheck cached
         }
         logger.debug { "Fetching status-list content" }
         val requestStart = now()
@@ -97,7 +97,7 @@ class CredentialFetcher(
             }
         }
         return response.takeIf { it.status.isSuccess() }
-            ?: throw IllegalStateException("URL $url returned unexpected status: ${response.status}")
+            ?: throw StatusListHttpException(response.status.value)
     }
 
     private suspend fun cached(url: String): StatusListContent? = mutex.withLock {
@@ -144,6 +144,9 @@ class CredentialFetcher(
         const val MAX_CACHE_ENTRIES = 256
     }
 }
+
+internal class StatusListHttpException(val status: Int) :
+    IllegalStateException("Status-list endpoint returned unexpected status: $status")
 
 internal object HttpCacheControl {
     fun remainingFreshness(

@@ -36,7 +36,7 @@ object Verifier2SessionCredentialPolicyValidation {
             credentials.flatMapIndexed { credentialIndex, credential ->
                 policies.vc_policies?.policies.orEmpty().map { policy ->
                     async(Dispatchers.Default) {
-                        log.trace { "Validating '$queryId' credential#$credentialIndex with policy '${policy.id}': $credential" }
+                        log.trace { "Validating '$queryId' credential#$credentialIndex with policy '${policy.id}'" }
                         val result = runCatching { policy.verify(credential, context) }
                             .getOrElse { ex ->
                                 log.warn { "Policy '${policy.id}' threw an unexpected exception for '$queryId' credential#$credentialIndex: ${ex.message}" }

@@ -33,6 +33,10 @@
 - Configure allowed/disallowed URLs:
   `"urls": { "whitelist": [ "https://example.org/allowed" ], "blacklist": [ "https://example.org/disallowed" ] }`
 
+With URL rules enabled, the JavaScript client checks each redirect destination that Fetch exposes. Browsers hide manual
+redirect destinations, so a redirected request fails there. Credential status, issuer metadata and JWKS clients also
+use this behavior to prevent HTTPS downgrades. Node can follow allowed redirects when `followRedirects` is enabled.
+
 ### Configurable caching
 
 - Configure maximum cache size: `"maximumCacheSize": 500`

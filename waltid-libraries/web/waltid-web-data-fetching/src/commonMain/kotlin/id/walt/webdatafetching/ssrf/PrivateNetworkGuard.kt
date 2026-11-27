@@ -1,5 +1,8 @@
 package id.walt.webdatafetching.ssrf
 
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.url.UrlConfiguration
+import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import kotlin.concurrent.Volatile
 
@@ -88,3 +91,7 @@ object PrivateNetworkGuardSettings {
  * Other engines are checked before the engine connects.
  */
 expect fun HttpClientConfig<*>.installPrivateNetworkGuard()
+
+internal expect fun HttpClientConfig<*>.installPrivateNetworkGuard(credentialFetch: Boolean, urlPolicy: () -> UrlConfiguration?)
+
+internal expect fun WebDataFetchingConfiguration.credentialHttpClient(configure: HttpClientConfig<*>.() -> Unit): HttpClient

@@ -16,7 +16,9 @@ import id.walt.policies2.vc.policies.status.expansion.*
 import id.walt.policies2.vc.policies.status.model.*
 import id.walt.policies2.vc.policies.status.reader.StatusValueReader
 import id.walt.policies2.vc.policies.status.validator.StatusValidator
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.mockk.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -154,25 +156,24 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
         fun shouldHandleFetcherErrors(scenario: TestScenario) = runTest {
             val entry = createEntry(scenario, size = 1)
             val attribute = createAttribute(scenario, 5u)
-            val error = RuntimeException("Network error")
+            val error = HttpRequestTimeoutException("$uri?token=synthetic-test-value", 100)
 
             coEvery { mockFetcher.fetch(uri) } returns Result.failure(error)
 
             val exception = assertThrows<StatusRetrievalError> { sut.validate(entry, attribute).getOrThrow() }
-            assertTrue(exception.message.contains("Network error"))
+            assertEquals("Status-list request timed out", exception.message)
         }
 
         @ParameterizedTest
         @MethodSource("getTestScenarios")
-        @DisplayName("Should handle empty error messages gracefully")
-        fun shouldHandleEmptyMessages(scenario: TestScenario) = runTest {
+        @DisplayName("Should propagate fetch cancellation")
+        fun shouldPropagateCancellation(scenario: TestScenario) = runTest {
             val entry = createEntry(scenario, size = 1)
             val attribute = createAttribute(scenario, 5u)
 
-            coEvery { mockFetcher.fetch(uri) } returns Result.failure(RuntimeException())
+            coEvery { mockFetcher.fetch(uri) } returns Result.failure(CancellationException("cancelled"))
 
-            val exception = assertThrows<StatusRetrievalError> { sut.validate(entry, attribute).getOrThrow() }
-            assertEquals("Status credential download error", exception.message)
+            assertThrows<CancellationException> { sut.validate(entry, attribute) }
         }
     }
 

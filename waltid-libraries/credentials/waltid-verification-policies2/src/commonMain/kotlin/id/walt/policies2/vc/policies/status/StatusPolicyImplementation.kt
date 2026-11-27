@@ -20,21 +20,17 @@ import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifie
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
 import id.walt.policies2.vc.policies.status.validator.IETFStatusValidator
 import id.walt.policies2.vc.policies.status.validator.W3CStatusValidator
-import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.serializer
 
 object StatusPolicyImplementation {
-    private val httpClient = HttpClient {
-        install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
-        }
-    }
+    // Status list URLs come from the credential being verified, so they are attacker-controlled.
+    // WebDataFetcher installs the private-network guard, a response size cap, and timeouts.
+    private val httpClient = WebDataFetcher(WebDataFetcherId.STATUS_POLICY2).httpClient
 
     private val credentialFetcher = CredentialFetcher(httpClient)
 

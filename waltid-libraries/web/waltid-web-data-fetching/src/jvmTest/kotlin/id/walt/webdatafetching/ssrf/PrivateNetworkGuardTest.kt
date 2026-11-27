@@ -226,7 +226,7 @@ class PrivateNetworkGuardTest {
                 "8.8.8.8" -> respond(
                     content = "",
                     status = HttpStatusCode.Found,
-                    headers = headersOf(HttpHeaders.Location, "http://8.8.4.4/final"),
+                    headers = headersOf(HttpHeaders.Location, "https://8.8.4.4/final"),
                 )
                 "8.8.4.4" -> respondOk("final destination")
                 else -> error("unexpected host: ${request.url.host}")
@@ -234,8 +234,19 @@ class PrivateNetworkGuardTest {
         }
         val client = guardedClient(engine)
 
-        val response = client.get("http://8.8.8.8/redirect-me")
+        val response = client.get("https://8.8.8.8/redirect-me")
         assertTrue(response.status.isSuccess())
+    }
+
+    @Test
+    fun `a secure redirect cannot continue over plaintext`() = runTest {
+        val engine = MockEngine {
+            respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, "http://example.invalid/list"))
+        }
+        guardedClient(engine).use { client ->
+            assertFailsWith<UnsupportedRedirectException> { client.get("https://8.8.8.8/list") }
+            assertEquals(1, engine.requestHistory.size)
+        }
     }
 
     @Test

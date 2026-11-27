@@ -19,9 +19,9 @@ class CredentialFetcher(
     private val logger = KotlinLogging.logger { }
 
     suspend fun fetch(url: String): Result<String> = runCatching {
-        logger.debug { "Fetching content from URL: $url" }
+        logger.debug { "Fetching status-list content" }
         decodeStatusListBody(download(url))
-    }.onFailure { logger.error { "Failed to fetch content from URL: $url" } }
+    }.onFailure { logger.error { "Failed to fetch status-list content" } }
 
     private suspend fun download(url: String): HttpResponse {
         val response = client.get(url) {
@@ -30,7 +30,7 @@ class CredentialFetcher(
             }
         }
         return response.takeIf { it.status.isSuccess() }
-            ?: throw IllegalStateException("URL $url returned unexpected status: ${response.status}")
+            ?: throw IllegalStateException("Status-list endpoint returned unexpected status: ${response.status.value}")
     }
 
     companion object {

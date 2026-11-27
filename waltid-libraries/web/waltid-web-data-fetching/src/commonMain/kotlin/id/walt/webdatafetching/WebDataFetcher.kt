@@ -1,9 +1,9 @@
 package id.walt.webdatafetching
 
 import id.walt.webdatafetching.config.RequestConfiguration
+import id.walt.webdatafetching.ssrf.credentialHttpClient
 import id.walt.webdatafetching.ssrf.installPrivateNetworkGuard
 import id.walt.webdatafetching.utils.UrlUtils
-import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -12,10 +12,11 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.CancellationException
 
 class WebDataFetcher private constructor(
-    id: String,
-    defaultConfiguration: WebDataFetchingConfiguration?,
+    private val id: String,
+    private val defaultConfiguration: WebDataFetchingConfiguration?,
     clientOverride: HttpClient?,
 ) : AutoCloseable {
 
@@ -30,23 +31,48 @@ class WebDataFetcher private constructor(
         defaultConfiguration = defaultConfiguration
     )
 
-    private val log = KotlinLogging.logger("WebDataFetcher[$id]")
     val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id, defaultConfiguration)
 
-    val httpClient = clientOverride ?: dataFetcherConfiguration.http.engineCreator().getHttpClient {
-        dataFetcherConfiguration.applyConfigurationToHttpClient(this)
+    val httpClient = clientOverride ?: buildHttpClient()
 
-        // Every caller-supplied URL this client fetches is a potential SSRF target (issuer metadata,
-        // request_uri, token/credential endpoints, ...). Guard unconditionally, not just when a `url`
-        // allowlist happens to be configured for this fetcher id.
-        installPrivateNetworkGuard()
-
-        install(ContentNegotiation) {
-            json()
+    private fun buildHttpClient(): HttpClient {
+        val credentialFetch = id in credentialFetcherIds
+        val configure: HttpClientConfig<*>.() -> Unit = {
+            // Ktor wire logging includes the entire URL and redirect Location, even at HEADERS.
+            val configuration = if (credentialFetch) {
+                dataFetcherConfiguration.copy(logging = dataFetcherConfiguration.logging.copy(enable = false))
+            } else {
+                dataFetcherConfiguration
+            }
+            configuration.applyConfigurationToHttpClient(this)
+            installPrivateNetworkGuard(credentialFetch, ::currentUrlPolicy)
+            install(ContentNegotiation) { json() }
+        }
+        return if (credentialFetch) {
+            dataFetcherConfiguration.credentialHttpClient(configure)
+        } else {
+            dataFetcherConfiguration.http.engineCreator().getHttpClient(configure)
         }
     }
 
+    @PublishedApi
+    internal val urlPolicyRevision: String get() = WebDataFetcherManager.urlPolicyRevision(id)
+
+    private fun currentUrlPolicy() = WebDataFetcherManager.getConfigurationForId(id, defaultConfiguration).url
+
+    @PublishedApi
+    internal fun requireUrlAllowed(url: Url) {
+        currentUrlPolicy()?.requireUrlAllowed(url)
+    }
+
     companion object {
+        private val credentialFetcherIds = setOf(
+            WebDataFetcherId.STATUS_POLICY.name,
+            WebDataFetcherId.STATUS_POLICY2.name,
+            WebDataFetcherId.JWKS_KEY_PROVIDER.name,
+            WebDataFetcherId.WELL_KNOWN_KEY_RESOLVER.name,
+        )
+
         /**
          * Build a [WebDataFetcher] backed by a caller-provided [HttpClient] instead of one created
          * from the configured engine. Use this only when you need engine-specific configuration the
@@ -78,9 +104,13 @@ class WebDataFetcher private constructor(
         customRequestConfig: RequestConfiguration? = null,
         customRequest: HttpRequestBuilder.() -> Unit = {}
     ): WebDataFetchingResult<Res> {
-        val cacheId = if (useCache) "${customRequestConfig?.getCacheId()}#${url}#${Res::class.simpleName}" else ""
+        // Redirect destinations can have separate URL rules. Only reuse a response obtained
+        // under the same URL policy revision, even when the original URL is still allowed.
+        val cacheId = if (useCache && cache != null) {
+            "$urlPolicyRevision#${customRequestConfig?.getCacheId()}#$url#${Res::class.simpleName}"
+        } else ""
 
-        dataFetcherConfiguration.url?.requireUrlAllowed(url.toString())
+        requireUrlAllowed(url)
 
         val cachedValue = if (useCache) cache?.get(cacheId) else null
 
@@ -100,6 +130,7 @@ class WebDataFetcher private constructor(
         }
 
         val httpResponse = httpResponseResult.getOrElse { ex ->
+            if (ex is CancellationException) throw ex
             throw DataFetchingException("Could not send request to: $url (${ex.message ?: "unknown error"})", ex)
         }
 
@@ -119,6 +150,7 @@ class WebDataFetcher private constructor(
                 runCatching {
                     dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
                 }.getOrElse { ex ->
+                    if (ex is CancellationException) throw ex
                     throw DataFetchingException(
                         // The body is not included: the URL is often caller-supplied, and this message can reach
                         // client-facing errors and logs.
@@ -130,7 +162,10 @@ class WebDataFetcher private constructor(
         } else {
             runCatching {
                 httpResponse.body<Res>()
-            }.getOrElse { ex -> throw DataFetchingException("Failed to deserialize response from: $url", ex) }
+            }.getOrElse { ex ->
+                if (ex is CancellationException) throw ex
+                throw DataFetchingException("Failed to deserialize response from: $url", ex)
+            }
         }
 
         val result = WebDataFetchingResult(
@@ -153,7 +188,7 @@ class WebDataFetcher private constructor(
      * - Response deserialization
      */
     suspend inline fun rawFetch(url: Url, customRequest: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
-        dataFetcherConfiguration.url?.requireUrlAllowed(url.toString())
+        requireUrlAllowed(url)
         val requestConfig = dataFetcherConfiguration.request
 
         val httpResponse = httpClient.request(url) {
@@ -197,7 +232,7 @@ class WebDataFetcher private constructor(
         send<Req, Res>(UrlUtils.parseUrl(urlString), req, customRequestConfig)
 
     suspend fun sendForm(url: String, parameters: Parameters, customRequest: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
-        dataFetcherConfiguration.url?.requireUrlAllowed(url)
+        requireUrlAllowed(UrlUtils.parseUrl(url))
         val requestConfig = dataFetcherConfiguration.request
 
         val httpResponse = httpClient.submitForm(url, parameters, false) {

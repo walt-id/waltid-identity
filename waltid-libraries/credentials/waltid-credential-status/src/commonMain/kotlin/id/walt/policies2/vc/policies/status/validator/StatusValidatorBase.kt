@@ -7,6 +7,7 @@ import id.walt.credentials.status.authenticateStatusList
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.policies.status.CredentialFetcher
 import id.walt.policies2.vc.policies.status.StatusListContent
+import id.walt.policies2.vc.policies.status.StatusListHttpException
 import id.walt.policies2.vc.policies.status.runStatusCheck
 import id.walt.policies2.vc.policies.status.model.StatusContent
 import id.walt.policies2.vc.policies.status.model.StatusPolicyAttribute
@@ -16,7 +17,12 @@ import id.walt.policies2.vc.policies.status.model.IETFEntry
 import id.walt.policies2.vc.policies.status.reader.StatusValueReader
 import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifier
 import id.walt.policies2.vc.policies.status.signature.StatusListSignerAuthorizer
+import id.walt.webdatafetching.ssrf.BlockedAddressException
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.network.sockets.SocketTimeoutException
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import kotlinx.coroutines.CancellationException
 import kotlin.time.Clock
 import id.walt.credentials.status.StatusProtocol
 import id.walt.policies2.vc.policies.status.model.StatusEntry
@@ -59,7 +65,16 @@ abstract class StatusValidatorBase<K : StatusContent, M : StatusEntry, T : Statu
         evaluatedAt: Instant = Instant.fromEpochSeconds(nowEpochSeconds),
     ): Result<EvaluatedCredentialStatus> = runStatusCheck {
         val statusListContent = suppliedContent ?: fetcher.fetch(entry.uri)
-            .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
+            .getOrElse { cause ->
+                val message = when (cause) {
+                    is CancellationException -> throw cause
+                    is HttpRequestTimeoutException, is ConnectTimeoutException, is SocketTimeoutException -> "Status-list request timed out"
+                    is BlockedAddressException -> "Status-list destination is blocked"
+                    is StatusListHttpException -> "Status-list endpoint returned unexpected status: ${cause.status}"
+                    else -> "Status credential download error"
+                }
+                throw StatusRetrievalError(message)
+            }
 
         val verified = signatureVerifier?.let { verifier ->
             requireNotNull(referencedCredential) { "Referenced credential is required for status-list signer authorization" }

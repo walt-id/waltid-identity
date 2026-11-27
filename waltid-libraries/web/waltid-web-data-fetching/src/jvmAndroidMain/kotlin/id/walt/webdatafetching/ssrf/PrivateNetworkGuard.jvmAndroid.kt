@@ -1,6 +1,10 @@
 package id.walt.webdatafetching.ssrf
 
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.url.UrlConfiguration
+import id.walt.webdatafetching.engines.OkHttpEngine
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.okhttp.OkHttpConfig
 import io.ktor.client.plugins.api.Send
@@ -12,11 +16,13 @@ import io.ktor.client.utils.EmptyContent
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Dns
 import java.net.InetAddress
+import java.net.Proxy
 import java.net.UnknownHostException
 
 private val log = KotlinLogging.logger("PrivateNetworkGuard")
@@ -81,7 +87,7 @@ private suspend fun requireAllowedTarget(url: Url) {
     val trustedHost = PrivateNetworkGuardSettings.isTrustedHost(host)
     val blocked = addresses.firstOrNull { isBlockedAddress(it, trustedHost) }
     if (blocked != null) {
-        log.warn { "Refusing to fetch $url: '$host' resolves to ${blocked.hostAddress}, which is a blocked address" }
+        log.warn { "Refusing to fetch from '$host': destination address is blocked" }
         throw BlockedAddressException("Refusing to fetch '$host': resolves to a blocked (private/loopback/link-local) address")
     }
 }
@@ -95,13 +101,13 @@ internal class UnsupportedRedirectException(message: String) : Exception(message
 
 private val ABSOLUTE_URL_SCHEME = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://")
 
-private fun resolveRedirectTarget(base: Url, location: String): Url {
+private fun resolveRedirectTarget(location: String): Url {
     // Url(String) defaults a missing host to "localhost" rather than leaving it blank, so a relative Location
     // like "/relative-path" would otherwise be misparsed as pointing at localhost. Require an explicit scheme.
     if (ABSOLUTE_URL_SCHEME.containsMatchIn(location)) {
         runCatching { Url(location) }.getOrNull()?.let { return it }
     }
-    throw UnsupportedRedirectException("Refusing to follow relative redirect Location '$location' from $base")
+    throw UnsupportedRedirectException("Refusing to follow a redirect without a supported absolute Location")
 }
 
 /**
@@ -119,7 +125,17 @@ internal object ConnectTimeDns : Dns {
     }
 }
 
-actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
+internal actual fun WebDataFetchingConfiguration.credentialHttpClient(configure: HttpClientConfig<*>.() -> Unit): HttpClient {
+    require(engine?.proxy == null) { "Status-list and JWKS fetches require a direct connection for destination validation" }
+    return OkHttpEngine.getHttpClient {
+        configure()
+        engine { proxy = Proxy.NO_PROXY }
+    }
+}
+
+actual fun HttpClientConfig<*>.installPrivateNetworkGuard() = installPrivateNetworkGuard(false) { null }
+
+internal actual fun HttpClientConfig<*>.installPrivateNetworkGuard(credentialFetch: Boolean, urlPolicy: () -> UrlConfiguration?) {
     // OkHttp connects to the addresses its Dns returns. The engine type is not visible on HttpClientConfig<*>,
     // so this is a no-op for every other engine, which keeps the pre-connect check below.
     val clientFollowsRedirects = this
@@ -128,7 +144,9 @@ actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
     }
     install(createClientPlugin("PrivateNetworkGuard") {
         on(Send) { request ->
-            requireAllowedTarget(request.url.build())
+            val initialUrl = request.url.build()
+            urlPolicy()?.requireUrlAllowed(initialUrl)
+            requireAllowedTarget(initialUrl)
             var call = proceed(request)
             val method = request.method
             if (!clientFollowsRedirects.followRedirects || (method != HttpMethod.Get && method != HttpMethod.Head)) {
@@ -141,12 +159,17 @@ actual fun HttpClientConfig<*>.installPrivateNetworkGuard() {
                 check(hops < MAX_REDIRECTS) { "Refusing to follow more than $MAX_REDIRECTS redirects" }
                 hops++
 
-                val target = resolveRedirectTarget(currentRequest.url.build(), location)
+                val target = resolveRedirectTarget(location)
+                val previous = currentRequest.url.build()
+                if (previous.protocol == URLProtocol.HTTPS && target.protocol == URLProtocol.HTTP) {
+                    throw UnsupportedRedirectException("Refusing to follow an HTTPS redirect to HTTP")
+                }
+                urlPolicy()?.requireUrlAllowed(target)
                 requireAllowedTarget(target)
 
                 val nextRequest = HttpRequestBuilder().takeFrom(currentRequest).apply {
                     url(target)
-                    if (!sameAuthority(currentRequest.url.build(), target)) {
+                    if (!sameAuthority(previous, target)) {
                         headers.remove(HttpHeaders.Authorization)
                     }
                     if (call.response.status in DOWNGRADE_TO_GET_STATUSES) {

@@ -5,10 +5,12 @@ import id.walt.crypto2.keys.EncodedKey
 import id.walt.crypto2.serialization.BinaryData
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
-import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.plugins.expectSuccess
 import io.ktor.http.URLBuilder
+import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import io.ktor.http.encodedPath
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -18,8 +20,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 object WellKnownKeyResolver : BaseKeyResolver {
-    private val log = KotlinLogging.logger { }
-
     private val web = WebDataFetcher(WebDataFetcherId.WELL_KNOWN_KEY_RESOLVER)
 
     @Deprecated(
@@ -32,52 +32,66 @@ object WellKnownKeyResolver : BaseKeyResolver {
     }
 
     suspend fun resolveJwkFromWellKnown(issuerId: String, header: JsonObject?): EncodedKey.Jwk {
-        log.debug { "Resolving issuer key via JWT VC Issuer Metadata for: $issuerId" }
-        try {
-            // Construct the well-known URL
-            val issuerUrl = Url(issuerId)
-            val wellKnownUrl = URLBuilder(issuerUrl).apply {
-                encodedPath = "/.well-known/jwt-vc-issuer" + encodedPath.removeSuffix("/")
-            }.buildString()
+        // Construct the well-known URL
+        val issuerUrl = Url(issuerId)
+        val wellKnownUrl = URLBuilder(issuerUrl).apply {
+            encodedPath = "/.well-known/jwt-vc-issuer" + encodedPath.removeSuffix("/")
+        }.build()
 
-            log.debug { "Fetching metadata from: $wellKnownUrl" }
-            val metadata = web.fetch<JsonObject>(wellKnownUrl).body
+        val metadata = fetchDocument(wellKnownUrl)
 
-            // Find the JWKS (either inline or via URI)
-            val jwks = when {
-                "jwks_uri" in metadata -> {
-                    val jwksUri = metadata["jwks_uri"]?.jsonPrimitive?.contentOrNull
-                        ?: throw IllegalArgumentException("Metadata 'jwks_uri' is not a valid string.")
-                    log.debug { "Fetching JWKS from: $jwksUri" }
-                    web.fetch<JsonObject>(jwksUri).body
-                }
+        // Find the JWKS (either inline or via URI)
+        val jwks = when {
+            "jwks_uri" in metadata -> {
+                val jwksUri = metadata["jwks_uri"]?.jsonPrimitive?.contentOrNull
+                    ?: throw IllegalArgumentException("Metadata 'jwks_uri' is not a valid string.")
 
-                "jwks" in metadata -> metadata["jwks"]?.jsonObject
-                    ?: throw IllegalArgumentException("Metadata 'jwks' is not a valid JSON object.")
-
-                else -> throw IllegalArgumentException("Issuer metadata must contain 'jwks' or 'jwks_uri'.")
+                fetchDocument(keySetRetrievalUrl(issuerUrl, jwksUri))
             }
 
-            // Find the specific key using the 'kid' from the JWS header if present,
-            // otherwise fall back to the first key in the JWKS.
-            val keys = jwks["keys"]?.jsonArray
-                ?: throw IllegalArgumentException("JWKS for issuer $issuerId contains no keys.")
-            val kid = header?.get("kid")?.jsonPrimitive?.contentOrNull
-            val keyJwk = if (kid != null) {
-                keys.singleOrNull { it.jsonObject["kid"]?.jsonPrimitive?.contentOrNull == kid }
-                    ?: throw IllegalArgumentException("Key with kid '$kid' not found in JWKS for issuer $issuerId.")
-            } else {
-                require(keys.size == 1) { "JWT VC issuer metadata with multiple keys must be resolved with kid: $issuerId" }
-                keys.single()
-            }
+            "jwks" in metadata -> metadata["jwks"]?.jsonObject
+                ?: throw IllegalArgumentException("Metadata 'jwks' is not a valid JSON object.")
 
-            return EncodedKey.Jwk(
-                data = BinaryData(Json.encodeToString(keyJwk.jsonObject).encodeToByteArray()),
-                privateMaterial = false,
-            )
-        } catch (e: Exception) {
-            log.error(e) { "Failed to retrieve key via JWT VC Issuer Metadata for $issuerId." }
-            throw e // Re-throw to indicate failure to the caller
+            else -> throw IllegalArgumentException("Issuer metadata must contain 'jwks' or 'jwks_uri'.")
         }
+
+        // Find the specific key using the 'kid' from the JWS header if present,
+        // an unqualified key set must contain exactly one key.
+        val keys = jwks["keys"]?.jsonArray
+            ?: throw IllegalArgumentException("JWKS contains no keys.")
+        val kid = header?.get("kid")?.jsonPrimitive?.contentOrNull
+        val keyJwk = if (kid != null) {
+            keys.singleOrNull { it.jsonObject["kid"]?.jsonPrimitive?.contentOrNull == kid }
+                ?: throw IllegalArgumentException("Key with kid '$kid' not found in JWKS.")
+        } else {
+            require(keys.size == 1) { "JWT VC issuer metadata with multiple keys must be resolved with kid" }
+            keys.single()
+        }
+
+        return EncodedKey.Jwk(
+            data = BinaryData(Json.encodeToString(keyJwk.jsonObject).encodeToByteArray()),
+            privateMaterial = false,
+        )
     }
+
+    private suspend fun fetchDocument(url: Url): JsonObject = try {
+        web.fetch<JsonObject>(url) { expectSuccess = true }.body
+    } catch (cause: CancellationException) {
+        throw cause
+    } catch (_: Exception) {
+        // Transport and decoding errors can include the full retrieval URL or response body.
+        throw IllegalArgumentException("Could not retrieve issuer key document")
+    }
+}
+
+internal fun keySetRetrievalUrl(issuer: Url, location: String): Url {
+    val keySet = try {
+        Url(location)
+    } catch (_: IllegalArgumentException) {
+        throw IllegalArgumentException("Issuer metadata contains an invalid key-set URL")
+    }
+    require(issuer.protocol != URLProtocol.HTTPS || keySet.protocol == URLProtocol.HTTPS) {
+        "An HTTPS issuer must reference an HTTPS key set"
+    }
+    return keySet
 }
