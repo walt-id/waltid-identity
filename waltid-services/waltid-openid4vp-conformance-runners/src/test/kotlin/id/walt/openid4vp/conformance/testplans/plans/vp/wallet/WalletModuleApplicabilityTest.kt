@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.wallet
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.testplans.httpdata.AvailableTestModule
 import id.walt.openid4vp.conformance.testplans.httpdata.AvailableTestModule.VariantAxis
 import kotlinx.serialization.json.JsonObject
@@ -18,6 +19,15 @@ import kotlin.test.assertTrue
  * that cannot pass. See [WalletModuleApplicability] for the upstream cause.
  */
 class WalletModuleApplicabilityTest {
+
+    @Test
+    fun fullPlanDoesNotInheritOldSuiteBugExclusions() {
+        assertNull(WalletModuleApplicability.inapplicableReason(
+            "oid4vp-1final-wallet-alternate-happy-flow", null, emptyMap(), ConformanceExecutionMode.FULL_PLAN))
+        assertNotNull(WalletModuleApplicability.inapplicableReason(
+            "oid4vp-1final-wallet-alternate-happy-flow", null, emptyMap(), ConformanceExecutionMode.CI))
+    }
+
 
     private fun axis(
         values: List<String>,

@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.Oid4vpVerifierVariantPlan
@@ -57,7 +58,9 @@ class VerifierConformanceTestRunner(
     private val testPlans: List<Oid4vpVerifierVariantPlan> by lazy {
         // Use ngrok URL as the verifier prefix - endpoint is /verification-session
         val verifier2UrlPrefix = "$verifierNgrokUrl/verification-session"
-        VerifierVariantMatrix.all().map {
+        VerifierVariantMatrix.all().filter {
+            ConformanceExecutionMode.current == ConformanceExecutionMode.CI || it.isHaip
+        }.map {
             Oid4vpVerifierVariantPlan(it, verifier2UrlPrefix, conformanceHost, conformancePort)
         }
     }

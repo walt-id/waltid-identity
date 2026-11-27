@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.wallet
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
 import id.walt.openid4vp.conformance.testplans.httpdata.AvailableTestModule
 
 /**
@@ -103,8 +104,12 @@ object WalletModuleApplicability {
         testModule: String,
         moduleMetadata: AvailableTestModule?,
         variantSelection: Map<String, String>,
-    ): String? = suiteLimitationReason(testModule, variantSelection)
-        ?: metadataReason(moduleMetadata, variantSelection)
+        mode: ConformanceExecutionMode = ConformanceExecutionMode.current,
+    ): String? = if (mode == ConformanceExecutionMode.FULL_PLAN) {
+        metadataReason(moduleMetadata, variantSelection)
+    } else {
+        suiteLimitationReason(testModule, variantSelection) ?: metadataReason(moduleMetadata, variantSelection)
+    }
 
     /** See [ERROR_PAGE_GATED_MODULES], [ALTERNATE_HAPPY_FLOW], and [REQUEST_URI_METHOD_POST]. */
     private fun suiteLimitationReason(

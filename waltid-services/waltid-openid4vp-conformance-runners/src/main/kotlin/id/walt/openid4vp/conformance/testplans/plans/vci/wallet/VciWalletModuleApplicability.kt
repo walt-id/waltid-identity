@@ -1,39 +1,31 @@
 package id.walt.openid4vp.conformance.testplans.plans.vci.wallet
 
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-
-/**
- * Harness-side skips for OpenID4VCI wallet modules the suite publishes but this wallet cannot run.
- *
- * Kept next to [id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletModuleApplicability]
- * rather than inlined in the runner so the reasons stay testable and the skip table stays honest.
- */
+/** Preserve the shared CI profile while full-plan and explicit driver checks exercise FAPI. */
 object VciWalletModuleApplicability {
+    fun skipReason(
+        module: String,
+        fullPlan: Boolean,
+        explicitlySelected: Boolean = false,
+        deferred: Boolean = false,
+    ): String? = when {
+        fullPlan || explicitlySelected -> null
+        module.startsWith("fapi2-security-profile-final-client-test-") ->
+            "FAPI client modules are outside the default CI profile; run full-plan mode or the explicit SDK driver check"
+        deferred -> "Deferred issuance is outside the default CI profile; run full-plan mode or explicitly select it"
+        else -> null
+    }
 
-    /**
-     * Module-name prefix of the FAPI 2.0 client tests the HAIP plan bundles.
-     *
-     * Those modules exercise the wallet as an OAuth client rather than as a credential recipient:
-     * the suite is only an authorization server, publishes no credential offer, and waits for the
-     * client to start an authorization request by itself. Driving them needs wallet-initiated
-     * issuance, which this harness has no entry point for.
-     */
-    const val FAPI2_CLIENT_MODULE_PREFIX = "fapi2-security-profile-final-client-test-"
+    private val rejectingModules = setOf(
+        "fapi2-security-profile-final-client-test-discovery-issuer-mismatch",
+        "fapi2-security-profile-final-client-test-invalid-authorization-response-iss",
+        "fapi2-security-profile-final-client-test-remove-authorization-response-iss",
+        "fapi2-security-profile-final-client-test-ensure-authorization-response-with-invalid-state-fails",
+        "fapi2-security-profile-final-client-test-ensure-authorization-response-with-invalid-missing-state-fails",
+    )
 
-    const val FAPI2_SKIP_REASON =
-        "FAPI 2.0 client test: needs wallet-initiated issuance, which the harness cannot yet trigger"
-
-    const val DEFERRED_SKIP_REASON = "Deferred credential issuance is not supported"
-
-    /**
-     * Why [testModule] should not be run for [variant], or `null` if it should.
-     */
-    fun skipReason(testModule: String, variant: JsonObject): String? {
-        if (testModule.startsWith(FAPI2_CLIENT_MODULE_PREFIX)) return FAPI2_SKIP_REASON
-        val issuanceMode = (variant["vci_credential_issuance_mode"] as? JsonPrimitive)?.contentOrNull
-        if (issuanceMode == "deferred") return DEFERRED_SKIP_REASON
-        return null
+    /** Suite acceptance alone does not establish successful storage or the expected SDK rejection. */
+    fun walletOutcomeFailure(module: String, observed: String): String? {
+        val expected = if (module in rejectingModules) "REJECTED" else "STORED"
+        return if (observed == expected) null else "Expected wallet outcome $expected, observed $observed"
     }
 }

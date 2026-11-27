@@ -28,7 +28,9 @@ class VpWalletConformanceAdapter(
     private val walletApiUrl: String,
     private val adapterPort: Int,
     private val walletId: String,
+    issuerCrl: ByteArray? = null,
 ) {
+    private val issuerCrl = issuerCrl?.copyOf()
     private var server: EmbeddedServer<*, *>? = null
 
     val authorizationEndpoint: String get() = "http://127.0.0.1:$adapterPort$AUTHORIZE_PATH"
@@ -37,6 +39,9 @@ class VpWalletConformanceAdapter(
         println("[Adapter] Starting on port $adapterPort -> wallet $walletApiUrl (wallet $walletId)")
         server = embeddedServer(CIO, port = adapterPort) {
             routing {
+                issuerCrl?.let { crl ->
+                    get(ISSUER_CRL_PATH) { call.respondBytes(crl, ContentType.parse("application/pkix-crl")) }
+                }
                 get(AUTHORIZE_PATH) { present(call, httpClient) }
                 post(AUTHORIZE_PATH) { present(call, httpClient) }
             }
@@ -87,6 +92,7 @@ class VpWalletConformanceAdapter(
     }
 
     companion object {
+        const val ISSUER_CRL_PATH = "/conformance/issuer.crl"
         private const val AUTHORIZE_PATH = "/openid4vp/authorize"
 
         /** Canonical form a wallet receives an authorization request in. */

@@ -1,5 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.verifier
 
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
+
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.openid4vp.clientidprefix.prefixes.X509Hash
@@ -27,6 +29,7 @@ class Oid4vpVerifierVariantPlan(
     verifier2UrlPrefix: String,
     conformanceHost: String,
     conformancePort: Int,
+    executionMode: ConformanceExecutionMode = ConformanceExecutionMode.current,
 ) : TestPlan {
 
     val name: String get() = variant.id
@@ -106,7 +109,7 @@ class Oid4vpVerifierVariantPlan(
             """.trimIndent()
         ),
 
-        moduleOutcomes = moduleOutcomes(variant),
+        moduleOutcomes = moduleOutcomes(variant, executionMode),
 
         // url_query means the request travels complete in the URL rather than behind a request_uri.
         presentUsingFullRequestUrl = !variant.signedRequest,
@@ -114,7 +117,8 @@ class Oid4vpVerifierVariantPlan(
         verificationSessionSetup = CrossDeviceFlowSetup(
             core = GeneralFlowConfig(
                 dcqlQuery = Json.decodeFromString(dcqlQuery),
-                policies = ConformanceVerifierPolicies.withoutMdocIssuerAuth(),
+                policies = if (executionMode == ConformanceExecutionMode.FULL_PLAN) ConformanceVerifierPolicies.fullPlan()
+                else ConformanceVerifierPolicies.withoutMdocIssuerAuth(),
 
                 signedRequest = variant.signedRequest,
                 encryptedResponse = variant.encryptedResponse,
@@ -187,7 +191,7 @@ class Oid4vpVerifierVariantPlan(
          * output instead of silently defaulting to a pass. Modules the suite does not include for a
          * given variant are simply never looked up.
          */
-        private fun moduleOutcomes(variant: VerifierVariant): Map<String, ExpectedVerifierOutcome> = buildMap {
+        private fun moduleOutcomes(variant: VerifierVariant, mode: ConformanceExecutionMode): Map<String, ExpectedVerifierOutcome> = buildMap {
             // Positive modules: a valid presentation must be accepted.
             put("oid4vp-1final-verifier-happy-flow", ExpectedVerifierOutcome.ACCEPT)
             put("oid4vp-1final-verifier-minimal-cnf-jwk", ExpectedVerifierOutcome.ACCEPT)
@@ -196,9 +200,18 @@ class Oid4vpVerifierVariantPlan(
             put("oid4vp-1final-verifier-request-uri-method-post", ExpectedVerifierOutcome.ACCEPT_OR_SKIP)
 
             // Negative modules: the verifier must reject the presentation.
+            if (mode == ConformanceExecutionMode.FULL_PLAN) {
+                put("oid4vp-1final-verifier-present-revoked-credential", ExpectedVerifierOutcome.REJECT)
+            }
             if (variant.isMdoc) {
+                if (mode == ConformanceExecutionMode.FULL_PLAN) {
+                    put("oid4vp-1final-verifier-present-credential-on-identifier-list", ExpectedVerifierOutcome.REJECT)
+                }
                 put("oid4vp-1final-verifier-invalid-session-transcript", ExpectedVerifierOutcome.REJECT)
             } else {
+                if (mode == ConformanceExecutionMode.FULL_PLAN) {
+                    put("oid4vp-1final-verifier-wrong-vct", ExpectedVerifierOutcome.REJECT)
+                }
                 put("oid4vp-1final-verifier-invalid-kb-jwt-signature", ExpectedVerifierOutcome.REJECT)
                 put("oid4vp-1final-verifier-invalid-credential-signature", ExpectedVerifierOutcome.REJECT)
                 put("oid4vp-1final-verifier-invalid-sd-hash", ExpectedVerifierOutcome.REJECT)

@@ -1,9 +1,12 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import id.walt.openid4vp.conformance.testplans.http.ConformanceEvidenceRequired
+import id.walt.openid4vp.conformance.report.FullPlanEvidence
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.SuiteReachedTerminalBeforeReady
 import id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse
+import id.walt.openid4vp.conformance.testplans.httpdata.TestRunResult
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletModuleApplicability
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
@@ -16,6 +19,15 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import io.ktor.http.Url
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import id.waltid.openid4vp.wallet.DcApiCredentialResponse
+import id.waltid.openid4vp.wallet.UnsupportedDcApiProtocolException
 
 /**
  * Executes a single wallet conformance test plan
@@ -35,7 +47,8 @@ class WalletTestPlanRunner(
     val testPlan: WalletTestPlan,
     val conformanceHttp: HttpClient,
     val conformanceHost: String,
-    val conformancePort: Int
+    val conformancePort: Int,
+    private val dcApiPresent: (suspend (String, JsonObject, String) -> DcApiCredentialResponse)? = null,
 ) {
 
     private val conformance = ConformanceInterface(conformanceHost, conformancePort)
@@ -81,7 +94,7 @@ class WalletTestPlanRunner(
                 val inapplicable = WalletModuleApplicability.inapplicableReason(
                     testModule = module.testModule,
                     moduleMetadata = moduleMetadata[module.testModule],
-                    variantSelection = testPlan.axisValues,
+                    variantSelection = testPlan.axisValues + module.variant.mapValues { it.value.jsonPrimitive.content },
                 )
                 val result = if (inapplicable != null) {
                     println("   Skipped: not applicable to this variant - $inapplicable")
@@ -95,7 +108,11 @@ class WalletTestPlanRunner(
                 } else {
                     runModuleRetryingTransport(testPlanId, module)
                 }
-                results.add(result)
+                val qualified = if (testPlan.axisValues["response_mode"] == "dc_api.jwt") result.copy(
+                    testName = "${testPlan.producerId}/${module.testModule}/${module.variant.entries.sortedBy { it.key }.joinToString(",") { "${it.key}=${it.value.jsonPrimitive.content}" }}",
+                ) else result
+                FullPlanEvidence.record(testPlanId, index, module, qualified)
+                results.add(qualified)
 
                 println("   Result: ${result.walletStatus}")
                 if (result.errorMessage != null) {
@@ -232,6 +249,7 @@ class WalletTestPlanRunner(
         // name instead produced report rows whose log link pointed at a test that does not exist,
         // making exactly the failures that need investigating the ones that could not be investigated.
         var testId: String? = null
+        var observedWalletStatus: String? = null
 
         try {
             // Create test instance for this module (same API as verifier tests)
@@ -251,20 +269,26 @@ class WalletTestPlanRunner(
             // that URL is what hands the request to the wallet, so there is no exposed
             // authorization_endpoint to read here - that only exists for verifier plans.
             val testRunResult = conformance.getTestRun(testId)
-            val requestUrl = testRunResult.getBrowserUrls().firstOrNull()
-                ?: error("Conformance suite published no browser URL to hand to the wallet")
-            println("   Authorization request for the wallet: $requestUrl")
+            if (testPlan.axisValues["response_mode"] == "dc_api.jwt") {
+                observedWalletStatus = deliverDcApiRequest(testRunResult)
+            } else {
+                val requestUrl = testRunResult.getBrowserUrls().firstOrNull()
+                    ?: error("Conformance suite published no browser URL to hand to the wallet")
+                println("   Authorization request for the wallet: $requestUrl")
 
-            val walletResponse = conformanceHttp.get(requestUrl)
-            println("   Wallet (via adapter) responded: ${walletResponse.status}")
-            conformance.markBrowserUrlVisited(testId, requestUrl)
+                val walletResponse = conformanceHttp.get(requestUrl)
+                println("   Wallet (via adapter) responded: ${walletResponse.status}")
+                observedWalletStatus = if (walletResponse.status.value in 400..499) "REJECTED"
+                    else "HTTP_${walletResponse.status.value}"
+                conformance.markBrowserUrlVisited(testId, requestUrl)
 
-            // OpenID4VP 1.0 8.2: a redirect_uri returned in the direct_post response must be opened
-            // in the end-user's browser, not consumed as a back channel. The suite fails the module
-            // if nobody visits it, so stand in for the browser here.
-            walletResponse.walletRedirectTo()?.let { redirectTo ->
-                println("   Opening redirect_uri from the direct_post response: $redirectTo")
-                submitRedirectFragment(conformanceHttp.get(redirectTo), redirectTo)
+                // OpenID4VP 1.0 8.2: a redirect_uri returned in the direct_post response must be opened
+                // in the end-user's browser, not consumed as a back channel. The suite fails the module
+                // if nobody visits it, so stand in for the browser here.
+                walletResponse.walletRedirectTo()?.let { redirectTo ->
+                    println("   Opening redirect_uri from the direct_post response: $redirectTo")
+                    submitRedirectFragment(conformanceHttp.get(redirectTo), redirectTo)
+                }
             }
 
             // Wait for the test to complete. The negative modules ask for a screenshot of the
@@ -291,6 +315,7 @@ class WalletTestPlanRunner(
             return TestPlanResult(
                 testName = "${testPlan.producerId}/$moduleId",
                 conformanceTestId = testId,
+                conformanceStatus = testInfo.status,
                 conformanceResult = conformanceResult,
                 walletStatus = walletStatus,
                 errorMessage = null
@@ -324,8 +349,22 @@ class WalletTestPlanRunner(
             return TestPlanResult(
                 testName = "${testPlan.producerId}/$moduleId",
                 conformanceTestId = id ?: moduleId,
-                conformanceResult = "ERROR",
-                walletStatus = "ERROR",
+                conformanceStatus = (e as? ConformanceEvidenceRequired)?.suiteStatus,
+                conformanceResult = when (e) {
+                    is ConformanceEvidenceRequired -> e.suiteResult
+                    is UnsupportedDcApiProtocolException -> null
+                    else -> "ERROR"
+                },
+                walletStatus = when (e) {
+                    is ConformanceEvidenceRequired -> observedWalletStatus ?: "BLOCKED"
+                    is UnsupportedDcApiProtocolException -> "BLOCKED"
+                    else -> "ERROR"
+                },
+                blockerReason = when (e) {
+                    is ConformanceEvidenceRequired -> e.message
+                    is UnsupportedDcApiProtocolException -> "Wallet SDK capability gap: ${e.message}; this module did not test its intended condition"
+                    else -> null
+                },
                 errorMessage = if (ConformanceTransportRetry.isConnectionReset(e)) {
                     "Connection reset"
                 } else {
@@ -333,6 +372,44 @@ class WalletTestPlanRunner(
                 },
             )
         }
+    }
+
+    /** Relay suite data to the real SDK; emulate only the browser/platform transport boundary. */
+    internal suspend fun deliverDcApiRequest(run: TestRunResult): String {
+        val interaction = run.getBrowserApiRequests().single()
+        val submit = Url(interaction.submitUrl)
+        val suite = Url("https://$conformanceHost:$conformancePort")
+        require(submit.protocol == suite.protocol && submit.host == suite.host && submit.port == suite.port) {
+            "DC API submission URL must belong to the configured conformance suite"
+        }
+        val origin = "${suite.protocol.name}://${suite.host}" +
+            if (suite.port == suite.protocol.defaultPort) "" else ":${suite.port}"
+        val request = interaction.request.getValue("digital").jsonObject.getValue("requests").jsonArray.single().jsonObject
+        val present = checkNotNull(dcApiPresent) { "No SDK DC API driver configured" }
+        var rejected = false
+        val response = try {
+            val result = present(request.getValue("protocol").jsonPrimitive.content,
+                request.getValue("data").jsonObject, origin)
+            buildJsonObject { put("protocol", result.protocol); put("data", result.data) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (unsupported: UnsupportedDcApiProtocolException) {
+            throw unsupported
+        } catch (failure: Exception) {
+            rejected = true
+            buildJsonObject {
+                put("exception", buildJsonObject {
+                    put("name", failure::class.simpleName ?: "WalletSdkRejection")
+                    put("message", "Wallet SDK rejected the DC API request")
+                })
+            }
+        }
+        val posted = conformanceHttp.post(interaction.submitUrl) {
+            contentType(ContentType.Application.Json)
+            setBody(response.toString())
+        }
+        check(posted.status.value in 200..299) { "DC API response submission failed: ${posted.status}" }
+        return if (rejected) "REJECTED" else "PRESENTED"
     }
 
     /**

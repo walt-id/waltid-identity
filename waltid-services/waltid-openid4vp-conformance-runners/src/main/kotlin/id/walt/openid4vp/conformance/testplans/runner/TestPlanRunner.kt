@@ -1,5 +1,9 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
+import id.walt.openid4vp.conformance.testplans.http.ConformanceEvidenceRequired
+import id.walt.openid4vp.conformance.config.ConformanceExecutionMode
+import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.ConformanceVerifierPolicies
+import id.walt.openid4vp.conformance.report.FullPlanEvidence
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.SuiteReachedTerminalBeforeReady
 import id.walt.openid4vp.conformance.testplans.http.Verifier2Interface
@@ -88,7 +92,7 @@ class TestPlanRunner(
                     errorMessage = error.message,
                     expected = expectationFor(module.testModule),
                 )
-            }
+            }.also { FullPlanEvidence.record(testPlanId, index, module, it) }
         }
     }
 
@@ -200,6 +204,17 @@ class TestPlanRunner(
         val expected = expectationFor(module.testModule)
         println("Expecting suite result in ${expected.acceptedConformanceResults}, verifier to ${expected.verifier}")
 
+        if (ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN) {
+            ConformanceVerifierPolicies.unsupportedModuleReason(module.testModule)?.let { reason ->
+                return TestPlanResult(
+                    testName = "$testPlanName / ${module.testModule}",
+                    conformanceTestId = "N/A",
+                    blockerReason = reason,
+                    expected = expected,
+                )
+            }
+        }
+
         // Create test - pass the variant from the module definition
         val createTestUrl = conformance.buildCreateTestUrl(testPlanId, module.testModule, module.variant)
         println("Creating test... ($createTestUrl)")
@@ -219,6 +234,16 @@ class TestPlanRunner(
             // A module left running still holds the plan alias. The next createTest would replace
             // its outcome with an alias conflict. Cancel before that, including before a retry.
             cancelQuietly(testId)
+            if (e is ConformanceEvidenceRequired) {
+                return TestPlanResult(
+                    testName = "$testPlanName / ${module.testModule}",
+                    conformanceTestId = testId,
+                    conformanceStatus = e.suiteStatus,
+                    conformanceResult = e.suiteResult,
+                    blockerReason = e.message,
+                    expected = expected,
+                )
+            }
             if (ConformanceTransportRetry.isConnectionReset(e)) {
                 return TestPlanResult(
                     testName = "$testPlanName / ${module.testModule}",
@@ -267,13 +292,39 @@ class TestPlanRunner(
         // After presentation. Positive modules park in WAITING until the verification-result
         // screenshot placeholder is filled, so fill it while polling.
         println("Waiting until Conformance processing is done...")
-        conformance.waitForTestStatus(testId, shouldBeWaiting = false, fulfillImagePlaceholders = true)
-
-        val testRunInfo = conformance.getTestRunInfo(testId)
-        println("Conformance: status=${testRunInfo.status} result=${testRunInfo.result}")
+        val evidenceRequired = try {
+            conformance.waitForTestStatus(testId, shouldBeWaiting = false, fulfillImagePlaceholders = true)
+            null
+        } catch (e: ConformanceEvidenceRequired) {
+            e
+        }
 
         val verifier2Info = verifier2.getVerificationSessionInfo(verificationSessionId)
         println("Verifier2: status=${verifier2Info.status} reason=${verifier2Info.statusReason}")
+
+        val revocationFailure = if (ConformanceExecutionMode.current == ConformanceExecutionMode.FULL_PLAN &&
+            module.testModule == "oid4vp-1final-verifier-present-revoked-credential") {
+            val policies = verifier2Info.policyResults
+            ConformanceVerifierPolicies.revocationFailureReason(
+                policies?.vcPolicies.orEmpty() + policies?.specificVcPolicies?.values.orEmpty().flatten())
+        } else null
+
+        if (evidenceRequired != null) {
+            // Preserve the observed product outcome independently of the outstanding UI evidence.
+            cancelQuietly(testId)
+            return TestPlanResult(
+                testName = "$testPlanName / ${module.testModule}",
+                conformanceTestId = testId,
+                conformanceStatus = evidenceRequired.suiteStatus,
+                conformanceResult = evidenceRequired.suiteResult,
+                verifierStatus = verifier2Info.status,
+                blockerReason = evidenceRequired.message,
+                expected = expected,
+            )
+        }
+
+        val testRunInfo = conformance.getTestRunInfo(testId)
+        println("Conformance: status=${testRunInfo.status} result=${testRunInfo.result}")
 
         return TestPlanResult(
             testName = "$testPlanName / ${module.testModule}",
@@ -282,6 +333,7 @@ class TestPlanRunner(
             conformanceResult = testRunInfo.result,
             verifierStatus = verifier2Info.status,
             expected = expected,
+            errorMessage = revocationFailure,
         )
     }
 

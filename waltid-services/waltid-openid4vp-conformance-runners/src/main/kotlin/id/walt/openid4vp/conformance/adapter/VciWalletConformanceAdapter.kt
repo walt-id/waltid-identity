@@ -13,6 +13,18 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
+import java.net.URI
+import id.walt.wallet2.handlers.WalletIssuanceSessionService
+import id.walt.wallet2.handlers.WalletIssuanceSessionRequest
+import id.walt.wallet2.handlers.WalletIssuanceAuthorizationCallback
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import id.walt.wallet2.handlers.WalletCredentialSelection
+import id.walt.wallet2.handlers.CredentialHolderBinding
+import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
+import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CancellationException
 
 /**
  * VCI Wallet Conformance Test Adapter
@@ -48,7 +60,9 @@ import kotlinx.serialization.json.*
  * @param testKeyId Registered client key, also the holder key in single-copy mode
  * @param attestationAuthority Test attester for plans using attestation-based client authentication
  * @param useScope Authorize the offered configuration by scope, as HAIP requires
- * @param batchHolderKeyIds Two distinct stored holder keys for the explicit batch gate; empty for single-copy plans
+ * @param batchHolderKeyIds Two distinct stored holder keys for batch modules; empty for single-copy plans
+ * @param issuanceSessions In-process SDK session resolver for FAPI VCI modules
+ * @param deferredTimeoutMillis Maximum polling budget for retained deferred issuance
  */
 class VciWalletConformanceAdapter(
     private val walletApiUrl: String = "http://127.0.0.1:7005",
@@ -59,8 +73,11 @@ class VciWalletConformanceAdapter(
     private val attestationAuthority: ClientAttestationTestAuthority? = null,
     private val useScope: Boolean = false,
     private val batchHolderKeyIds: List<String> = emptyList(),
+    private val issuanceSessions: (suspend (String) -> WalletIssuanceSessionService)? = null,
+    private val deferredTimeoutMillis: Long = ConformanceConfig.HTTP_REQUEST_TIMEOUT_MS - 5_000L,
 ) {
     init {
+        require(deferredTimeoutMillis > 0) { "Deferred polling budget must be positive" }
         require(batchHolderKeyIds.isEmpty() ||
             (batchHolderKeyIds.size == 2 && batchHolderKeyIds.all(String::isNotBlank) && batchHolderKeyIds.distinct().size == 2)) {
             "The batch conformance adapter requires two distinct stored holder keys"
@@ -113,6 +130,7 @@ class VciWalletConformanceAdapter(
                 }
 
                 post("/credential-offer") { handleCredentialOfferApi(call) }
+                post("/issuance-session") { handleIssuanceSession(call) }
                 get("/callback") { handleAuthCallback(call) }
                 post(WALLET_INSTANCE_ATTESTATION_PATH) { handleWalletInstanceAttestation(call) }
             }
@@ -143,6 +161,9 @@ class VciWalletConformanceAdapter(
             return
         }
 
+        val requestBatch = call.request.queryParameters["batch"]?.toBooleanStrictOrNull()
+            ?: batchHolderKeyIds.isNotEmpty()
+
         try {
             println("[VCI Adapter] Received credential offer")
 
@@ -157,9 +178,12 @@ class VciWalletConformanceAdapter(
             // Parse JSON offer to determine grant type
             val offerJson = parseOfferJson(offer)
             if (offerJson == null) {
-                // URI format - try direct claim
-                val result = claimCredentialPreAuth(client, offer)
-                call.respond(HttpStatusCode.OK, "Processed: ${result.message}")
+                // A referenced offer does not expose its grants until resolved. The runner
+                // knows which grant the suite selected; keep authorization in Wallet2.
+                val result = if (call.request.queryParameters["grant_type"] == "authorization_code") {
+                    claimCredentialAuthCode(client, offer, requestBatch)
+                } else claimCredentialPreAuth(client, offer, requestBatch)
+                call.respond(if (result.success) HttpStatusCode.OK else HttpStatusCode.BadRequest, "Processed: ${result.message}")
                 return
             }
 
@@ -172,13 +196,13 @@ class VciWalletConformanceAdapter(
 
             when {
                 hasPreAuthCode -> {
-                    val result = claimCredentialPreAuth(client, offer)
-                    call.respond(HttpStatusCode.OK, "Pre-auth claim: ${result.message}")
+                    val result = claimCredentialPreAuth(client, offer, requestBatch)
+                    call.respond(if (result.success) HttpStatusCode.OK else HttpStatusCode.BadRequest, "Pre-auth claim: ${result.message}")
                 }
 
                 hasAuthCode -> {
-                    val result = claimCredentialAuthCode(client, offer)
-                    call.respond(HttpStatusCode.OK, "Auth-code claim: ${result.message}")
+                    val result = claimCredentialAuthCode(client, offer, requestBatch)
+                    call.respond(if (result.success) HttpStatusCode.OK else HttpStatusCode.BadRequest, "Auth-code claim: ${result.message}")
                 }
 
                 else -> {
@@ -186,11 +210,101 @@ class VciWalletConformanceAdapter(
                 }
             }
 
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             println("[VCI Adapter] ERROR: ${e.message}")
             e.printStackTrace()
             call.respond(HttpStatusCode.InternalServerError, "Error: ${e.message}")
         }
+    }
+
+    /** Drive either VCI flow through the retained SDK used by native wallets. */
+    private suspend fun handleIssuanceSession(call: ApplicationCall) {
+        val service = issuanceSessions?.invoke(requireNotNull(walletId))
+        if (service == null) {
+            call.respond(HttpStatusCode.ServiceUnavailable, "Wallet SDK session driver is not configured")
+            return
+        }
+        val client = requireNotNull(httpClient)
+        val issuer = call.request.queryParameters["credential_issuer"]
+            ?: return call.respond(HttpStatusCode.BadRequest, "Missing credential issuer")
+        val format = when (val selected = call.request.queryParameters["format"]) {
+            "sd_jwt_vc" -> "dc+sd-jwt"
+            "mdoc" -> "mso_mdoc"
+            else -> selected
+        }
+        var stage = "prepare request"
+        try {
+            val offerUrl = call.request.queryParameters["offer_url"]
+            val request = if (offerUrl != null) {
+                // The suite targets our HTTP adapter; native SDK sessions accept the
+                // actual inline offer or an openid-credential-offer deep link.
+                val parsed = CredentialOfferParser.parseFromQueryParams(offerUrl)
+                val inline = parsed.credentialOffer?.let { Json.encodeToJsonElement(it).jsonObject }
+                val reference = parsed.credentialOfferUri?.let {
+                    Url("openid-credential-offer://?" + Parameters.build {
+                        append("credential_offer_uri", it)
+                    }.formUrlEncode())
+                }
+                WalletIssuanceSessionRequest(offerJson = inline, offerUrl = reference, keyId = testKeyId,
+                    clientId = CLIENT_ID, redirectUri = Url(getRedirectUri()))
+            } else {
+                val metadata = IssuerMetadataResolver(client).resolveCredentialIssuerMetadata(issuer).metadata
+                val configuration = metadata.credentialConfigurationsSupported.entries.firstOrNull { (_, value) ->
+                    value.format.value == format
+                }?.key ?: error("Issuer offers no configuration for requested format")
+                WalletIssuanceSessionRequest(credentialIssuer = issuer, credentialConfigurationIds = listOf(configuration),
+                    keyId = testKeyId, clientId = CLIENT_ID, redirectUri = Url(getRedirectUri()))
+            }
+            stage = "resolve offer"
+            val session = service.start(request)
+            try {
+                stage = "begin authorization"
+                val batch = call.request.queryParameters["batch"]?.toBooleanStrictOrNull() == true
+                require(!batch || batchHolderKeyIds.size == 2) { "Batch requires two configured holder keys" }
+                val selections = if (batch) session.offer.credentials.map { credential ->
+                    WalletCredentialSelection(credential.configurationId,
+                        holderBindings = batchHolderKeyIds.map { CredentialHolderBinding(keyId = it) })
+                } else null
+                val authorization = service.beginAuthorization(session.id, selections)
+                stage = "follow authorization"
+                val callback = followAuthorizationRedirect(client, authorization.url)
+                stage = "continue authorization"
+                val initial = service.continueAuthorization(WalletIssuanceAuthorizationCallback(session.id, callback))
+                stage = "finish issuance"
+                val outcome = completeSessionIssuance(initial, deferredTimeoutMillis) { id -> service.resumeDeferred(id) }
+                call.respond(if (outcome is WalletIssuanceOutcome.Stored && outcome.credentialIds.isNotEmpty())
+                    HttpStatusCode.OK else HttpStatusCode.BadRequest,
+                    "Wallet SDK outcome: ${outcome?.let { it::class.simpleName } ?: "DeferredTimeout"}" +
+                        if (outcome is WalletIssuanceOutcome.Failed) " (${outcome.error.code})" else "")
+            } finally {
+                service.cancel(session.id)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // The suite decides whether rejection was expected. Do not turn SDK rejection into success.
+            val origin = e.stackTrace.firstOrNull { it.className.startsWith("id.walt") }
+            println("[VCI Adapter] SDK failure during $stage: ${e::class.simpleName} at $origin")
+            call.respond(HttpStatusCode.BadRequest, "Wallet SDK rejected issuance during $stage (${e::class.simpleName})")
+        }
+    }
+
+    private suspend fun followAuthorizationRedirect(client: HttpClient, authorizationUrl: String): String {
+        var current = authorizationUrl
+        repeat(MAX_AUTHORIZATION_REDIRECTS) {
+            val response = client.get(current)
+            val location = response.headers[HttpHeaders.Location]
+                ?: error("Authorization endpoint answered ${response.status} without a redirect")
+            val target = resolveAuthorizationRedirect(current, location)
+            if ("${target.protocol.name}://${target.host}:${target.port}${target.encodedPath}" == getRedirectUri()) {
+                // Preserve the entire callback, including state and iss, for SDK validation.
+                return target.toString()
+            }
+            current = target.toString()
+        }
+        error("Authorization exceeded redirect budget")
     }
 
     /**
@@ -271,7 +385,9 @@ class VciWalletConformanceAdapter(
      * wallet's DTOs (it read `tokenEndpoint`/`cNonce` fields that no longer exist and omitted
      * required ones), and which therefore never completed a single flow.
      */
-    private suspend fun claimCredentialAuthCode(client: HttpClient, offer: String): ClaimResult {
+    private suspend fun claimCredentialAuthCode(client: HttpClient, offer: String, requestBatch: Boolean = batchHolderKeyIds.isNotEmpty()): ClaimResult {
+        if (requestBatch && batchHolderKeyIds.size != 2) return ClaimResult(false, "Batch requires two configured holder keys")
+        val batchHolderKeyIds = if (requestBatch) this.batchHolderKeyIds else emptyList()
         val offerSource = buildOfferSource(offer)
 
         // 1. Endpoints the wallet needs back on the final call; authorization-url does not return them.
@@ -329,6 +445,7 @@ class VciWalletConformanceAdapter(
         // 4. Everything after the redirect is the wallet's job.
         val url = "$walletApiUrl/wallet/$walletId/credentials/receive/authorized$batchSuffix"
         println("[VCI Adapter] POST $url")
+        val existingDeferred = deferredHandles(client).keys
         val response = client.post(url) {
             contentType(ContentType.Application.Json)
             setBody(
@@ -352,12 +469,7 @@ class VciWalletConformanceAdapter(
                 }.toString()
             )
         }
-        val body = response.bodyAsText()
-        return if (response.status.isSuccess()) {
-            ClaimResult(true, body)
-        } else {
-            ClaimResult(false, "Status ${response.status}: $body")
-        }
+        return finishIssuance(client, response, existingDeferred)
     }
 
     /**
@@ -384,7 +496,7 @@ class VciWalletConformanceAdapter(
                     )
                 )
 
-            val target = URLBuilder(current).apply { takeFrom(location) }.build()
+            val target = resolveAuthorizationRedirect(current, location)
             if ("${target.protocol.name}://${target.host}:${target.port}${target.encodedPath}" == getRedirectUri()) {
                 target.parameters["error"]?.let { error ->
                     return Result.failure(
@@ -409,7 +521,9 @@ class VciWalletConformanceAdapter(
         )
     }
 
-    private suspend fun claimCredentialPreAuth(client: HttpClient, offer: String): ClaimResult {
+    private suspend fun claimCredentialPreAuth(client: HttpClient, offer: String, requestBatch: Boolean = batchHolderKeyIds.isNotEmpty()): ClaimResult {
+        if (requestBatch && batchHolderKeyIds.size != 2) return ClaimResult(false, "Batch requires two configured holder keys")
+        val batchHolderKeyIds = if (requestBatch) this.batchHolderKeyIds else emptyList()
         return try {
             val url = "$walletApiUrl/wallet/$walletId/credentials/receive"
             println("[VCI Adapter] POST $url")
@@ -427,20 +541,65 @@ class VciWalletConformanceAdapter(
                 buildOfferRequest(offer).entries.forEach { (key, value) -> put(key, value) }
                 selections?.let { put("credentials", it) }
             }
+            val existingDeferred = deferredHandles(client).keys
             val response = client.post(url) {
                 contentType(ContentType.Application.Json)
                 setBody(requestBody.toString())
             }
 
-            val body = response.bodyAsText()
-            if (response.status.isSuccess()) {
-                ClaimResult(true, body)
-            } else {
-                ClaimResult(false, "Status ${response.status}: $body")
-            }
+            finishIssuance(client, response, existingDeferred)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             ClaimResult(false, "Exception: ${e.message}")
         }
+    }
+
+    private suspend fun deferredHandles(client: HttpClient): Map<String, JsonObject> {
+        val response = client.get("$walletApiUrl/wallet/$walletId/credentials/receive/deferred")
+        check(response.status.isSuccess()) { "Cannot list retained issuance handles: ${response.status}" }
+        return Json.parseToJsonElement(response.bodyAsText()).jsonArray.associate { element ->
+            val handle = element.jsonObject
+            handle.getValue("id").jsonPrimitive.content to handle
+        }
+    }
+
+    /** Resume only handles created by this offer; never redeem the single-use grant again. */
+    private suspend fun finishIssuance(
+        client: HttpClient,
+        response: io.ktor.client.statement.HttpResponse,
+        existingDeferred: Set<String>,
+    ): ClaimResult {
+        val body = response.bodyAsText()
+        // A released response may be 409 when deferred progress cannot fit its old wire shape.
+        if (!response.status.isSuccess() && response.status != HttpStatusCode.Conflict) {
+            return ClaimResult(false, "Status ${response.status}: $body")
+        }
+        val pending = deferredHandles(client).filterKeys { it !in existingDeferred }.toMutableMap()
+        if (pending.isEmpty()) return ClaimResult(response.status.isSuccess(), body)
+        return withTimeoutOrNull(deferredTimeoutMillis) {
+            while (pending.isNotEmpty()) {
+                val (id, handle) = pending.entries.first()
+                val seconds = handle["intervalSeconds"]?.jsonPrimitive?.longOrNull ?: 0L
+                require(seconds >= 0) { "Invalid deferred polling interval" }
+                delay(Math.multiplyExact(seconds, 1_000L))
+                val resumed = client.post("$walletApiUrl/wallet/$walletId/credentials/receive/deferred/$id")
+                if (!resumed.status.isSuccess()) return@withTimeoutOrNull ClaimResult(false, "Deferred resume: ${resumed.status}")
+                val outcome = Json.parseToJsonElement(resumed.bodyAsText()).jsonObject
+                when (outcome["type"]?.jsonPrimitive?.contentOrNull) {
+                    "stored" -> pending.remove(id)
+                    "deferred" -> {
+                        pending.remove(id)
+                        outcome.getValue("credentials").jsonArray.forEach { element ->
+                            val next = element.jsonObject
+                            pending[next.getValue("id").jsonPrimitive.content] = next
+                        }
+                    }
+                    else -> return@withTimeoutOrNull ClaimResult(false, "Deferred issuance did not store credentials: ${outcome["type"]}")
+                }
+            }
+            ClaimResult(true, "Deferred credentials stored")
+        } ?: ClaimResult(false, "Deferred issuance exceeded polling budget")
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -524,7 +683,11 @@ class VciWalletConformanceAdapter(
 
     private suspend fun extractOffer(call: ApplicationCall): String? {
         return call.request.queryParameters["credential_offer"]
-            ?: call.request.queryParameters["credential_offer_uri"]
+            ?: call.request.queryParameters["credential_offer_uri"]?.let { reference ->
+                "openid-credential-offer://?" + Parameters.build {
+                    append("credential_offer_uri", reference)
+                }.formUrlEncode()
+            }
             ?: call.receiveText().takeIf { it.isNotBlank() }
     }
 
@@ -615,5 +778,41 @@ class VciWalletConformanceAdapter(
 
         /** Matches the `<code>` the conformance suite embeds in its `tx_code` description. */
         val TX_CODE_IN_DESCRIPTION = Regex("<([^>]+)>")
+    }
+}
+
+/** Resolve one browser redirect without carrying parameters from the preceding request. */
+internal fun resolveAuthorizationRedirect(current: String, location: String): Url =
+    Url(URI(current).resolve(location).toString())
+
+/** Finish only this SDK transition's deferred handles, respecting each returned interval. */
+internal suspend fun completeSessionIssuance(
+    initial: WalletIssuanceOutcome,
+    timeoutMillis: Long,
+    resume: suspend (String) -> WalletIssuanceOutcome,
+): WalletIssuanceOutcome? {
+    if (initial !is WalletIssuanceOutcome.Deferred) return initial
+    return withTimeoutOrNull(timeoutMillis) {
+        val pending = initial.credentials.associateBy { it.id }.toMutableMap()
+        val stored = initial.storedCredentialIds.toMutableSet()
+        while (pending.isNotEmpty()) {
+            val (id, credential) = pending.entries.first()
+            val interval = credential.intervalSeconds ?: 0L
+            require(interval >= 0) { "Invalid deferred polling interval" }
+            delay(Math.multiplyExact(interval, 1_000L))
+            when (val outcome = resume(id)) {
+                is WalletIssuanceOutcome.Stored -> {
+                    stored.addAll(outcome.credentialIds)
+                    pending.remove(id)
+                }
+                is WalletIssuanceOutcome.Deferred -> {
+                    stored.addAll(outcome.storedCredentialIds)
+                    pending.remove(id)
+                    outcome.credentials.forEach { pending[it.id] = it }
+                }
+                else -> return@withTimeoutOrNull outcome
+            }
+        }
+        WalletIssuanceOutcome.Stored(initial.sessionId, stored.toList())
     }
 }

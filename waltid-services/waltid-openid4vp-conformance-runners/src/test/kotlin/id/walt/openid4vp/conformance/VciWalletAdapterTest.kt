@@ -1,0 +1,199 @@
+package id.walt.openid4vp.conformance
+
+import com.sun.net.httpserver.HttpExchange
+import com.sun.net.httpserver.HttpServer
+import id.walt.openid4vp.conformance.adapter.VciWalletConformanceAdapter
+import id.walt.openid4vp.conformance.adapter.resolveAuthorizationRedirect
+import id.walt.openid4vp.conformance.adapter.completeSessionIssuance
+import id.walt.wallet2.handlers.WalletDeferredCredential
+import id.walt.wallet2.handlers.WalletIssuanceOutcome
+import kotlinx.coroutines.CancellationException
+import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
+import io.ktor.client.HttpClient
+import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.Url
+import kotlinx.coroutines.runBlocking
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
+class VciWalletAdapterTest {
+    @Test
+    fun sdkDeferredIssuanceRetainsStoredCopiesAndResumesUpdatedHandles() = runBlocking<Unit> {
+        val ids = mutableListOf<String>()
+        val initial = WalletIssuanceOutcome.Deferred("session", listOf("already-stored"),
+            listOf(WalletDeferredCredential("first", "config", 0)))
+        val result = completeSessionIssuance(initial, 1_000) { id ->
+            ids += id
+            when (id) {
+                "first" -> WalletIssuanceOutcome.Deferred("session", listOf("second-stored"),
+                    listOf(WalletDeferredCredential("next", "config", 0)))
+                "next" -> WalletIssuanceOutcome.Stored("session", listOf("third-stored"))
+                else -> error("Polled a handle outside this issuance")
+            }
+        }
+        assertEquals(listOf("first", "next"), ids)
+        assertEquals(WalletIssuanceOutcome.Stored("session", listOf("already-stored", "second-stored", "third-stored")), result)
+    }
+
+    @Test
+    fun sdkDeferredDeadlineDoesNotPollEarlyAndParentCancellationPropagates() = runBlocking<Unit> {
+        val waiting = WalletIssuanceOutcome.Deferred("session", emptyList(),
+            listOf(WalletDeferredCredential("pending", "config", 60)))
+        assertNull(completeSessionIssuance(waiting, 25) { error("Polled before issuer interval") })
+        val ready = waiting.copy(credentials = listOf(WalletDeferredCredential("pending", "config", 0)))
+        assertFailsWith<CancellationException> {
+            completeSessionIssuance(ready, 1_000) { throw CancellationException("parent cancelled") }
+        }
+    }
+
+    @Test
+    fun referencedAuthorizationOfferUsesTheResolverAndPreservesTheReferenceUri() = runBlocking<Unit> {
+        val reference = "https://issuer.example/offer?id=one&hint=a%2Fb"
+        var receivedReference: String? = null
+        val unexpectedReceives = AtomicInteger()
+        withAdapter { backend, client, endpoint ->
+            backend.createContext("/wallet/test/credentials/receive/resolve-offer") { exchange ->
+                val request = Json.parseToJsonElement(exchange.requestBody.readBytes().decodeToString()).jsonObject
+                receivedReference = Url(request.getValue("offerUrl").jsonPrimitive.content).parameters["credential_offer_uri"]
+                exchange.json(400, "{\"error\":\"resolver-reached\"}")
+            }
+            backend.createContext("/wallet/test/credentials/receive") { exchange ->
+                unexpectedReceives.incrementAndGet()
+                exchange.json(500, "{}")
+            }
+            backend.start()
+            val response = client.post(endpoint) {
+                parameter("credential_offer_uri", reference)
+                parameter("grant_type", "authorization_code")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("resolver-reached"))
+            assertEquals(reference, receivedReference)
+            assertEquals(0, unexpectedReceives.get(), "Authorization offers must not enter pre-authorized receive")
+        }
+    }
+
+    @Test
+    fun callbackDoesNotInheritAuthorizationRequestParameters() {
+        val callback = "http://127.0.0.1:7007/callback?code=test-code&state=expected&iss=https%3A%2F%2Fissuer.example"
+        val resolved = resolveAuthorizationRedirect(
+            "https://issuer.example/authorize?client_id=wallet&request_uri=urn%3Atest", callback)
+        assertEquals(setOf("code", "state", "iss"), resolved.parameters.names())
+        assertEquals("https://issuer.example/callback?code=x", resolveAuthorizationRedirect(
+            "https://issuer.example/authorize?request_uri=old", "/callback?code=x").toString())
+        assertEquals("test-code", AuthorizationResponseParser.parseAuthorizationResponse(
+            resolved.toString(), "expected", "http://127.0.0.1:7007/callback", "https://issuer.example", true).code)
+    }
+
+    @Test
+    fun deferredIssuanceResumesOnlyNewHandlesWithoutRedeemingTheOfferAgain() = runBlocking<Unit> {
+        val received = AtomicBoolean()
+        val redemptions = AtomicInteger()
+        val polls = AtomicInteger()
+        val oldHandlePolls = AtomicInteger()
+        withAdapter { backend, client, endpoint ->
+            backend.createContext("/wallet/test/credentials/receive") { exchange ->
+                when (exchange.requestURI.path) {
+                    "/wallet/test/credentials/receive" -> {
+                        redemptions.incrementAndGet()
+                        received.set(true)
+                        exchange.json(200, "{\"credentialIds\":[],\"deferredTransactionIds\":{\"config\":\"transaction\"}}")
+                    }
+                    "/wallet/test/credentials/receive/deferred" -> exchange.json(200,
+                        if (received.get()) """[{"id":"old","intervalSeconds":0},{"id":"new","intervalSeconds":0}]"""
+                        else """[{"id":"old","intervalSeconds":0}]""")
+                    "/wallet/test/credentials/receive/deferred/new" -> exchange.json(200,
+                        if (polls.incrementAndGet() == 1) """{"type":"deferred","credentials":[{"id":"new","intervalSeconds":0}]}"""
+                        else """{"type":"stored","credentialIds":["stored"]}""")
+                    else -> { oldHandlePolls.incrementAndGet(); exchange.json(500, "{}") }
+                }
+            }
+            backend.start()
+            val result = client.post(endpoint) { parameter("credential_offer", OFFER) }
+            assertEquals(HttpStatusCode.OK, result.status)
+            assertEquals(1, redemptions.get())
+            assertEquals(2, polls.get())
+            assertEquals(0, oldHandlePolls.get())
+        }
+    }
+
+    @Test
+    fun deferredPollingDeadlineReturnsAFailedClaimRatherThanCancellation() = runBlocking<Unit> {
+        val received = AtomicBoolean()
+        val polls = AtomicInteger()
+        withAdapter(deferredTimeoutMillis = 100) { backend, client, endpoint ->
+            backend.createContext("/wallet/test/credentials/receive") { exchange ->
+                when (exchange.requestURI.path) {
+                    "/wallet/test/credentials/receive" -> {
+                        received.set(true)
+                        exchange.json(409, "{}")
+                    }
+                    "/wallet/test/credentials/receive/deferred" -> exchange.json(200,
+                        if (received.get()) """[{"id":"new","intervalSeconds":60}]""" else "[]")
+                    else -> { polls.incrementAndGet(); exchange.json(500, "{}") }
+                }
+            }
+            backend.start()
+            val response = client.post(endpoint) { parameter("credential_offer", OFFER) }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("Deferred issuance exceeded polling budget"))
+            assertEquals(0, polls.get(), "Do not poll before the issuer's required interval")
+        }
+    }
+
+    @Test
+    fun walletFailureIsNotReportedAsSuccessfulOfferProcessing() = runBlocking<Unit> {
+        withAdapter { backend, client, endpoint ->
+            backend.createContext("/wallet/test/credentials/receive") { exchange ->
+                if (exchange.requestURI.path.endsWith("/deferred")) exchange.json(200, "[]")
+                else exchange.json(400, "{\"error\":\"invalid_grant\"}")
+            }
+            backend.start()
+            assertEquals(HttpStatusCode.BadRequest, client.post(endpoint) {
+                parameter("credential_offer", OFFER)
+            }.status)
+        }
+    }
+
+    private suspend fun withAdapter(deferredTimeoutMillis: Long = 55_000, block: suspend (HttpServer, HttpClient, String) -> Unit) {
+        val backend = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val port = ServerSocket(0).use { it.localPort }
+        val adapter = VciWalletConformanceAdapter(
+            walletApiUrl = "http://127.0.0.1:${backend.address.port}", adapterPort = port, walletId = "test",
+            deferredTimeoutMillis = deferredTimeoutMillis)
+        HttpClient().use { client ->
+            try {
+                adapter.start(client)
+                block(backend, client, "http://127.0.0.1:$port/credential-offer")
+            } finally {
+                adapter.stop()
+                backend.stop(0)
+            }
+        }
+    }
+
+    private fun HttpExchange.json(status: Int, body: String) = use {
+        requestBody.readBytes()
+        responseHeaders.add("Content-Type", "application/json")
+        val bytes = body.toByteArray()
+        sendResponseHeaders(status, bytes.size.toLong())
+        responseBody.write(bytes)
+    }
+
+    private companion object {
+        const val OFFER = """{"credential_issuer":"https://issuer.example","credential_configuration_ids":["config"],"grants":{"urn:ietf:params:oauth:grant-type:pre-authorized_code":{"pre-authorized_code":"test"}}}"""
+    }
+}

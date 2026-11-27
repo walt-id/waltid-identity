@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.report.ConformanceReportWriter
 import id.walt.openid4vp.conformance.testplans.ConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
@@ -13,9 +14,10 @@ class ConformanceTests {
 
     companion object {
         val verifier2UrlPrefix: String =
-            "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
-        val conformanceHost: String = "localhost.emobix.co.uk" // "conformance.waltid.cloud" // conformance-v5-1-43.waltid.cloud
-        val conformancePort: Int = 8443 // 443
+            System.getenv("VERIFIER_NGROK_URL")?.trimEnd('/')?.plus("/verification-session")
+                ?: "https://verifier2.localhost/verification-session"
+        val conformanceHost: String = ConformanceConfig.CONFORMANCE_HOST
+        val conformancePort: Int = ConformanceConfig.CONFORMANCE_PORT
 
         val conformanceServerVersionResult = runBlocking {
             runCatching {
