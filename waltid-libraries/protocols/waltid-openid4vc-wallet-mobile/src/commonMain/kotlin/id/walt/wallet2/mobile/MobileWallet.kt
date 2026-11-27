@@ -607,6 +607,16 @@ public class MobileWallet internal constructor(
             ).alsoRefreshDigitalCredentialRegistration()
     }
 
+    /** Approves only outstanding proofs with the selections and holder keys accepted before the token exchange. */
+    public suspend fun retryIssuanceSigning(sessionId: String): WalletIssuanceOutcome = lifecycle.use {
+        issuanceSessions.retrySigning(sessionId).alsoRefreshDigitalCredentialRegistration()
+    }
+
+    /** Declines outstanding signing and preserves credentials already delivered or deferred by the issuer. */
+    public suspend fun declineIssuanceSigning(sessionId: String): WalletIssuanceOutcome = lifecycle.use {
+        issuanceSessions.declineSigning(sessionId)
+    }
+
     /** Cancels an active issuance session and discards its protocol continuation material. */
     public suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome = lifecycle.use {
         issuanceSessions.cancel(sessionId)

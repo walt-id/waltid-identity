@@ -244,6 +244,14 @@ public class WalletSdkBridge private constructor(
     ): WalletBridgeResult<WalletIssuanceOutcome> =
         walletBridgeCall { operations.continueAuthorizationIssuance(sessionId, callbackUri) }
 
+    /** Continues the accepted issuance after a fresh holder decision. */
+    public suspend fun retryIssuanceSigning(sessionId: String): WalletBridgeResult<WalletIssuanceOutcome> =
+        walletBridgeCall { operations.retryIssuanceSigning(sessionId) }
+
+    /** Declines signing for the original issuance session and preserves earlier deliveries. */
+    public suspend fun declineIssuanceSigning(sessionId: String): WalletBridgeResult<WalletIssuanceOutcome> =
+        walletBridgeCall { operations.declineIssuanceSigning(sessionId) }
+
     /** Cancels one active issuance session and discards its continuation material. */
     public suspend fun cancelIssuance(
         sessionId: String,
@@ -505,6 +513,9 @@ internal interface WalletSdkBridgeOperations {
         callbackUri: String,
     ): WalletIssuanceOutcome
 
+    suspend fun retryIssuanceSigning(sessionId: String): WalletIssuanceOutcome
+    suspend fun declineIssuanceSigning(sessionId: String): WalletIssuanceOutcome
+
     suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome
 
     suspend fun listDeferredIssuance(): List<WalletIssuanceContinuation>
@@ -647,6 +658,9 @@ internal class MobileWalletSdkBridgeOperations(
         callbackUri: String,
     ): WalletIssuanceOutcome =
         wallet.continueAuthorizationIssuance(sessionId, callbackUri)
+
+    override suspend fun retryIssuanceSigning(sessionId: String): WalletIssuanceOutcome = wallet.retryIssuanceSigning(sessionId)
+    override suspend fun declineIssuanceSigning(sessionId: String): WalletIssuanceOutcome = wallet.declineIssuanceSigning(sessionId)
 
     override suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome =
         wallet.cancelIssuance(sessionId)

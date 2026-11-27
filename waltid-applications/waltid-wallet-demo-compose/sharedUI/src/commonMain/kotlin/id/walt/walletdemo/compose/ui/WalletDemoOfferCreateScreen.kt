@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import id.walt.walletdemo.compose.ui.components.SigningReviewContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -73,8 +74,8 @@ fun WalletDemoOfferCreateScreen(
                 val offer = state.preview
                 val requirement = offer.transactionCode
                 val enabled = !state.submitting
-                val acceptEnabled = enabled && (requirement == null || requirement.accepts(txCode)) &&
-                    offer.offeredCredentials.any { (copies[it.configurationId] ?: 1) > 0 }
+                val acceptEnabled = enabled && (offer.awaitingSigning || ((requirement == null || requirement.accepts(txCode)) &&
+                    offer.offeredCredentials.any { (copies[it.configurationId] ?: 1) > 0 }))
                 val accept = {
                     if (acceptEnabled) onAccept(
                         txCode.trim().ifBlank { null }?.takeIf { requirement != null }, copies,
@@ -90,25 +91,29 @@ fun WalletDemoOfferCreateScreen(
                         fillViewport = false,
                         feedback = state.errorMessage?.let { message -> { Text(message, color = MaterialTheme.colorScheme.error) } },
                         actions = {
-                            OfferReviewActions(offer.requiresIssuerAuthentication, acceptEnabled, enabled, accept, onDecline)
+                            OfferReviewActions(offer.requiresIssuerAuthentication, acceptEnabled, enabled, accept, onDecline, offer.awaitingSigning)
                         },
                     ) {
-                        OfferReviewSection(
-                            preview = offer,
-                            acceptEnabled = acceptEnabled,
-                            reviewEnabled = enabled,
-                            txCode = txCode,
-                            onTxCodeChange = { choices.transactionCode = requirement?.normalizeInput(it) ?: it },
-                            copies = copies,
-                            onCopiesChange = { id, count ->
-                                if (enabled && offer.offeredCredentials.any { it.configurationId == id }) {
-                                    choices.copies = copies + (id to count.coerceIn(0, (offer.batchSize ?: 1).coerceAtLeast(1)))
-                                }
-                            },
-                            onAccept = accept,
-                            onDecline = onDecline,
-                            showActions = false,
-                        )
+                        if (offer.awaitingSigning) {
+                            SigningReviewContent(offer, copies)
+                        } else {
+                            OfferReviewSection(
+                                preview = offer,
+                                acceptEnabled = acceptEnabled,
+                                reviewEnabled = enabled,
+                                txCode = txCode,
+                                onTxCodeChange = { choices.transactionCode = requirement?.normalizeInput(it) ?: it },
+                                copies = copies,
+                                onCopiesChange = { id, count ->
+                                    if (enabled && offer.offeredCredentials.any { it.configurationId == id }) {
+                                        choices.copies = copies + (id to count.coerceIn(0, (offer.batchSize ?: 1).coerceAtLeast(1)))
+                                    }
+                                },
+                                onAccept = accept,
+                                onDecline = onDecline,
+                                showActions = false,
+                            )
+                        }
                     }
                 }
             }

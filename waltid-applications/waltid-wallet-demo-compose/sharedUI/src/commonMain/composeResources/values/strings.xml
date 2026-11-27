@@ -204,4 +204,7 @@
     <string name="proximity_reader_not_evaluated">Reader authentication was not evaluated for this request.</string>
     <string name="proximity_more_requested_fields">Show more requested fields</string>
     <string name="proximity_more_requested_documents">Show more requested documents</string>
+    <string name="issuance_approve_signing">Approve signing</string>
+    <string name="issuance_signing_copies">%1$s × %2$d</string>
+    <string name="issuance_signing_selection">Approve signing to finish receiving the credentials you selected from %1$s.</string>
 </resources>

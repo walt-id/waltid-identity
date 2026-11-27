@@ -77,10 +77,27 @@ sealed interface WalletDemoIssuanceOutcome {
         val storedCredentialIds: List<String> = emptyList(),
         val deferredCredentials: List<WalletDemoDeferredCredential> = emptyList(),
         val offerConsumed: Boolean = false,
+        val signingApprovalRequired: Boolean = false,
+        val remainingSigningTargets: List<String> = emptyList(),
         val failedTargetCount: Int = 0,
         val notAttemptedTargetCount: Int = 0,
         val kind: WalletDemoIssuanceFailureKind = WalletDemoIssuanceFailureKind.General,
     ) : WalletDemoIssuanceOutcome
+}
+
+/** A failed read before approval can leave the existing review in place without new target details. */
+fun WalletDemoIssuanceOutcome.Failed.signingReviewAfter(
+    previous: WalletDemoIssuanceOutcome.Failed?,
+): WalletDemoIssuanceOutcome.Failed? = when {
+    !signingApprovalRequired -> null
+    remainingSigningTargets.isNotEmpty() -> this
+    else -> previous?.copy(message = message)
+}
+
+fun WalletDemoIssuanceOutcome.signingDeclineError(): String? = when (this) {
+    WalletDemoIssuanceOutcome.Cancelled -> null
+    is WalletDemoIssuanceOutcome.Failed -> message
+    else -> "Could not decline signing."
 }
 
 fun WalletDemoIssuanceOutcome.Failed.problem() =

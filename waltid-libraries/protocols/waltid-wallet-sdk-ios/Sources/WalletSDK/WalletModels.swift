@@ -1289,6 +1289,10 @@ public struct IssuanceFailure: Equatable, Sendable {
     /// Whether the caller may submit the same reviewed offer again after this transition.
     public let canRetryOffer: Bool
 
+    /// The holder can retry signing using the same session ID. A read failure can leave this
+    /// available without new target details.
+    public let signingApprovalRequired: Bool
+
     /// Creates a sanitized issuance failure.
     ///
     /// - Parameters:
@@ -1307,10 +1311,23 @@ public struct IssuanceFailure: Equatable, Sendable {
     ///   - targetFailure: The failed credential target and any unattempted targets, when available.
     ///   - canRetryOffer: Whether the caller may submit the same reviewed offer again.
     public init(code: IssuanceErrorCode, message: String, targetFailure: IssuanceTargetFailure? = nil, canRetryOffer: Bool) {
+        self.init(code: code, message: message, targetFailure: targetFailure, canRetryOffer: canRetryOffer, signingApprovalRequired: false)
+    }
+
+    /// Creates a failure with the wallet's decision about resuming the accepted proof.
+    ///
+    /// - Parameters:
+    ///   - code: Stable category of the failed issuance transition.
+    ///   - message: Public description that excludes protocol secrets.
+    ///   - targetFailure: The failed credential target and any unattempted targets, when available.
+    ///   - canRetryOffer: Whether the caller may resubmit the reviewed offer.
+    ///   - signingApprovalRequired: Whether the holder can retry signing on the original session ID.
+    public init(code: IssuanceErrorCode, message: String, targetFailure: IssuanceTargetFailure?, canRetryOffer: Bool, signingApprovalRequired: Bool) {
         self.code = code
         self.message = message
         self.targetFailure = targetFailure
         self.canRetryOffer = canRetryOffer
+        self.signingApprovalRequired = signingApprovalRequired
     }
 }
 

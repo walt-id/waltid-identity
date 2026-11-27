@@ -206,6 +206,13 @@ metadata for review UI. After a failed acceptance, keep Accept available for the
 same offer only if `outcome.error.canRetryOffer` is true. The user can correct a
 rejected transaction code. A lost token response closes the offer.
 
+After the holder dismisses post-exchange signing, `outcome.signingApprovalRequired`
+keeps the original session available for `retryIssuanceSigning(sessionId)` or
+`declineIssuanceSigning(sessionId)`. Run the operation the holder chooses. If a
+temporary read failure returns this flag without new target details, keep the current
+review and earlier progress. Close the signing review when the decline result is
+`Cancelled`.
+
 For an authorization-code offer, call
 `beginAuthorizationIssuance(session.id)` after the user accepts the reviewed
 offer, open the returned browser URL, and then continue with

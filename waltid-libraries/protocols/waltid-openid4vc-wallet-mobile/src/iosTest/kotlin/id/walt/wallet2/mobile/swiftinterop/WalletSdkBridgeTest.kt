@@ -767,6 +767,9 @@ class WalletSdkBridgeTest {
             callbackUri: String,
         ) = error("Not used by this test fake")
 
+        override suspend fun retryIssuanceSigning(sessionId: String): WalletIssuanceOutcome = error("Unexpected signing retry")
+        override suspend fun declineIssuanceSigning(sessionId: String): WalletIssuanceOutcome = error("Unexpected signing decline")
+
         override suspend fun cancelIssuance(sessionId: String): WalletIssuanceOutcome {
             cancelledIssuanceSessionId = sessionId
             return WalletIssuanceOutcome.Cancelled(sessionId)

@@ -34,6 +34,8 @@ private enum WalletStatusText {
     static let resolvingCredentialOffer = "Resolving credential offer..."
     static let reviewCredentialOffer = "Review credential offer"
     static let credentialOfferDeclined = "Credential offer declined"
+    static let decliningSigning = "Declining signing..."
+    static let declineSigningFailed = "Could not decline signing"
     static let receivingCredential = "Receiving credential..."
     static let resolvingPresentation = "Resolving presentation..."
     static let presentingCredential = "Presenting credential..."
@@ -260,7 +262,9 @@ class WalletViewModel: ObservableObject {
     private var statusDismissedKey: String?
     private var statusHideTask: Task<Void, Never>?
     private var receiveTask: Task<Void, Never>?
-    private var issuanceSession: IssuanceSession?
+    @Published private(set) var signingTargets: [IssuanceCredentialTarget] = []
+    var awaitingSigning: Bool { !signingTargets.isEmpty }
+    private var issuanceSession: IssuanceSession? { didSet { signingTargets = [] } }
     private var pendingPresentationSuccessMessage: String?
     private var presentationTask: Task<Void, Never>?
     private var paymentConsentTask: Task<Void, Never>?
@@ -295,7 +299,8 @@ class WalletViewModel: ObservableObject {
     }
 
     var acceptOfferEnabled: Bool {
-        offerReviewEnabled && hasValidTransactionCode &&
+        if awaitingSigning { return offerReviewEnabled }
+        return offerReviewEnabled && hasValidTransactionCode &&
             (offerPreview?.credentials.contains { (issuanceCopyCounts[$0.configurationID] ?? 1) > 0 } ?? false)
     }
 
@@ -1306,7 +1311,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func updateIssuanceCopies(_ configurationID: String, _ count: Int) {
-        guard offerReviewEnabled,
+        guard offerReviewEnabled, !awaitingSigning,
               offerPreview?.credentials.contains(where: { $0.configurationID == configurationID }) == true else { return }
         issuanceCopyCounts[configurationID] = min(max(0, count), max(1, offerPreview?.batchSize ?? 1))
     }
@@ -1338,6 +1343,11 @@ class WalletViewModel: ObservableObject {
         setLoading(WalletStatusText.receivingCredential, tab: .receive, committing: true)
         receiveTask = Task {
             do {
+                if awaitingSigning {
+                    let result = try await walletClient.approveSigning(sessionID: session.id)
+                    try await completeIssuanceOutcome(result, previousCredentials: previousCredentials, request: request)
+                    return
+                }
                 let selections = try issuanceSelections(session.offer)
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
@@ -1370,9 +1380,38 @@ class WalletViewModel: ObservableObject {
     }
 
     func declineOffer() {
+        if awaitingSigning, let sessionID = issuanceSession?.id {
+            guard offerReviewEnabled else { return }
+            setLoading(WalletStatusText.decliningSigning, tab: .receive, committing: true)
+            receiveTask = Task {
+                do {
+                    let outcome = try await walletClient.declineSigning(sessionID: sessionID)
+                    try Task.checkCancellation()
+                    guard issuanceSession?.id == sessionID else { return }
+                    switch outcome {
+                    case .cancelled:
+                        issuanceSession = nil
+                        finishDecliningOffer()
+                    case let .failed(_, error, _, _):
+                        setError(WalletStatusText.failure(WalletStatusText.declineSigningFailed, error.message), tab: .receive)
+                    default:
+                        setError(WalletStatusText.declineSigningFailed, tab: .receive)
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard issuanceSession?.id == sessionID else { return }
+                    setError(WalletStatusText.failure(WalletStatusText.declineSigningFailed, error), tab: .receive)
+                }
+            }
+            return
+        }
         receiveTask?.cancel()
-        let sessionID = issuanceSession?.id
-        issuanceSession = nil
+        cancelIssuanceIfPresent()
+        finishDecliningOffer()
+    }
+
+    private func finishDecliningOffer() {
         offerPreview = nil
         authorizationRequestURL = nil
         offerUrl = ""
@@ -1382,9 +1421,6 @@ class WalletViewModel: ObservableObject {
         externalFlow = nil
         selectedTab = .credentials
         setSuccess(WalletStatusText.credentialOfferDeclined, tab: .credentials)
-        if let sessionID {
-            Task { try? await walletClient.cancelIssuance(sessionID: sessionID) }
-        }
     }
 
     func authorizationRequestOpened() {
@@ -1474,12 +1510,17 @@ class WalletViewModel: ObservableObject {
             setSuccess(WalletStatusText.credentialOfferDeclined, tab: .receive)
             return
         case let .failed(_, error, storedIDs, pending):
+            if error.signingApprovalRequired && error.targetFailure == nil {
+                setError(WalletStatusText.failure(WalletStatusText.receiveFailed, error.message), tab: .receive)
+                return
+            }
             deferredCredentials = (deferredCredentials + pending).reduce(into: []) { result, credential in
                 if let index = result.firstIndex(where: { $0.id == credential.id }) { result[index] = credential }
                 else { result.append(credential) }
             }
             lastReceivedCredentialIDs = storedIDs
-            if !error.canRetryOffer {
+            signingTargets = error.signingApprovalRequired ? error.targetFailure.map { [$0.target] + $0.notAttempted } ?? [] : []
+            if !error.canRetryOffer && !error.signingApprovalRequired {
                 issuanceReceipt = IssuanceReceipt(issuer: issuer, pendingIDs: Set(pending.map(\.id)), problem: error)
                 issuanceSession = nil
                 offerPreview = nil
@@ -1546,6 +1587,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func updateTxCode(_ value: String) {
+        guard !awaitingSigning else { return }
         txCode = offerPreview?.transactionCode.map { normalizedTransactionCode(value, requirement: $0) } ?? value
     }
 
@@ -1993,9 +2035,13 @@ class WalletViewModel: ObservableObject {
 
     private func cancelIssuanceIfPresent() {
         guard let sessionID = issuanceSession?.id else { return }
+        let signing = awaitingSigning
         issuanceSession = nil
         authorizationRequestURL = nil
-        Task { try? await walletClient.cancelIssuance(sessionID: sessionID) }
+        Task {
+            if signing { _ = try? await walletClient.declineSigning(sessionID: sessionID) }
+            else { _ = try? await walletClient.cancelIssuance(sessionID: sessionID) }
+        }
     }
 
     private func discardPresentationPreviewIfPresent() {

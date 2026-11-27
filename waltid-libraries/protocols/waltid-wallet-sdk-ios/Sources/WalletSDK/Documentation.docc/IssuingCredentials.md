@@ -161,6 +161,13 @@ case .cancelled:
 }
 ```
 
+When ``IssuanceFailure/signingApprovalRequired`` is true, show the remaining targets and
+earlier deliveries. If the holder approves, call ``Wallet/retryIssuanceSigning(sessionID:)``
+with the original session ID. If the retry returns this flag without new target details,
+keep the current review and earlier progress. If the holder declines, call
+``Wallet/declineIssuanceSigning(sessionID:)`` and close the review once the wallet returns
+`.cancelled`. This preserves earlier deliveries. A completed deferred poll reports its own stored IDs.
+
 After recreating the wallet, recover pending work with ``Wallet/listDeferredIssuance()``.
 Wait at least ``DeferredCredential/intervalSeconds`` before polling with
 ``Wallet/resumeDeferredIssuance(deferredCredentialID:)``. A still-pending outcome retains

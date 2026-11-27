@@ -942,6 +942,7 @@ class WalletDemoController(
     }
 
     fun updateTxCode(value: String) {
+        if (_state.value.offerPreview?.awaitingSigning == true) return
         _state.update {
             val normalized = it.offerPreview?.transactionCode?.normalizeInput(value) ?: value
             it.copy(requestDrafts = it.requestDrafts.copy(txCode = normalized))
@@ -1149,7 +1150,7 @@ class WalletDemoController(
     fun updateIssuanceCopies(configurationId: String, copies: Int) {
         val current = _state.value
         val preview = current.offerPreview ?: return
-        if (!current.offerReviewEnabled || preview.offeredCredentials.none { it.configurationId == configurationId }) return
+        if (!current.offerReviewEnabled || preview.awaitingSigning || preview.offeredCredentials.none { it.configurationId == configurationId }) return
         val count = copies.coerceIn(0, issuanceCopyLimit(preview, current.issuanceCopyCounts, configurationId))
         _state.compareAndSet(current, current.copy(issuanceCopyCounts = current.issuanceCopyCounts + (configurationId to count)))
     }
@@ -1170,6 +1171,10 @@ class WalletDemoController(
 
         receiveJob = scope.launch(dispatcher) {
             try {
+                if (preview.awaitingSigning) {
+                    completeIssuanceOutcome(ready, request, wallet.approveSigning(session.id))
+                    return@launch
+                }
                 val selections = preview.credentialSelections(current.issuanceCopyCounts, WalletDemoHolderBinding(ready.keyId, ready.did))
                 when (session.grant) {
                     WalletDemoIssuanceGrant.PreAuthorizedCode -> completeIssuanceOutcome(
@@ -1197,6 +1202,50 @@ class WalletDemoController(
 
     fun declineOffer() {
         val sessionId = issuanceSession?.id ?: return
+        val current = _state.value
+        if (current.offerPreview?.awaitingSigning == true) {
+            if (!current.offerReviewEnabled) return
+            val request = ReceiveRequest(current.requestDrafts.offerUrl.trim(), current.receiveNavigationResetKey)
+            if (!_state.compareAndSet(current, current.copy(operation = WalletOperationState.Receiving))) return
+            receiveJob = scope.launch(dispatcher) {
+                val failure = try {
+                    wallet.declineSigning(sessionId).signingDeclineError()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    error.message ?: "Could not decline signing."
+                }
+                currentCoroutineContext().ensureActive()
+                if (!isCurrent(request) || issuanceSession?.id != sessionId) return@launch
+                if (failure == null) {
+                    finishDecliningOffer()
+                } else {
+                    updateIfCurrent(request, WalletOperationState.Receiving) {
+                        it.withFailedOperation(WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, failure), WalletDemoTab.Receive)
+                    }
+                }
+            }
+            return
+        }
+
+        val declined = finishDecliningOffer()
+        scope.launch(dispatcher) {
+            try {
+                val result = wallet.cancelIssuance(sessionId)
+                if (result is WalletDemoIssuanceOutcome.Failed) error(result.message)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                _state.update {
+                    if (it.operation == declined) it.withFailedOperation(
+                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error), WalletDemoTab.Credentials,
+                    ) else it
+                }
+            }
+        }
+    }
+
+    private fun finishDecliningOffer(): WalletOperationState.Succeeded {
         issuanceSession = null
         val declineTab = WalletDemoTab.Credentials
         val declined = WalletOperationState.Succeeded(WalletDisplayText.CredentialOfferDeclined, declineTab)
@@ -1211,19 +1260,7 @@ class WalletDemoController(
                 receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
             ).withPublishedStatus()
         }
-        scope.launch(dispatcher) {
-            try {
-                wallet.cancelIssuance(sessionId)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Throwable) {
-                _state.update {
-                    if (it.operation == declined) it.withFailedOperation(
-                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error), declineTab,
-                    ) else it
-                }
-            }
-        }
+        return declined
     }
 
     private suspend fun completeIssuanceOutcome(
@@ -1287,14 +1324,17 @@ class WalletDemoController(
             }
             is WalletDemoIssuanceOutcome.Failed -> {
                 if (outcome.offerConsumed) issuanceSession = null
+                val signingReview = outcome.signingReviewAfter(_state.value.offerPreview?.signingReview)
+                val progress = signingReview ?: outcome
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.copy(
-                        offerPreview = if (outcome.offerConsumed) null else it.offerPreview,
+                        offerPreview = if (outcome.offerConsumed) null
+                            else it.offerPreview?.copy(signingReview = signingReview),
                         authorizationRequestUrl = null,
                         requestDrafts = if (outcome.offerConsumed) it.requestDrafts.copy(txCode = "") else it.requestDrafts,
                         deferredCredentials = (it.deferredCredentials + outcome.deferredCredentials)
                             .associateBy(WalletDemoDeferredCredential::id).values.toList(),
-                        lastReceivedCredentialIds = outcome.storedCredentialIds,
+                        lastReceivedCredentialIds = progress.storedCredentialIds,
                         issuanceReceipt = if (outcome.offerConsumed) WalletDemoIssuanceReceipt(
                             issuer, outcome.deferredCredentials.map { pending -> pending.id }.toSet(), outcome.problem(),
                         ) else it.issuanceReceipt,
@@ -1305,7 +1345,7 @@ class WalletDemoController(
                 currentCoroutineContext().ensureActive()
                 updateIfCurrent(request, WalletOperationState.Receiving) {
                     it.copy(session = ready.copy(credentials = credentials)).withFailedOperation(
-                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, outcome.messageWithProgress()),
+                        WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, progress.messageWithProgress()),
                         WalletDemoTab.Receive,
                     )
                 }
@@ -2014,9 +2054,10 @@ class WalletDemoController(
 
     private fun cancelIssuance() {
         val sessionId = issuanceSession?.id ?: return
+        val signing = _state.value.offerPreview?.awaitingSigning == true
         issuanceSession = null
         scope.launch(dispatcher) {
-            runCatching { wallet.cancelIssuance(sessionId) }
+            runCatching { if (signing) wallet.declineSigning(sessionId) else wallet.cancelIssuance(sessionId) }
         }
     }
 

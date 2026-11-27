@@ -7,7 +7,10 @@ data class WalletDemoOfferPreview(
     val requiresIssuerAuthentication: Boolean = false,
     val batchSize: Int? = null,
     val holderKeyBudget: Int? = null,
-)
+    val signingReview: WalletDemoIssuanceOutcome.Failed? = null,
+) {
+    val awaitingSigning: Boolean get() = signingReview != null
+}
 
 fun initialIssuanceCopyCounts(preview: WalletDemoOfferPreview): Map<String, Int> {
     val perType = (preview.batchSize ?: 1).coerceAtLeast(1)

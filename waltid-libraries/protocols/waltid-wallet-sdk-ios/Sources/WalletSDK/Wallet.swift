@@ -220,6 +220,22 @@ public actor Wallet {
         try await bridge.continueAuthorizationIssuance(sessionID: sessionID, callbackURI: callbackURI)
     }
 
+    /// Approves only the remaining proof using the original selection and holder keys.
+    ///
+    /// - Parameter sessionID: Identifier of the original issuance session awaiting signing approval.
+    public func retryIssuanceSigning(sessionID: String) async throws -> IssuanceOutcome {
+        try await bridge.retryIssuanceSigning(sessionID: sessionID)
+    }
+
+    /// Declines the remaining proofs and preserves earlier deliveries.
+    ///
+    /// - Parameter sessionID: Identifier of the original issuance session awaiting signing approval.
+    /// - Returns: A cancelled outcome or a typed failure if the wallet could not confirm the decline.
+    /// - Throws: ``WalletError`` when the SDK bridge cannot perform the transition.
+    public func declineIssuanceSigning(sessionID: String) async throws -> IssuanceOutcome {
+        try await bridge.declineIssuanceSigning(sessionID: sessionID)
+    }
+
     /// Cancels an active issuance session and removes its deferred continuations.
     ///
     /// - Parameter sessionID: Opaque identifier of the session to cancel.

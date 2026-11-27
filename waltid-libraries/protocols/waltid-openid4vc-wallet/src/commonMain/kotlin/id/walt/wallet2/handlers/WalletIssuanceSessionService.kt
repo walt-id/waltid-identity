@@ -6,6 +6,8 @@ import id.walt.crypto2.jose.CompactJws
 import id.walt.crypto2.jose.Jwk
 import id.walt.crypto2.jose.selectJwsAlgorithm
 import id.walt.crypto2.keys.Key
+import id.walt.crypto2.keys.KeyUseAuthorizationException
+import id.walt.crypto2.keys.KeyUseAuthorizationFailure
 import id.walt.crypto2.keys.KeyUsage
 import id.walt.crypto2.keys.toPublicJwk
 import id.walt.crypto2.providers.cryptography.defaultSoftwareKeyProviders
@@ -63,11 +65,14 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import id.waltid.openid4vci.wallet.credential.CredentialIssuanceTarget
 import id.waltid.openid4vci.wallet.credential.CredentialEncryption
 import id.waltid.openid4vci.wallet.credential.acceptCredentialResponse
 import id.waltid.openid4vci.wallet.credential.isApplicationJwt
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
 import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
@@ -389,7 +394,19 @@ sealed interface WalletIssuanceOutcome {
         val storedCredentialIds: List<String> = emptyList(),
         val deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
         val failure: CredentialIssuanceFailure? = null,
+        /** Whether the holder can explicitly retry signing with this session ID. */
+        @OptIn(ExperimentalSerializationApi::class)
+        @EncodeDefault(EncodeDefault.Mode.NEVER)
+        val signingApprovalRequired: Boolean = false,
     ) : WalletIssuanceOutcome {
+        constructor(
+            sessionId: String,
+            error: WalletIssuanceError,
+            storedCredentialIds: List<String> = emptyList(),
+            deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
+            failure: CredentialIssuanceFailure? = null,
+        ) : this(sessionId, error, storedCredentialIds, deferredCredentials, failure, signingApprovalRequired = false)
+
         constructor(
             sessionId: String,
             error: WalletIssuanceError,
@@ -401,7 +418,15 @@ sealed interface WalletIssuanceOutcome {
             sessionId: String = this.sessionId,
             error: WalletIssuanceError = this.error,
             storedCredentialIds: List<String> = this.storedCredentialIds,
-        ): Failed = Failed(sessionId, error, storedCredentialIds, deferredCredentials, failure)
+        ): Failed = copy(sessionId, error, storedCredentialIds, deferredCredentials, failure, signingApprovalRequired)
+
+        fun copy(
+            sessionId: String = this.sessionId,
+            error: WalletIssuanceError = this.error,
+            storedCredentialIds: List<String> = this.storedCredentialIds,
+            deferredCredentials: List<WalletIssuanceContinuation> = this.deferredCredentials,
+            failure: CredentialIssuanceFailure? = this.failure,
+        ): Failed = copy(sessionId, error, storedCredentialIds, deferredCredentials, failure, signingApprovalRequired)
     }
 }
 
@@ -624,12 +649,13 @@ class WalletIssuanceSessionService(
             beginTransition(sessionId, SessionState.AWAITING_ACCEPTANCE)
         } catch (error: CancellationException) {
             throw error
+        } catch (_: ActiveSessionReadException) {
+            return failed(sessionId, WalletIssuanceErrorCode.STORAGE, retry = IssuanceRetry.OFFER)
         } catch (error: IssuanceStageException) {
             return failed(sessionId, error.code)
         } catch (error: Exception) {
             log.error(error) { "Could not load issuance session '$sessionId' for pre-authorized issuance" }
-            // The store failed before this attempt could claim the offer or submit its grant.
-            return failed(sessionId, WalletIssuanceErrorCode.STORAGE, canRetryOffer = true)
+            return failed(sessionId, WalletIssuanceErrorCode.STORAGE)
         } ?: return invalidSession(sessionId)
         val grant = active.resolved.offer?.grants?.preAuthorizedCode
             ?: return failAndRemove(active, WalletIssuanceErrorCode.INVALID_SESSION)
@@ -700,6 +726,44 @@ class WalletIssuanceSessionService(
         return complete(active) {
             tokenForAuthorizationCode(active, parsed.code, authorization.pkce.codeVerifier)
         }
+    }
+
+    /** Approves an already exchanged grant using the accepted targets and their original holder keys. */
+    suspend fun retrySigning(sessionId: String): WalletIssuanceOutcome {
+        val active = try {
+            beginTransition(sessionId, SessionState.AWAITING_SIGNATURE)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: ActiveSessionReadException) {
+            return failed(sessionId, WalletIssuanceErrorCode.STORAGE, retry = IssuanceRetry.SIGNING,
+                message = "Could not read the issuance session. Try approving signing again.")
+        } catch (error: IssuanceStageException) {
+            return failed(sessionId, error.code)
+        } catch (_: Exception) {
+            return failed(sessionId, WalletIssuanceErrorCode.STORAGE)
+        } ?: return invalidSession(sessionId)
+        return complete(active)
+    }
+
+    /** Declines only signing, even after the approval expired or the original key became unavailable. */
+    suspend fun declineSigning(sessionId: String): WalletIssuanceOutcome = try {
+        mutex.withLock {
+            val cached = sessions[sessionId]
+            val record = sessionStore?.get(activeRecordId(sessionId))
+            val state = when {
+                cached != null && (!cached.persistable || sessionStore == null || cached.persistedSnapshot == record) -> cached.state
+                record != null -> json.decodeFromString<PersistedActiveSession>(record.payload).state
+                else -> null
+            }
+            if (state != null && state != SessionState.AWAITING_SIGNATURE) return@withLock invalidSession(sessionId)
+            if (record != null && !removeUnchangedRecord(record)) return@withLock invalidSession(sessionId)
+            sessions.remove(sessionId)
+            WalletIssuanceOutcome.Cancelled(sessionId)
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        failed(sessionId, WalletIssuanceErrorCode.STORAGE, message = "Could not save the signing decision. Try declining again.")
     }
 
     /** Cancels idle work. A transition already processing a remote response must finish first. */
@@ -1122,17 +1186,28 @@ class WalletIssuanceSessionService(
     private suspend fun complete(
         active: ActiveSession,
         retryTokenRejection: Boolean = false,
-        obtainToken: suspend () -> TokenRequestBuilder.TokenResponse,
+        obtainToken: (suspend () -> TokenRequestBuilder.TokenResponse)? = null,
     ): WalletIssuanceOutcome {
-        val storedIds = mutableListOf<String>()
+        val pending = active.pendingProof
+        val storedIds = pending?.storedIds.orEmpty().toMutableList()
         val deferredResults = mutableListOf<WalletIssuanceContinuation>()
         return try {
             val advertisedDpop = active.dpopAlgorithms()
-            val token = obtainToken()
+            val token = pending?.token ?: checkNotNull(obtainToken).invoke()
             val dpop = dpopAlgorithmsForToken(token.token_type, advertisedDpop)
-            emitEvent(WalletSessionEvent.issuance_token_obtained)
-
-            issueCredentials(active, token, dpop, storedIds, deferredResults)
+            val deadline = pending?.expiresAt ?: (now() + minOf(sessionPolicy.reviewTtl,
+                token.expires_in?.seconds ?: sessionPolicy.reviewTtl)).toEpochMilliseconds()
+            if (pending == null) emitEvent(WalletSessionEvent.issuance_token_obtained)
+            try {
+                issueCredentials(active, token, dpop, storedIds, deferredResults)
+            } catch (dismissed: SigningDismissed) {
+                val proof = PendingIssuanceProof(token.copy(refresh_token = null), active.tokenRequestAnonymous,
+                    deadline, dismissed.failure.target, storedIds.toList(), deferredResults.map { it.id })
+                val retained = retainProof(active, proof)
+                return failed(active.public.id, WalletIssuanceErrorCode.CRYPTO, storedIds, deferredResults,
+                    dismissed.failure, retry = IssuanceRetry.SIGNING.takeIf { retained },
+                    message = "Signing approval was not completed. Approve signing to continue this issuance.".takeIf { retained })
+            }
             removeSession(active.public.id)
             if (deferredResults.isNotEmpty()) {
                 WalletIssuanceOutcome.Deferred(active.public.id, storedIds, deferredResults.map(::WalletDeferredCredential))
@@ -1166,6 +1241,47 @@ class WalletIssuanceSessionService(
         }
     }
 
+    private suspend fun remainingDeliveries(ids: List<String>): List<WalletIssuanceContinuation> = try {
+        ids.mapNotNull { id ->
+            val cached = mutex.withLock { deferred[id] }
+            val persisted = sessionStore?.get(deferredRecordId(id))
+            when {
+                cached != null && (!cached.persistable || sessionStore == null || cached.persistedSnapshot == persisted) -> cached.public
+                persisted != null -> decodePersistedDeferred(persisted).public
+                else -> null
+            }
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        throw IssuanceStageException(WalletIssuanceErrorCode.STORAGE, error)
+    }
+
+    private class SigningDismissed(val failure: CredentialIssuanceFailure) : Exception()
+
+    private suspend fun retainProof(active: ActiveSession, proof: PendingIssuanceProof): Boolean {
+        if (proof.expiresAt <= nowEpochMilliseconds()) {
+            invalidateActiveSessionBestEffort(active.public.id, active)
+            return false
+        }
+        return try {
+            mutex.withLock {
+                if (sessions[active.public.id] !== active || active.state != SessionState.PROCESSING) return@withLock false
+                val awaiting = active.copy(state = SessionState.AWAITING_SIGNATURE, pendingProof = proof,
+                    authorization = null, expiresAtEpochMilliseconds = proof.expiresAt)
+                persistActive(awaiting)
+                sessions[active.public.id] = awaiting
+                true
+            }
+        } catch (cancelled: CancellationException) {
+            invalidateActiveSessionBestEffort(active.public.id, active)
+            throw cancelled
+        } catch (_: Exception) {
+            invalidateActiveSessionBestEffort(active.public.id, active)
+            false
+        }
+    }
+
     private suspend fun issueCredentials(
         active: ActiveSession,
         token: TokenRequestBuilder.TokenResponse,
@@ -1174,10 +1290,13 @@ class WalletIssuanceSessionService(
         deferredResults: MutableList<WalletIssuanceContinuation>,
     ) {
         val metadata = active.resolved.issuerMetadata.metadata
+        val targets = grantedCredentialSelections(metadata, requireNotNull(active.selections), token.authorization_details, token.scope)
+        val startIndex = active.pendingProof?.target?.let { target -> targets.indexOfFirst { it.target == target } } ?: 0
+        require(startIndex in targets.indices)
         try {
             executeCredentialTargets(
                 wallet, httpClient, metadata,
-                grantedCredentialSelections(metadata, requireNotNull(active.selections), token.authorization_details, token.scope),
+                targets.drop(startIndex),
                 CredentialIssuanceAccess(token.access_token, active.keyMaterial, dpopAlgorithms,
                     active.request.clientId.takeUnless { active.tokenRequestAnonymous },
                     walletClientId = active.request.clientId),
@@ -1192,6 +1311,10 @@ class WalletIssuanceSessionService(
         } catch (error: CredentialIssuanceException) {
             error.storageOutcome?.let { deferredResults += it.deferredCredentials }
             val cause = error.cause
+            if (error.failure.stage == CredentialIssuanceStage.PROOF &&
+                cause is KeyUseAuthorizationException && cause.failure == KeyUseAuthorizationFailure.AuthorizationNotCompleted) {
+                throw SigningDismissed(error.failure)
+            }
             val code = error.storageOutcome?.error?.code ?: (cause as? IssuanceStageException)?.code ?: when {
                 cause is NonceRequestException -> when (cause.error) {
                     NonceRequestError.INVALID_ENDPOINT -> WalletIssuanceErrorCode.ISSUER_METADATA
@@ -1210,6 +1333,9 @@ class WalletIssuanceSessionService(
                 log.error(error) { "Could not store issuance progress for session '${active.public.id}'" }
             }
             throw IssuanceStageException(code, error, error.failure)
+        } finally {
+            // A delivery can settle while the holder is approving the next proof.
+            active.pendingProof?.let { deferredResults.addAll(0, remainingDeliveries(it.deferredIds)) }
         }
     }
 
@@ -1726,7 +1852,9 @@ class WalletIssuanceSessionService(
     private fun ActiveSession.clientConfiguration() =
         ClientConfiguration(request.clientId, listOf(request.redirectUri.toString()))
 
-    private suspend fun beginTransition(sessionId: String, expected: SessionState): ActiveSession? {
+    private suspend fun beginTransition(
+        sessionId: String, expected: SessionState,
+    ): ActiveSession? {
         val active = loadActive(sessionId) ?: return null
         val marked = mutex.withLock {
             if (sessions[sessionId] !== active || active.state != expected) return@withLock false
@@ -1766,11 +1894,20 @@ class WalletIssuanceSessionService(
         }
     }
 
+    private class ActiveSessionReadException(cause: Exception) : Exception(cause)
+
     private suspend fun loadActive(sessionId: String): ActiveSession? {
         if (mutex.withLock { runtime.closed }) return null
         val cached = mutex.withLock { sessions[sessionId] }
         val store = sessionStore
-        val record = store?.get(activeRecordId(sessionId))
+        suspend fun readRecord() = try {
+            store?.get(activeRecordId(sessionId))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            throw ActiveSessionReadException(error)
+        }
+        val record = readRecord()
         if (cached != null && (!cached.persistable || store == null || record == cached.persistedSnapshot)) {
             if (cached.expiresAtEpochMilliseconds <= nowEpochMilliseconds()) {
                 invalidateActiveSessionBestEffort(sessionId)
@@ -1822,11 +1959,16 @@ class WalletIssuanceSessionService(
             "Stored issuance session PKCE binding is invalid"
         }
         when (persisted.state) {
-            SessionState.AWAITING_ACCEPTANCE -> require(persisted.authorization == null) {
+            SessionState.AWAITING_ACCEPTANCE -> require(persisted.pendingProof == null && persisted.authorization == null) {
                 "Stored review session already contains authorization state"
             }
 
-            SessionState.AWAITING_CALLBACK -> require(persisted.authorization != null && persisted.selections != null) {
+            SessionState.AWAITING_SIGNATURE -> require(persisted.pendingProof != null && persisted.selections != null &&
+                persisted.authorization == null && persisted.pendingProof.expiresAt == persisted.expiresAtEpochMilliseconds) {
+                "Stored signing continuation is incomplete"
+            }
+
+            SessionState.AWAITING_CALLBACK -> require(persisted.pendingProof == null && persisted.authorization != null && persisted.selections != null) {
                 "Stored callback session is missing authorization state"
             }
 
@@ -1858,6 +2000,8 @@ class WalletIssuanceSessionService(
             did = persisted.request.did,
             authorization = authorization,
             state = persisted.state,
+            pendingProof = persisted.pendingProof,
+            tokenRequestAnonymous = persisted.pendingProof?.anonymous ?: false,
             expiresAtEpochMilliseconds = persisted.expiresAtEpochMilliseconds,
             attestationChallenge = persisted.attestationChallenge,
             authorizationServerDpopNonce = persisted.authorizationServerDpopNonce,
@@ -1866,7 +2010,7 @@ class WalletIssuanceSessionService(
         )
         return mutex.withLock {
             if (runtime.closed) return@withLock null
-            sessions[sessionId] ?: if (store.get(activeRecordId(sessionId)) == record) {
+            sessions[sessionId] ?: if (readRecord() == record) {
                 active.also { sessions[sessionId] = it }
             } else null
         }
@@ -1901,11 +2045,11 @@ class WalletIssuanceSessionService(
         keyId: String?,
         selectedPublicJwk: String,
     ): WalletKeyStoreEntry {
-        val keyMaterial = resolveIssuanceKeyMaterial(inlineKey = null, keyId = keyId)
+        val keyMaterial = wallet.resolveKeyMaterial(keyId, setOf(KeyUsage.SIGN))
+            ?: throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO)
         val expected = Json.parseToJsonElement(selectedPublicJwk).jsonObject
-        require(publicJwkMatches(keyMaterial.exportPublicJwkObject(), expected)) {
-            "The holder key no longer matches the issuance session"
-        }
+        if (!publicJwkMatches(keyMaterial.exportPublicJwkObject(), expected))
+            throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO)
         return keyMaterial
     }
 
@@ -1937,6 +2081,7 @@ class WalletIssuanceSessionService(
             authorization = active.authorization?.public,
             codeVerifier = active.authorization?.pkce?.codeVerifier,
             state = active.state,
+            pendingProof = active.pendingProof.takeIf { active.state == SessionState.AWAITING_SIGNATURE },
             expiresAtEpochMilliseconds = active.expiresAtEpochMilliseconds,
             attestationChallenge = active.attestationChallenge,
             authorizationServerDpopNonce = active.authorizationServerDpopNonce,
@@ -2318,7 +2463,7 @@ class WalletIssuanceSessionService(
         } catch (error: Exception) {
             return failAndRemove(active, (error as? IssuanceStageException)?.code ?: WalletIssuanceErrorCode.STORAGE)
         }
-        return failed(active.public.id, code, canRetryOffer = canRetry)
+        return failed(active.public.id, code, retry = IssuanceRetry.OFFER.takeIf { canRetry })
     }
 
     private suspend fun rollbackAuthorizationStart(active: ActiveSession) {
@@ -2347,21 +2492,25 @@ class WalletIssuanceSessionService(
         return failed(active.public.id, code, storedIds, deferredCredentials, failure)
     }
 
+    private enum class IssuanceRetry { OFFER, SIGNING }
+
     private suspend fun failed(
         sessionId: String,
         code: WalletIssuanceErrorCode,
         storedIds: List<String> = emptyList(),
         deferredCredentials: List<WalletIssuanceContinuation> = emptyList(),
         failure: CredentialIssuanceFailure? = null,
-        canRetryOffer: Boolean = false,
+        retry: IssuanceRetry? = null,
+        message: String? = null,
     ): WalletIssuanceOutcome.Failed {
         emitEvent(WalletSessionEvent.issuance_failed)
         return WalletIssuanceOutcome.Failed(
             sessionId = sessionId,
-            error = WalletIssuanceError(code, code.publicDescription(), canRetryOffer),
+            error = WalletIssuanceError(code, message ?: code.publicDescription(), canRetryOffer = retry == IssuanceRetry.OFFER),
             storedCredentialIds = storedIds.toList(),
             deferredCredentials = deferredCredentials.toList(),
             failure = failure,
+            signingApprovalRequired = retry == IssuanceRetry.SIGNING,
         )
     }
 
@@ -2436,12 +2585,10 @@ class WalletIssuanceSessionService(
         var challengeContext: ClientAttestationChallengeContext? = null,
         /**
          * Whether the token request for this session used anonymous pre-authorized access.
-         * Both token-exchange paths assign this before any proof is built, and token exchange and
-         * proof building run in the same `complete()` call (no persist/restore in between), so the
-         * default only applies before a token has been obtained. Recording it here lets credential
-         * proofs omit `iss` without re-running attestation (which has side effects).
+         * Restored with a pending proof so a retry keeps the original proof issuer binding.
          */
         var tokenRequestAnonymous: Boolean = false,
+        var pendingProof: PendingIssuanceProof? = null,
         var persistedSnapshot: WalletIssuanceSessionRecord? = null,
         var selections: List<ResolvedWalletCredentialSelection>? = null,
     ) {
@@ -2527,6 +2674,17 @@ class WalletIssuanceSessionService(
         val expiresAtEpochMilliseconds: Long,
         val attestationChallenge: String? = null,
         val authorizationServerDpopNonce: String? = null,
+        val pendingProof: PendingIssuanceProof? = null,
+    )
+
+    @Serializable
+    internal class PendingIssuanceProof(
+        val token: TokenRequestBuilder.TokenResponse,
+        val anonymous: Boolean,
+        val expiresAt: Long,
+        val target: CredentialIssuanceTarget,
+        val storedIds: List<String>,
+        val deferredIds: List<String>,
     )
 
     @Serializable
@@ -2662,7 +2820,7 @@ class WalletIssuanceSessionService(
     ) : Exception(code.name, cause)
 
     @Serializable
-    internal enum class SessionState { AWAITING_ACCEPTANCE, AWAITING_CALLBACK, PROCESSING }
+    internal enum class SessionState { AWAITING_ACCEPTANCE, AWAITING_CALLBACK, PROCESSING, AWAITING_SIGNATURE }
 
     private companion object {
         const val MAX_ACTIVE_SESSIONS = 32

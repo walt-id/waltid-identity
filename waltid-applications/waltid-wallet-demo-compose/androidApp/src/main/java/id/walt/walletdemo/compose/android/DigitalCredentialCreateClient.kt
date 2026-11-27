@@ -17,6 +17,8 @@ import kotlinx.coroutines.ensureActive
 internal interface DigitalCredentialCreateClient {
     data class Offer(val protocol: String, val session: WalletDemoIssuanceSession, val holder: WalletDemoHolderBinding)
     suspend fun prepare(intent: Intent): Offer
+    suspend fun approveSigning(id: String): WalletDemoIssuanceOutcome
+    suspend fun declineSigning(id: String): WalletDemoIssuanceOutcome
     suspend fun accept(id: String, code: String?, selections: List<WalletDemoCredentialSelection>): WalletDemoIssuanceOutcome
     suspend fun authorize(id: String, selections: List<WalletDemoCredentialSelection>): WalletIssuanceAuthorization
     suspend fun continueAuthorization(id: String, callback: String): WalletDemoIssuanceOutcome
@@ -50,6 +52,8 @@ internal class MobileDigitalCredentialCreateClient(
         return DigitalCredentialCreateClient.Offer(input.request.protocol, session, WalletDemoHolderBinding(identity.keyId, identity.did))
     }
 
+    override suspend fun approveSigning(id: String) = wallet().retryIssuanceSigning(id).toDemoIssuanceOutcome()
+    override suspend fun declineSigning(id: String) = wallet().declineIssuanceSigning(id).toDemoIssuanceOutcome()
     override suspend fun accept(id: String, code: String?, selections: List<WalletDemoCredentialSelection>) =
         wallet().continuePreAuthorizedIssuance(id, code, selections.toMobileSelections()).toDemoIssuanceOutcome()
     override suspend fun authorize(id: String, selections: List<WalletDemoCredentialSelection>) =

@@ -112,9 +112,11 @@ struct OfferReviewActions: View {
     let onAccept: () -> Void
     let onDecline: () -> Void
 
+    var awaitingSigning = false
+
     var body: some View {
         WalletActions(
-            primary: WalletAction(requiresIssuerAuthentication ? "Continue to sign in" : "Accept",
+            primary: WalletAction(awaitingSigning ? "Approve signing" : (requiresIssuerAuthentication ? "Continue to sign in" : "Accept"),
                 enabled: isAcceptEnabled, identifier: WalletAccessibilityID.offerAcceptButton, perform: onAccept),
             secondary: WalletAction("Decline", enabled: isReviewEnabled,
                 identifier: WalletAccessibilityID.offerDeclineButton, perform: onDecline)

@@ -275,6 +275,11 @@ internal class MobileDemoWallet(
             WalletDemoIssuanceAuthorization(url = it.url)
         }
 
+    override suspend fun approveSigning(sessionId: String): WalletDemoIssuanceOutcome =
+        mobileWallet.retryIssuanceSigning(sessionId).toDemoIssuanceOutcome()
+    override suspend fun declineSigning(sessionId: String): WalletDemoIssuanceOutcome =
+        mobileWallet.declineIssuanceSigning(sessionId).toDemoIssuanceOutcome()
+
     override suspend fun listDeferredIssuance(): List<WalletDemoDeferredCredential> =
         mobileWallet.listDeferredIssuance().map { it.toDemoDeferredCredential() }
 

@@ -438,6 +438,63 @@ final class WalletViewModelReceiveTests: XCTestCase {
         XCTAssertEqual(calls, 1)
     }
 
+    func testDismissedSigningOffersOnlyAnExplicitApproval() async throws {
+        let (model, client) = try await signingReview()
+        let target = try XCTUnwrap(model.signingTargets.first)
+        model.updateIssuanceCopies(target.configurationID, 0)
+        XCTAssertEqual(model.issuanceCopyCounts[target.configurationID], 1)
+        XCTAssertTrue(model.acceptOfferEnabled)
+
+        await client.failNextSigningApproval(
+            .init(code: .storage, message: "Could not read the issuance session",
+                  targetFailure: nil, canRetryOffer: false, signingApprovalRequired: true)
+        )
+        model.acceptOffer()
+        try await waitUntil { model.isError && !model.isLoading }
+        XCTAssertEqual(model.signingTargets, [target])
+        XCTAssertTrue(model.acceptOfferEnabled)
+        let approvalsAfterFailure = await client.signingApprovals
+        XCTAssertEqual(approvalsAfterFailure, 1)
+
+        model.acceptOffer()
+        try await waitUntil { model.receiveCompleted && !model.isLoading }
+        let approvals = await client.signingApprovals
+        let grantCalls = await client.issuanceContinuationCalls
+        XCTAssertEqual(approvals, 2)
+        XCTAssertEqual(grantCalls, 1)
+        XCTAssertNil(model.offerPreview)
+    }
+
+    func testSigningDeclineKeepsReviewUntilTheWalletConfirmsCancellation() async throws {
+        let (model, client) = try await signingReview()
+        let sessionID = "transaction-code-session"
+        let storageFailure = IssuanceOutcome.failed(
+            sessionID: sessionID, error: .init(code: .storage, message: "Storage temporarily unavailable"),
+            storedCredentialIDs: [], deferredCredentials: []
+        )
+        for reply: Result<IssuanceOutcome, WalletError> in [
+            .success(storageFailure), .failure(.invalidInput("Could not open wallet"))
+        ] {
+            await client.setNextSigningDecline(reply)
+            model.declineOffer()
+            XCTAssertTrue(model.isLoading)
+            XCTAssertNotNil(model.offerPreview)
+            try await waitUntil { model.isError && !model.isLoading }
+            XCTAssertTrue(model.statusMessage.contains("Could not decline signing"))
+            XCTAssertTrue(model.awaitingSigning)
+            XCTAssertTrue(model.acceptOfferEnabled)
+        }
+
+        model.declineOffer()
+        try await waitUntil { model.offerPreview == nil && !model.isLoading }
+        XCTAssertEqual(model.statusMessage, "Credential offer declined")
+        XCTAssertEqual(model.selectedTab, .credentials)
+        let declinedIDs = await client.signingDeclineSessionIDs
+        let ordinaryCancelledIDs = await client.cancelledIssuanceSessionIDs
+        XCTAssertEqual(declinedIDs, Array(repeating: sessionID, count: 3))
+        XCTAssertTrue(ordinaryCancelledIDs.isEmpty)
+    }
+
     func testRejectedTransactionCodeCanBeCorrectedOnTheSameOffer() async throws {
         let failure = IssuanceFailure(code: .issuerResponse, message: "Transaction code rejected", canRetryOffer: true)
         let client = TransactionCodeWalletClient(firstAcceptanceFailure: failure)
@@ -913,6 +970,26 @@ final class WalletViewModelReceiveTests: XCTestCase {
         )
     }
 
+    private func signingReview() async throws -> (WalletViewModel, TransactionCodeWalletClient) {
+        let target = IssuanceCredentialTarget(configurationID: "ExampleCredential")
+        let failure = IssuanceFailure(
+            code: .crypto, message: "Signing was dismissed",
+            targetFailure: .init(target: target, stage: .proof, notAttempted: []),
+            canRetryOffer: false, signingApprovalRequired: true
+        )
+        let client = TransactionCodeWalletClient(transactionCode: nil, firstAcceptanceFailure: failure)
+        let model = WalletViewModel(walletClient: client, identityDocumentRegistrationUpdate: {})
+        model.unlockForTests()
+        try await waitUntil { model.isReady }
+        model.offerUrl = "openid-credential-offer://issuer.example"
+        model.previewOffer()
+        try await waitUntil { model.offerPreview != nil && !model.isLoading }
+        model.acceptOffer()
+        try await waitUntil { model.awaitingSigning && !model.isLoading }
+        XCTAssertEqual(model.signingTargets, [target])
+        return (model, client)
+    }
+
     private func waitUntil(
         timeoutNanoseconds: UInt64 = 20_000_000_000,
         condition: @escaping @MainActor () -> Bool
@@ -958,6 +1035,37 @@ private actor PendingRegistrationUpdate {
 }
 
 private actor TransactionCodeWalletClient: WalletClient {
+    private(set) var signingApprovals = 0
+    private var nextSigningApprovalFailure: IssuanceFailure?
+
+    func failNextSigningApproval(_ failure: IssuanceFailure) {
+        nextSigningApprovalFailure = failure
+    }
+
+    func approveSigning(sessionID: String) async throws -> IssuanceOutcome {
+        signingApprovals += 1
+        if let failure = nextSigningApprovalFailure {
+            nextSigningApprovalFailure = nil
+            return .failed(sessionID: sessionID, error: failure, storedCredentialIDs: [], deferredCredentials: [])
+        }
+        credentialIssued = true
+        return .stored(sessionID: sessionID, credentialIDs: [Self.credential.id])
+    }
+
+    private(set) var signingDeclineSessionIDs: [String] = []
+    private var nextSigningDecline: Result<IssuanceOutcome, WalletError>?
+
+    func setNextSigningDecline(_ result: Result<IssuanceOutcome, WalletError>) {
+        nextSigningDecline = result
+    }
+
+    func declineSigning(sessionID: String) async throws -> IssuanceOutcome {
+        signingDeclineSessionIDs.append(sessionID)
+        let reply = nextSigningDecline
+        nextSigningDecline = nil
+        return try reply?.get() ?? .cancelled(sessionID: sessionID)
+    }
+
     private(set) var issuanceContinuationCalls = 0
     private(set) var issuanceStartCalls = 0
     private(set) var presentationPreviewCalls = 0
