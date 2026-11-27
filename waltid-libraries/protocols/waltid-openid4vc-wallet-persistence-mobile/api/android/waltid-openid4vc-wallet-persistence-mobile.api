@@ -557,7 +557,7 @@ public final class id/walt/wallet2/persistence/stores/DriverFactory {
 	public final fun openExistingEncryptedDriver (Ljava/lang/String;Ljava/lang/String;Lid/walt/wallet2/persistence/encryption/DatabaseEncryptionKey;Ljava/lang/String;)Lapp/cash/sqldelight/db/SqlDriver;
 }
 
-public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore : id/walt/wallet2/data/WalletCredentialInventory, id/walt/wallet2/data/WalletCredentialStore, id/walt/wallet2/status/CredentialStatusInventory {
+public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore : id/walt/wallet2/data/WalletCredentialInventory, id/walt/wallet2/data/WalletCredentialStore, id/walt/wallet2/status/CredentialStatusInventory, id/walt/wallet2/status/StoredCredentialStatusInventory {
 	public fun <init> (Lid/walt/wallet2/persistence/db/WalletPersistenceQueries;)V
 	public fun acknowledgeStatusNotice (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun addCredential (Lid/walt/wallet2/data/StoredCredential;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -570,8 +570,10 @@ public final class id/walt/wallet2/persistence/stores/SqlDelightCredentialStore 
 	public fun readCredentialStatus (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun readCredentialStatusRecord (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun readStatusInput (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun readStatusRow (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun removeCredential (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public fun statusPage (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun statusRows (Ljava/lang/String;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class id/walt/wallet2/persistence/stores/SqlDelightDidStore : id/walt/wallet2/data/WalletDidStore {

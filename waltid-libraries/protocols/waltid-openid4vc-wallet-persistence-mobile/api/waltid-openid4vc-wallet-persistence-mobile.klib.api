@@ -623,7 +623,7 @@ final class id.walt.wallet2.persistence.stores/DriverFactory { // id.walt.wallet
     final fun useAppGroup(kotlin/String): id.walt.wallet2.persistence.stores/DriverFactory // id.walt.wallet2.persistence.stores/DriverFactory.useAppGroup|useAppGroup(kotlin.String){}[0]
 }
 
-final class id.walt.wallet2.persistence.stores/SqlDelightCredentialStore : id.walt.wallet2.data/WalletCredentialInventory, id.walt.wallet2.data/WalletCredentialStore, id.walt.wallet2.status/CredentialStatusInventory { // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore|null[0]
+final class id.walt.wallet2.persistence.stores/SqlDelightCredentialStore : id.walt.wallet2.data/WalletCredentialInventory, id.walt.wallet2.data/WalletCredentialStore, id.walt.wallet2.status/CredentialStatusInventory, id.walt.wallet2.status/StoredCredentialStatusInventory { // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore|null[0]
     constructor <init>(id.walt.wallet2.persistence.db/WalletPersistenceQueries) // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.<init>|<init>(id.walt.wallet2.persistence.db.WalletPersistenceQueries){}[0]
 
     final suspend fun acknowledgeStatusNotice(kotlin/String, kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.acknowledgeStatusNotice|acknowledgeStatusNotice(kotlin.String;kotlin.String){}[0]
@@ -636,8 +636,10 @@ final class id.walt.wallet2.persistence.stores/SqlDelightCredentialStore : id.wa
     final suspend fun readCredentialStatus(kotlin/String): id.walt.wallet2.status/PersistedCredentialStatus? // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.readCredentialStatus|readCredentialStatus(kotlin.String){}[0]
     final suspend fun readCredentialStatusRecord(kotlin/String): id.walt.wallet2.status/CredentialStatusStoredRecord? // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.readCredentialStatusRecord|readCredentialStatusRecord(kotlin.String){}[0]
     final suspend fun readStatusInput(kotlin/String): id.walt.wallet2.status/CredentialStatusInput? // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.readStatusInput|readStatusInput(kotlin.String){}[0]
+    final suspend fun readStatusRow(kotlin/String): id.walt.wallet2.status/StoredCredentialStatusRow? // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.readStatusRow|readStatusRow(kotlin.String){}[0]
     final suspend fun removeCredential(kotlin/String): kotlin/Boolean // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.removeCredential|removeCredential(kotlin.String){}[0]
     final suspend fun statusPage(kotlin/String?, kotlin/Int): kotlin.collections/List<id.walt.wallet2.status/CredentialStatusInput> // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.statusPage|statusPage(kotlin.String?;kotlin.Int){}[0]
+    final suspend fun statusRows(kotlin/String?, kotlin/Int): kotlin.collections/List<id.walt.wallet2.status/StoredCredentialStatusRow> // id.walt.wallet2.persistence.stores/SqlDelightCredentialStore.statusRows|statusRows(kotlin.String?;kotlin.Int){}[0]
 }
 
 final class id.walt.wallet2.persistence.stores/SqlDelightDidStore : id.walt.wallet2.data/WalletDidStore { // id.walt.wallet2.persistence.stores/SqlDelightDidStore|null[0]

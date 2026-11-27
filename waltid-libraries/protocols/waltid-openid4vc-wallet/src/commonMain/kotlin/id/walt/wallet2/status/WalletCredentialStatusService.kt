@@ -2,6 +2,7 @@
 
 package id.walt.wallet2.status
 
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.status.CheckFailure
 import id.walt.credentials.status.CredentialStatus
 import id.walt.credentials.status.CredentialStatusEntry
@@ -148,6 +149,13 @@ class WalletCredentialStatusService private constructor(
         fun record(): Record? = (input as? CredentialStatusInput.Signed)?.let { Record(reference, source, it.credential) }
     }
 
+    private data class SnapshotEntry(
+        val reference: WalletCredentialReference,
+        val notices: CredentialStatusNoticeStore?,
+        val state: State?,
+        val notice: CredentialStatusNoticeState?,
+    )
+
     private data class Record(val reference: WalletCredentialReference, val source: Source, val credential: StoredCredential) {
         val store: Any get() = source.identity
         val fingerprint = credential.statusFingerprint()
@@ -163,6 +171,7 @@ class WalletCredentialStatusService private constructor(
         val persisted: CredentialStatusStoredRecord? = null,
         val policy: String? = null,
         val sessionNotice: SessionNotice? = null,
+        val storedCredentialDigest: String? = null,
     )
     private class Flight(val result: Deferred<CredentialStatusRefreshResult>, var owners: Int = 0)
 
@@ -231,17 +240,16 @@ class WalletCredentialStatusService private constructor(
     /** Returns local observations and pending notices in oldest check time order. */
     suspend fun snapshot(): WalletCredentialStatusSnapshot {
         check(job.isActive) { "Credential status service is closed" }
-        val candidates = candidates()
-        val local = candidates.map { it to it.readLocalState() }
+        val local = snapshotEntries()
         val at = now()
-        val entries = local.map { (candidate, state) ->
-            WalletCredentialStatus(candidate.reference, state?.metadata ?: unreadable, at)
+        val entries = local.map { entry ->
+            WalletCredentialStatus(entry.reference, entry.state?.metadata ?: unreadable, at)
         }
-        val notices = local.mapNotNull { (candidate, state) ->
-            state?.let { pendingNotice(candidate, it, at) }
+        val notices = local.mapNotNull { entry ->
+            entry.state?.let { pendingNotice(entry, it, at) }
         }.sortedWith(compareBy({ it.checkedAt }, { it.reference.storeIndex }, { it.reference.credentialId }))
         mutex.withLock {
-            val retained = candidates.mapTo(mutableSetOf(), Candidate::reference)
+            val retained = local.mapTo(mutableSetOf(), SnapshotEntry::reference)
             states.keys.filter { it !in retained }.forEach {
                 states.remove(it); retryAfter.remove(it); flights.remove(it)?.result?.cancel()
             }
@@ -255,6 +263,19 @@ class WalletCredentialStatusService private constructor(
                 }
             }.minOrNull()
             return WalletCredentialStatusSnapshot(at, entries, flights.keys.toSet(), next, notices)
+        }
+    }
+
+    private suspend fun snapshotEntries(): List<SnapshotEntry> = wallet.credentialStores.flatMapIndexed { index, store ->
+        val source = Source(store)
+        if (store is StoredCredentialStatusInventory) buildList {
+            scanStatusPages(store::statusRows, StoredCredentialStatusRow::id) { row ->
+                val reference = WalletCredentialReference(index, row.id)
+                add(SnapshotEntry(reference, store, row.readLocalState(reference, source), row.notice))
+            }
+        } else candidates(index, store, source).map { candidate ->
+            SnapshotEntry(candidate.reference, source.notices, candidate.readLocalState(),
+                (candidate.input as? CredentialStatusInput.Signed)?.notice)
         }
     }
 
@@ -279,6 +300,11 @@ class WalletCredentialStatusService private constructor(
         return wallet.credentialStores.flatMapIndexed { index, store ->
             val source = Source(store)
             ids.mapNotNull { id ->
+                if (store is StoredCredentialStatusInventory) {
+                    val row = store.readStatusRow(id) ?: return@mapNotNull null
+                    val reference = WalletCredentialReference(index, id)
+                    return@mapNotNull WalletCredentialStatus(reference, row.readLocalState(reference, source)?.metadata ?: unreadable, at)
+                }
                 val input = source.read(id) ?: return@mapNotNull null
                 val reference = WalletCredentialReference(index, id)
                 WalletCredentialStatus(reference, Candidate(reference, source, input).readLocalState()?.metadata ?: unreadable, at)
@@ -286,10 +312,32 @@ class WalletCredentialStatusService private constructor(
         }
     }
 
-    private suspend fun pendingNotice(candidate: Candidate, state: State, at: Instant): PendingCredentialStatusNotice? {
-        val input = candidate.input as CredentialStatusInput.Signed
-        val saved = input.storedStatus?.snapshot
-        val retained = input.notice?.takeIf {
+    private suspend fun StoredCredentialStatusRow.readLocalState(
+        reference: WalletCredentialReference,
+        source: Source,
+    ): State? {
+        check(job.isActive) { "Credential status service is closed" }
+        val stored = storedStatus
+        val cached = mutex.withLock {
+            states[reference]?.takeIf { it.store === source.identity && it.persisted == stored && it.storedCredentialDigest != null }
+        }
+        val digest = cached?.let { credentialDigest() }
+        if (cached != null && cached.storedCredentialDigest == digest && cached.policy == statusTrustPolicy()) {
+            mutex.withLock {
+                check(job.isActive) { "Credential status service is closed" }
+                // A refresh may replace this state while the digest is being checked.
+                if (states[reference] === cached) return cached
+            }
+        }
+        val credential = readCredential() ?: return null
+        val currentDigest = (credential.credential as? SelectivelyDisclosableVerifiableCredential)
+            ?.signedWithDisclosures?.takeIf { it.isNotBlank() }?.let { digest ?: credentialDigest() }
+        return localState(Record(reference, source, credential), stored, currentDigest)
+    }
+
+    private suspend fun pendingNotice(entry: SnapshotEntry, state: State, at: Instant): PendingCredentialStatusNotice? {
+        val saved = state.persisted?.snapshot
+        val retained = entry.notice?.takeIf {
             saved?.schemaVersion == 2 && saved.credentialFingerprint == state.fingerprint
         }
         if (state.sessionNotice == null && (retained == null || retained.acknowledged)) return null
@@ -304,7 +352,7 @@ class WalletCredentialStatusService private constructor(
             retained.previousEvidenceRevision != null && retained.previousEvidenceRevision == state.sessionNotice.evidenceRevision
         ) {
             if (!retained.acknowledged) {
-                candidate.source.notices?.acknowledgeStatusNotice(candidate.reference.credentialId, retained.version)
+                entry.notices?.acknowledgeStatusNotice(entry.reference.credentialId, retained.version)
             }
             return null
         }
@@ -313,7 +361,7 @@ class WalletCredentialStatusService private constructor(
         val historical = entries.none {
             it.referenceId == notice.referenceId && it.meaning == notice.kind && it.lastObservation()?.isFresh(at) == true
         }
-        return PendingCredentialStatusNotice(candidate.reference, notice.version, notice.kind, notice.checkedAt, historical)
+        return PendingCredentialStatusNotice(entry.reference, notice.version, notice.kind, notice.checkedAt, historical)
     }
 
     suspend fun acknowledgeNotice(reference: WalletCredentialReference, version: String) {
@@ -421,20 +469,34 @@ class WalletCredentialStatusService private constructor(
     private suspend fun candidate(reference: WalletCredentialReference, source: Source): Candidate? =
         source.read(reference.credentialId)?.let { Candidate(reference, source, it) }
 
-    private suspend fun candidates(): List<Candidate> = wallet.credentialStores.flatMapIndexed { index, store ->
-        val source = Source(store)
-        val inputs = if (store is CredentialStatusInventory) buildList<CredentialStatusInput> {
-            var cursor: String? = null
-            do {
-                currentCoroutineContext().ensureActive()
-                val page = store.statusPage(cursor, 64)
-                addAll(page)
-                cursor = page.lastOrNull()?.id
-            } while (page.size == 64)
+    private suspend fun candidates(): List<Candidate> =
+        wallet.credentialStores.flatMapIndexed { index, store -> candidates(index, store, Source(store)) }
+
+    private suspend fun candidates(index: Int, store: WalletCredentialStore, source: Source): List<Candidate> {
+        val inputs = if (store is CredentialStatusInventory) buildList {
+            scanStatusPages(store::statusPage, CredentialStatusInput::id) { add(it) }
         } else store.listCredentials().toList().mapNotNull {
             if (store is CredentialStatusNoticeStore) source.read(it.id) else CredentialStatusInput.Signed(it)
         }
-        inputs.map { Candidate(WalletCredentialReference(index, it.id), source, it) }
+        return inputs.map { Candidate(WalletCredentialReference(index, it.id), source, it) }
+    }
+
+    private suspend fun <T> scanStatusPages(
+        readPage: suspend (String?, Int) -> List<T>,
+        id: (T) -> String,
+        visit: suspend (T) -> Unit,
+    ) {
+        val pageSize = 64
+        var cursor: String? = null
+        do {
+            currentCoroutineContext().ensureActive()
+            val page = readPage(cursor, pageSize)
+            for (row in page) {
+                currentCoroutineContext().ensureActive()
+                visit(row)
+            }
+            cursor = page.lastOrNull()?.let(id)
+        } while (page.size == pageSize)
     }
 
     private suspend fun records(): List<Record> = candidates().mapNotNull(Candidate::record)
@@ -500,13 +562,13 @@ class WalletCredentialStatusService private constructor(
     private suspend fun local(record: Record): CredentialStatus =
         localState(record, record.source.snapshots?.readCredentialStatusRecord(record.credential.id)).metadata
 
-    private suspend fun localState(record: Record, stored: CredentialStatusStoredRecord?): State {
+    private suspend fun localState(record: Record, stored: CredentialStatusStoredRecord?, digest: String? = null): State {
         check(job.isActive) { "Credential status service is closed" }
         val policy = statusTrustPolicy()
         mutex.withLock {
             states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint &&
                 it.persisted == stored && it.policy == policy }
-                ?.let { return it }
+                ?.let { return rememberDigest(record.reference, it, digest) }
         }
         val discovered = resolver.discover(record.credential.credential)
         val restored = stored?.snapshot?.takeIf { it.schemaVersion == 2 && it.credentialFingerprint == record.fingerprint }?.let { saved ->
@@ -525,18 +587,26 @@ class WalletCredentialStatusService private constructor(
         return mutex.withLock {
             val cached = states[record.reference]?.takeIf { it.store === record.store && it.fingerprint == record.fingerprint && it.policy == policy }
             if (cached != null) {
-                if (cached.persisted == stored) return@withLock cached
+                if (cached.persisted == stored) return@withLock rememberDigest(record.reference, cached, digest)
                 val reconciled = reconcile(restored, cached.metadata)
                 val restricted = retainedRestrictions(reconciled, cached.metadata, cached.nonPersistentReferenceIds)
-                cached.copy(metadata = reconciled, nonPersistentReferenceIds = restricted, persisted = stored)
+                cached.copy(
+                    metadata = reconciled, nonPersistentReferenceIds = restricted, persisted = stored,
+                    storedCredentialDigest = digest ?: cached.storedCredentialDigest,
+                )
                     .also { states[record.reference] = it }
             } else {
                 flights.remove(record.reference)?.result?.cancel()
-                State(record.store, record.fingerprint, ++generation, restored, persisted = stored, policy = policy)
-                    .also { states[record.reference] = it }
+                State(record.store, record.fingerprint, ++generation, restored, persisted = stored, policy = policy,
+                    storedCredentialDigest = digest).also { states[record.reference] = it }
             }
         }
     }
+
+    // The issuer fingerprint can stay the same when the stored disclosures change.
+    private fun rememberDigest(reference: WalletCredentialReference, state: State, digest: String?): State =
+        if (digest == null || state.storedCredentialDigest == digest) state
+        else state.copy(storedCredentialDigest = digest).also { states[reference] = it }
 
     private fun reconcile(current: CredentialStatus, previous: CredentialStatus): CredentialStatus {
         if (current !is CredentialStatus.References) return previous
@@ -718,6 +788,7 @@ class WalletCredentialStatusService private constructor(
         states[reference] = state.copy(
             persisted = stored,
             sessionNotice = sessionNotice?.let { SessionNotice(it, stored?.revision) },
+            storedCredentialDigest = states[reference]?.storedCredentialDigest,
         )
         if (state.metadata.hasCheckError) retryAfter[reference] = now() + 30.seconds
         else retryAfter.remove(reference)

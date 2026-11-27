@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalObjCRefinement::class)
+
 package id.walt.wallet2.persistence.stores
 
 import id.walt.credentials.CredentialParser
@@ -12,12 +14,16 @@ import id.walt.wallet2.data.WalletCredentialSummary
 import id.walt.wallet2.data.toCredentialSummary
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.status.CredentialStatusInventory
+import id.walt.wallet2.status.StoredCredentialStatusInventory
+import id.walt.wallet2.status.StoredCredentialStatusRow
 import id.walt.wallet2.persistence.db.Credentials
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlin.experimental.ExperimentalObjCRefinement
+import kotlin.native.HiddenFromObjC
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -30,10 +36,17 @@ private const val MAX_BACKFILL_CHARS = 512 * 1024
  */
 public class SqlDelightCredentialStore private constructor(
     private val queries: WalletPersistenceQueries,
-    status: SqlDelightStatusInventory,
-) : WalletCredentialStore, WalletCredentialInventory, CredentialStatusInventory by status {
+    private val status: SqlDelightStatusInventory,
+) : WalletCredentialStore, WalletCredentialInventory, CredentialStatusInventory by status, StoredCredentialStatusInventory {
     /** Opens the foreground credential store in the already-open database. */
     public constructor(queries: WalletPersistenceQueries) : this(queries, SqlDelightStatusInventory(queries))
+
+    @HiddenFromObjC
+    override suspend fun readStatusRow(id: String): StoredCredentialStatusRow? = status.readStatusRow(id)
+
+    @HiddenFromObjC
+    override suspend fun statusRows(afterId: String?, limit: Int): List<StoredCredentialStatusRow> =
+        status.statusRows(afterId, limit)
 
     /**
      * Loads a stored credential by wallet-local identifier.

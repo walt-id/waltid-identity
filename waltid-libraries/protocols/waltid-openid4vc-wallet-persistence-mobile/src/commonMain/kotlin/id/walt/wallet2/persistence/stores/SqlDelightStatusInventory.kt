@@ -8,11 +8,13 @@ import id.walt.wallet2.status.CredentialStatusInput
 import id.walt.wallet2.status.CredentialStatusInventory
 import id.walt.wallet2.status.CredentialStatusNoticeState
 import id.walt.wallet2.status.CredentialStatusStoredRecord
+import id.walt.wallet2.status.StoredCredentialStatusRow
 import id.walt.wallet2.status.statusFingerprint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.Json
+import org.kotlincrypto.hash.sha2.SHA256
 
 internal class SqlDelightStatusInventory(
     private val queries: WalletPersistenceQueries,
@@ -24,31 +26,46 @@ internal class SqlDelightStatusInventory(
         queries.selectCredentialStatus(credentialId).executeAsOneOrNull()?.let(::decodeStatusRecord)
 
     override suspend fun readStatusInput(id: String): CredentialStatusInput? =
-        queries.selectStatusInput(id, ::SignedInput).executeAsOneOrNull()?.parse()
+        readStatusRow(id)?.parse()
 
-    override suspend fun statusPage(afterId: String?, limit: Int): List<CredentialStatusInput> {
+    fun readStatusRow(id: String): StoredCredentialStatusRow? =
+        queries.selectStatusInput(id, ::SignedInput).executeAsOneOrNull()
+
+    fun statusRows(afterId: String?, limit: Int): List<StoredCredentialStatusRow> {
         require(limit in 1..1001)
         val page = if (afterId == null) queries.firstStatusPage(limit.toLong(), ::SignedInput)
             else queries.nextStatusPage(afterId, limit.toLong(), ::SignedInput)
-        return page.executeAsList().map {
+        return page.executeAsList()
+    }
+
+    override suspend fun statusPage(afterId: String?, limit: Int): List<CredentialStatusInput> =
+        statusRows(afterId, limit).map {
             currentCoroutineContext().ensureActive()
             it.parse()
         }
-    }
 
-    private inner class SignedInput(val id: String, val serialized: String, val snapshot: String?, val notice: String?) {
-        suspend fun parse(): CredentialStatusInput = try {
-            CredentialStatusInput.Signed(
-            StoredCredential(id, CredentialParser.detectAndParse(serialized).second),
-            snapshot?.let(::decodeStatusRecord),
-            decodeNotice(notice),
-        )
+    private inner class SignedInput(
+        override val id: String,
+        private val serialized: String,
+        private val snapshot: String?,
+        private val serializedNotice: String?,
+    ) : StoredCredentialStatusRow {
+        override val storedStatus: CredentialStatusStoredRecord? get() = snapshot?.let(::decodeStatusRecord)
+        override val notice: CredentialStatusNoticeState? get() = decodeNotice(serializedNotice)
+
+        override fun credentialDigest(): String = SHA256().digest(serialized.encodeToByteArray()).toHexString()
+
+        override suspend fun readCredential(): StoredCredential? = try {
+            StoredCredential(id, CredentialParser.detectAndParse(serialized).second)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            CredentialStatusInput.Unreadable(id)
+            null
         }
     }
+
+    private suspend fun StoredCredentialStatusRow.parse(): CredentialStatusInput =
+        readCredential()?.let { CredentialStatusInput.Signed(it, storedStatus, notice) } ?: CredentialStatusInput.Unreadable(id)
 
     private fun decodeStatusRecord(raw: String): CredentialStatusStoredRecord? =
         runCatching { json.decodeFromString(CredentialStatusStoredRecord.serializer(), raw) }.getOrNull()
