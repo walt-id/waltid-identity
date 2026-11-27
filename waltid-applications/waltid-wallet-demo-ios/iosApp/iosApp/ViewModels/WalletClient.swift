@@ -28,6 +28,8 @@ protocol WalletClient {
         _ signingProtection: WalletDemoSigningProtection
     ) async throws -> WalletDemoSigningProtectionAvailability
     func credentials() async throws -> [Credential]
+    func credentialSummaries() async throws -> [CredentialSummary]
+    func credential(id: String) async throws -> Credential?
     func listDeferredIssuance() async throws -> [DeferredCredential]
     func startIssuance(_ request: IssuanceRequest) async throws -> IssuanceSession
     func beginAuthorizationIssuance(sessionID: String, credentials: [IssuanceCredentialSelection]?) async throws -> IssuanceAuthorization
@@ -63,6 +65,9 @@ protocol WalletClient {
 }
 
 extension WalletClient {
+    func credentialSummaries() async throws -> [CredentialSummary] { try await credentials().map(CredentialSummary.init) }
+    func credential(id: String) async throws -> Credential? { try await credentials().first { $0.id == id } }
+
     func reconcileBackgroundStatus(automaticChecks: Bool, resumePaused: Bool) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
     func setBackgroundStatusPreference(_ preference: CredentialStatusMaintenancePreference) async throws -> CredentialStatusMaintenanceEnrollment? { nil }
     func invalidateCredentialStatusSnapshot() async throws {}
@@ -172,6 +177,9 @@ final class SDKWalletClient: WalletClient {
             reviewedStatus: reviewedStatus, did: did, paymentConsentRevision: paymentConsentRevision)
     }
 
+    func credentialSummaries() async throws -> [CredentialSummary] { try await wallet().credentialSummaries() }
+    func credential(id: String) async throws -> Credential? { try await wallet().credential(id: id) }
+
     func credentials() async throws -> [Credential] {
         try await wallet().credentials()
     }
@@ -200,7 +208,7 @@ final class SDKWalletClient: WalletClient {
     func resumeDeferredIssuance(deferredCredentialID: String) async throws -> IssuanceOutcome { try await wallet().resumeDeferredIssuance(deferredCredentialID: deferredCredentialID) }
 
     func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
-        try await wallet().previewPresentation(request: request)
+        try await wallet().previewPresentationForClaimReview(request: request)
     }
 
     func preparePaymentConsent(

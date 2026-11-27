@@ -1,10 +1,25 @@
 package id.walt.walletdemo.compose.android
 
+import android.graphics.Color
 import android.graphics.Bitmap
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import coil3.SingletonImageLoader
+import coil3.Uri
+import coil3.annotation.DelicateCoilApi
+import coil3.decode.DataSource
+import coil3.map.Mapper
+import coil3.memory.MemoryCache
+import coil3.request.allowHardware
+import coil3.size.Precision
+import coil3.toBitmap
+import coil3.toUri
+import id.walt.walletdemo.compose.logic.WalletDemoIssuerMetadata
+import id.walt.walletdemo.compose.logic.WalletDemoMetadataDisplay
+import id.walt.walletdemo.compose.logic.WalletDemoOfferPreview
+import id.walt.walletdemo.compose.logic.WalletDemoOfferedCredentialMetadata
+import id.walt.walletdemo.compose.ui.prefetchOfferCardArt
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -13,6 +28,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -30,6 +46,38 @@ import kotlin.concurrent.thread
 
 @RunWith(AndroidJUnit4::class)
 class WalletImageLoaderInitializationTest {
+    @OptIn(DelicateCoilApi::class)
+    @Test
+    fun prefetchStoresEncodedArtworkAndTheCardDecodesAtItsDisplaySize() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val original = SingletonImageLoader.get(context)
+        ImageResponse(stalled = false, width = 1600, height = 1000).use { server ->
+            val artwork = "https://artwork.example/${server.url.substringAfterLast(':')}"
+            val cache = MemoryCache.Builder().maxSizeBytes(16L * 1024 * 1024).build()
+            val loader = original.newBuilder().memoryCache(cache).components {
+                add(Mapper<String, Uri> { data, _ -> server.url.toUri().takeIf { data == artwork } })
+            }.build()
+            SingletonImageLoader.setUnsafe(loader)
+            try {
+                val display = WalletDemoMetadataDisplay("Credential", null, null, backgroundImageUri = artwork)
+                val item = WalletDemoOfferedCredentialMetadata("credential", "dc+sd-jwt", null, null, display, emptyList())
+                prefetchOfferCardArt(context, WalletDemoOfferPreview(WalletDemoIssuerMetadata("issuer", null), listOf(item), null))
+                assertEquals(0L, cache.size)
+                val displayRequest = ImageRequest.Builder(context).data(artwork).size(336, 210)
+                    .precision(Precision.EXACT).allowHardware(false).networkCachePolicy(CachePolicy.DISABLED).build()
+                val result = loader.execute(displayRequest) as SuccessResult
+                assertEquals(DataSource.DISK, result.dataSource)
+                val bitmap = result.image.toBitmap()
+                assertEquals(336, bitmap.width)
+                assertEquals(210, bitmap.height)
+                assertEquals(Color.MAGENTA, bitmap.getPixel(168, 105))
+            } finally {
+                SingletonImageLoader.setUnsafe(original)
+                loader.shutdown()
+            }
+        }
+    }
+
     @Test
     fun cancellingAnImageBodyReadKeepsTheLoaderUsable() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -70,7 +118,7 @@ class WalletImageLoaderInitializationTest {
         }
     }
 
-    private class ImageResponse(stalled: Boolean) : AutoCloseable {
+    private class ImageResponse(stalled: Boolean, width: Int = 2, height: Int = 2) : AutoCloseable {
         private val server = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
         private val socket = AtomicReference<Socket>()
         private val failure = AtomicReference<Throwable>()
@@ -85,13 +133,14 @@ class WalletImageLoaderInitializationTest {
                     val input = connection.getInputStream().bufferedReader()
                     while (!input.readLine().isNullOrEmpty()) { /* Consume request headers. */ }
                     val image = ByteArrayOutputStream().use { output ->
-                        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        bitmap.eraseColor(Color.MAGENTA)
                         bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
                         bitmap.recycle()
                         output.toByteArray()
                     }
                     val output = connection.getOutputStream()
-                    output.write("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: ${image.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                    output.write("HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nCache-Control: max-age=3600\r\nContent-Length: ${image.size}\r\nConnection: close\r\n\r\n".toByteArray())
                     output.write(image, 0, 1)
                     output.flush()
                     bodyStarted.countDown()

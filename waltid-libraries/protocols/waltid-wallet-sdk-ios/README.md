@@ -32,6 +32,12 @@ generated bridge symbols behind the package implementation.
 - Local binary dependency: `WalletCore.xcframework`
 - Current delivery mode: local package plus locally assembled XCFramework
 
+## Lists and detail
+
+Use `try await wallet.credentialSummaries()` for list rows. On selection, `try await wallet.credential(id: row.id)` loads the full credential with its local status and returns `nil` if it was removed. Managed storage reads indexed fields. A custom Swift `WalletCredentialStore` provides full rows from which the SDK derives summaries.
+
+For OpenID4VP consent, use `previewPresentationForClaimReview(request:)` and render the effective claims from `reviewPresentation`. Pass the same selections to submission after approval. See the [presentation guide](Sources/WalletSDK/Documentation.docc/PresentingCredentials.md).
+
 ## Credential status
 
 Read `credentialStatusSnapshot()` or observe `credentialStatuses` without issuer networking.
@@ -130,7 +136,7 @@ let outcome = try await wallet.continuePreAuthorizedIssuance(
     sessionID: session.id,
     transactionCode: transactionCode
 )
-let credentials = try await wallet.credentials()
+let rows = try await wallet.credentialSummaries()
 let presentation = try await wallet.present(
     request: authorizationRequestURL,
     did: identity.did

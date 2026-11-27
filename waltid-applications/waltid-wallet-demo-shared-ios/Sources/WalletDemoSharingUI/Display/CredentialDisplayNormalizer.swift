@@ -14,11 +14,19 @@ public enum CredentialDisplayNormalizer {
         }
     }
 
-    /// Build one display snapshot off the main thread. Image claims remain unresolved.
-    public static func details(for credentials: [Credential]) async -> [CredentialDetails] {
+    public static func cards(for summaries: [CredentialSummary]) async -> [CredentialCardItem] {
         await withCheckedContinuation { continuation in
             queue.async {
-                continuation.resume(returning: credentials.map(details(for:)))
+                continuation.resume(returning: summaries.map { CredentialCardItem(id: $0.id, summary: .stored(from: $0)) })
+            }
+        }
+    }
+
+    /// Build one display snapshot off the main thread. Image claims remain unresolved.
+    public static func loadDetails(for credential: Credential) async -> CredentialDetails {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume(returning: details(for: credential))
             }
         }
     }

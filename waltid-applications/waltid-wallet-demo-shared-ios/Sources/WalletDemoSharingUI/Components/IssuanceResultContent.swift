@@ -15,7 +15,8 @@ public extension EnvironmentValues {
 
 public struct IssuanceResultContent: View {
     private let receipt: IssuanceReceipt?
-    private let saved: [Credential]
+    private let saved: [CredentialSummary]
+    private let loadCredential: (String) async throws -> Credential?
     private let pending: [DeferredCredential]
     private let busy: Bool
     private let onResume: (DeferredCredential) -> Void
@@ -23,8 +24,16 @@ public struct IssuanceResultContent: View {
 
     public init(receipt: IssuanceReceipt?, saved: [Credential], pending: [DeferredCredential], busy: Bool,
                 missingSavedCount: Int = 0, onResume: @escaping (DeferredCredential) -> Void) {
+        self.init(receipt: receipt, summaries: saved.map(CredentialSummary.init), pending: pending, busy: busy,
+                  missingSavedCount: missingSavedCount, loadCredential: { id in saved.first { $0.id == id } }, onResume: onResume)
+    }
+
+    public init(receipt: IssuanceReceipt?, summaries: [CredentialSummary], pending: [DeferredCredential], busy: Bool,
+                missingSavedCount: Int = 0, loadCredential: @escaping (String) async throws -> Credential?,
+                onResume: @escaping (DeferredCredential) -> Void) {
         self.receipt = receipt
-        self.saved = saved
+        self.saved = summaries
+        self.loadCredential = loadCredential
         self.pending = pending
         self.busy = busy
         self.onResume = onResume
@@ -42,7 +51,7 @@ public struct IssuanceResultContent: View {
                 WalletSection(String(format: String(localized: "Saved · %d", bundle: .module), saved.count + missingSavedCount)) {
                     VStack(spacing: 0) {
                         ForEach(saved, id: \.id) { credential in
-                            SavedCredentialRow(credential: credential)
+                            SavedCredentialRow(credential: credential, loadCredential: loadCredential)
                             if credential.id != saved.last?.id { Divider() }
                         }
                     }
@@ -79,7 +88,10 @@ public struct IssuanceResultContent: View {
 }
 
 private struct SavedCredentialRow: View {
-    let credential: Credential
+    let credential: CredentialSummary
+    let loadCredential: (String) async throws -> Credential?
+    @State private var details: CredentialDetails?
+    @State private var unavailable = false
     @State private var detailsOpen = false
     @Environment(\.walletReviewNavigationAvailable) private var hasNavigation
     @Environment(\.retainWalletReceipt) private var retainReceipt
@@ -96,15 +108,31 @@ private struct SavedCredentialRow: View {
         .walletReviewDestination(isPresented: $detailsOpen) {
             if hasNavigation {
                 WalletDetailPage(String(localized: "Credential information", bundle: .module)) {
-                    CredentialInformationContent(details: CredentialDisplayNormalizer.details(for: credential))
+                    information
                 }
             } else {
                 WalletDetailSheet(String(localized: "Credential information", bundle: .module), onDismiss: { detailsOpen = false }) {
-                    CredentialInformationContent(details: CredentialDisplayNormalizer.details(for: credential))
+                    information
                 }
             }
         }
     }
+    private var information: some View {
+        Group {
+            if let details { CredentialInformationContent(details: details) }
+            else if unavailable { Text(String(localized: "Credential details are unavailable.", bundle: .module)) }
+            else { ProgressView() }
+        }.task(id: credential.id) {
+            details = nil
+            unavailable = false
+            if let value = try? await loadCredential(credential.id) {
+                let loaded = await CredentialDisplayNormalizer.loadDetails(for: value)
+                if !Task.isCancelled { details = loaded }
+            } else if !Task.isCancelled { unavailable = true }
+        }
+        .onDisappear { details = nil }
+    }
+
 }
 
 private struct PendingCredentialRow: View {

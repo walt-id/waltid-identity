@@ -33,6 +33,9 @@ CREATE TABLE credentials (
     holder_key_binding TEXT
 );
 
+selectCredentialIds:
+SELECT id FROM credentials;
+
 selectAllCredentials:
 SELECT * FROM credentials;
 
@@ -70,6 +73,38 @@ VALUES (?, ?, ?, ?, ?, ?, ?);
 deleteCredentialById:
 DELETE FROM credentials WHERE id = ?;
 
+CREATE TABLE credential_inventory (
+    credential_id TEXT NOT NULL PRIMARY KEY REFERENCES credentials(id) ON DELETE CASCADE,
+    issuer TEXT,
+    subject TEXT,
+    type_metadata TEXT NOT NULL
+);
+
+CREATE TRIGGER invalidate_inventory_on_insert AFTER INSERT ON credentials BEGIN
+    DELETE FROM credential_inventory WHERE credential_id = new.id;
+END;
+
+CREATE TRIGGER invalidate_inventory_on_update AFTER UPDATE OF serialized_credential, id ON credentials BEGIN
+    DELETE FROM credential_inventory WHERE credential_id IN (old.id, new.id);
+END;
+
+CREATE TRIGGER invalidate_inventory_on_delete AFTER DELETE ON credentials BEGIN
+    DELETE FROM credential_inventory WHERE credential_id = old.id;
+END;
+
+selectCredentialSummaries:
+SELECT c.id, c.format, c.label, c.added_at, c.metadata, i.issuer, i.subject, i.type_metadata
+FROM credentials AS c LEFT JOIN credential_inventory AS i ON i.credential_id = c.id;
+
+saveCredentialInventory:
+INSERT OR REPLACE INTO credential_inventory (credential_id, issuer, subject, type_metadata)
+VALUES (?, ?, ?, ?);
+
+saveCredentialInventoryIfCurrent:
+INSERT OR REPLACE INTO credential_inventory (credential_id, issuer, subject, type_metadata)
+SELECT id, :issuer, :subject, :type_metadata FROM credentials
+WHERE id = :credential_id AND serialized_credential = :expected_credential;
+
 -- Small authenticated observations, protected by the same encrypted database as credentials.
 CREATE TABLE credential_status_snapshots (
     credential_id TEXT NOT NULL PRIMARY KEY REFERENCES credentials(id) ON DELETE CASCADE,
@@ -94,6 +129,10 @@ AND (SELECT snapshot FROM credential_status_snapshots WHERE credential_id = :cre
 
 credentialStatusChanges:
 SELECT changes();
+
+deleteCredentialStatusForReplacement:
+DELETE FROM credential_status_snapshots WHERE credential_id = :id
+AND NOT EXISTS (SELECT 1 FROM credentials WHERE id = :id AND serialized_credential = :serialized_credential);
 
 deleteCredentialStatus:
 DELETE FROM credential_status_snapshots WHERE credential_id = ?;

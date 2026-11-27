@@ -64,7 +64,7 @@ internal fun PresentTab(
                 is id.walt.walletdemo.compose.logic.WalletOperationState.Succeeded -> result.message
                 is id.walt.walletdemo.compose.logic.WalletOperationState.Failed -> result.message
                 else -> "The sharing operation has ended."
-            }, style = MaterialTheme.typography.bodyLarge,
+            }, modifier = Modifier.testTag("wallet.presentationResultMessage"), style = MaterialTheme.typography.bodyLarge,
                 color = if (result is id.walt.walletdemo.compose.logic.WalletOperationState.Failed)
                     MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
         }

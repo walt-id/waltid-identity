@@ -422,7 +422,7 @@ class WalletIssuanceSessionService(
     private val sessionPolicy: WalletIssuanceSessionPolicy = WalletIssuanceSessionPolicy(),
     private val now: () -> Instant = { Clock.System.now() },
     runtimeState: WalletIssuanceSessionState?,
-) {
+) : AutoCloseable {
     /** Creates an engine with its own runtime state; retains the released constructor contract. */
     constructor(
         wallet: Wallet,
@@ -448,7 +448,13 @@ class WalletIssuanceSessionService(
         }
     }
 
-    private val httpClient = httpClient ?: WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
+    private val ownedFetcher = if (httpClient == null) WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER) else null
+    private val httpClient = httpClient ?: requireNotNull(ownedFetcher).httpClient
+
+    /** Releases the transport created by this service. Persisted continuations can be reopened by another wallet. */
+    override fun close() {
+        ownedFetcher?.close()
+    }
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = false }
     private val mutex = runtime.mutex
     private val sessions = runtime.sessions

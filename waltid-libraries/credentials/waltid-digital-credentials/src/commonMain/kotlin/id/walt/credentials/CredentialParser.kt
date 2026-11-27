@@ -19,6 +19,8 @@ import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.DataIntegrityProofCredentialSignature
 import id.walt.credentials.signatures.JwtCredentialSignature
 import id.walt.credentials.signatures.SdJwtCredentialSignature
+import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
+import id.walt.sdjwt.ObjectPropertyDisclosure
 import id.walt.credentials.signatures.sdjwt.SdJwtDisclosureLocator
 import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
@@ -319,9 +321,22 @@ object CredentialParser {
         // Disclosures follow the first "~" in the full credential string.
         // `signature` is the bare JWT signature bytes (no tilde); disclosures must be
         // extracted from `credential` itself per RFC 9901 §4 compact serialisation format.
-        val disclosuresPart = credential.substringAfter("~", "")
-        log.trace { "Parsing disclosures: $disclosuresPart" }
-        val parsedDisclosures = parseDisclosureString(disclosuresPart)
+        val type = header["typ"]?.jsonPrimitive?.content
+        val compact = if (type == "dc+sd-jwt" || type == "vc+sd-jwt") SDJwt.parse(credential) else null
+        val parsedDisclosures = if (compact == null) {
+            parseDisclosureString(credential.substringAfter("~", ""))
+        } else if (credential.indexOf('~') !in 0 until credential.lastIndex) {
+            null
+        } else {
+            compact.digestedDisclosures.values.map { disclosure ->
+                SdJwtSelectiveDisclosure(
+                    salt = disclosure.salt,
+                    name = (disclosure as? ObjectPropertyDisclosure)?.key,
+                    value = disclosure.value,
+                    encoded = disclosure.disclosure,
+                )
+            }
+        }
         val locatedDisclosures = SdJwtDisclosureLocator.locate(payload, parsedDisclosures.orEmpty())
         val availableDisclosures = parsedDisclosures?.let { locatedDisclosures }
 
@@ -341,7 +356,7 @@ object CredentialParser {
             if (availableDisclosures?.isNotEmpty() == true ||
                 header.getValue("typ").jsonPrimitive.content.let { it == "vc+sd-jwt" || it == "dc+sd-jwt" }
             ) {
-                SDJwt.parse(credential).fullPayload
+                (compact ?: SDJwt.parse(credential)).fullPayload
             } else payload
 
         return when {

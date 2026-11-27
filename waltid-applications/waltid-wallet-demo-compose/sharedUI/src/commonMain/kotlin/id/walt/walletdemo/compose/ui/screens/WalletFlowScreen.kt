@@ -24,6 +24,7 @@ internal fun WalletFlowScreen(
         requestKey = "${state.selectedTab}:${state.receiveNavigationResetKey}:${state.presentationNavigationResetKey}",
         offer = state.offerPreview,
         savedCredentials = state.receivedCredentials(),
+        loadCredential = controller::credentialDetails,
         enabled = !state.isBusy,
         onClose = onClose.takeIf { state.canDismissExternalFlow },
         header = {

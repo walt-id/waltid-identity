@@ -82,10 +82,10 @@ struct ReceiveView: View {
     private var resultContent: some View {
         WalletReviewScaffold {
             WalletTabStatusBanner(viewModel: viewModel, tab: .receive)
-            IssuanceResultContent(receipt: viewModel.issuanceReceipt, saved: viewModel.receivedCredentials,
+            IssuanceResultContent(receipt: viewModel.issuanceReceipt, summaries: viewModel.receivedCredentials,
                 pending: pendingCredentials,
                 busy: viewModel.isLoading, missingSavedCount: viewModel.missingReceivedCredentialIDs.count,
-                onResume: viewModel.resumeDeferredCredential)
+                loadCredential: viewModel.credential(id:), onResume: viewModel.resumeDeferredCredential)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier(sheetLayoutReady && !viewModel.isLoading
                     ? "issuance-receipt-ready" : "issuance-receipt")

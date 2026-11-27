@@ -41,7 +41,7 @@ final class WalletVisualTests: XCTestCase {
         let fixtures = try WalletVisualFixtures()
         let credential = try fixtures.credential()
         let model = makeModel()
-        model.isReady = true; model.statusMessage = ""; model.credentials = [credential]
+        model.isReady = true; model.statusMessage = ""; model.credentials = [CredentialSummary(credential)]
         let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
         let status = try fixtures.credentialStatus("revoked_partial")
         try capture(CredentialsTabView(viewModel: model, selectedDetailsID: .constant(nil), cards: cards,
@@ -65,7 +65,7 @@ final class WalletVisualTests: XCTestCase {
         let queued = PendingCredentialStatusNotice(credentialID: other.id, version: "suspended-v1",
             kind: .suspended, checkedAt: checkedAt.addingTimeInterval(23), historical: false)
         let model = makeModel()
-        model.credentials = [credential, other]
+        model.credentials = [credential, other].map(CredentialSummary.init)
         model.isReady = true
         model.statusMessage = "Wallet operation completed"
         let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
@@ -429,7 +429,7 @@ final class WalletVisualTests: XCTestCase {
         await model.readerTrustSettings.awaitPendingOperations()
         model.isReady = true
         model.statusMessage = ""
-        model.credentials = empty ? [] : [try WalletVisualFixtures().credential()]
+        model.credentials = empty ? [] : [CredentialSummary(try WalletVisualFixtures().credential())]
         let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
         XCTAssertEqual(cards.count, model.credentials.count)
         try capture(CredentialsTabView(viewModel: model, selectedDetailsID: .constant(nil), cards: cards,
@@ -792,7 +792,7 @@ final class WalletVisualTests: XCTestCase {
         model.selectedTab = .receive
         model.statusMessage = try fixtures.partialResultStatus()
         if missingDetails { model.statusMessage = "Received 2 credential(s)" }
-        model.credentials = [try fixtures.credential()]
+        model.credentials = [CredentialSummary(try fixtures.credential())]
         model.lastReceivedCredentialIDs = model.credentials.map(\.id)
         if missingDetails { model.lastReceivedCredentialIDs.append("missing-credential") }
         let pending = try fixtures.deferredCredential()

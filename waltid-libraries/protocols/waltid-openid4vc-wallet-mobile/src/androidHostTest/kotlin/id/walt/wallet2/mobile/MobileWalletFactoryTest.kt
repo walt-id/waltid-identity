@@ -6,6 +6,7 @@ import id.walt.crypto2.keys.Key as ManagedKeyMaterial
 import id.walt.wallet2.mobile.identity.*
 import id.walt.crypto2.keys.PlatformKeyFacts
 import id.walt.wallet2.persistence.keys.WalletKeyProtection
+import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import com.sun.net.httpserver.HttpServer
 import id.walt.crypto2.algorithms.DigestAlgorithm
@@ -82,6 +83,31 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MobileWalletFactoryTest {
+    @Test
+    fun factoryClosesItsDriverOnceAndReopensOnlyToDelete() = runTest {
+        database().use { database ->
+            var opened = 0
+            var closed = 0
+            val wallet = encryptedWallet(MobileWalletConfig(), database, FakePlatformManagedKeyProvider()) {
+                opened++
+                object : SqlDriver by database.driver {
+                    override fun close() { closed++ }
+                }
+            }
+            database.queries.insertCredential("unindexed", "unreadable", "mso_mdoc", null, 0, null, null)
+            wallet.close()
+            wallet.close()
+            assertEquals(1, opened)
+            assertEquals(1, closed)
+            assertFailsWith<IllegalStateException> { wallet.credentialSummaries() }
+            wallet.deleteWallet()
+            wallet.deleteWallet()
+            assertEquals(2, opened)
+            assertEquals(2, closed)
+            assertTrue(database.queries.selectCredentialIds().executeAsList().isEmpty())
+        }
+    }
+
     @Test
     fun `cold factory reopens saved identity and authenticates DID requests without creating keys`() = runTest {
         val verifier = JWKKey.generate(KeyType.secp256r1)
@@ -199,6 +225,7 @@ class MobileWalletFactoryTest {
         config: MobileWalletConfig,
         database: TestDatabase,
         provider: FakePlatformManagedKeyProvider,
+        openDriver: () -> SqlDriver = { database.driver },
     ): MobileWallet = createEncryptedSqlDelightMobileWallet(
         config = config,
         clientIdTrustConfiguration = ClientIdTrustConfiguration(),
@@ -214,7 +241,7 @@ class MobileWalletFactoryTest {
             override fun create(configuration: BleProximityTransportConfiguration): ReaderSelectedTransportProvider =
                 error("No transport needed")
         },
-        openEncryptedDriver = { _, _, _, _ -> database.driver },
+        openEncryptedDriver = { _, _, _, _ -> openDriver() },
         deleteDatabase = {},
     )
 

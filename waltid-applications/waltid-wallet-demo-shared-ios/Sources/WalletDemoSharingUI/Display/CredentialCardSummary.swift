@@ -57,15 +57,23 @@ public struct CredentialCardSummary {
 
     /// The list card uses issuer artwork and a title; personal claim groups stay unopened.
     public static func stored(from credential: Credential) -> CredentialCardSummary {
+        stored(format: credential.format, label: credential.label, typeMetadataJSON: credential.credentialDataJSON, metadataJSON: credential.metadataJSON)
+    }
+
+    public static func stored(from summary: CredentialSummary) -> CredentialCardSummary {
+        stored(format: summary.format, label: summary.label, typeMetadataJSON: summary.typeMetadataJSON, metadataJSON: summary.metadataJSON)
+    }
+
+    private static func stored(format: String, label: String?, typeMetadataJSON: String, metadataJSON: String?) -> CredentialCardSummary {
         let display = StoredCredentialMetadataParser.credentialDisplay(
-            from: credential.metadataJSON, preferredLocales: Locale.preferredLanguages
+            from: metadataJSON, preferredLocales: Locale.preferredLanguages
         )
         return CredentialCardSummary(
             title: CredentialTitles.displayName(
-                format: credential.format,
-                credentialDataJSON: credential.credentialDataJSON,
+                format: format,
+                credentialDataJSON: typeMetadataJSON,
                 displayName: display?.name,
-                fallback: credential.label ?? credential.format
+                fallback: label ?? format
             ),
             backgroundColor: display?.backgroundColor,
             backgroundImageURI: display?.backgroundImageURI,

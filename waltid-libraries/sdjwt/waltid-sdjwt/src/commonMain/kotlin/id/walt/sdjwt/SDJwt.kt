@@ -231,27 +231,41 @@ open class SDJwt internal constructor(
          * Parse SD-JWT from a token string
          */
         fun parse(sdJwt: String): SDJwt {
-            val matchResult = Regex(SD_JWT_PATTERN).matchEntire(sdJwt)
-                ?: throw IllegalArgumentException("Invalid SD-JWT format: $sdJwt")
-            val matchedGroups = matchResult.groups as MatchNamedGroupCollection
-            val disclosures = matchedGroups["disclosures"]?.value?.trim(SEPARATOR)?.split(SEPARATOR) ?: emptyList()
+            fun invalidFormat(): Nothing = throw IllegalArgumentException("Invalid SD-JWT format: $sdJwt")
+
+            // The compact serialization is ASCII. Android's regex matcher copies its whole input
+            // to native UTF-16, including any large disclosures.
+            val parts = sdJwt.split(SEPARATOR)
+            val issuerJwt = parts.first()
+            val issuerParts = compactJwsParts(issuerJwt) ?: invalidFormat()
+            val lastPart = parts.last()
+            val keyBindingJwt = lastPart.takeIf { parts.size > 1 && '.' in it }
+            if (keyBindingJwt != null && compactJwsParts(keyBindingJwt) == null) invalidFormat()
+            val isPresentation = lastPart.isEmpty() || keyBindingJwt != null
+            val disclosures = parts.subList(1, if (isPresentation) parts.lastIndex else parts.size)
+            if (!disclosures.all(::isBase64UrlPart)) invalidFormat()
             val uniqueDisclosures = disclosures.toSet()
             if (uniqueDisclosures.size != disclosures.size) {
                 throw SDJwtVerificationException("Duplicate disclosure in tilde chain")
             }
 
             return SDJwt(
-                jwt = matchedGroups["sdjwt"]!!.value,
-                header = Json.parseToJsonElement(
-                    matchedGroups["header"]!!.value.decodeFromBase64Url().decodeToString()
-                ).jsonObject,
+                jwt = issuerJwt,
+                header = Json.parseToJsonElement(issuerParts[0].decodeFromBase64Url().decodeToString()).jsonObject,
                 sdPayload = SDPayload.parse(
-                    jwtBody = matchedGroups["body"]!!.value,
+                    jwtBody = issuerParts[1],
                     disclosures = uniqueDisclosures
                 ),
-                keyBindingJwt = matchedGroups["kbjwt"]?.value?.let { KeyBindingJwt.parse(it) },
-                isPresentation = matchedGroups["kbjwt"] != null || sdJwt.endsWith("~")
+                keyBindingJwt = keyBindingJwt?.let { KeyBindingJwt.parse(it) },
+                isPresentation = isPresentation
             )
+        }
+
+        private fun compactJwsParts(jwt: String): List<String>? =
+            jwt.split('.', limit = 3).takeIf { it.size == 3 && it.all(::isBase64UrlPart) }
+
+        private fun isBase64UrlPart(part: String): Boolean = part.isNotEmpty() && part.all {
+            it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_'
         }
 
         /**

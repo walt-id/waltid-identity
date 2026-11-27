@@ -789,6 +789,8 @@ class WalletSdkBridgeTest {
         override suspend fun resumeDeferredIssuance(deferredCredentialId: String) =
             error("Not used by this test fake")
 
+        override suspend fun credentialSummaries(): List<id.walt.wallet2.data.WalletCredentialSummary> = emptyList()
+        override suspend fun credentialRead(credentialId: String) = credentialReads().firstOrNull { it.credential.id == credentialId }
         override suspend fun credentialReads(): List<MobileWalletCredentialRead> = credentials().map {
             MobileWalletCredentialRead(it, CredentialStatus.references(), Clock.System.now().toString())
         }

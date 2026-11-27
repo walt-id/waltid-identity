@@ -116,3 +116,15 @@ interface DemoWallet {
      */
     fun pendingAuthorizationIssuance(): WalletDemoIssuanceSession? = null
 }
+
+/** Optional indexed reads for hosts that load card details on demand. */
+interface DemoWalletInventory {
+    suspend fun listCredentialSummaries(): List<WalletDemoCredential>
+    suspend fun credential(id: String): WalletDemoCredential?
+}
+
+internal suspend fun DemoWallet.listCredentialSummaries(): List<WalletDemoCredential> =
+    if (this is DemoWalletInventory) this.listCredentialSummaries() else listCredentials()
+
+internal suspend fun DemoWallet.credential(id: String): WalletDemoCredential? =
+    if (this is DemoWalletInventory) this.credential(id) else listCredentials().firstOrNull { it.id == id }

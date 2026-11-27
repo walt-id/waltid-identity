@@ -11,6 +11,7 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryIssuanceSessionStore
 import io.ktor.client.HttpClient
+import io.ktor.client.request.get
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.http.*
@@ -32,6 +33,17 @@ import kotlinx.coroutines.withContext
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 class WalletBatchIssuanceTest {
+    @Test
+    fun closingServiceKeepsCallerHttpClientUsable() = runTest {
+        val fixture = batchTestFixture(true)
+        HttpClient(MockEngine { respond("ok") }).use { client ->
+            val service = WalletIssuanceSessionService(fixture.wallet, httpClient = client)
+            service.close()
+            service.close()
+            assertEquals(HttpStatusCode.OK, client.get("https://fixture.invalid/check").status)
+        }
+    }
+
     private var current = Clock.System.now()
     private val clockedServices = mutableSetOf<WalletIssuanceSessionService>()
 

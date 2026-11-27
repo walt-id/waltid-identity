@@ -6,6 +6,9 @@ import android.graphics.Bitmap
 import android.view.View
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.CompositionLocalProvider
+import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.WalletDemoCredential
+import id.walt.walletdemo.compose.logic.loadProximityCredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoCredentialStatuses
 import id.walt.walletdemo.compose.ui.components.CredentialStatusUiContext
 import id.walt.walletdemo.compose.ui.components.LocalCredentialStatusUi
@@ -58,6 +61,7 @@ class PreparedProximitySharingAndroidTest {
         val state = mutableStateOf(WalletDemoProximityUiState(active = true,
             sessionState = ProximityState.PreparationRequired(plan), recentPlan = plan,
             selections = listOf(WalletDemoProximityDocumentSelection(0, "credential", setOf(field, secondField)))))
+        val details = mutableStateOf(emptyMap<String, CredentialDetails>())
         var approved = false
         var cancelled = false
         setContent {
@@ -65,7 +69,7 @@ class PreparedProximitySharingAndroidTest {
                 snapshot = WalletDemoCredentialStatuses(mapOf("credential" to WalletVisualFixtures.credentialStatus("revoked_current"))))) {
             WalletDemoTheme {
                 Surface {
-                WalletDemoProximityScreen(state = state.value, credentialDetailsById = emptyMap(),
+                WalletDemoProximityScreen(state = state.value, credentialDetailsById = details.value,
                     hostActions = WalletDemoProximityHostActionExecutor { ProximityHostActionResult.Completed },
                     onSelectCredential = { _, _ -> }, onToggleElement = { _, _ -> },
                     onContinueAfterResponseChange = {}, onApprove = { _, _ -> approved = true }, onDecline = {},
@@ -77,7 +81,13 @@ class PreparedProximitySharingAndroidTest {
         }
         onNodeWithText("Review before reconnecting").assertIsDisplayed()
         onNodeWithText("City service desk").assertIsDisplayed()
-        onNodeWithText("Approve and get ready").assertIsDisplayed().assertIsEnabled()
+        onNodeWithText("Approve and get ready").assertIsDisplayed().assertIsNotEnabled()
+        details.value = loadProximityCredentialDetails(state.value.displayedCredentialIds) { id ->
+            WalletDemoCredential(id, "mso_mdoc", "Example issuer", label = "Credential",
+                credentialDataJson = """{"org.iso.18013.5.1":{"given_name":"Ada","family_name":"Example"}}""")
+        }
+        onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Approve and get ready").assertIsEnabled()
         onAllNodesWithText("Stay connected for another request").assertCountEquals(0)
         assertFalse(approved)
         capture("compose-preparation")

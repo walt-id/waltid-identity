@@ -2211,25 +2211,26 @@ object WalletPresentationHandler {
             }
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED
         } else unsignedRequestObjectPolicy
-        val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         val resolved = AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
             unsignedRequestObjectPolicy = requestPolicy,
             trustConfiguration = clientIdTrustConfiguration,
             expectedRequestObjectAudience = expectedRequestObjectAudience,
             fetchRequestUri = { requestUri, requestUriMethod ->
-                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
-                    webResolveAuthReq = fetcher,
-                    requestUri = requestUri,
-                    unsignedRequestObjectPolicy = requestPolicy,
-                    requestUriMethod = requestUriMethod,
-                    expectedRequestObjectAudience = expectedRequestObjectAudience,
-                    requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
-                        WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
-                        clientIdTrustConfiguration,
-                        requestPolicy,
-                    ),
-                )
+                WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST).use { fetcher ->
+                    AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        webResolveAuthReq = fetcher,
+                        requestUri = requestUri,
+                        unsignedRequestObjectPolicy = requestPolicy,
+                        requestUriMethod = requestUriMethod,
+                        expectedRequestObjectAudience = expectedRequestObjectAudience,
+                        requestUriPostWalletMetadata = AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(
+                            WalletPresentationFormatRegistry.buildVpFormatsSupported(capabilities()),
+                            clientIdTrustConfiguration,
+                            requestPolicy,
+                        ),
+                    )
+                }
             },
         )
         if (haipRedirect) {
@@ -2556,7 +2557,12 @@ object WalletPresentationHandler {
     private data class CredentialCandidate(val credential: RawDcqlCredential, val metadata: ResolvedTypeMetadata?)
 
     private fun List<CredentialCandidate>.matchingContext() = DcqlMatchingContext(
-        associate { it.credential to it.metadata?.types.orEmpty() },
+        buildMap {
+            for (candidate in this@matchingContext) {
+                val types = candidate.metadata?.types ?: continue
+                if (types.isNotEmpty()) put(candidate.credential, types)
+            }
+        },
     )
 
     /** An unusable stored credential cannot fail matching for the other candidates. */

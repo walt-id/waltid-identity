@@ -1,6 +1,8 @@
 package id.walt.wallet2.mobile
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.examples.SdJwtExamples
 import id.walt.credentials.status.CredentialStatusFreshness
 import id.walt.credentials.status.StatusMeaning
 import id.walt.credentials.status.StatusTestIssuer
@@ -17,8 +19,11 @@ import id.walt.wallet2.status.CredentialStatusNoticeState
 import id.walt.wallet2.status.CredentialStatusNoticeStore
 import id.walt.wallet2.status.CredentialStatusRefreshMode
 import id.walt.wallet2.status.CredentialStatusRefreshOutcome
+import id.walt.wallet2.status.CredentialStatusReviewChangedException
 import id.walt.wallet2.status.CredentialStatusSnapshotStore
 import id.walt.wallet2.status.CredentialStatusStoredRecord
+import id.walt.wallet2.status.StoredCredentialStatusInventory
+import id.walt.wallet2.status.StoredCredentialStatusRow
 import id.walt.wallet2.status.WalletCredentialStatusService
 import id.walt.wallet2.status.WalletCredentialReference
 import id.walt.wallet2.status.reviewGuard
@@ -38,8 +43,12 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
@@ -106,6 +115,110 @@ class StatusMaintenanceIntegrationTest {
         }
         assertNotNull(store.readCredentialStatus("b"))
         assertNull(store.readCredentialStatus("c"))
+    }
+
+    @Test
+    fun approvalReusesStatusOnlyForTheCurrentStoredCredentialAndEvidence() = withWallet {
+        val issuer = StatusTestIssuer.create("https://status.example/approved")
+        val signed = issuer.sign(buildJsonObject {
+            put("iss", issuer.did)
+            put("exp", 4_000_000_000)
+            put("vct", "urn:example:test")
+            putJsonObject("status") {
+                putJsonObject("status_list") {
+                    put("idx", 0)
+                    put("uri", issuer.uri)
+                }
+            }
+        }, "dc+sd-jwt") + "~"
+        store.addCredential(StoredCredential("a", CredentialParser.detectAndParse(signed).second))
+        setList(issuer, value = 0u)
+        assertEquals(1, assertIs<CredentialStatusMaintenanceResult.Finished>(wake()).checked)
+        val inventory = CountingStatusInventory(store)
+
+        fun writeFromAnotherConnection(raw: String) {
+            open().use { other ->
+                other.execute(null, "UPDATE credentials SET serialized_credential = ? WHERE id = 'a'", 1) {
+                    bindString(0, raw)
+                }
+            }
+        }
+
+        val policy = managedCredentialStatusTrustPolicy()
+        service(policy, inventory).use { foreground ->
+            val displayed = foreground.snapshot().credentials.single().presentation
+            assertEquals(CredentialStatusFreshness.FRESH, displayed.freshness)
+            val guard = foreground.reviewGuard(setOf("a"), mapOf("a" to displayed.advisoryRevision))
+            guard.check()
+            assertEquals(1, inventory.parses)
+
+            writeFromAnotherConnection(signed + "\n")
+            guard.check()
+            assertEquals(2, inventory.parses, "A different stored representation must go through the parser")
+            assertEquals(2, inventory.pointReads, "A cache miss must decode the row it already read")
+            guard.check()
+            assertEquals(2, inventory.parses, "The exact stored representation can be reused after a successful parse")
+
+            writeFromAnotherConnection(signed)
+            setList(issuer, value = 1u)
+            open().use { other ->
+                val credentials = SqlDelightCredentialStore(WalletPersistenceDatabase(other).walletPersistenceQueries)
+                service(policy, credentials).use { writer ->
+                    assertEquals(CredentialStatusRefreshOutcome.COMPLETED,
+                        writer.refresh(mode = CredentialStatusRefreshMode.FORCE).single().outcome)
+                }
+                assertFailsWith<CredentialStatusReviewChangedException> { guard.check() }
+                assertEquals(3, inventory.parses, "Approval must see the evidence written on another connection")
+                assertTrue(foreground.selectedStatuses(setOf("")).isEmpty())
+
+                val notice = foreground.snapshot().pendingNotices.single()
+                assertEquals(3, inventory.parses, "A warm snapshot can use the same evidence as approval")
+                assertTrue(credentials.acknowledgeStatusNotice("a", notice.version))
+            }
+            assertTrue(foreground.snapshot().pendingNotices.isEmpty())
+            assertEquals(3, inventory.parses, "Reading the new acknowledgement must not require parsing")
+        }
+    }
+
+    @Test
+    fun selectedStatusHonorsTheStoresOwnView() = withWallet {
+        add("a")
+        var visible = true
+        val view = object : WalletCredentialStore by store, CredentialStatusInventory by store {
+            override suspend fun readStatusInput(id: String): CredentialStatusInput? =
+                if (visible) store.readStatusInput(id) else null
+
+            override suspend fun statusPage(afterId: String?, limit: Int): List<CredentialStatusInput> =
+                if (visible) store.statusPage(afterId, limit) else emptyList()
+        }
+        service(credentials = view).use { foreground ->
+            assertEquals(1, foreground.snapshot().credentials.size)
+            visible = false
+            assertTrue(foreground.selectedStatuses(setOf("a")).isEmpty())
+            assertTrue(foreground.snapshot().credentials.isEmpty())
+        }
+    }
+
+    @Test
+    fun unchangedApprovalReusesStatusAfterDisclosuresAreReplaced() = withWallet {
+        val signed = SdJwtExamples.sdJwtVcSignedExample2
+        val original = CredentialParser.detectAndParse(signed).second
+        val reduced = CredentialParser.detectAndParse(signed.split('~').take(2).joinToString("~", postfix = "~")).second
+        assertEquals(original.signed, reduced.signed)
+        store.addCredential(StoredCredential("a", original))
+        val inventory = CountingStatusInventory(store)
+        service(credentials = inventory).use { foreground ->
+            val advisory = foreground.snapshot().credentials.single().presentation.advisoryRevision
+            val guard = foreground.reviewGuard(setOf("a"), mapOf("a" to advisory))
+            guard.check()
+            assertEquals(1, inventory.parses)
+
+            store.addCredential(StoredCredential("a", reduced))
+            guard.check()
+            assertEquals(2, inventory.parses)
+            repeat(3) { guard.check() }
+            assertEquals(2, inventory.parses)
+        }
     }
 
     @Test
@@ -499,6 +612,29 @@ class StatusMaintenanceIntegrationTest {
             assertEquals("a", it.snapshot().pendingNotices.single().reference.credentialId)
         }
         assertNull(store.readCredentialStatus("b"))
+    }
+
+    private class CountingStatusInventory(private val store: SqlDelightCredentialStore) :
+        WalletCredentialStore by store, StoredCredentialStatusInventory by store {
+        var parses = 0
+            private set
+        var pointReads = 0
+            private set
+
+        override suspend fun readStatusRow(id: String): StoredCredentialStatusRow? {
+            pointReads++
+            return store.readStatusRow(id)?.countingParses()
+        }
+
+        override suspend fun statusRows(afterId: String?, limit: Int): List<StoredCredentialStatusRow> =
+            store.statusRows(afterId, limit).map { it.countingParses() }
+
+        private fun StoredCredentialStatusRow.countingParses() = object : StoredCredentialStatusRow by this {
+            override suspend fun readCredential(): StoredCredential? {
+                parses++
+                return this@countingParses.readCredential()
+            }
+        }
     }
 
     private class Fixture(val driver: JdbcSqliteDriver, val open: () -> JdbcSqliteDriver) {

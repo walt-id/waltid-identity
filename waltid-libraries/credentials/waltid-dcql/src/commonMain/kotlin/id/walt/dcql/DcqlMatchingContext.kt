@@ -25,7 +25,7 @@ class DcqlMatchingContext(resolvedVctTypes: Map<DcqlCredential, Set<String>> = e
     }
 
     internal fun vctTypes(credential: DcqlCredential): Set<String> =
-        types[CredentialInput(credential.id, credential.format, credential.data)].orEmpty()
+        if (types.isEmpty()) emptySet() else types[CredentialInput(credential.id, credential.format, credential.data)].orEmpty()
 
     companion object {
         val Empty = DcqlMatchingContext()

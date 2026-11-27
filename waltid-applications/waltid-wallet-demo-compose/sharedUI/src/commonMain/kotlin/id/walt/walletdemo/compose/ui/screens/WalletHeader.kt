@@ -80,7 +80,7 @@ internal fun WalletHeader(
 
 internal data class CredentialDetailsChrome(
     val onClose: () -> Unit,
-    val onCopy: () -> Unit,
+    val onCopy: (() -> Unit)?,
     val onDelete: (() -> Unit)?,
     val title: String? = null,
     val onBack: (() -> Unit)? = null,

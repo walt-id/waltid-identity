@@ -13,16 +13,23 @@ internal object SdJwtDisclosureLocator {
     fun locate(payload: JsonObject, disclosures: List<SdJwtSelectiveDisclosure>): List<SdJwtSelectiveDisclosure> {
         val located = mutableListOf<SdJwtSelectiveDisclosure>()
         val seenDigests = mutableSetOf<String>()
-        // Preserve the parser's legacy issuer encoding fallbacks; prefer the exact wire bytes.
-        val byDigest = mutableMapOf<String, SdJwtSelectiveDisclosure>()
-        disclosures.forEach { disclosure ->
-            listOf(disclosure.asHashedFromEncoded(), disclosure.asHashed(), disclosure.asHashed2(), disclosure.asHashed3())
-                .forEach { byDigest.getOrPut(it) { disclosure } }
+        val wireDigests = disclosures.associateBy { it.asHashedFromEncoded() }
+        val legacyDigests by lazy(LazyThreadSafetyMode.NONE) {
+            buildMap {
+                for (disclosure in disclosures) {
+                    for (digest in listOf(disclosure.asHashedFromEncoded(), disclosure.asHashed(),
+                        disclosure.asHashed2(), disclosure.asHashed3())) {
+                        getOrPut(digest) { disclosure }
+                    }
+                }
+            }
         }
-
+        // Encodings of disclosures with the same salt can alias. Preserve the original tie-breaking order.
+        val repeatedSalt = disclosures.map { it.salt }.toSet().size != disclosures.size
         fun resolve(hash: String): SdJwtSelectiveDisclosure? {
             require(seenDigests.add(hash)) { "Invalid SD-JWT: repeated digest (RFC 9901 §7.1 step 4)" }
-            return byDigest[hash]
+            if (repeatedSalt) return legacyDigests[hash]
+            return wireDigests[hash] ?: legacyDigests[hash]
         }
 
         fun scan(element: JsonElement, path: List<JsonElement>) {

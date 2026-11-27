@@ -43,7 +43,7 @@ internal class MobileDemoWallet(
     private val isIos: Boolean = false,
     private val onRegistrationRefreshed: suspend () -> Unit = {},
     private val preferredSigningProtection: WalletDemoSigningProtection = WalletDemoSigningProtection.Biometric,
-) : ProximityDemoWallet {
+) : ProximityDemoWallet, DemoWalletInventory {
     override suspend fun proximityPresentationCapabilities(
         configuration: ProximityConfiguration,
     ): ProximityCapabilities =
@@ -255,6 +255,15 @@ internal class MobileDemoWallet(
         mobileWallet.refreshCredentialStatuses(ids?.toList(),
             if (force) CredentialStatusRefreshMode.FORCE else CredentialStatusRefreshMode.IF_DUE).toDemoSummary()
 
+    override suspend fun listCredentialSummaries(): List<WalletDemoCredential> =
+        mobileWallet.credentialSummaries().map { row ->
+            WalletDemoCredential(id = row.id, format = row.format, issuer = row.issuer, subject = row.subject,
+                label = row.label ?: row.format, addedAt = row.addedAt, metadataJson = row.metadataJson,
+                content = CredentialContent.Inventory(row.typeMetadataJson))
+        }
+
+    override suspend fun credential(id: String): WalletDemoCredential? = mobileWallet.credentialRead(id)?.credential?.toDemoCredential()
+
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         mobileWallet.credentials().map { it.toDemoCredential() }
 
@@ -315,7 +324,7 @@ internal class MobileDemoWallet(
         mobileWallet.resumeDeferredIssuance(deferredCredentialId).toDemoIssuanceOutcome()
 
     override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreviewResult =
-        when (val result = mobileWallet.previewPresentation(requestUrl)) {
+        when (val result = mobileWallet.previewPresentationForClaimReview(requestUrl)) {
             is MobileWalletPresentationPreviewResult.Ready ->
                 WalletDemoPresentationPreviewResult.Ready(result.preview.toDemoPreview())
 

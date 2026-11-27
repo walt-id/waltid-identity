@@ -4,7 +4,7 @@ Display local status and request checks without making presentation depend on is
 
 ## Overview
 
-``Wallet/credentials()`` includes optional status on each ``Credential``.
+Use ``Wallet/credentialSummaries()`` for the list and ``Wallet/credential(id:)`` for one full credential with local status. ``Wallet/credentials()`` loads every full credential.
 ``Wallet/credentialStatusSnapshot()`` and ``Wallet/credentialStatuses`` read the same local state
 without rebuilding credential artwork or making issuer requests. The stream has one latest-value
 buffer and also updates when evidence becomes stale. Cancel its consuming task when the screen or

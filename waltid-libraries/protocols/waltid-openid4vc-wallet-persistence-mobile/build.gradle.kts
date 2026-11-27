@@ -57,6 +57,7 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)
+            implementation(identityLibs.kotlincrypto.hash.sha2)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

@@ -425,6 +425,17 @@ class WalletDemoProximityControllerTest {
         startExchange(controller)
         advanceUntilIdle()
 
+        val ids = controller.state.value.displayedCredentialIds
+        val reads = mutableListOf<String>()
+        val details = loadProximityCredentialDetails(ids) { id ->
+            reads += id
+            WalletDemoCredential(id, "mso_mdoc", null, label = id,
+                credentialDataJson = """{"org.iso.18013.5.1":{"family_name":"Example"}}""")
+        }
+        assertEquals(setOf("credential-a", "credential-b", "proof-credential"), reads.toSet())
+        assertEquals(reads.size, reads.distinct().size)
+        assertEquals(DisplayValue.Text("Example"), details.getValue("credential-b").groups
+            .flatMap { it.items }.single { it.pathComponents.last() == "family_name" }.value)
         assertFalse(controller.state.value.canApprove)
         assertEquals(1, controller.state.value.selections.size)
         assertTrue(controller.state.value.selections.none { it.requestIndex == 0 })

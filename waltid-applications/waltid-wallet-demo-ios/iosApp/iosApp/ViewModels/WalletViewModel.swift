@@ -154,7 +154,7 @@ class WalletViewModel: ObservableObject {
     @Published var did = ""
     @Published var keyID = ""
     @Published var publicJWK = ""
-    @Published var credentials: [Credential] = [] { didSet { scheduleCredentialStatusCheck() } }
+    @Published var credentials: [CredentialSummary] = [] { didSet { scheduleCredentialStatusCheck() } }
     @Published var statusMessage = WalletStatusText.startingWallet
     @Published var isLoading = false { didSet { if !isLoading { scheduleCredentialStatusCheck() } } }
     @Published var isError = false
@@ -307,8 +307,12 @@ class WalletViewModel: ObservableObject {
         return normalizedCode.count == length
     }
 
-    var receivedCredentials: [Credential] {
-        var credentialsByID: [String: Credential] = [:]
+    func credential(id: String) async throws -> Credential? {
+        try await walletClient.credential(id: id)
+    }
+
+    var receivedCredentials: [CredentialSummary] {
+        var credentialsByID: [String: CredentialSummary] = [:]
         credentials.forEach { credential in
             credentialsByID[credential.id] = credential
         }
@@ -397,7 +401,7 @@ class WalletViewModel: ObservableObject {
             do {
                 let removed = try await walletClient.deleteCredential(id: id)
                 guard removed else { return }
-                credentials = try await walletClient.credentials()
+                credentials = try await walletClient.credentialSummaries()
                 reconcileIdentityDocumentRegistrations()
                 if presentationReview != nil {
                     discardPresentationPreviewIfPresent()
@@ -1431,7 +1435,7 @@ class WalletViewModel: ObservableObject {
 
     private func completeIssuanceOutcome(
         _ rawOutcome: IssuanceOutcome,
-        previousCredentials: [Credential],
+        previousCredentials: [CredentialSummary],
         request: ReceiveRequest
     ) async throws {
         try Task.checkCancellation()
@@ -1456,7 +1460,7 @@ class WalletViewModel: ObservableObject {
             issuanceReceipt = IssuanceReceipt(issuer: issuer, pendingIDs: Set(deferred.map(\.id)))
             receiveCompleted = false
             if !storedIDs.isEmpty {
-                let refreshed = try await walletClient.credentials()
+                let refreshed = try await walletClient.credentialSummaries()
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
                 credentials = refreshed
@@ -1487,7 +1491,7 @@ class WalletViewModel: ObservableObject {
                 txCode = ""
             }
             if !storedIDs.isEmpty {
-                let refreshed = try await walletClient.credentials()
+                let refreshed = try await walletClient.credentialSummaries()
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
                 credentials = refreshed
@@ -1498,8 +1502,8 @@ class WalletViewModel: ObservableObject {
         try Task.checkCancellation()
         guard isCurrent(request) else { return }
         var detailsError: String? = nil
-        let refreshedCredentials: [Credential]
-        do { refreshedCredentials = try await walletClient.credentials() }
+        let refreshedCredentials: [CredentialSummary]
+        do { refreshedCredentials = try await walletClient.credentialSummaries() }
         catch is CancellationError { throw CancellationError() }
         catch {
             refreshedCredentials = credentials
@@ -1569,8 +1573,8 @@ class WalletViewModel: ObservableObject {
                 switch outcome {
                 case let .stored(_, credentialIDs):
                     var detailsError: String? = nil
-                    let refreshedCredentials: [Credential]
-                    do { refreshedCredentials = try await walletClient.credentials() }
+                    let refreshedCredentials: [CredentialSummary]
+                    do { refreshedCredentials = try await walletClient.credentialSummaries() }
                     catch is CancellationError { throw CancellationError() }
                     catch {
                         refreshedCredentials = credentials
@@ -1598,7 +1602,7 @@ class WalletViewModel: ObservableObject {
                     }
                 case let .deferred(_, storedIDs, pending):
                     if !storedIDs.isEmpty {
-                        let refreshed = try await walletClient.credentials()
+                        let refreshed = try await walletClient.credentialSummaries()
                         try Task.checkCancellation()
                         guard isCurrent(request) else { return }
                         credentials = refreshed
@@ -1618,7 +1622,7 @@ class WalletViewModel: ObservableObject {
                     lastReceivedCredentialIDs = receivedIDs(storedIDs)
                     issuanceReceipt = receipt(pending, problem: error)
                     if !storedIDs.isEmpty {
-                        let refreshed = try await walletClient.credentials()
+                        let refreshed = try await walletClient.credentialSummaries()
                         try Task.checkCancellation()
                         guard isCurrent(request) else { return }
                         credentials = refreshed
@@ -1651,7 +1655,7 @@ class WalletViewModel: ObservableObject {
         receiveTask = Task {
             do {
                 let pending = try await walletClient.listDeferredIssuance()
-                let refreshed = try await walletClient.credentials()
+                let refreshed = try await walletClient.credentialSummaries()
                 try Task.checkCancellation()
                 guard isCurrent(request) else { return }
                 credentials = refreshed
@@ -2082,7 +2086,7 @@ class WalletViewModel: ObservableObject {
         }
 
         logE2E("Bootstrap: calling wallet.credentials()")
-        let list = try await walletClient.credentials()
+        let list = try await walletClient.credentialSummaries()
         logE2E("Bootstrap: listCredentials returned \(list.count) credentials")
 
         did = result.did
@@ -2265,8 +2269,8 @@ class WalletViewModel: ObservableObject {
 
     private static func resolvedReceivedCredentialIDs(
         returnedCredentialIDs: [String],
-        previousCredentials: [Credential],
-        refreshedCredentials: [Credential]
+        previousCredentials: [CredentialSummary],
+        refreshedCredentials: [CredentialSummary]
     ) -> [String] {
         if !returnedCredentialIDs.isEmpty {
             return returnedCredentialIDs.reduce(into: []) { if !$0.contains($1) { $0.append($1) } }

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalObjCRefinement::class)
+
 package id.walt.wallet2.persistence.stores
 
 import id.walt.credentials.CredentialParser
@@ -7,28 +9,49 @@ import id.walt.wallet2.data.HolderKeyBinding
 import id.walt.wallet2.data.HolderKeyBindingErrorCode
 import id.walt.wallet2.data.HolderKeyBindingException
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.WalletCredentialInventory
+import id.walt.wallet2.data.WalletCredentialSummary
+import id.walt.wallet2.data.toCredentialSummary
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.status.CredentialStatusInventory
+import id.walt.wallet2.status.StoredCredentialStatusInventory
+import id.walt.wallet2.status.StoredCredentialStatusRow
 import id.walt.wallet2.persistence.db.Credentials
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlin.experimental.ExperimentalObjCRefinement
+import kotlin.native.HiddenFromObjC
 import kotlin.time.Clock
 import kotlin.time.Instant
 
 private val json = Json { ignoreUnknownKeys = true }
+private const val MAX_BACKFILL_ROWS = 32
+private const val MAX_BACKFILL_CHARS = 512 * 1024
 
 /**
  * SQLDelight-backed implementation of [WalletCredentialStore] for mobile wallets.
  */
 public class SqlDelightCredentialStore private constructor(
     private val queries: WalletPersistenceQueries,
-    status: SqlDelightStatusInventory,
-) : WalletCredentialStore, CredentialStatusInventory by status {
+    private val status: SqlDelightStatusInventory,
+) : WalletCredentialStore, WalletCredentialInventory, CredentialStatusInventory by status, StoredCredentialStatusInventory {
     /** Opens the foreground credential store in the already-open database. */
     public constructor(queries: WalletPersistenceQueries) : this(queries, SqlDelightStatusInventory(queries))
+
+    /** Reads the current unparsed status row for wallet-local [id], or returns null if the credential is absent. */
+    @HiddenFromObjC
+    override suspend fun readStatusRow(id: String): StoredCredentialStatusRow? = status.readStatusRow(id)
+
+    /**
+     * Reads up to [limit] unparsed status rows in wallet-local ID order, strictly after [afterId].
+     * A null [afterId] starts at the first row. The supported [limit] is 1 through 1,001.
+     */
+    @HiddenFromObjC
+    override suspend fun statusRows(afterId: String?, limit: Int): List<StoredCredentialStatusRow> =
+        status.statusRows(afterId, limit)
 
     /**
      * Loads a stored credential by wallet-local identifier.
@@ -47,37 +70,70 @@ public class SqlDelightCredentialStore private constructor(
         }
     }
 
+    /** Backfill old rows with bounded transactions. A replacement cannot inherit the previous row's display fields. */
+    override suspend fun credentialSummaries(): List<WalletCredentialSummary> {
+        val pending = mutableListOf<Pair<WalletCredentialSummary, String>>()
+        var pendingChars = 0
+        fun flush() {
+            if (pending.isEmpty()) return
+            queries.transaction {
+                for ((summary, expected) in pending) {
+                    queries.saveCredentialInventoryIfCurrent(summary.issuer, summary.subject, summary.typeMetadataJson,
+                        summary.id, expected)
+                }
+            }
+            pending.clear()
+            pendingChars = 0
+        }
+
+        val summaries = queries.selectCredentialSummaries().executeAsList().mapNotNull { row ->
+            val types = row.type_metadata
+            if (types != null) {
+                WalletCredentialSummary(row.id, row.format, row.issuer, row.subject, row.label,
+                    Instant.fromEpochMilliseconds(row.added_at).toString(), types, row.metadata)
+            } else {
+                val original = queries.selectCredentialById(row.id).executeAsOneOrNull() ?: return@mapNotNull null
+                val summary = original.toStoredCredential().toCredentialSummary()
+                val signed = original.serialized_credential
+                if (pending.size >= MAX_BACKFILL_ROWS || signed.length > MAX_BACKFILL_CHARS - pendingChars) flush()
+                pending.add(summary to signed)
+                pendingChars += signed.length
+                if (pendingChars >= MAX_BACKFILL_CHARS) flush()
+                summary
+            }
+        }
+        flush()
+        return summaries
+    }
+
     /**
      * Stores a credential and its display metadata.
      */
     override suspend fun addCredential(entry: StoredCredential) {
         val rawString = entry.credential.serializedForWalletPersistence()
+        val summary = entry.toCredentialSummary()
         queries.transaction {
-            if (queries.selectCredentialById(entry.id).executeAsOneOrNull()?.serialized_credential != rawString) {
-                queries.deleteCredentialStatus(entry.id)
-            }
+            queries.deleteCredentialStatusForReplacement(entry.id, rawString)
             queries.insertCredential(
                 id = entry.id,
                 serialized_credential = rawString,
                 format = entry.credential.format,
                 label = entry.label,
                 added_at = entry.addedAt?.toEpochMilliseconds() ?: Clock.System.now().toEpochMilliseconds(),
-                metadata = entry.metadata?.let { json.encodeToString(JsonObject.serializer(), it) },
+                metadata = summary.metadataJson,
                 holder_key_binding = entry.holderKeyBinding?.let { json.encodeToString(HolderKeyBinding.serializer(), it) },
             )
+            queries.saveCredentialInventory(entry.id, summary.issuer, summary.subject, summary.typeMetadataJson)
         }
     }
 
     /**
      * Removes a credential by wallet-local identifier.
      */
-    override suspend fun removeCredential(id: String): Boolean {
-        val exists = queries.selectCredentialById(id).executeAsOneOrNull() != null
-        if (exists) queries.transaction {
-            queries.deleteCredentialStatus(id)
-            queries.deleteCredentialById(id)
-        }
-        return exists
+    override suspend fun removeCredential(id: String): Boolean = queries.transactionWithResult {
+        queries.deleteCredentialStatus(id)
+        queries.deleteCredentialById(id)
+        queries.credentialStatusChanges().executeAsOne() == 1L
     }
 
     private suspend fun Credentials.toStoredCredential(): StoredCredential {

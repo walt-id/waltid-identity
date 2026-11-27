@@ -8,6 +8,44 @@ import kotlin.test.*
 
 class SDJwtTest {
     @Test
+    fun compactParsingPreservesSignedSegmentsAndPresentationForm() {
+        val disclosure = "WyJzYWx0IiwiY2xhaW0iLCJ2YWx1ZSJd"
+        val digest = SHA256().digest(disclosure.encodeToByteArray()).encodeToBase64Url()
+        val payload = """{"_sd":["$digest"]}""".encodeToByteArray().encodeToBase64Url()
+        val issuerJwt = "e30.$payload.AA"
+        val bindingJwt = "e30.eyJhdWQiOiJ2ZXJpZmllciJ9.BB"
+
+        // Keep accepting the two historical forms without a final separator.
+        for ((suffix, isPresentation) in listOf("" to false, "~$disclosure" to false, "~" to true, "~$disclosure~" to true)) {
+            val parsed = SDJwt.parse(issuerJwt + suffix)
+            assertEquals(issuerJwt, parsed.jwt)
+            assertEquals(isPresentation, parsed.isPresentation)
+            assertNull(parsed.keyBindingJwt)
+            assertEquals(if (disclosure in suffix) setOf(disclosure) else emptySet(), parsed.disclosures)
+        }
+
+        val bound = SDJwt.parse("$issuerJwt~$disclosure~$bindingJwt")
+        assertEquals(issuerJwt, bound.jwt)
+        assertEquals(bindingJwt, bound.keyBindingJwt?.jwt)
+        assertEquals("value", bound.fullPayload["claim"]?.jsonPrimitive?.content)
+        assertTrue(bound.isPresentation)
+    }
+
+    @Test
+    fun compactParsingRejectsInvalidSeparatorsAndCharacters() {
+        val issuerJwt = "e30.e30.AA"
+        val bindingJwt = "e30.e30.BB"
+        for (invalid in listOf(
+            "$issuerJwt~~", "$issuerJwt~~$bindingJwt", "$issuerJwt~$bindingJwt~",
+            "$issuerJwt~AA.BB", "$issuerJwt~AA.BB.CC.DD", "$issuerJwt~A=",
+            "$issuerJwt~Å", "$issuerJwt~AA\n", "$issuerJwt.BB", "e30..AA",
+        )) {
+            val error = assertFailsWith<IllegalArgumentException> { SDJwt.parse(invalid) }
+            assertTrue(error.message.orEmpty().startsWith("Invalid SD-JWT format:"))
+        }
+    }
+
+    @Test
     fun testParseSdJwt() {
         val sdJwtString =
             "eyJraWQiOiJkaWQ6a2V5Ono2TWtuM2dWOFY2M2JScEJNdEFwbm5BaWhDTXZEYVBlcno2aWFyMURwZE5LZTNrMSN6Nk1rbjNnVjhWNjNiUnBCTXRBcG5uQWloQ012RGFQZXJ6NmlhcjFEcGROS2UzazEiLCJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSJ9.eyJzdWIiOiJkaWQ6a2V5Ono2TWtuM2dWOFY2M2JScEJNdEFwbm5BaWhDTXZEYVBlcno2aWFyMURwZE5LZTNrMSIsIm5iZiI6MTY4NDkxOTg2NCwiaXNzIjoiZGlkOmtleTp6Nk1rbjNnVjhWNjNiUnBCTXRBcG5uQWloQ012RGFQZXJ6NmlhcjFEcGROS2UzazEiLCJpYXQiOjE2ODQ5MTk4NjQsInZjIjp7InR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiLCJWZXJpZmlhYmxlQXR0ZXN0YXRpb24iLCJWZXJpZmlhYmxlSWQiXSwiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiXSwiaWQiOiJ1cm46dXVpZDplMDNjMDY2OC0yMDhmLTRkNzctYTBjNi02ZDBkZjAxYWRmYWQiLCJpc3N1ZXIiOiJkaWQ6a2V5Ono2TWtuM2dWOFY2M2JScEJNdEFwbm5BaWhDTXZEYVBlcno2aWFyMURwZE5LZTNrMSIsImlzc3VhbmNlRGF0ZSI6IjIwMjMtMDUtMjRUMDk6MTc6NDRaIiwiaXNzdWVkIjoiMjAyMy0wNS0yNFQwOToxNzo0NFoiLCJ2YWxpZEZyb20iOiIyMDIzLTA1LTI0VDA5OjE3OjQ0WiIsImNyZWRlbnRpYWxTY2hlbWEiOnsiaWQiOiJodHRwczovL3Jhdy5naXRodWJ1c2VyY29udGVudC5jb20vd2FsdC1pZC93YWx0aWQtc3Npa2l0LXZjbGliL21hc3Rlci9zcmMvdGVzdC9yZXNvdXJjZXMvc2NoZW1hcy9WZXJpZmlhYmxlSWQuanNvbiIsInR5cGUiOiJGdWxsSnNvblNjaGVtYVZhbGlkYXRvcjIwMjEifSwiZXZpZGVuY2UiOlt7ImRvY3VtZW50UHJlc2VuY2UiOlsiUGh5c2ljYWwiXSwiZXZpZGVuY2VEb2N1bWVudCI6WyJQYXNzcG9ydCJdLCJzdWJqZWN0UHJlc2VuY2UiOiJQaHlzaWNhbCIsInR5cGUiOlsiRG9jdW1lbnRWZXJpZmljYXRpb24iXSwidmVyaWZpZXIiOiJkaWQ6ZWJzaToyQTlCWjlTVWU2QmF0YWNTcHZzMVY1Q2RqSHZMcFE3YkVzaTJKYjZMZEhLblF4YU4ifV0sIl9zZCI6WyJzRkoxY1BOR2d5NktrRzAxOW9tdFBvVm5GYXR6clRXQkV0Si1yQmpzQU1VIl19LCJqdGkiOiJ1cm46dXVpZDplMDNjMDY2OC0yMDhmLTRkNzctYTBjNi02ZDBkZjAxYWRmYWQifQ.XqhNYYB9CITa0KCMOj1v1tbQvj3sfuDmGaKL3sDDJndQPGEa_QosbunSnBef5O4optTslUOSaplR7BiTiY2cCQ~WyJfZ2RWc3dIS2U2b3ZVMElYT3NXQ1Z3IiwiZGF0ZU9mQmlydGgiLCIxOTgzLTA3LTA1Il0~WyJsYVpHcU5rczE1YU5USEFvYnFfWEx3IiwiZmlyc3ROYW1lIiwiU2V2ZXJpbiJd~WyJDc1FfVkFaeUVzVmxSWWQ1YjJPNWhRIiwiY3JlZGVudGlhbFN1YmplY3QiLHsiaWQiOiJkaWQ6a2V5Ono2TWtuM2dWOFY2M2JScEJNdEFwbm5BaWhDTXZEYVBlcno2aWFyMURwZE5LZTNrMSIsImN1cnJlbnRBZGRyZXNzIjpbIlZpZW5uYSJdLCJmYW1pbHlOYW1lIjoiU3RhbXBsZXIiLCJnZW5kZXIiOiJtYWxlIiwibmFtZUFuZEZhbWlseU5hbWVBdEJpcnRoIjoiSmFuZSBET0UiLCJwZXJzb25hbElkZW50aWZpZXIiOiIwOTA0MDA4MDg0SCIsInBsYWNlT2ZCaXJ0aCI6IkdyYXoiLCJfc2QiOlsiUXh4ZXlNbHk3dU9feWNRaThuU2Zmb2VUb2JQSDRVZ0JfVGh3LUMyMTJDNCIsImNJeXVGWVNBUjAtZ2JpMGxQbmZTWVQySExEdlpsTlBOSGoxUGY0am9uek0iXX1d"

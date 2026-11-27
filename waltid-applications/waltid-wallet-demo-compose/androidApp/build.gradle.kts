@@ -106,6 +106,10 @@ if (providers.gradleProperty("itbDemoPaymentTrust").orNull == "true") {
 }
 
 dependencies {
+    if (providers.gradleProperty("walletLeakCanary").orNull == "true") {
+        debugImplementation(identityLibs.leakcanary.android)
+    }
+
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedLogic"))
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedUI"))
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))

@@ -526,53 +526,19 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         captureGallery(app, name: "compose-ios-wallet-presentation-eudi-pid-mdoc-review")
 
         ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share", useCoordinateTap: true)
-        var submitStatus = ui.waitForStatus(
-            prefixes: ["Presenting credential", "Presentation sent", "Present failed", "Receive failed", "Bootstrap failed"],
-            timeout: 10
-        )
-        if submitStatus == nil {
-            ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share", useCoordinateTap: true)
-            submitStatus = ui.waitForStatus(
-                prefixes: ["Presenting credential", "Presentation sent", "Present failed", "Receive failed", "Bootstrap failed"],
-                timeout: 10
-            )
-        }
-        guard let submitStatus else {
-            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            screenshot.name = "Presentation submit did not change status"
-            screenshot.lifetime = .keepAlways
-            add(screenshot)
-
-            let hierarchy = XCTAttachment(string: app.debugDescription)
-            hierarchy.name = "Presentation submit UI hierarchy"
-            hierarchy.lifetime = .keepAlways
-            add(hierarchy)
-
-            XCTFail("Presentation submit did not update app status after tapping Share")
-            return
-        }
-        XCTAssertFalse(submitStatus.starts(with: "Present failed"), "Present failed: \(submitStatus)")
-        XCTAssertFalse(submitStatus.starts(with: "Receive failed"), "Receive failed during presentation: \(submitStatus)")
-        XCTAssertFalse(submitStatus.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(submitStatus)")
-
+        let message = app.descendants(matching: .any)["wallet.presentationResultMessage"]
+        XCTAssertTrue(message.waitForExistence(timeout: credentialOperationTimeout), app.debugDescription)
+        // Touch the receipt itself before waiting for the remote verifier.
+        message.tap()
+        XCTAssertTrue(message.label.hasPrefix("Presentation sent"), message.label)
         let presentationDone = app.buttons["wallet.presentationDone"]
-        XCTAssertTrue(presentationDone.waitForExistence(timeout: credentialOperationTimeout))
-        // Retain the receipt before remote verification can consume its idle-dismissal window.
-        app.otherElements["wallet.review.content"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(presentationDone.exists)
 
         try await backend.waitForVerifierSuccess(
             sessionID: session.sessionID,
             timeoutSeconds: presentationOperationTimeout
         )
 
-        if let presentStatus = ui.waitForStatus(
-            prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
-            timeout: verifierPollingTimeout
-        ) {
-            XCTAssertFalse(presentStatus.starts(with: "Present failed"), "Present failed: \(presentStatus)")
-            XCTAssertFalse(presentStatus.starts(with: "Receive failed"), "Receive failed during presentation: \(presentStatus)")
-            XCTAssertFalse(presentStatus.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(presentStatus)")
-        }
         XCTAssertTrue(presentationDone.exists, "The touched sharing result must remain open until Done")
         XCTAssertFalse(app.textFields["wallet.presentationInput"].exists)
         captureHost("Sharing result")

@@ -32,7 +32,7 @@ private fun cardDisplayData(
     credentialDisplay: WalletDemoMetadataDisplay?,
 ): CredentialCardDisplayData = CredentialCardDisplayData(
     id = summary.id,
-    title = resolveCardTitle(summary.format, summary.credentialDataJson, credentialDisplay?.name, summary.label),
+    title = resolveCardTitle(summary.format, summary.content.json, credentialDisplay?.name, summary.label),
     issuer = issuerDisplay?.name?.takeIf { it.isNotBlank() }
         ?: summary.issuer?.takeIf { it.isNotBlank() }
         ?: CredentialDisplayText.Unknown,

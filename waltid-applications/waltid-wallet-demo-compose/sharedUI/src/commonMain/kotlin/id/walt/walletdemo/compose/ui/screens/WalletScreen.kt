@@ -168,6 +168,7 @@ internal fun WalletScreen(
             }
             CredentialsTab(
                 state = collectionState,
+                loadCredential = controller::credentialDetails,
                 onDeleteCredential = if (allowCredentialDelete) controller::deleteCredential else null,
                 onDetailsChromeChange = { detailsChrome = it },
                 onDetailsVisible = controller::checkCredentialStatusWhileViewingDetails,

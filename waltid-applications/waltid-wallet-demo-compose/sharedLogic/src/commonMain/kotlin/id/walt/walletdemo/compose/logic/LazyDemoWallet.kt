@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.flow
 
 internal open class LazyDemoWallet<Wallet : DemoWallet>(
     private val createWallet: suspend () -> Wallet,
-) : DemoWallet {
+) : DemoWallet, DemoWalletInventory {
     private val mutex = Mutex()
     private var wallet: Wallet? = null
 
@@ -62,6 +62,8 @@ internal open class LazyDemoWallet<Wallet : DemoWallet>(
         statusReviewEpoch: Long?,
     ): WalletDemoOperationResult = wallet().submitStatusReviewedPresentation(previewHandle, selectedCredentialOptions, selectedDisclosureOptions, reviewedStatus, did, paymentConsentRevision, statusReviewEpoch)
 
+    override suspend fun listCredentialSummaries() = wallet().listCredentialSummaries()
+    override suspend fun credential(id: String) = wallet().credential(id)
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
 

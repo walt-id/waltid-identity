@@ -133,6 +133,14 @@ final class ProximityPresentationViewModel: ObservableObject {
         }
     }
 
+    var displayedCredentialIDs: Set<String> {
+        if let review { return Set(review.documents.flatMap { $0.credentialOptions.map(\.credentialID) }) }
+        if case .completed(_, _, let receipt) = sessionState {
+            return Set(receipt?.submission.documents.map(\.credentialID) ?? [])
+        }
+        return Set(preparedSharing?.submission.documents.map(\.credentialID) ?? [])
+    }
+
     var preparingApproval: Bool {
         if case .preparationRequired = sessionState { return true }
         return false

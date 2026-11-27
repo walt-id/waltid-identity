@@ -278,6 +278,40 @@ Run public-backend tests serially on iOS. The tests depend on public network
 services, so a transient simulator networking failure should be retried before
 treating it as a product regression.
 
+### Local memory checks
+
+Use synthetic credentials and a fixed credential count. In one process, repeat
+open, present or cancel, and dismiss at least 20 times. To check SDK teardown,
+close and reopen the wallet in the consumer between iterations. Record the
+revision, build, device and OS, and whether status observation and background
+maintenance are enabled.
+
+On Android, set `ANDROID_SERIAL` to the target from `adb devices -l` and enable
+LeakCanary in the local debug demo:
+
+```bash
+ANDROID_SERIAL="$ANDROID_SERIAL" ./gradlew -PenableAndroidBuild=true -PwalletLeakCanary=true \
+  :waltid-applications:waltid-wallet-demo-compose:androidApp:installPreviewDebug
+```
+
+Filter Logcat for `LeakCanary` and inspect the retaining path after dismissal.
+The demo automatically watches Android lifecycle objects. To watch a specific
+wallet or session, use `AppWatcher.objectWatcher.expectWeaklyReachable` after
+closing it in the local debug consumer. [LeakCanary guide](https://square.github.io/leakcanary/getting_started/)
+
+For footprint comparisons, use optimized builds with LeakCanary off. With the
+same PID, sample `adb -s "$ANDROID_SERIAL" shell dumpsys meminfo "$APP_PID"` before
+the flow, at the same points during it, and after a fixed settling interval.
+Compare total PSS across runs on the same device. Use Android Studio allocation
+recording or Perfetto in a separate run to attribute temporary buffers.
+[Android memory tools](https://developer.android.com/tools/dumpsys#meminfo)
+
+On iOS, use Xcode’s Debug Memory Graph after dismissal to follow retaining
+references. For allocation attribution, use **Product → Profile** with
+Allocations and VM Tracker, and mark generations before the flow and after
+dismissal. Record peak and settled physical footprint in separate optimized
+runs. [Apple memory profiling guide](https://developer.apple.com/documentation/xcode/gathering-information-about-memory-use)
+
 ### Live review galleries
 
 `mobile-e2e-fixtures/wallet-gallery-drivers.json` registers the basic public-demo

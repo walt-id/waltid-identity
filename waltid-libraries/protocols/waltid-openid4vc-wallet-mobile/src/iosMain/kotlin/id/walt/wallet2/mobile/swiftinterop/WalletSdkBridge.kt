@@ -8,6 +8,7 @@ import id.walt.wallet2.mobile.MobileWalletAnnexCPreview
 import id.walt.wallet2.mobile.MobileWalletAnnexCRequest
 import id.walt.wallet2.mobile.MobileWalletAnnexCSubmission
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.data.WalletCredentialSummary
 import id.walt.wallet2.mobile.MobileWalletCredentialRead
 import id.walt.wallet2.status.WalletCredentialStatusSnapshot
 import id.walt.wallet2.status.CredentialStatusRefreshResult
@@ -87,6 +88,16 @@ public class WalletSdkBridge private constructor(
     /** Local composed reads; no status endpoint is requested. */
     public suspend fun credentialReads(): WalletBridgeResult<List<WalletBridgeCredentialRead>> = walletBridgeCall {
         operations.credentialReads().map { it.toStatusBridgeRead() }
+    }
+
+    /** Card inventory for Swift, including the small format-specific type hints. */
+    public suspend fun credentialSummaries(): WalletBridgeResult<List<WalletBridgeCredentialSummary>> = walletBridgeCall {
+        operations.credentialSummaries().map(::WalletBridgeCredentialSummary)
+    }
+
+    /** Reads one full credential when present. */
+    public suspend fun credentialRead(credentialId: String): WalletBridgeResult<WalletBridgeCredentialRead?> = walletBridgeCall {
+        operations.credentialRead(credentialId)?.toStatusBridgeRead()
     }
 
     /** Reads the current opt-in on the foreground wallet. */
@@ -330,6 +341,10 @@ public class WalletSdkBridge private constructor(
             operations.previewPresentation(requestUrl = requestUrl)
         }
 
+    /** Projects option data to type hints for hosts using authoritative claim review. */
+    public suspend fun previewPresentationForClaimReview(requestUrl: String): WalletBridgeResult<MobileWalletPresentationPreviewResult> =
+        walletBridgeCall { operations.previewPresentationForClaimReview(requestUrl) }
+
     /** Prepares exact selection data through the same typed error/cancellation bridge as submission. */
     public suspend fun reviewPresentation(
         previewHandle: MobileWalletPresentationPreviewHandle,
@@ -520,6 +535,8 @@ internal interface WalletSdkBridgeOperations {
     suspend fun resumeDeferredIssuance(deferredCredentialId: String): WalletIssuanceOutcome
 
     suspend fun credentials(): List<MobileWalletCredential>
+    suspend fun credentialSummaries(): List<WalletCredentialSummary>
+    suspend fun credentialRead(credentialId: String): MobileWalletCredentialRead?
     suspend fun credentialReads(): List<MobileWalletCredentialRead>
     val credentialStatuses: Flow<WalletCredentialStatusSnapshot>
     suspend fun credentialStatusSnapshot(): WalletCredentialStatusSnapshot
@@ -539,6 +556,9 @@ internal interface WalletSdkBridgeOperations {
     suspend fun previewPresentation(
         requestUrl: String,
     ): MobileWalletPresentationPreviewResult
+
+    suspend fun previewPresentationForClaimReview(requestUrl: String): MobileWalletPresentationPreviewResult =
+        previewPresentation(requestUrl)
 
     suspend fun reviewPresentation(
         previewHandle: MobileWalletPresentationPreviewHandle,
@@ -673,6 +693,8 @@ internal class MobileWalletSdkBridgeOperations(
         wallet.resumeDeferredIssuance(deferredCredentialId)
 
     override suspend fun credentials(): List<MobileWalletCredential> = wallet.credentials()
+    override suspend fun credentialSummaries(): List<WalletCredentialSummary> = wallet.credentialSummaries()
+    override suspend fun credentialRead(credentialId: String): MobileWalletCredentialRead? = wallet.credentialRead(credentialId)
     override suspend fun credentialReads(): List<MobileWalletCredentialRead> = wallet.credentialReads()
     override val credentialStatuses: Flow<WalletCredentialStatusSnapshot> get() = wallet.credentialStatuses
     override suspend fun credentialStatusSnapshot(): WalletCredentialStatusSnapshot = wallet.credentialStatusSnapshot()
@@ -701,6 +723,9 @@ internal class MobileWalletSdkBridgeOperations(
         requestUrl: String,
     ): MobileWalletPresentationPreviewResult =
         wallet.previewPresentation(requestUrl = requestUrl)
+
+    override suspend fun previewPresentationForClaimReview(requestUrl: String): MobileWalletPresentationPreviewResult =
+        wallet.previewPresentationForClaimReview(requestUrl)
 
     override suspend fun reviewPresentation(
         previewHandle: MobileWalletPresentationPreviewHandle,

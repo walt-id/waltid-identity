@@ -40,10 +40,16 @@ class HttpWalletAttestationProvider(
     private val attesterPath: String,
     private val bearerToken: String = "",
     private val hostHeader: String = "",
-    private val httpClient: HttpClient = HttpClient {
+    httpClient: HttpClient? = null,
+) : WalletAttestationProvider, AutoCloseable {
+
+    private val ownedClient = if (httpClient == null) HttpClient {
         install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
-    },
-) : WalletAttestationProvider {
+    } else null
+    private val transport = httpClient ?: requireNotNull(ownedClient)
+
+    /** Releases the transport created by this provider. Injected transports belong to their caller. */
+    override fun close() { ownedClient?.close() }
 
     private val mutex = Mutex()
     private var cachedKey: AttestationCacheKey? = null
@@ -72,7 +78,7 @@ class HttpWalletAttestationProvider(
                 put("instancePublicKeyJwk", instanceKeyJwk)
             }
 
-            val response = httpClient.post(endpoint) {
+            val response = transport.post(endpoint) {
                 contentType(ContentType.Application.Json)
                 setBody(requestBody.toString())
                 bearerToken.trim().takeIf { it.isNotEmpty() }?.let {

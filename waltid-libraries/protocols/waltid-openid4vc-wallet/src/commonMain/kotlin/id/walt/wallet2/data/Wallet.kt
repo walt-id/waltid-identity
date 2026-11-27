@@ -113,6 +113,9 @@ data class Wallet(
     /** Cancels status work and observation without initializing an unused status service. */
     fun closeCredentialStatusService() { statusService?.close() }
 
+    /** Waits for status reads and checks before their backing storage is closed. */
+    suspend fun awaitCredentialStatusServiceClose() { statusService?.closeAndJoin() }
+
     /** Notifies an existing observer after direct writes to a custom store; no network or lazy initialization. */
     fun notifyCredentialStatusInventoryChanged() { statusService?.notifyCredentialInventoryChanged() }
 

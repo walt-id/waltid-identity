@@ -283,6 +283,17 @@ public actor Wallet {
         try await bridge.credentials()
     }
 
+    /// Lists card metadata without reading full signed payloads from an indexed mobile store.
+    public func credentialSummaries() async throws -> [CredentialSummary] {
+        try await bridge.credentialSummaries()
+    }
+
+    /// Reads the full credential and its local status when opening a detail view.
+    /// - Parameter id: The stored credential identifier.
+    public func credential(id: String) async throws -> Credential? {
+        try await bridge.credential(id: id)
+    }
+
     /// Removes one stored credential by wallet-local identifier.
     ///
     /// - Parameter id: Stable wallet-local credential identifier.
@@ -330,6 +341,12 @@ public actor Wallet {
     /// - Throws: ``WalletError`` when the request cannot be resolved safely or a local wallet operation fails.
     public func previewPresentation(request: URL) async throws -> PresentationPreviewResult {
         try await bridge.previewPresentation(request: request)
+    }
+
+    /// Returns type metadata for selective options with requested claims. Use the prepared claim review to render consent.
+    /// - Parameter request: The OpenID4VP authorization request URL.
+    public func previewPresentationForClaimReview(request: URL) async throws -> PresentationPreviewResult {
+        try await bridge.previewPresentationForClaimReview(request: request)
     }
 
     /// Prepares the effective claims for this selection without signing or sending credentials.

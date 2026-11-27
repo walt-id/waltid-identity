@@ -108,6 +108,9 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.credentialTypeMetadata
+import id.walt.wallet2.data.WalletCredentialSummary
+import id.walt.wallet2.data.readCredentialSummaries
 import kotlinx.coroutines.flow.flow
 
 internal object MobileDidSupport {
@@ -261,6 +264,9 @@ public class MobileWallet internal constructor(
     private val readerTrustEvaluator: ReaderTrustEvaluator = MdocReaderAuthenticationTrustEvaluator,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val onDigitalCredentialRegistryChanged: suspend () -> Unit = {},
+    private val persistedCredentialIds: (() -> List<String>)? = null,
+    private val closePersistence: () -> Unit = {},
+    private val preparePersistenceForDeletion: suspend () -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
     private val statusMaintenance: StatusMaintenanceEnrollmentStore? = null,
     private val managedCredentialStatus: Boolean = false,
@@ -291,6 +297,8 @@ public class MobileWallet internal constructor(
     private val registrationMutex = Mutex()
     private val lastRegistrationResult = MutableStateFlow<MobileWalletCredentialRegistrationResult?>(null)
 
+    private val ownedProviderTransport = if (walletProviderConfig != null && issuanceHttpClient == null) HttpClient() else null
+
     private val walletProviderClient: WalletProviderHttpClient? = walletProviderConfig?.let { config ->
         WalletProviderHttpClient(
             baseUrl = config.baseUrl,
@@ -298,7 +306,7 @@ public class MobileWallet internal constructor(
             bearerToken = config.bearerToken,
             hostHeader = config.hostHeader,
             composition = config.composition,
-            httpClient = issuanceHttpClient ?: HttpClient(),
+            httpClient = issuanceHttpClient ?: requireNotNull(ownedProviderTransport),
             verificationKeyFromJwt = { jwt ->
                 walletProviderVerificationKey(jwt) { pem ->
                     X509CertificateUtil.parseCertificatePem(pem)
@@ -310,20 +318,12 @@ public class MobileWallet internal constructor(
 
     private val walletProviderComposition = walletProviderConfig?.composition
 
-    private val attestationAssembler: ClientAttestationAssembler? = when {
-        walletProviderClient != null && walletProviderComposition?.includesWalletInstanceAttestation() == true ->
-            ClientAttestationAssembler(walletProviderClient)
-        attestationProvider != null -> ClientAttestationAssembler(attestationProvider)
-        attestationConfig != null -> ClientAttestationAssembler(
-            HttpWalletAttestationProvider(
-                baseUrl = attestationConfig.baseUrl,
-                attesterPath = attestationConfig.attesterPath,
-                bearerToken = attestationConfig.bearerToken,
-                hostHeader = attestationConfig.hostHeader,
-            )
-        )
-        else -> null
-    }
+    private val attestationSource = walletProviderClient?.takeIf { walletProviderComposition?.includesWalletInstanceAttestation() == true }
+        ?: attestationProvider
+    private val ownedAttestationProvider = if (attestationSource == null) attestationConfig?.let {
+        HttpWalletAttestationProvider(it.baseUrl, it.attesterPath, it.bearerToken, it.hostHeader)
+    } else null
+    private val attestationAssembler = (attestationSource ?: ownedAttestationProvider)?.let(::ClientAttestationAssembler)
 
     private val issuanceSessionState = id.walt.wallet2.handlers.WalletIssuanceSessionState(walletId, issuanceSessionStore)
 
@@ -397,14 +397,17 @@ public class MobileWallet internal constructor(
         proximityCoordinator.start(configuration)
     }
 
-    private val issuanceSessions = WalletIssuanceSessionService(
-        wallet = wallet,
-        attestationAssembler = attestationAssembler,
-        metadataTrustResolver = credentialIssuerMetadataTrustResolver,
-        onEvent = ::emitSessionEvent,
-        runtimeState = issuanceSessionState,
-        httpClient = issuanceHttpClient,
-    )
+    private val issuanceService = lazy {
+        WalletIssuanceSessionService(
+            wallet = wallet,
+            attestationAssembler = attestationAssembler,
+            metadataTrustResolver = credentialIssuerMetadataTrustResolver,
+            onEvent = ::emitSessionEvent,
+            runtimeState = issuanceSessionState,
+            httpClient = issuanceHttpClient,
+        )
+    }
+    private val issuanceSessions by issuanceService
 
     private val signingIdentityManager = createSigningIdentityManager?.invoke(lifecycle, ::syncDigitalCredentialRegistration)
 
@@ -728,6 +731,18 @@ public class MobileWallet internal constructor(
         wallet.streamAllCredentials().map { it.toMobileWalletCredential() }.toList()
     }
 
+    /** Returns card metadata without loading signed payloads from an indexed mobile store. */
+    public suspend fun credentialSummaries(): List<WalletCredentialSummary> = lifecycle.use {
+        credentialStore.readCredentialSummaries()
+    }
+
+    /** Reads one full credential and its local status when a caller opens its details. */
+    public suspend fun credentialRead(credentialId: String): MobileWalletCredentialRead? = lifecycle.use {
+        wallet.credentialStatuses().readCredential(credentialId)?.let { read ->
+            MobileWalletCredentialRead(read.credential.toMobileWalletCredential(), read.status, read.evaluatedAt.toString())
+        }
+    }
+
     private fun StoredCredential.toMobileWalletCredential(): MobileWalletCredential {
         val meta = toMetadata()
         return MobileWalletCredential(id = meta.id, format = meta.format, issuer = meta.issuer,
@@ -793,8 +808,19 @@ public class MobileWallet internal constructor(
         preference: CredentialStatusMaintenancePreference,
     ): CredentialStatusMaintenanceEnrollment? = lifecycle.use { statusMaintenance?.set(preference) }
 
-    /** Closes this instance to new operations and cancels status work without deleting stored data. */
-    public suspend fun close(): Unit = lifecycle.close { wallet.closeCredentialStatusService() }
+    /** Stops wallet-owned work and releases the encrypted database. Stored credentials can be reopened. */
+    public suspend fun close(): Unit = lifecycle.close {
+        stopWalletWork()
+        closePersistence()
+    }
+
+    private suspend fun stopWalletWork() {
+        proximityCoordinator.shutdown()
+        wallet.awaitCredentialStatusServiceClose()
+        if (issuanceService.isInitialized()) issuanceSessions.close()
+        ownedAttestationProvider?.close()
+        ownedProviderTransport?.close()
+    }
 
     /** Returns the native adapter's current runtime capability snapshot. */
     public fun digitalCredentialCapabilities(): MobileWalletDigitalCredentialCapabilities =
@@ -913,6 +939,16 @@ public class MobileWallet internal constructor(
      */
     public suspend fun previewDigitalCredentialPresentation(
         request: MobileWalletDigitalCredentialRequest,
+    ): MobileWalletDigitalCredentialPreview = previewDigitalCredentialPresentation(request, compact = false)
+
+    /** Preview for a host that renders the effective claims from [reviewDigitalCredentialPresentation]. */
+    public suspend fun previewDigitalCredentialPresentationForClaimReview(
+        request: MobileWalletDigitalCredentialRequest,
+    ): MobileWalletDigitalCredentialPreview = previewDigitalCredentialPresentation(request, compact = true)
+
+    private suspend fun previewDigitalCredentialPresentation(
+        request: MobileWalletDigitalCredentialRequest,
+        compact: Boolean,
     ): MobileWalletDigitalCredentialPreview = lifecycle.use {
         require(request.protocol != MobileWalletDigitalCredentialProtocols.ISO_MDOC_ANNEX_C) {
             "ISO 18013-7 Annex C requests use the dedicated Annex C facade"
@@ -960,7 +996,7 @@ public class MobileWallet internal constructor(
                     )
                 },
             ),
-            credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
+            credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption(compact) },
             credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
             readerAuthentication = MobileWalletReaderAuthentication.NOT_APPLICABLE,
             readerTrust = null,
@@ -999,7 +1035,7 @@ public class MobileWallet internal constructor(
         val disclosures = selectedDisclosureOptions?.toList()
         val revisions = reviewedStatus.toMap()
         val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(credentials.mapTo(mutableSetOf()) { it.credentialId }, revisions) }
-        guard.check()
+        lifecycle.use { guard.check() }
         return withContext(guard) {
             submitDigitalCredentialPresentation(requestId, credentials, disclosures, did, paymentConsentRevision)
         }
@@ -1076,7 +1112,7 @@ public class MobileWallet internal constructor(
         val captured = submission.copy(selectedCredentialOptions = submission.selectedCredentialOptions.toList())
         val revisions = reviewedStatus.toMap()
         val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(captured.selectedCredentialOptions.mapTo(mutableSetOf()) { it.credentialId }, revisions) }
-        guard.check()
+        lifecycle.use { guard.check() }
         return withContext(guard) { submitAnnexCPresentation(captured) }
     }
 
@@ -1106,7 +1142,7 @@ public class MobileWallet internal constructor(
         did: String? = null,
         runPolicies: Boolean? = null,
     ): MobileWalletPresentationResult = lifecycle.use {
-        val preview = when (val result = previewPresentation(requestUrl)) {
+        val preview = when (val result = previewPresentationForClaimReview(requestUrl)) {
             is MobileWalletPresentationPreviewResult.Invalid -> {
                 // Match the protocol shortcut: malformed transaction data remains a local failure.
                 if (result.errorCode == MobileWalletPresentationErrorCode.invalidTransactionData) {
@@ -1132,7 +1168,14 @@ public class MobileWallet internal constructor(
      * [id.waltid.openid4vp.wallet.UnsafePresentationErrorResponseException], preserving the protocol
      * error and the separate response-safety failure. Resolution failures remain local exceptions.
      */
-    public suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreviewResult = lifecycle.use {
+    public suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreviewResult =
+        previewPresentation(requestUrl, compact = false)
+
+    /** Preview for a host that renders the effective claims from [reviewPresentation]. */
+    public suspend fun previewPresentationForClaimReview(requestUrl: String): MobileWalletPresentationPreviewResult =
+        previewPresentation(requestUrl, compact = true)
+
+    private suspend fun previewPresentation(requestUrl: String, compact: Boolean): MobileWalletPresentationPreviewResult = lifecycle.use {
         val result = WalletPresentationHandler.previewPresentationWithTrust(
             wallet = wallet,
             request = PreviewPresentationRequest(
@@ -1177,7 +1220,7 @@ public class MobileWallet internal constructor(
                             responseEncryption = result.responseEncryption,
                             transactionData = transactionData,
                         ),
-                        credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
+                        credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption(compact) },
                         credentialRequirements = result.credentialRequirements.map { it.toMobileCredentialRequirement() },
                     )
                 )
@@ -1240,7 +1283,7 @@ public class MobileWallet internal constructor(
         val disclosures = selectedDisclosureOptions?.toList()
         val revisions = reviewedStatus.toMap()
         val guard = lifecycle.use { wallet.credentialStatuses().reviewGuard(credentials.mapTo(mutableSetOf()) { it.credentialId }, revisions) }
-        guard.check()
+        lifecycle.use { guard.check() }
         return withContext(guard) {
             submitPresentation(previewHandle, credentials, disclosures, did, runPolicies, paymentConsentRevision)
         }
@@ -1319,18 +1362,26 @@ public class MobileWallet internal constructor(
      * instance; other operations remain closed. Successful deletion is idempotent.
      */
     public suspend fun deleteWallet(): Unit = lifecycle.delete {
-        if (!localStoresCleared) {
-            statusMaintenance?.retire()
-            wallet.closeCredentialStatusService()
-            issuanceSessions.closeSessions()
-            proximityCoordinator.shutdown()
-            WalletPresentationHandler.clearPreviews(wallet)
-            keyStore.listKeys().toList().forEach { key -> keyStore.removeKey(key.keyId) }
-            credentialStore.listCredentials().toList().forEach { credential -> credentialStore.removeCredential(credential.id) }
-            didStore.listDids().toList().forEach { did -> didStore.removeDid(did.did) }
-            // Registry failures cannot prevent removal of the already cleared local database.
-            syncDigitalCredentialRegistration()
-            localStoresCleared = true
+        stopWalletWork()
+        try {
+            if (!localStoresCleared) {
+                preparePersistenceForDeletion()
+                statusMaintenance?.retire()
+                try {
+                    issuanceSessions.closeSessions()
+                } finally {
+                    issuanceSessions.close()
+                }
+                WalletPresentationHandler.clearPreviews(wallet)
+                keyStore.listKeys().toList().forEach { key -> keyStore.removeKey(key.keyId) }
+                val credentialIds = persistedCredentialIds?.invoke() ?: credentialStore.listCredentials().map { it.id }.toList()
+                credentialIds.forEach { id -> credentialStore.removeCredential(id) }
+                didStore.listDids().toList().forEach { did -> didStore.removeDid(did.did) }
+                syncDigitalCredentialRegistration()
+                localStoresCleared = true
+            }
+        } finally {
+            closePersistence()
         }
         deleteLocalPersistence()
     }
@@ -1341,7 +1392,7 @@ public class MobileWallet internal constructor(
         onEvent(mobileEvent)
     }
 
-    private fun PresentationCredentialOption.toMobileCredentialOption(): MobileWalletPresentationCredentialOption =
+    private fun PresentationCredentialOption.toMobileCredentialOption(compact: Boolean): MobileWalletPresentationCredentialOption =
         MobileWalletPresentationCredentialOption(
             queryId = queryId,
             credentialId = credentialId,
@@ -1350,7 +1401,10 @@ public class MobileWallet internal constructor(
             issuer = issuer,
             subject = subject,
             label = label,
-            credentialDataJson = credentialData.encodeJsonObject(),
+            credentialDataJson = if (compact && disclosures.any { it.requested } &&
+                format in setOf("mso_mdoc", "dc+sd-jwt", "vc+sd-jwt")) {
+                credentialData.credentialTypeMetadata().encodeJsonObject()
+            } else credentialData.encodeJsonObject(),
             disclosures = disclosures.map { disclosure ->
                 MobileWalletPresentationDisclosure(
                     path = disclosure.path,
