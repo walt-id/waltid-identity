@@ -142,17 +142,24 @@ jobs:
     name: Integration Tests - AWS
     runs-on: ubuntu-latest
     needs: tag
-    steps:
-      - name: Dispatch integration-test-aws.yml
+    # AWS and Azure share each provider's queue with PR and scheduled tests.
+    # Allow 350 minutes for queuing and execution, then check the result within the six-hour runner limit.
+    timeout-minutes: 360
+    env:
+      WORKFLOW: integration-test-aws.yml
+      WAIT_MINUTES: '350'
+    steps: &enterprise_integration_steps
+      - name: Dispatch ${{ env.WORKFLOW }}
         id: dispatch
         uses: benc-uk/workflow-dispatch@v1.3.3
         with:
-          workflow: integration-test-aws.yml
+          workflow: ${{ env.WORKFLOW }}
           repo: walt-id/waltid-identity-enterprise
           ref: ${{ needs.tag.outputs.tag }}
           token: ${{ secrets.GH_ACCESS_TOKEN }}
       - &wait-for-dispatched-run
         name: Require the dispatched run to succeed
+        timeout-minutes: ${{ fromJSON(env.WAIT_MINUTES || '360') }}
         env:
           GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
           RUN_URL: ${{ steps.dispatch.outputs.runUrl }}
@@ -167,20 +174,44 @@ jobs:
               *) echo "::error::Dispatched workflow at $RUN_URL returned '$result'."; exit 1 ;;
             esac
           done
+      - name: Require a successful integration run for the tagged Enterprise commit
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+          RUN_ID: ${{ steps.dispatch.outputs.runId }}
+          TAG: ${{ needs.tag.outputs.tag }}
+          ENTERPRISE_SHA: ${{ fromJSON(needs.tag.outputs.checkout-refs).enterprise }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RUN_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::No run ID returned for $WORKFLOW on $TAG."
+            exit 1
+          fi
+          if ! gh api "repos/walt-id/waltid-identity-enterprise/actions/runs/$RUN_ID" \
+            | jq -e --arg path ".github/workflows/$WORKFLOW" --arg tag "$TAG" --arg sha "$ENTERPRISE_SHA" '
+                .path == $path and .event == "workflow_dispatch" and .head_branch == $tag and
+                .head_sha == $sha and .status == "completed" and .conclusion == "success"' > /dev/null; then
+            echo "::error::$WORKFLOW run $RUN_ID did not confirm success for $TAG at $ENTERPRISE_SHA."
+            exit 1
+          fi
   integration-test-azure:
     name: Integration Tests - Azure
     runs-on: ubuntu-latest
     needs: tag
-    steps:
-      - name: Dispatch integration-test-azure.yml
-        id: dispatch
-        uses: benc-uk/workflow-dispatch@v1.3.3
-        with:
-          workflow: integration-test-azure.yml
-          repo: walt-id/waltid-identity-enterprise
-          ref: ${{ needs.tag.outputs.tag }}
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
-      - *wait-for-dispatched-run
+    timeout-minutes: 360
+    env:
+      WORKFLOW: integration-test-azure.yml
+      WAIT_MINUTES: '350'
+    steps: *enterprise_integration_steps
+  integration-test-postgresql:
+    name: Integration Tests - PostgreSQL
+    runs-on: ubuntu-latest
+    needs: tag
+    timeout-minutes: 205
+    env:
+      WORKFLOW: integration-test-postgresql.yml
+      # A release dispatch has its own concurrency group and a 180-minute job limit.
+      WAIT_MINUTES: '195'
+    steps: *enterprise_integration_steps
   sonar-snapshot:
     name: SonarQube Cloud release scan
     runs-on: ubuntu-latest
@@ -258,7 +289,7 @@ jobs:
   deploy-license:
     name: Deploy license (staging)
     runs-on: ubuntu-latest
-    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, sonar-snapshot, integration-test-aws, integration-test-azure ]
+    needs: [ version, tag, gradle, docker, api-docker, sdk-docs, sonar-snapshot, integration-test-aws, integration-test-azure, integration-test-postgresql ]
     if: ${{ needs.tag.outputs.is-latest == 'true' }}
     steps:
       - name: Dispatch deploy-k8s.yml
