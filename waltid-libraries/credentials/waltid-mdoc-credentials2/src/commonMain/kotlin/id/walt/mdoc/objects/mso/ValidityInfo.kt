@@ -78,4 +78,16 @@ data class ValidityInfo(
         require(update >= validFrom) { "expectedUpdate cannot be before validFrom" }
         require(update <= validUntil) { "expectedUpdate cannot be after validUntil" }
     }
+
+    /** Verify the ETSI TS 119 472-1 requirements for whole-second validity timestamps. */
+    fun requireEtsiPrecision() {
+        require(validFrom.nanosecondsOfSecond == 0) {
+            "MSO validityInfo.validFrom SHALL NOT contain fractions of seconds " +
+                "(EAA-6.2.7.1-05 ETSI TS 119 472-1); got: ${validFrom}"
+        }
+        require(validUntil.nanosecondsOfSecond == 0) {
+            "MSO validityInfo.validUntil SHALL NOT contain fractions of seconds " +
+                "(EAA-6.2.7.1-05 ETSI TS 119 472-1); got: ${validUntil}"
+        }
+    }
 }

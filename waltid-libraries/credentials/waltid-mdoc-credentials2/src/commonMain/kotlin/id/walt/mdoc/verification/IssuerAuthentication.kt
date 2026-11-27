@@ -9,6 +9,7 @@ import id.walt.certificate.x509.validation.validator.*
 import id.walt.cose.protectedAlgorithm
 import id.walt.cose.verify
 import id.walt.crypto2.keys.Key
+import id.walt.mdoc.issuance.requireMdocSignedWithinCertificateValidity
 import id.walt.mdoc.objects.document.Document
 import kotlinx.io.bytestring.ByteString
 import kotlin.io.encoding.Base64
@@ -48,15 +49,7 @@ suspend fun verifyIssuerAuthentication(
         validateDocumentSignerCertificateChain(certificateChain, verificationTime)
     }
     val mso = document.issuerSigned.decodeMobileSecurityObject()
-    val leaf = certificateChain.first()
-    val signed = mso.validityInfo.signed
-    val leafValidity = leaf.data.validity
-    require(leafValidity.notBefore <= signed) {
-        "MSO signed is before the document signer certificate notBefore"
-    }
-    require(signed <= leafValidity.notAfter) {
-        "MSO signed is after the document signer certificate notAfter"
-    }
+    requireMdocSignedWithinCertificateValidity(mso.validityInfo.signed, certificateChain.first().data.validity)
     return IssuerAuthenticationVerification(certificateChain, parsed.signerKey, algorithm)
 }
 

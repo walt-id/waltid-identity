@@ -2,7 +2,7 @@ package id.walt.issuer2.domain
 
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.mdoc.issuance.MsoData
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement

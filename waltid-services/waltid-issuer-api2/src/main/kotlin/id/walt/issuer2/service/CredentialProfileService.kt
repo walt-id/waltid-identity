@@ -6,7 +6,10 @@ import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.CredentialStatusConfiguration
 import id.walt.openid4vci.CredentialFormat
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.credentials.issuance.MdlAgeValidation
+import id.walt.credentials.issuance.MdlLoginClaimMapping
+import id.walt.mdoc.issuance.MdlAge
+import id.walt.mdoc.issuance.MsoData
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -62,8 +65,48 @@ class CredentialProfileService(
                     profile.credentialConfigurationId
         }
         requireMsoDataOnlyForMdoc(profile.credentialConfigurationId, profile.msoData)
+        validateMdlAge(
+            profile.credentialConfigurationId, profile.credentialData, profile.mapping,
+            profile.idTokenClaimsMapping, profile.msoData,
+        )
         return profile
     }
+
+    internal fun validateMdlAge(
+        configurationId: String,
+        credentialData: JsonObject,
+        mapping: JsonObject?,
+        idTokenClaimsMapping: Map<String, String>?,
+        msoData: MsoData?,
+        canUseLoginClaims: Boolean = true,
+        explicitBirthYear: JsonElement? = null,
+    ) {
+        if (isMdl(configurationId)) {
+            MdlAgeValidation.validateConfiguration(
+                credentialData = credentialData,
+                mapping = mapping,
+                loginClaimDestinations = if (canUseLoginClaims) idTokenClaimsMapping.orEmpty().values else emptyList(),
+                validFrom = msoData?.validFrom,
+                explicitBirthYear = explicitBirthYear,
+            )
+        }
+    }
+
+    internal fun claimsDestination(
+        configurationId: String,
+        credentialData: JsonObject,
+        claimsMapping: Map<String, String>,
+    ): JsonObject =
+        if (isMdl(configurationId)) {
+            MdlLoginClaimMapping.forDestinations(claimsMapping.values).prepareDestination(credentialData)
+        } else {
+            credentialData
+        }
+
+    internal fun isMdl(configurationId: String): Boolean =
+        credentialFormat(configurationId) == CredentialFormat.MSO_MDOC &&
+            metadataConfig.credentialConfigurations[configurationId]
+                ?.jsonObject?.get("doctype")?.jsonPrimitive?.content == MdlAge.DOC_TYPE
 
     internal fun statusForIssuance(
         profile: CredentialProfile,

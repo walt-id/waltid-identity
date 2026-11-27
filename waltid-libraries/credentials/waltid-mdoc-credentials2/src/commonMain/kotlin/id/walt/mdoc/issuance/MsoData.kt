@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalSerializationApi::class)
 
-package id.walt.openid4vci.mdoc
+package id.walt.mdoc.issuance
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

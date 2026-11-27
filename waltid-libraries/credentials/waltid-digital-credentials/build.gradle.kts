@@ -31,6 +31,7 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // walt.id
+            implementation(project(":waltid-libraries:credentials:waltid-credential-mapping"))
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:crypto:waltid-crypto2"))
             api(project(":waltid-libraries:crypto:waltid-jose"))
@@ -45,6 +46,9 @@ kotlin {
 
 
             implementation(identityLibs.kotlincrypto.hash.sha2)
+        }
+        jvmMain.dependencies {
+            implementation(identityLibs.jaywayjsonpath)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

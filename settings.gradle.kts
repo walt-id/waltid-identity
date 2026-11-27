@@ -55,6 +55,7 @@ val modules = listOfNotNull(
     * "$libraries:credentials".group(
         "waltid-w3c-credentials",
         "waltid-credential-key-resolver",
+        "waltid-credential-mapping",
         "waltid-digital-credentials",
         "waltid-digital-credentials-examples",
         "waltid-mdoc-credentials",

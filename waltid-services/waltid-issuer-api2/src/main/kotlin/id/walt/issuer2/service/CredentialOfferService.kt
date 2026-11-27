@@ -1,6 +1,8 @@
 package id.walt.issuer2.service
 
 import id.walt.credentials.issuance.CredentialDataMergeUtils.validateMdocNamespaceMappingShape
+import id.walt.credentials.issuance.MdlAgeValidation
+import id.walt.credentials.issuance.MdlBirthYear
 import id.walt.issuer2.service.openid4vci.IssuerTypeMetadataCatalogue
 import id.walt.sdjwt.metadata.type.validateIssuanceInput
 
@@ -16,7 +18,7 @@ import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.openid4vci.CredentialFormat
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.mdoc.issuance.MsoData
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -69,17 +71,39 @@ class CredentialOfferService(
             val issuerKey = overrides?.issuerKey ?: profile.issuerKey
             require(issuerKey.isNotEmpty()) { "issuerKey must not be empty" }
             require(issuerKey["type"] != null) { "issuerKey must contain a key type" }
-            val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
+            val mergedData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
             val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
+            val mapping = overrides?.mapping ?: profile.mapping
+            val msoData = (profile.msoData ?: MsoData()).merge(overrides?.msoData).takeUnless { it.isEmpty() }
+            val canUseLoginClaims = request.authMethod == AuthenticationMethod.AUTHORIZED
+            val loginClaimDestinations = if (canUseLoginClaims) idTokenClaimsMapping.orEmpty().values else emptyList()
+            val mdlBirthYear = if (profileService.isMdl(profile.credentialConfigurationId)) {
+                MdlAgeValidation.birthYearOrigin(mergedData, overrides?.credentialData, mapping, loginClaimDestinations)
+            } else null
+            val credentialData = try {
+                val resolvedData = if (mdlBirthYear == MdlBirthYear.Inherited) {
+                    MdlAgeValidation.reconcileInheritedBirthYear(mergedData, mapping, loginClaimDestinations)
+                } else {
+                    mergedData
+                }
+                profileService.validateMdlAge(
+                    profile.credentialConfigurationId, resolvedData, mapping, idTokenClaimsMapping, msoData,
+                    canUseLoginClaims = canUseLoginClaims,
+                    explicitBirthYear = (mdlBirthYear as? MdlBirthYear.Explicit)?.value,
+                )
+                resolvedData
+            } catch (e: IllegalArgumentException) {
+                throw BadRequestException(e.message ?: "Invalid mDL age configuration", e)
+            }
             val credentialStatus = try {
                 profileService.statusForIssuance(profile, overrides?.credentialStatus, overrides?.mapping)
             } catch (e: IllegalArgumentException) {
                 throw BadRequestException(e.message ?: "Invalid credentialStatus configuration", e)
             }
-            idTokenClaimsMapping?.let { mapping ->
+            idTokenClaimsMapping?.let { claimsMapping ->
                 JsonObjectPathMapper.validateJsonObjectContainsPaths(
-                    jsonObject = credentialData,
-                    jsonPathList = mapping.values.toList(),
+                    jsonObject = profileService.claimsDestination(profile.credentialConfigurationId, credentialData, claimsMapping),
+                    jsonPathList = claimsMapping.values.toList(),
                 )
             }
             val issuanceRequest = IssuanceRequest(
@@ -89,15 +113,15 @@ class CredentialOfferService(
                 issuerKey = issuerKey,
                 expectedCredentialProofKeyJwks = overrides?.expectedCredentialProofKeyJwk?.let(::listOf),
                 credentialData = credentialData,
-                mapping = overrides?.mapping ?: profile.mapping,
+                mapping = mapping,
                 selectiveDisclosure = overrides?.selectiveDisclosure ?: profile.selectiveDisclosure,
                 idTokenClaimsMapping = idTokenClaimsMapping,
                 mDocNameSpacesDataMappingConfig =
                     overrides?.mDocNameSpacesDataMappingConfig ?: profile.mDocNameSpacesDataMappingConfig,
                 authorizedTransactionDataTypes = overrides?.authorizedTransactionDataTypes
                     ?: profile.authorizedTransactionDataTypes,
-                msoData = (profile.msoData ?: MsoData()).merge(overrides?.msoData)
-                    .takeUnless { it.isEmpty() },
+                msoData = msoData,
+                mdlBirthYear = mdlBirthYear,
                 x5Chain = overrides?.x5Chain ?: profile.x5Chain,
                 issuerDid = overrides?.issuerDid ?: profile.issuerDid,
                 credentialStatus = credentialStatus,

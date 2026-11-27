@@ -36,7 +36,7 @@ import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.offers.TxCode
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.mdoc.issuance.MsoData
 import id.walt.sdjwt.SDMap
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import io.ktor.client.HttpClient

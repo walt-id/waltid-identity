@@ -46,19 +46,7 @@ class MsoVerificationMdocVpPolicy(
         mso.precheck()
         timestamps.validate(verificationContext?.verificationTime ?: Clock.System.now())
 
-        // EAA-6.2.7.1-04/05 (ETSI TS 119 472-1 v1.2.1): validFrom and validUntil SHALL
-        // have seconds precision and SHALL NOT contain fractions of seconds.
-        // Only enforced when strictEtsiPrecision=true (e.g. in ETSI plugtest context).
-        if (strictEtsiPrecision) {
-            require(timestamps.validFrom.nanosecondsOfSecond == 0) {
-                "MSO validityInfo.validFrom SHALL NOT contain fractions of seconds " +
-                "(EAA-6.2.7.1-05 ETSI TS 119 472-1); got: ${timestamps.validFrom}"
-            }
-            require(timestamps.validUntil.nanosecondsOfSecond == 0) {
-                "MSO validityInfo.validUntil SHALL NOT contain fractions of seconds " +
-                "(EAA-6.2.7.1-05 ETSI TS 119 472-1); got: ${timestamps.validUntil}"
-            }
-        }
+        if (strictEtsiPrecision) timestamps.requireEtsiPrecision()
 
         require(MdocCrypto.isSupportedDigest(mso.digestAlgorithm)) {
             "MSO digest algorithm is not supported: ${mso.digestAlgorithm}"

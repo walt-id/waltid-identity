@@ -2,7 +2,7 @@ package id.walt.issuer2.models
 
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
-import id.walt.openid4vci.mdoc.MsoData
+import id.walt.mdoc.issuance.MsoData
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode

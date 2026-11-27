@@ -17,6 +17,9 @@ import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.proofs.ProofType
 import id.walt.sdjwt.SDMap
+import java.time.LocalDate
+import java.time.Period
+import java.time.ZoneOffset
 import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -341,28 +344,30 @@ object Issuer2RequestExamples {
         runtimeOverrides = CredentialOfferRuntimeOverrides(
             credentialData = buildJsonObject {
                 putJsonObject("org.iso.18013.5.1") {
+                    val birthDate = LocalDate.parse("1986-03-22")
                     put("family_name", "Doe")
                     put("given_name", "Jane")
-                    put("birth_date", "1986-03-22")
+                    put("birth_date", birthDate.toString())
+                    put("age_birth_year", birthDate.year)
+                    put("age_in_years", Period.between(birthDate, LocalDate.now(ZoneOffset.UTC)).years)
                     put("issue_date", "2019-10-20")
-                    put("expiry_date", "2024-10-20")
+                    put("expiry_date", "2029-10-20")
                     put("issuing_country", "AT")
                     put("issuing_authority", "AT DMV")
                     put("document_number", "123456789")
-                    put("portrait", "AQIDBAUGBwgJCgsMDQ4P")
                     putJsonArray("driving_privileges") {
                         addJsonObject {
                             put("vehicle_category_code", "A")
                             put("issue_date", "2018-08-09")
-                            put("expiry_date", "2024-10-20")
+                            put("expiry_date", "2029-10-20")
                         }
                         addJsonObject {
                             put("vehicle_category_code", "B")
                             put("issue_date", "2017-02-23")
-                            put("expiry_date", "2024-10-20")
+                            put("expiry_date", "2029-10-20")
                         }
                     }
-                    put("un_distinguishing_sign", "AT")
+                    put("un_distinguishing_sign", "A")
                 }
             },
         ),
@@ -370,6 +375,22 @@ object Issuer2RequestExamples {
         issuerStateMode = IssuerStateMode.INCLUDE,
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
     )
+
+    fun preAuthorizedMdlOfferWithAgeOverride(issuanceDate: LocalDate = LocalDate.now(ZoneOffset.UTC)): CredentialOfferCreateRequest {
+        val birthDate = LocalDate.parse("1990-08-26")
+        return PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE.copy(
+            profileId = MDOC_MDL_PROFILE_ID,
+            runtimeOverrides = CredentialOfferRuntimeOverrides(
+                credentialData = buildJsonObject {
+                    putJsonObject("org.iso.18013.5.1") {
+                        put("birth_date", birthDate.toString())
+                        put("age_birth_year", birthDate.year)
+                        put("age_in_years", Period.between(birthDate, issuanceDate).years)
+                    }
+                },
+            ),
+        )
+    }
 
     val CREDENTIAL_OFFER_RESPONSE_BY_REFERENCE = CredentialOfferCreateResponse(
         offerId = EXAMPLE_OFFER_ID,
@@ -603,6 +624,7 @@ object Issuer2RequestExamples {
         "[pre-authorized][single][by-reference][issuerKey override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE,
         "[pre-authorized][single][by-reference][selective disclosure override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE,
         "[pre-authorized][single][by-reference][mDoc credentialData override]" to PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE,
+        "[pre-authorized][single][by-reference][mDL age override]" to preAuthorizedMdlOfferWithAgeOverride(),
         "[pre-authorized][single][by-reference][authorized transaction types override]" to PROFILE_PRE_AUTHORIZED_OFFER_WITH_AUTHORIZED_TRANSACTION_DATA_TYPES_OVERRIDE,
         "[pre-authorized][multiple][by-reference]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER,
         "[pre-authorized][multiple][by-value]" to PROFILE_PRE_AUTHORIZED_MULTI_CREDENTIAL_OFFER_BY_VALUE,

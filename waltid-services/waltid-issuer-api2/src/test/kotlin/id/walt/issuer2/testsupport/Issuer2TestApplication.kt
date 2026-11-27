@@ -2,6 +2,8 @@ package id.walt.issuer2.testsupport
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
+import id.walt.issuer2.application.Issuer2Module
+import id.walt.issuer2.configurePlugins
 import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
@@ -9,7 +11,10 @@ import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.issuer2Module
 import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
+import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.routing.routing
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
@@ -24,6 +29,7 @@ fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
     configureProfilesConfig: (Issuer2ProfilesConfig) -> Issuer2ProfilesConfig = { it },
     configureMetadataConfig: (Issuer2MetadataConfig) -> Issuer2MetadataConfig = { it },
     configureAuthenticationConfig: (AuthenticationServiceConfig) -> AuthenticationServiceConfig = { it },
+    preAuthorizedCodeRepository: PreAuthorizedCodeRepository? = null,
     configureServiceConfig: (Issuer2ServiceConfig) -> Issuer2ServiceConfig = { it },
 ) {
     loadIssuer2ConfigFiles()
@@ -44,10 +50,23 @@ fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
             json(json)
         }
         installIssuer2AuthenticationForTests()
-        issuer2Module(
-            withPlugins = true,
-            credentialProofKeyAcceptance = credentialProofKeyAcceptance,
-        )
+        if (preAuthorizedCodeRepository == null) {
+            issuer2Module(withPlugins = true, credentialProofKeyAcceptance = credentialProofKeyAcceptance)
+        } else {
+            configurePlugins()
+            val module = Issuer2Module(
+                serviceConfig = ConfigManager.getConfig(),
+                metadataConfig = ConfigManager.getConfig(),
+                profilesConfig = ConfigManager.getConfig(),
+                credentialProofKeyAcceptance = credentialProofKeyAcceptance,
+                preAuthorizedCodeRepository = preAuthorizedCodeRepository,
+            )
+            monitor.subscribe(ApplicationStopped) { module.close() }
+            routing {
+                module.managementController.register(this)
+                module.openId4VciController.register(this)
+            }
+        }
     }
 }
 

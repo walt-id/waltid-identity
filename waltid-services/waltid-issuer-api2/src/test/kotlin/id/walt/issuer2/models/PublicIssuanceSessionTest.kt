@@ -1,5 +1,6 @@
 package id.walt.issuer2.models
 
+import id.walt.credentials.issuance.MdlBirthYear
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.repository.IssuanceSessionStorageCodec
 import id.walt.issuer2.repository.fixtures.PreBatchIssuanceSession
@@ -21,6 +22,7 @@ class PublicIssuanceSessionTest {
         val request = original.issuanceRequests.single().copy(
             issuerKey = buildJsonObject { put("kid", "private-issuer-key") },
             credentialStatus = JsonArray(listOf(JsonArray(listOf(buildJsonObject { put("unused", "private-status") })))),
+            mdlBirthYear = MdlBirthYear.Inherited,
         )
         val state = id.walt.issuer2.domain.CredentialStatusIssuanceState(
             leaseId = "private-lease",
@@ -37,6 +39,7 @@ class PublicIssuanceSessionTest {
             val public = session.toPublicJson().toString()
             assertFalse(public.contains("private-"))
             assertFalse(public.contains("credentialStatusIssuance"))
+            assertFalse(public.contains("mdlBirthYear"))
         }
         assertTrue((0 until singleIssuanceSessionDescriptor.elementsCount).none {
             singleIssuanceSessionDescriptor.getElementName(it) == "credentialStatusIssuance"
@@ -129,7 +132,7 @@ class PublicIssuanceSessionTest {
             }) + mapOf(
                 "issuanceResults" to buildJsonObject { put("configuration", publicResult) },
                 "issuanceRequests" to JsonArray(internal.getValue("issuanceRequests").jsonArray.map {
-                    JsonObject(it.jsonObject + ("issuerKey" to redactedIssuerKey))
+                    JsonObject(it.jsonObject - "mdlBirthYear" + ("issuerKey" to redactedIssuerKey))
                 }),
             ))
             assertEquals(batch, IssuanceSessionStorageCodec.decode(internal.toString()))

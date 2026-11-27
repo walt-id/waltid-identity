@@ -26,8 +26,9 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.metadata.issuer.CredentialDisplayLogo
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
-import id.walt.openid4vci.mdoc.MsoData
-import id.walt.openid4vci.mdoc.MsoValidityResolver
+import id.walt.credentials.issuance.MsoDataMapping
+import id.walt.mdoc.issuance.MsoData
+import id.walt.mdoc.issuance.MsoValidUntilSource
 import id.walt.credentials.issuance.InstantClock
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -82,6 +83,24 @@ class MdocCredentialValidityTest {
         val explicit = fixture.issue("2026-09-08T19:18:17Z", from, until)
         assertEquals(from, explicit.validFrom)
         assertEquals(until, explicit.validUntil)
+    }
+
+    @Test
+    fun `accepts signed at the leaf certificate boundaries and rejects signing outside them`() = runTest {
+        val notBefore = "2026-09-08T12:00:00Z"
+        val notAfter = "2026-09-09T00:00:00Z"
+        val fixture = fixture(notBefore, notAfter)
+        assertEquals(Instant.parse(notBefore), fixture.issue(notBefore).signed)
+        assertEquals(Instant.parse(notAfter), fixture.issue(notAfter).signed)
+
+        val tooEarly = assertFailsWith<IllegalArgumentException> {
+            fixture.issueResult(now = "2026-09-08T11:59:59Z", roundValidityToTwelveHours = false)
+        }
+        assertTrue(tooEarly.message.orEmpty().contains("notBefore"))
+        val tooLate = assertFailsWith<IllegalArgumentException> {
+            fixture.issueResult(now = "2026-09-09T12:00:00Z")
+        }
+        assertTrue(tooLate.message.orEmpty().contains("notAfter"))
     }
 
     @Test
@@ -226,7 +245,7 @@ class MdocCredentialValidityTest {
     fun `namespace date functions use unrounded issuedAt when MSO rounding is enabled`() = runTest {
         val now = Instant.parse("2026-09-08T19:18:10Z")
         val namespace = "org.iso.18013.5.1"
-        val resolved = MsoValidityResolver.resolve(
+        val resolved = MsoDataMapping.resolve(
             MsoData(validFrom = "<timestamp-in:6h>"),
             signed = now,
             clock = InstantClock(now),
@@ -306,8 +325,8 @@ class MdocCredentialValidityTest {
     @Test
     fun `omitted msoData validUntil is rounded through the resolver provenance`() = runTest {
         val now = Instant.parse("2026-09-08T19:18:10Z")
-        val resolved = id.walt.openid4vci.mdoc.MsoValidityResolver.resolve(null, signed = now)
-        assertEquals(id.walt.openid4vci.mdoc.MsoValidUntilSource.DEFAULT, resolved.validUntilSource)
+        val resolved = MsoDataMapping.resolve(null, signed = now)
+        assertEquals(MsoValidUntilSource.DEFAULT, resolved.validUntilSource)
         assertNull(resolved.validUntil)
         val validity = fixture().issue(
             time = now.toString(),
@@ -346,7 +365,10 @@ class MdocCredentialValidityTest {
         )
     }
 
-    private suspend fun fixture(notBefore: String = "2026-01-01T00:00:00Z"): Fixture {
+    private suspend fun fixture(
+        notBefore: String = "2026-01-01T00:00:00Z",
+        notAfter: String = "2028-01-01T00:00:00Z",
+    ): Fixture {
         val runtime = CryptoRuntime(defaultSoftwareKeyProviders())
         suspend fun key(id: String) = runtime.generateSoftwareKey(
             GenerateSoftwareKeyRequest(KeyId(id), KeySpec.Ec(EcCurve.P256), setOf(KeyUsage.SIGN, KeyUsage.VERIFY))
@@ -356,7 +378,7 @@ class MdocCredentialValidityTest {
             issuer, SignatureAlgorithm.Ecdsa(DigestAlgorithm.SHA_256, EcdsaSignatureEncoding.DER),
         ) {
             subjectDn = "CN=mdoc validity test"
-            validity = X509Certificate.Validity(Instant.parse(notBefore), Instant.parse("2028-01-01T00:00:00Z"))
+            validity = X509Certificate.Validity(Instant.parse(notBefore), Instant.parse(notAfter))
         }
         return Fixture(issuer, listOf(key("holder-1"), key("holder-2")), certificate)
     }

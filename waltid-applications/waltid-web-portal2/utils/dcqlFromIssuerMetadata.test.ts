@@ -159,7 +159,7 @@ test("PID defaults to family name, given name, and birth date", () => {
   );
 });
 
-test("non-PID credentials still default to every advertised claim", () => {
+test("mDL exact age can be selected but is omitted from default requests", () => {
   const configuration = {
     format: "mso_mdoc",
     doctype: "org.iso.18013.5.1.mDL",
@@ -167,6 +167,7 @@ test("non-PID credentials still default to every advertised claim", () => {
       claims: [
         { path: ["org.iso.18013.5.1", "family_name"] },
         { path: ["org.iso.18013.5.1", "portrait"] },
+        { path: ["org.iso.18013.5.1", "age_in_years"] },
       ],
     },
   };
@@ -175,6 +176,9 @@ test("non-PID credentials still default to every advertised claim", () => {
     "org.iso.18013.5.1.family_name",
     "org.iso.18013.5.1.portrait",
   ]);
+  assert.ok(claimsFromIssuerMetadata(configuration).some(
+    (claim) => claim.id === "org.iso.18013.5.1.age_in_years",
+  ));
 });
 
 const pidPaths = [

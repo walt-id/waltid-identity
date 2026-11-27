@@ -1,5 +1,6 @@
 package id.walt.issuer2.models
 
+import id.walt.issuer2.domain.IssuanceRequest
 import id.walt.issuer2.domain.IssuanceResult
 import id.walt.openid4vci.requests.notification.NotificationEvent
 import id.walt.issuer2.domain.IssuanceSession
@@ -7,6 +8,7 @@ import id.walt.issuer2.domain.CredentialStatusConfiguration
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.listSerialDescriptor
 import kotlinx.serialization.descriptors.mapSerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.builtins.serializer
@@ -31,6 +33,17 @@ private val publicIssuanceResultDescriptor: SerialDescriptor =
         element("walletNotificationEventDescription", String.serializer().nullable.descriptor, isOptional = true)
     }
 
+private val publicIssuanceRequestDescriptor: SerialDescriptor =
+    buildClassSerialDescriptor("id.walt.issuer2.models.PublicIssuanceRequest") {
+        val request = IssuanceRequest.serializer().descriptor
+        for (index in 0 until request.elementsCount) {
+            val name = request.getElementName(index)
+            if (name != "mdlBirthYear") element(
+                name, request.getElementDescriptor(index), isOptional = request.isElementOptional(index),
+            )
+        }
+    }
+
 val multiIssuanceSessionDescriptor: SerialDescriptor =
     buildClassSerialDescriptor("id.walt.issuer2.models.MultiIssuanceSession") {
         val session = IssuanceSession.serializer().descriptor
@@ -38,7 +51,11 @@ val multiIssuanceSessionDescriptor: SerialDescriptor =
             val name = session.getElementName(index)
             if (name !in setOf("deferredState", "issuanceClaimId", "credentialStatusIssuance")) element(
                 name,
-                if (name == "issuanceResults") mapSerialDescriptor(String.serializer().descriptor, publicIssuanceResultDescriptor) else session.getElementDescriptor(index),
+                when (name) {
+                    "issuanceRequests" -> listSerialDescriptor(publicIssuanceRequestDescriptor)
+                    "issuanceResults" -> mapSerialDescriptor(String.serializer().descriptor, publicIssuanceResultDescriptor)
+                    else -> session.getElementDescriptor(index)
+                },
                 isOptional = session.isElementOptional(index),
             )
         }
@@ -53,7 +70,7 @@ val singleIssuanceSessionDescriptor: SerialDescriptor =
             if (name !in setOf("issuanceRequests", "issuanceResults", "authorizedCredentialIdentifiers", "deferredState", "issuanceClaimId", "credentialStatusIssuance"))
                 element(name, session.getElementDescriptor(index), isOptional = session.isElementOptional(index))
         }
-        val request = id.walt.issuer2.domain.IssuanceRequest.serializer().descriptor
+        val request = publicIssuanceRequestDescriptor
         for (index in 0 until request.elementsCount) {
             val name = request.getElementName(index)
             if (name != "credentialIdentifier") element(
@@ -92,10 +109,10 @@ fun IssuanceSession.toPublicJson(json: Json = Json): JsonObject {
         add("credentialStatusIssuance")
         if (deferredStatus == null) add("deferredStatus")
     })
-    fun publicRequest(request: id.walt.issuer2.domain.IssuanceRequest): JsonObject {
-        val value = json.encodeToJsonElement(request).jsonObject
-        return if (CredentialStatusConfiguration.isPreallocated(request.credentialStatus))
-            JsonObject(value - "credentialStatus") else value
+    fun publicRequest(request: IssuanceRequest): JsonObject {
+        val fields = json.encodeToJsonElement(request).jsonObject - "mdlBirthYear"
+        return JsonObject(if (CredentialStatusConfiguration.isPreallocated(request.credentialStatus))
+            fields - "credentialStatus" else fields)
     }
     if (publicRequests.size != 1) {
         val publicSession = JsonObject(encoded + ("issuanceRequests" to JsonArray(publicRequests.map(::publicRequest))))

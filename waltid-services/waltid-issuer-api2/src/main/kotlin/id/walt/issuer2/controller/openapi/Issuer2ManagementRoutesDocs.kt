@@ -110,12 +110,21 @@ object Issuer2ManagementRoutesDocs {
 
             - Put namespace data functions such as `<date>`, `<date-in:365d>`, and `<date-before:30d>` in `mapping`.
               Put MSO validity functions in `msoData`. Offer creation returns HTTP 400 for top-level validity fields in `mapping`.
+            - The mDL `age_in_years` claim is optional. Supply it as a nonnegative integer in the profile or
+              runtime overrides. The issuer checks it against the final `birth_date` and the UTC date of MSO
+              `validFrom` before signing. Offers with fixed values are also checked at creation.
+              Leave `msoData.validFrom` unset in the profile and offer to start validity at the MSO signing timestamp.
+            - Issuer2 updates an inherited `age_birth_year` from the final `birth_date` before signing.
+              A conflicting explicit year returns HTTP 400 if the conflict is known at offer creation.
+              Issuer2 also checks the year when `age_in_years` is omitted.
             - Non-empty `runtimeOverrides.msoData` is accepted only for `mso_mdoc`. Blank validity values are rejected.
               Null `expectedUpdate` clears the profile value; null `validFrom` or `validUntil` inherits it.
-            - Validity must satisfy `signed <= validFrom < validUntil`. `expectedUpdate` is optional;
+            - Data functions use the wallet's claim time. Validity must satisfy `signed <= validFrom < validUntil`
+              using the timestamps recorded in the MSO. `expectedUpdate` is optional;
               this issuer does not require it to fall within that window.
-            - Without a configured `validUntil`, the default is 365 days, rounded to a 12-hour UTC bucket
-              when rounding is enabled. Explicit `validUntil` timestamps and resolved data functions are not rounded.
+            - Issuer2 rounds generated `msoData` timestamps and the default 365-day expiry down to 12-hour UTC
+              boundaries. A generated `validFrom` in the signing window starts at the recorded signing time
+              if the signer certificate became valid partway through that window. Literal dates retain second precision.
 
             See [MSO validity configuration](https://docs.walt.id/community-stack/issuer2/configurations/config-files/issuer-profiles#mso-validity-msodata).
 
