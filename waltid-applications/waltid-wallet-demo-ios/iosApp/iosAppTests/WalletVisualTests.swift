@@ -65,7 +65,7 @@ final class WalletVisualTests: XCTestCase {
         let queued = PendingCredentialStatusNotice(credentialID: other.id, version: "suspended-v1",
             kind: .suspended, checkedAt: checkedAt.addingTimeInterval(23), historical: false)
         let model = makeModel()
-        model.credentials = [credential, other]
+        model.credentials = [credential, other].map(CredentialSummary.init)
         model.isReady = true
         model.statusMessage = "Wallet operation completed"
         let cards = await CredentialDisplayNormalizer.cards(for: model.credentials)
