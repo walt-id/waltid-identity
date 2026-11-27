@@ -181,6 +181,59 @@ test("mDL exact age can be selected but is omitted from default requests", () =>
   ));
 });
 
+const pidPaths = [
+  ["family_name"], ["given_name"], ["birthdate"], ["address", "locality"], ["place_of_birth", "country"],
+];
+const legacyPidPaths = [
+  ["family_name"], ["given_name"], ["birth_date"], ["resident_city"], ["birth_place", "country"],
+];
+
+for (const { label, vct, paths, birthId } of [
+  { label: "current metadata", vct: "urn:eudi:pid:1", paths: pidPaths, birthId: "birthdate" },
+  {
+    label: "legacy claim names",
+    vct: "urn:eudi:pid:1",
+    paths: legacyPidPaths,
+    birthId: "birth_date",
+  },
+  {
+    label: "the legacy demo VCT",
+    vct: "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1",
+    paths: legacyPidPaths,
+    birthId: "birth_date",
+  },
+]) {
+  test(`SD-JWT PID uses rulebook paths with ${label}`, () => {
+    const configuration = {
+      format: "dc+sd-jwt",
+      vct,
+      credential_metadata: { claims: paths.map((path) => ({ path })) },
+    };
+    assert.deepEqual(defaultSelectedClaimIds(configuration, "pid-sd-jwt"), ["family_name", "given_name", birthId]);
+    const query = dcqlFromIssuerMetadata("pid-sd-jwt", configuration, claimsFromIssuerMetadata(configuration));
+    assert.deepEqual(query.meta, { vct_values: [vct] });
+    assert.deepEqual(query.claims.map((claim) => claim.path), pidPaths);
+  });
+}
+
+test("custom SD-JWT VCTs retain their advertised paths and defaults", () => {
+  const paths = [["birth_date"], ["resident_city"]];
+  for (const [id, vct] of [
+    ["custom-pid", "urn:eudi:pid:10"],
+    ["urn:eudi:pid:1", "urn:eudi:pid:10"],
+    ["custom-pid", "https://issuer.example/openid4vci/urn:eudi:pid:1"],
+  ] as const) {
+    const configuration = {
+      format: "dc+sd-jwt",
+      vct,
+      credential_metadata: { claims: paths.map((path) => ({ path })) },
+    };
+    const query = dcqlFromIssuerMetadata(id, configuration, claimsFromIssuerMetadata(configuration));
+    assert.deepEqual(query.claims.map((claim) => claim.path), paths, vct);
+    assert.deepEqual(defaultSelectedClaimIds(configuration, id), ["birth_date", "resident_city"], vct);
+  }
+});
+
 test("sanitizes credential query ids to OpenID4VP identifier characters", () => {
   assert.equal(dcqlCredentialQueryId("urn:eudi:pid:1"), "urn-eudi-pid-1");
   assert.equal(
