@@ -131,14 +131,7 @@ internal suspend fun HttpClient.requestCredentialResponse(
         dpop?.nonce = response.headers[DPOP_NONCE_HEADER] ?: dpopNonce
         if (response.status.isSuccess()) {
             onStage(CredentialIssuanceStage.RESPONSE)
-            val credentialResponse = prepared.responseDecryptionKey?.let { responseKey ->
-                require(response.contentType().isApplicationJwt()) {
-                    "Encrypted credential response must use application/jwt"
-                }
-                endpointJson.decodeFromString<CredentialResponse>(
-                    CredentialEncryption.decryptResponse(response.bodyAsText(), responseKey),
-                )
-            } ?: response.body<CredentialResponse>()
+            val credentialResponse = response.readCredentialResponse(prepared.responseDecryptionKey)
             return credentialResponse.validateCredentialResponse(response.status.value, expectedTransactionId)
         }
 
@@ -178,6 +171,12 @@ internal suspend fun HttpClient.requestCredentialResponse(
         )
     }
     error("DPoP nonce retry exhausted for the credential endpoint")
+}
+
+internal suspend fun HttpResponse.readCredentialResponse(decryptionKey: Crypto2Key?): CredentialResponse {
+    if (decryptionKey == null) return body()
+    require(contentType().isApplicationJwt()) { "Encrypted credential response must use application/jwt" }
+    return endpointJson.decodeFromString(CredentialEncryption.decryptResponse(bodyAsText(), decryptionKey))
 }
 
 internal suspend fun requestProofNonce(

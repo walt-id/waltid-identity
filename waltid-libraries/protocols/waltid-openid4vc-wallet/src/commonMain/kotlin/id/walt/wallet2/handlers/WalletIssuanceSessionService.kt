@@ -15,7 +15,6 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.requests.notification.NotificationEvent
-import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.*
 import id.walt.wallet2.issuance.CredentialReceiptTrustException
 import id.walt.wallet2.issuance.receiptOrigin
@@ -31,13 +30,8 @@ import id.waltid.openid4vci.wallet.authorization.AuthorizationResponseParser
 import id.waltid.openid4vci.wallet.authorization.PushedAuthorizationRequestExecutor
 import id.waltid.openid4vci.wallet.credential.CredentialEncryption
 import id.waltid.openid4vci.wallet.credential.CredentialRequestBuilder
-import id.waltid.openid4vci.wallet.credential.acceptCredentialResponse
-import id.waltid.openid4vci.wallet.credential.isApplicationJwt
 import id.waltid.openid4vci.wallet.credential.validateCredentialResponse
-import id.waltid.openid4vci.wallet.dpop.DPOP_HEADER
-import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_ATTEMPTS
 import id.waltid.openid4vci.wallet.dpop.DPOP_NONCE_HEADER
-import id.waltid.openid4vci.wallet.dpop.USE_DPOP_NONCE
 import id.waltid.openid4vci.wallet.metadata.CredentialIssuerMetadataTrustResolver
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.nonce.NonceRequestError
@@ -671,20 +665,16 @@ class WalletIssuanceSessionService(
                 } catch (error: Exception) {
                     throw IssuanceStageException(WalletIssuanceErrorCode.PROTOCOL, error)
                 }
-                val response = postProtected(
-                    endpoint = request.endpoint, accessToken = request.accessToken, tokenType = request.tokenType,
-                    dpop = request.dpop, keyMaterial = request.keyMaterial, dpopNonce = request.dpopNonce,
-                    body = preparedRequest.body, contentType = preparedRequest.contentType,
-                )
+                val response = httpClient.pollDeferredCredential(request, preparedRequest)
                 ensureContinuationOwned(record.persistedSnapshot)
                 val updatedRequest = request.copy(dpopNonce = response.dpopNonce)
                 record = record.copy(content = DeferredContent.Remote(updatedRequest))
                 stage = WalletIssuanceErrorCode.PROTOCOL
-                val legacyPending = response.response.status == HttpStatusCode.BadRequest && response.oauthError == "issuance_pending"
-                if (response.response.status == HttpStatusCode.Accepted || legacyPending) {
-                    val pendingBody = response.response.credentialResponse(preparedRequest.responseDecryptionKey, legacyPending)
+                val legacyPending = response.status == HttpStatusCode.BadRequest && response.oauthError == "issuance_pending"
+                if (response.status == HttpStatusCode.Accepted || legacyPending) {
+                    val pendingBody = response.readCredential(legacyPending)
                     val pending = if (legacyPending) pendingBody.validateLegacyDeferredPendingResponse(request.transactionId)
-                        else pendingBody.validateCredentialResponse(response.response.status.value, request.transactionId)
+                        else pendingBody.validateCredentialResponse(response.status.value, request.transactionId)
                     record = record.copy(
                         public = record.public.copy(intervalSeconds = pending.interval),
                         content = DeferredContent.Remote(updatedRequest.copy(
@@ -694,7 +684,7 @@ class WalletIssuanceSessionService(
                     retainDeferred(record)
                     return WalletIssuanceOutcome.Deferred(record.sessionId, emptyList(), listOf(WalletDeferredCredential(record.public)))
                 }
-                if (response.response.status != HttpStatusCode.OK) {
+                if (response.status != HttpStatusCode.OK) {
                     // An explicit terminal denial consumes the continuation; transient failures retain it.
                     val terminal = response.oauthError in setOf("invalid_transaction_id", "credential_request_denied", "invalid_token")
                     record = record.copy(claimed = false)
@@ -702,8 +692,8 @@ class WalletIssuanceSessionService(
                     return failed(record.sessionId, WalletIssuanceErrorCode.ISSUER_RESPONSE,
                         deferredCredentials = if (terminal) emptyList() else listOf(record.public))
                 }
-                val issued = response.response.credentialResponse(preparedRequest.responseDecryptionKey, legacyPending = false)
-                    .validateCredentialResponse(response.response.status.value, request.transactionId)
+                val issued = response.readCredential()
+                    .validateCredentialResponse(response.status.value, request.transactionId)
                 val credentials = requireNotNull(issued.credentials)
                 val configured = request.validation as? DeferredResponseValidation.Configured
                 // 1.1.0 stored one key for the whole returned array, without configuration/proof metadata.
@@ -1157,77 +1147,6 @@ class WalletIssuanceSessionService(
             else -> return false
         }
         return fields.all { field -> first[field] != null && first[field] == second[field] }
-    }
-
-    private suspend fun postProtected(
-        endpoint: String,
-        accessToken: String,
-        tokenType: String,
-        dpop: Set<String>?,
-        keyMaterial: WalletKeyStoreEntry,
-        dpopNonce: String?,
-        body: String,
-        contentType: ContentType = ContentType.Application.Json,
-    ): ProtectedResponse {
-        var nonce = dpopNonce
-        repeat(DPOP_NONCE_ATTEMPTS) { attempt ->
-            val proof = try {
-                dpop?.let { algorithms ->
-                    buildDpopProof(
-                        keyMaterial = keyMaterial,
-                        algorithms = algorithms,
-                        endpoint = endpoint,
-                        accessToken = accessToken,
-                        nonce = nonce,
-                    )
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                throw IssuanceStageException(WalletIssuanceErrorCode.CRYPTO, error)
-            }
-            val response = try {
-                httpClient.post(endpoint) {
-                    header(HttpHeaders.Authorization, "${authorizationScheme(tokenType)} $accessToken")
-                    proof?.let { header(DPOP_HEADER, it) }
-                    if (contentType.isApplicationJwt()) acceptCredentialResponse()
-                    contentType(contentType)
-                    setBody(body)
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                throw IssuanceStageException(WalletIssuanceErrorCode.NETWORK, error)
-            }
-            val oauthError = response.oauthErrorCode()
-            val suppliedNonce = response.headers[DPOP_NONCE_HEADER]
-            if (
-                attempt == 0 &&
-                proof != null &&
-                oauthError == USE_DPOP_NONCE &&
-                !suppliedNonce.isNullOrBlank()
-            ) {
-                nonce = suppliedNonce
-                return@repeat
-            }
-            return ProtectedResponse(response, suppliedNonce ?: nonce, oauthError)
-        }
-        error("DPoP nonce retry exhausted")
-    }
-
-    private suspend fun HttpResponse.credentialResponse(
-        responseDecryptionKey: Key?,
-        legacyPending: Boolean,
-    ): CredentialResponse {
-        if (responseDecryptionKey != null && !legacyPending && status.isSuccess()) {
-            require(contentType().isApplicationJwt()) {
-                "Encrypted deferred credential response must use application/jwt"
-            }
-            return json.decodeFromString(
-                CredentialEncryption.decryptResponse(bodyAsText(), responseDecryptionKey),
-            )
-        }
-        return body()
     }
 
     private suspend fun obtainAttestationJwt(active: ActiveSession): String? {
@@ -2051,12 +1970,6 @@ class WalletIssuanceSessionService(
         val notificationEndpoint: String? = null,
     )
 
-    private data class ProtectedResponse(
-        val response: HttpResponse,
-        val dpopNonce: String?,
-        val oauthError: String?,
-    )
-
     @Serializable
     internal sealed interface DeferredResponseValidation {
         @Serializable
@@ -2087,13 +2000,6 @@ class WalletIssuanceSessionService(
         val legacy = requireNotNull(legacyKey) { "Key '$keyId' has no usable public representation" }
         return legacy.getPublicKey().exportJWKObject()
     }
-
-    private class IssuanceStageException(
-        val code: WalletIssuanceErrorCode,
-        cause: Throwable? = null,
-        val failure: CredentialIssuanceFailure? = null,
-        val receiptFailure: CredentialReceiptTrustException? = null,
-    ) : Exception(code.name, cause)
 
     @Serializable
     internal enum class SessionState { AWAITING_ACCEPTANCE, AWAITING_CALLBACK, PROCESSING }
