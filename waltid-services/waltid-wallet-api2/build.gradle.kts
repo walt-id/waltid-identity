@@ -57,6 +57,8 @@ dependencies {
     implementation(project(":waltid-libraries:crypto:waltid-crypto2"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto2-migration-v1"))
     implementation(project(":waltid-libraries:crypto:waltid-jose"))
+    // clientIdTrust.trustRegistry
+    implementation(project(":waltid-libraries:credentials:waltid-trust-decision"))
 
     /* -- Tests -- */
     testImplementation(identityLibs.bundles.waltid.ktortesting)

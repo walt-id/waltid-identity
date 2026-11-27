@@ -4,6 +4,10 @@ package id.walt.openid4vp.clientidprefix
 
 import id.walt.certificate.x509.X509CertificateTrustStore
 import id.walt.certificate.x509.truststore.InMemoryTrustStore
+import id.walt.trust.decision.TrustDecisionEvaluator
+import id.walt.trust.decision.TrustPurpose
+import id.walt.trust.decision.TrustRequirement
+import id.walt.trust.model.TrustedEntityType
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import kotlinx.serialization.Serializable
 
@@ -28,16 +32,96 @@ data class RequestContext(
 
 data class ClientIdTrustConfiguration(
     /**
-     * Wallet-controlled X.509 trust store for `x509_hash` / `x509_san_dns` Request Objects.
-     * Null fails those prefixes closed. Callers typically wrap PEM pins and/or Trust Registry
-     * relying-party certificates in [InMemoryTrustStore].
+     * Wallet-controlled X.509 trust store for a `verifier_attestation` signed with `x5c`, and for
+     * `x509_hash` / `x509_san_dns` Request Objects while [x509TrustRegistry] is not set. Callers typically
+     * wrap PEM pins in [InMemoryTrustStore]. With neither this nor [x509TrustRegistry], the x509 prefixes
+     * fail closed.
      */
     val x509TrustAnchors: X509CertificateTrustStore? = null,
     val trustedVerifierAttestationIssuers: Set<String> = emptySet(),
     val preRegisteredClients: Map<String, ClientMetadata> = emptyMap(),
+    /**
+     * Decides `x509_hash` / `x509_san_dns` trust through a trust registry. When set, those prefixes ignore
+     * [x509TrustAnchors], so a registry denial never falls through to a pinned anchor. A
+     * `verifier_attestation` `x5c` chain is still checked only against [x509TrustAnchors].
+     */
+    val x509TrustRegistry: ClientIdX509TrustRegistry? = null,
 ) {
+    @Deprecated("Retained for binary compatibility", level = DeprecationLevel.HIDDEN)
+    constructor(
+        x509TrustAnchors: X509CertificateTrustStore? = null,
+        trustedVerifierAttestationIssuers: Set<String> = emptySet(),
+        preRegisteredClients: Map<String, ClientMetadata> = emptyMap(),
+    ) : this(x509TrustAnchors, trustedVerifierAttestationIssuers, preRegisteredClients, x509TrustRegistry = null)
+
+    @Deprecated("Retained for binary compatibility", level = DeprecationLevel.HIDDEN)
+    fun copy(
+        x509TrustAnchors: X509CertificateTrustStore? = this.x509TrustAnchors,
+        trustedVerifierAttestationIssuers: Set<String> = this.trustedVerifierAttestationIssuers,
+        preRegisteredClients: Map<String, ClientMetadata> = this.preRegisteredClients,
+    ): ClientIdTrustConfiguration =
+        ClientIdTrustConfiguration(x509TrustAnchors, trustedVerifierAttestationIssuers, preRegisteredClients, x509TrustRegistry)
+
     val x509TrustStore: X509CertificateTrustStore
         get() = x509TrustAnchors ?: InMemoryTrustStore()
+
+    /**
+     * Whether `x509_hash` / `x509_san_dns` have a trust source: [x509TrustRegistry], or [x509TrustAnchors] that are
+     * not an empty [InMemoryTrustStore]. Without one those prefixes fail closed and are not advertised.
+     */
+    val hasX509Trust: Boolean
+        get() = x509TrustRegistry != null || !x509TrustAnchors.isMissing()
+}
+
+/**
+ * Trust-registry decisions for `x509_hash` / `x509_san_dns` Request Objects.
+ *
+ * The wallet still checks the leaf certificate profile, the request signature and the binding of the
+ * certificate to the client id itself. Only then it asks [evaluator] whether the whole `x5c` chain is
+ * trusted for [TrustPurpose.WALLET_PRESENTATION_AUTH_REQUEST], under [TrustRequirement.RegistryFresh]:
+ * `TRUSTED` for one of [expectedEntityTypes], from an accepted, `FRESH` source.
+ *
+ * @property evaluator owns the path validation. The wallet orders `x5c` only by issuer and subject names
+ *   and, where present, key identifiers; the one signature it verifies is the request's, against the leaf key.
+ *   Before answering `TRUSTED`, an evaluator must cryptographically validate the path from the leaf (the first
+ *   `x5c` certificate) to a certificate listed in an accepted source, and report that listing as the matched
+ *   entity. The wallet then checks its entity type, the source's freshness and its acceptance. The walt.id
+ *   Trust Registry's `resolve/certificate-chain` validates the path with PKIX.
+ * @property expectedEntityTypes the registry roles a verifier's chain may match. They come from the
+ *   wallet's configuration, never from the request. Copied at construction into a set that rejects changes,
+ *   so neither the caller nor another wallet can change them afterwards.
+ * @property requireAuthenticatedSource additionally require an `AUTHENTICATED` trust source.
+ */
+class ClientIdX509TrustRegistry(
+    val evaluator: TrustDecisionEvaluator,
+    expectedEntityTypes: Set<TrustedEntityType> = RELYING_PARTY_ENTITY_TYPES,
+    val requireAuthenticatedSource: Boolean = false,
+) {
+    val expectedEntityTypes: Set<TrustedEntityType> = expectedEntityTypes.toReadOnlySet()
+
+    init {
+        require(this.expectedEntityTypes.isNotEmpty()) { "expectedEntityTypes must name at least one entity type" }
+    }
+
+    override fun toString(): String =
+        "ClientIdX509TrustRegistry(expectedEntityTypes=$expectedEntityTypes, requireAuthenticatedSource=$requireAuthenticatedSource)"
+
+    companion object {
+        /** A relying party listed itself, or by the provider of its access certificate. Rejects changes. */
+        val RELYING_PARTY_ENTITY_TYPES: Set<TrustedEntityType> = setOf(
+            TrustedEntityType.RELYING_PARTY_PROVIDER,
+            TrustedEntityType.ACCESS_CERTIFICATE_PROVIDER,
+        ).toReadOnlySet()
+    }
+}
+
+/**
+ * A copy that rejects changes, also through `java.util.Set` from Java: [buildSet] returns a read-only
+ * implementation that throws on any change, while [setOf] and [toSet] return a `LinkedHashSet` that a cast can change.
+ */
+private fun Set<TrustedEntityType>.toReadOnlySet(): Set<TrustedEntityType> {
+    val source = this
+    return buildSet { addAll(source) }
 }
 
 internal fun X509CertificateTrustStore?.isMissing(): Boolean =
@@ -83,6 +167,10 @@ sealed class ClientIdError(val message: String) {
     data object X509HashMismatch :
         ClientIdError("The client_id hash does not match the hash of the provided certificate.")
 
+    /**
+     * The wallet has no X.509 trust anchors for the check: for `x509_hash` / `x509_san_dns` that means no trust
+     * registry either, for a `verifier_attestation` `x5c` chain no anchors.
+     */
     @Serializable
     data object MissingX509TrustAnchors : ClientIdError("No X.509 trust anchors are configured.")
 
@@ -93,6 +181,23 @@ sealed class ClientIdError(val message: String) {
     @Serializable
     data object X509TrustAnchorMismatch :
         ClientIdError("The certificate chain does not reach a configured X.509 trust anchor.")
+
+    /**
+     * The trust registry answered, but its decision does not meet
+     * [id.walt.trust.decision.TrustRequirement.RegistryFresh]: [reason] says why, e.g. the decision code, the matched
+     * entity type, or the source's freshness or authenticity.
+     */
+    @Serializable
+    data class X509TrustRegistryRejected(val reason: String) :
+        ClientIdError("The trust registry did not trust the certificate chain: $reason")
+
+    /**
+     * The trust registry could not be asked or did not answer ([id.walt.trust.model.TrustDecisionCode.UNKNOWN]).
+     * Distinct from [X509TrustRegistryRejected], which is a denial.
+     */
+    @Serializable
+    data object X509TrustSourceUnavailable :
+        ClientIdError("The X.509 trust source is unavailable.")
 
     /**
      * The `redirect_uri`'s FQDN did not match an `x509_san_dns` Client Identifier.
