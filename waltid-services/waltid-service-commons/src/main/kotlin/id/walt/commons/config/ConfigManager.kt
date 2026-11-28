@@ -36,12 +36,23 @@ object ConfigManager {
         customDecoders.add(decoder)
     }
 
+    private val configLoaderCustomizations = mutableMapOf<KClass<out WaltConfig>, ConfigLoaderBuilder.() -> Unit>()
+
+    /**
+     * Customize only loaders for [type], before configuration sources are merged and decoded.
+     * Registering again for the same type replaces its previous customization.
+     */
+    fun customizeConfigLoader(type: KClass<out WaltConfig>, configure: ConfigLoaderBuilder.() -> Unit) {
+        configLoaderCustomizations[type] = configure
+    }
+
     fun preclear() {
         registeredConfigurations.clear()
         loadedConfigurations.clear()
         preloadedConfigurations.clear()
         configLoaders.clear()
         customDecoders.clear()
+        configLoaderCustomizations.clear()
     }
 
     fun preloadAndRegisterConfig(id: String, config: WaltConfig) {
@@ -83,6 +94,7 @@ object ConfigManager {
                     // Add any custom decoders registered by services
                     customDecoders.forEach { addDecoder(it) }
                 }
+                .apply { configLoaderCustomizations[type]?.invoke(this) }
                 .addCommandLineSource(args)
                 .addEnvironmentSource(allowUppercaseNames = false)
                 // Check for system property config.file.<id> first, then fall back to default path
