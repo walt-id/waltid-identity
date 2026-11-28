@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap
 object PasswordHashing {
     private const val BCRYPT_MAX_BYTES = 72L
     private const val CONFIGURED_PEPPER_TAG = "p1:"
+    private const val DECOY_LENGTH = 32
 
     private val versionedPasswordStore: VersionedPasswordPepperStore?
         get() = if (KtorAuthnzManager.isAccountStoreConfigured) {
@@ -26,7 +27,7 @@ object PasswordHashing {
     private fun hash(password: String, algorithm: PasswordHashingAlgorithm): PasswordHash {
         val store = versionedPasswordStore
         require(store == null || algorithm != PasswordHashingAlgorithm.NONE) { "A password hash algorithm is required" }
-        val pepper = if (store?.writeUnmarkedPasswords == true) store.unmarkedPasswordPepper else config.pepper
+        val pepper = writePepper(store)
         require(!algorithm.needsSeparateSalt) {
             "$algorithm cannot store its salt in the password record. Choose ARGON2, BCRYPT, SCRYPT or PBKDF2_COMPRESSED."
         }
@@ -41,6 +42,10 @@ object PasswordHashing {
         val tag = if (store != null && pepper != store.unmarkedPasswordPepper) CONFIGURED_PEPPER_TAG else ""
         return PasswordHash(tag + encoded, algorithm)
     }
+
+    /** The pepper [hash] adds to new hashes. */
+    private fun writePepper(store: VersionedPasswordPepperStore? = versionedPasswordStore): String =
+        if (store?.writeUnmarkedPasswords == true) store.unmarkedPasswordPepper else config.pepper
 
     private val PasswordHashingAlgorithm.needsSeparateSalt: Boolean
         get() = this == PasswordHashingAlgorithm.PBKDF2 || this == PasswordHashingAlgorithm.MESSAGE_DIGEST ||
@@ -109,20 +114,31 @@ object PasswordHashing {
         return CheckResult(true, true, updated)
     }
 
-    private val decoyHashes = ConcurrentHashMap<PasswordHashingAlgorithm, PasswordHash>()
+    private val decoyHashes = ConcurrentHashMap<Pair<PasswordHashingAlgorithm, String>, PasswordHash>()
 
     /**
      * Checks [passwordToCheck] against a decoy hash of the configured algorithm, for a login name without a stored
      * password: it takes about as long as checking a real one, so the response time does not tell whether the account
      * exists. The result is always invalid.
+     *
+     * Returns whether a decoy was checked: not when no hash can be made with the configuration at all, e.g. a bcrypt
+     * pepper of 72 bytes or more, with which no password can be stored either.
      */
-    fun checkWithoutStoredHash(passwordToCheck: String) {
+    fun checkWithoutStoredHash(passwordToCheck: String): Boolean {
         val algorithm = config.selectedPwHashAlgorithm
-        val decoy = decoyHashes.getOrPut(algorithm) {
-            val secret = ByteArray(16).also(SecureRandom()::nextBytes).toHexString()
-            runCatching { hash(secret, algorithm) }.getOrNull() ?: return
-        }
+        val pepper = writePepper()
+        val key = algorithm to pepper
+        val decoy = decoyHashes[key] ?: newDecoy(algorithm, pepper)?.also { decoyHashes[key] = it } ?: return false
         runCatching { check(passwordToCheck, decoy, allowUpgrade = false) }
+        return true
+    }
+
+    private fun newDecoy(algorithm: PasswordHashingAlgorithm, pepper: String): PasswordHash? {
+        val length = if (algorithm == PasswordHashingAlgorithm.BCRYPT) {
+            (BCRYPT_MAX_BYTES - pepper.encodeToByteArray().size).toInt().coerceIn(1, DECOY_LENGTH)
+        } else DECOY_LENGTH
+        val secret = ByteArray(DECOY_LENGTH / 2).also(SecureRandom()::nextBytes).toHexString().take(length)
+        return runCatching { hash(secret, algorithm) }.getOrNull()
     }
 
     fun fitsBcrypt(password: String, pepper: String): Boolean =

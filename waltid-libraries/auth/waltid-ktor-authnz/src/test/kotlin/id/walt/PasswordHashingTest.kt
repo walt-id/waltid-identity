@@ -121,4 +121,27 @@ class PasswordHashingTest {
         val historical = PasswordHash(Password.hash(limit + "suffix").addPepper(config.pepper).withBcrypt().result, BCRYPT)
         assertEquals(PasswordHashing.CheckResult(true, false), PasswordHashing.check(limit, historical))
     }
+
+    @Test
+    fun `unknown-account checks hash with bcrypt even next to a long pepper`() {
+        config.selectedPwHashAlgorithm = BCRYPT
+        listOf(48, 71).forEach { bytes ->
+            KtorAuthnzManager.passwordHashingConfig = config.copy(pepper = "p".repeat(bytes)).also { it.selectedPwHashAlgorithm = BCRYPT }
+            val stored = PasswordHashing.hash("x")
+            PasswordHashing.check("wrong", stored) // warm up
+
+            // The first call makes and caches the decoy - itself a hash as slow as a check - so only a later call shows
+            // that the cached decoy is really checked.
+            assertTrue(PasswordHashing.checkWithoutStoredHash("wrong"), "no decoy next to a $bytes-byte pepper")
+
+            val real = kotlin.time.measureTime { PasswordHashing.check("wrong", stored) }
+            val decoy = kotlin.time.measureTime { PasswordHashing.checkWithoutStoredHash("wrong") }
+            assertTrue(decoy > real / 10, "cached decoy check took $decoy, a real one $real ($bytes-byte pepper)")
+        }
+
+        // With 72 bytes of pepper no bcrypt hash can be made at all - neither a password's nor a decoy.
+        KtorAuthnzManager.passwordHashingConfig = config.copy(pepper = "p".repeat(72)).also { it.selectedPwHashAlgorithm = BCRYPT }
+        assertFails { PasswordHashing.hash("x") }
+        assertFalse(PasswordHashing.checkWithoutStoredHash("wrong"))
+    }
 }
