@@ -113,7 +113,13 @@ abstract class UserPassBasedAuthMethod(
     internal suspend inline fun <reified T : PasswordStoredData> verifyStoredPassword(
         identifier: AccountIdentifier, password: String
     ): AccountIdentifier {
-        val stored = lookupAccountIdentifierStoredData<T>(identifier)
+        // An unknown login name fails like a wrong password - same answer, about the same time - so that logins do
+        // not reveal which names have an account.
+        val stored = KtorAuthnzManager.accountStore.lookupStoredDataForAccountIdentifier(identifier, this) as? T
+        if (stored == null) {
+            PasswordHashing.checkWithoutStoredHash(password)
+            throw InvalidCredentialsException()
+        }
         val hash = PasswordHash.fromString(checkNotNull(stored.passwordHash) { "Missing password hash" })
         val store = KtorAuthnzManager.accountStore as? PasswordHashUpgradeStore
         val result = PasswordHashing.check(password, hash, allowUpgrade = store != null)
