@@ -27,6 +27,10 @@ import kotlin.reflect.KParameter
 import kotlin.reflect.full.primaryConstructor
 
 fun registerIssuer2ConfigDecoders() {
+    ConfigManager.customizeConfigLoader(Issuer2MetadataConfig::class) {
+        addParser("conf", Issuer2MetadataHoconParser())
+        addDecoder(Issuer2MetadataJsonDecoder())
+    }
     // Decode through the primary constructor. Hoplite's reflective decoder can
     // otherwise choose the legacy constructor and silently discard newer fields.
     ConfigManager.registerCustomDecoder(Issuer2ServiceConfigDecoder())
