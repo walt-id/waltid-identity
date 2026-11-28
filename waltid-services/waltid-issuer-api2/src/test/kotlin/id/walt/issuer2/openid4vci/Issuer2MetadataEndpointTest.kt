@@ -120,6 +120,35 @@ class Issuer2MetadataEndpointTest {
     }
 
     @Test
+    fun claimPathIntegersBeyondInt64ArePublishedExactly() = testApplication {
+        val metadataConfig = Files.createTempFile(temporaryDirectory, "credential-issuer-metadata-", ".conf")
+        Files.writeString(
+            metadataConfig,
+            Files.readString(issuer2ConfigDir().resolve("credential-issuer-metadata.conf")) + """
+                |credentialConfigurations.sca_payment_card_mso_mdoc.credential_metadata.claims += {
+                |  path = ["eu.europa.ec.eudi.sca.payment_card.1", "limits", 10000000000000000001]
+                |}
+                |credentialConfigurations.sca_payment_card_mso_mdoc.credential_metadata.claims += {
+                |  path = ["eu.europa.ec.eudi.sca.payment_card.1", "limits", "10000000000000000001"]
+                |}
+                |""".trimMargin(),
+        )
+        installIssuer2WithConfigFiles(metadataConfigFile = metadataConfig)
+
+        val response = apiClient().get("/.well-known/openid-credential-issuer/openid4vci")
+        assertEquals(HttpStatusCode.OK, response.status)
+        val paths = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            .getValue("credential_configurations_supported").jsonObject
+            .getValue("sca_payment_card_mso_mdoc").jsonObject
+            .getValue("credential_metadata").jsonObject
+            .getValue("claims").jsonArray
+            .map { it.jsonObject.getValue("path").toString() }
+
+        assertTrue("""["eu.europa.ec.eudi.sca.payment_card.1","limits",10000000000000000001]""" in paths, paths.toString())
+        assertTrue("""["eu.europa.ec.eudi.sca.payment_card.1","limits","10000000000000000001"]""" in paths, paths.toString())
+    }
+
+    @Test
     fun unknownVctTypesReturnNotFoundThroughBothMetadataUrls() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
@@ -888,8 +917,9 @@ class Issuer2MetadataEndpointTest {
         signedMetadata: MetadataSigningMethod? = null,
         metadataSigningKeyResolver: MetadataSigningKeyReferenceResolver? = null,
         metadataSigningCertificateResolver: MetadataSigningCertificateReferenceResolver? = null,
+        metadataConfigFile: Path? = null,
     ) {
-        loadIssuer2ConfigFiles(signedMetadata)
+        loadIssuer2ConfigFiles(signedMetadata, metadataConfigFile)
         application {
             install(ServerContentNegotiation) {
                 json(json)
