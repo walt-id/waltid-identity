@@ -113,7 +113,7 @@ class AuthenticationBehaviourTest {
 
         assertEquals(HttpStatusCode.TooManyRequests, login().status, "locked even with the right password")
         assertEquals(HttpStatusCode.TooManyRequests, login(user = "ALICE1").status, "case does not escape the lock")
-        assertEquals(HttpStatusCode.NotFound, login(user = "bob").status, "other identifiers are not locked")
+        assertEquals(HttpStatusCode.Unauthorized, login(user = "bob").status, "other identifiers are not locked")
     }
 
     @Test

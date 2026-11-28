@@ -148,6 +148,33 @@ class AuthFlowRoutesTest {
     }
 
     @Test
+    fun `an unknown email fails like a wrong password`() = flowTest {
+        val wrongPassword = """{"email":"alice@example.com","password":"wrong"}"""
+        val unknownEmail = """{"email":"nobody@example.com","password":"wrong"}"""
+        listOf("/auth/email", "/auth/emailpass").forEach { path ->
+            val known = post(path, wrongPassword)
+            val unknown = post(path, unknownEmail)
+            assertEquals(HttpStatusCode.Unauthorized, known.status, known.bodyAsText())
+            assertEquals(known.status, unknown.status, path)
+            assertEquals(known.bodyAsText(), unknown.bodyAsText(), path)
+        }
+
+        // The same as a step of an explicitly started session.
+        val known = post("/auth/${post("/auth/start?flow=email").info().id}/email", wrongPassword)
+        val unknown = post("/auth/${post("/auth/start?flow=email").info().id}/email", unknownEmail)
+        assertEquals(HttpStatusCode.Unauthorized, unknown.status, unknown.bodyAsText())
+        assertEquals(known.bodyAsText(), unknown.bodyAsText())
+    }
+
+    @Test
+    fun `an unknown username fails like a wrong password`() = flowTest {
+        val known = post("/auth/userpass", """{"username":"alice1","password":"wrong"}""")
+        val unknown = post("/auth/userpass", """{"username":"nobody","password":"wrong"}""")
+        assertEquals(HttpStatusCode.Unauthorized, unknown.status, unknown.bodyAsText())
+        assertEquals(known.bodyAsText(), unknown.bodyAsText())
+    }
+
+    @Test
     fun `an explicitly started session names its flow`() = flowTest {
         assertEquals(HttpStatusCode.BadRequest, post("/auth/start").status, "several flows: which one?")
         val started = post("/auth/start?flow=userpass").info()

@@ -9,6 +9,8 @@ import com.password4j.ScryptFunction
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.KtorAuthnzManager.passwordHashingConfig as config
 import id.walt.ktorauthnz.accounts.VersionedPasswordPepperStore
+import java.security.SecureRandom
+import java.util.concurrent.ConcurrentHashMap
 
 object PasswordHashing {
     private const val BCRYPT_MAX_BYTES = 72L
@@ -105,6 +107,22 @@ object PasswordHashing {
         if (target == PasswordHashingAlgorithm.BCRYPT && !fitsBcrypt(passwordToCheck, config.pepper)) return CheckResult(true, false)
         val updated = hash(passwordToCheck, target)
         return CheckResult(true, true, updated)
+    }
+
+    private val decoyHashes = ConcurrentHashMap<PasswordHashingAlgorithm, PasswordHash>()
+
+    /**
+     * Checks [passwordToCheck] against a decoy hash of the configured algorithm, for a login name without a stored
+     * password: it takes about as long as checking a real one, so the response time does not tell whether the account
+     * exists. The result is always invalid.
+     */
+    fun checkWithoutStoredHash(passwordToCheck: String) {
+        val algorithm = config.selectedPwHashAlgorithm
+        val decoy = decoyHashes.getOrPut(algorithm) {
+            val secret = ByteArray(16).also(SecureRandom()::nextBytes).toHexString()
+            runCatching { hash(secret, algorithm) }.getOrNull() ?: return
+        }
+        runCatching { check(passwordToCheck, decoy, allowUpgrade = false) }
     }
 
     fun fitsBcrypt(password: String, pepper: String): Boolean =
