@@ -39,6 +39,7 @@ dependencies {
 
     implementation(identityLibs.hoplite.core)
     implementation(identityLibs.hoplite.hocon)
+    implementation(identityLibs.typesafe.config)
 
     implementation(identityLibs.oshai.kotlinlogging)
     implementation(identityLibs.slf4j.julbridge)

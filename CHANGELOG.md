@@ -1,5 +1,9 @@
 # Unreleased
 
+### Issuer 2 mdoc claim paths loaded from HOCON
+
+- In `credential-issuer-metadata.conf`, unquoted JSON integers beyond the 64-bit range now retain their exact numeric value in `mso_mdoc` claim paths after the namespace and data-element segments. Quoted values and oversized zero-padded tokens remain strings. Other configuration files and JSON-valued fields retain their existing parsing behaviour.
+
 ### Issuer 2 and Wallet 2 API responses
 
 - Issuer 2 profile and session responses now report the issuer signing key as `{"type":"redacted"}`. The generated OpenAPI profile examples use the same value.
